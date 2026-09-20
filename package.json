@@ -1,0 +1,11 @@
+{
+  "name": "omodos-worker",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "4.135.0"
+  }
+}
