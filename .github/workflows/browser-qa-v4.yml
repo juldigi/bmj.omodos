@@ -348,7 +348,8 @@ jobs:
                   severity:'Kritikal',
                   deskripsiTemuan:'Patrol lebih baru'
                 }];
-                const patrolNewer = machineLatestStatusSnapshot_('QA Status Machine');
+                const machineIdentity = { kode:'QA-STATUS-1', nama:'QA Status Machine' };
+                const patrolNewer = machineLatestStatusSnapshot_(machineIdentity);
 
                 ENTRIES = [{
                   'ID':'QA-LOG-2',
@@ -360,7 +361,7 @@ jobs:
                   'Status':'SELESAI',
                   'Deskripsi Masalah':'Logbook lebih baru'
                 }];
-                const logNewer = machineLatestStatusSnapshot_('QA Status Machine');
+                const logNewer = machineLatestStatusSnapshot_(machineIdentity);
                 return {
                   patrolNewer: {
                     source: patrolNewer?.source,
