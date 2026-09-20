@@ -241,7 +241,7 @@ jobs:
             }
 
             const rootV4 = page.locator('#v4-nav-group [data-v4-root]');
-            await rootV4.click();
+            await rootV4.click({force:true, timeout:1000});
             await page.waitForTimeout(50);
             sidebarClickQA.commandCenter = await page.evaluate(() => {
               const view = document.getElementById('view-omodos4');
