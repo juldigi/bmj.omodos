@@ -26,15 +26,29 @@ jobs:
           css='<link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="3">'
           js='<!-- OMODOS4_FRONTEND_SAFE_V3 --><script src="/omodos4/hotfix.js" defer></script>'
           if "OMODOS4_FRONTEND_SAFE_V2" in text: raise SystemExit("Unsafe V2 marker unexpectedly present")
-          if css not in text:
-              pos=text.lower().rfind("</head>")
-              if pos<0: raise SystemExit("Final </head> not found")
-              text=text[:pos]+css+"\n"+text[pos:]
-          if js not in text:
-              pos=text.lower().rfind("</body>")
-              if pos<0: raise SystemExit("Final </body> not found")
-              text=text[:pos]+js+"\n"+text[pos:]
+
+          # Normalize any prior misplaced V3 insertions before placing them at real document boundaries.
+          text=text.replace(css+"\n","").replace(css,"")
+          text=text.replace(js+"\n","").replace(js,"")
+
+          lower=text.lower()
+          head_close=lower.find("</head>")
+          body_open=lower.find("<body")
+          if head_close<0 or body_open<0 or head_close>body_open:
+              raise SystemExit("Real document head boundary not found before body")
+          text=text[:head_close]+css+"\n"+text[head_close:]
+
+          body_close=text.lower().rfind("</body>")
+          if body_close<0: raise SystemExit("Final </body> not found")
+          text=text[:body_close]+js+"\n"+text[body_close:]
+
+          if text.count(css)!=1: raise SystemExit("V3 stylesheet loader count must be 1")
           if text.count("OMODOS4_FRONTEND_SAFE_V3")!=1: raise SystemExit("Loader marker count must be 1")
+          css_pos=text.index(css)
+          first_head_close=text.lower().find("</head>")
+          first_body_open=text.lower().find("<body")
+          if not (css_pos < first_head_close < first_body_open):
+              raise SystemExit("Stylesheet loader must be inside the real document head")
           loader_pos=text.index(js)
           tail=text[loader_pos+len(js):].lower()
           if "<script" in tail: raise SystemExit("Loader must be the final script before </body>")
