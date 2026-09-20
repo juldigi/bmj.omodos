@@ -1,0 +1,95 @@
+name: Verify Production Login Handler
+
+on:
+  push:
+    branches:
+      - deploy/backend-login-restore
+    paths:
+      - ".github/workflows/verify-production-login-handler.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify login action with guaranteed-invalid credentials
+        shell: python
+        run: |
+          import json,urllib.request,urllib.error
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          url="https://omodos.offsetbmj.workers.dev/api"
+          payload={
+            "action":"login",
+            "username":"__omodos_qa_nonexistent_user__",
+            "password":"__omodos_qa_invalid_password__"
+          }
+          req=urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers={
+              "Content-Type":"text/plain;charset=utf-8",
+              "User-Agent":"OMODOS-Login-Handler-QA/1.0",
+              "Cache-Control":"no-cache"
+            }
+          )
+          try:
+            with urllib.request.urlopen(req,timeout=30) as r:
+              status=r.status
+              headers=r.headers
+              body=r.read()
+          except urllib.error.HTTPError as e:
+            status=e.code
+            headers=e.headers
+            body=e.read()
+
+          ct=(headers.get("Content-Type") or "").lower()
+          text=body.decode("utf-8",errors="replace").lstrip()
+          try:
+            data=json.loads(text)
+            valid_json=True
+          except Exception:
+            data={}
+            valid_json=False
+
+          if status==404:
+            raise SystemExit("Login action still returned HTTP 404")
+          if not valid_json:
+            raise SystemExit("Login action did not return valid JSON")
+          if data.get("ok") is True:
+            raise SystemExit("Safety failure: dummy credentials unexpectedly authenticated")
+
+          report=[
+            "# Production Login Handler Verification",
+            "",
+            f"- Verified UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Endpoint: /api",
+            f"- HTTP status: {status}",
+            f"- Content-Type: {ct}",
+            f"- Valid JSON: {'YES' if valid_json else 'NO'}",
+            f"- Dummy credentials authenticated: {'YES' if data.get('ok') is True else 'NO'}",
+            f"- Error field present: {'YES' if bool(data.get('error')) else 'NO'}",
+            "- HTTP 404: NO",
+            "- Login handler verdict: PASS"
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/PRODUCTION_LOGIN_HANDLER.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[LOGIN_HANDLER_QA] status="+str(status)+" valid_json="+str(valid_json)+" ok="+str(data.get("ok")))
+
+      - name: Commit sanitized verification report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/PRODUCTION_LOGIN_HANDLER.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "test: verify production login handler"
+          git push
