@@ -1,0 +1,117 @@
+name: Audit Current Active Worker Version
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/audit-current-active-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect actual active Worker version
+        shell: python
+        run: |
+          import os,json,base64,hashlib,urllib.request
+          from pathlib import Path
+
+          aid="3c0bf44ff86c9587390f09b6d0bc42dd"
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          worker="omodos"
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments")
+          result=dep.get("result")
+          rows=(result.get("deployments") or []) if isinstance(result,dict) else (result if isinstance(result,list) else [])
+          if not rows:
+            raise SystemExit("No deployments returned")
+          current=rows[0]
+          versions=current.get("versions") or []
+          active=[v for v in versions if float(v.get("percentage") or 0)>0]
+          if not active:
+            raise SystemExit("No active version in newest deployment")
+
+          out=["# Current Active OMODOS Worker Version",""]
+          out.append(f"- Deployment ID: {current.get('id')}")
+          out.append(f"- Created on: {current.get('created_on')}")
+          out.append(f"- Strategy: {current.get('strategy')}")
+          out.append(f"- Source: {current.get('source')}")
+          out.append("")
+          out.append("## Active versions")
+          out.append("")
+
+          for av in active:
+            vid=str(av.get("version_id") or "")
+            detail=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/{worker}/versions/{vid}?include=modules").get("result") or {}
+            bindings=detail.get("bindings") or []
+            safe=[]
+            if isinstance(bindings,list):
+              for b in bindings:
+                if isinstance(b,dict):
+                  safe.append({
+                    k:b.get(k) for k in ("name","type","class_name","namespace_id")
+                    if b.get(k) is not None
+                  })
+            elif isinstance(bindings,dict):
+              for name,b in bindings.items():
+                item={"name":name}
+                if isinstance(b,dict):
+                  for k in ("type","class_name","namespace_id"):
+                    if b.get(k) is not None:item[k]=b.get(k)
+                safe.append(item)
+
+            mods=detail.get("modules") or []
+            mod_rows=[]
+            for m in mods:
+              if not isinstance(m,dict):continue
+              raw=b""
+              if m.get("content_base64"):
+                raw=base64.b64decode(m["content_base64"])
+              mod_rows.append({
+                "name":m.get("name"),
+                "bytes":len(raw),
+                "sha256":hashlib.sha256(raw).hexdigest() if raw else ""
+              })
+
+            assets=detail.get("assets") or {}
+            config=assets.get("config") if isinstance(assets,dict) else None
+
+            out.append(f"- Version ID: {vid}")
+            out.append(f"  - Percentage: {av.get('percentage')}")
+            out.append(f"  - Number: {detail.get('number')}")
+            out.append(f"  - Created: {detail.get('created_on')}")
+            out.append(f"  - Compatibility date: {detail.get('compatibility_date')}")
+            out.append(f"  - Main module: {detail.get('main_module')}")
+            out.append(f"  - Bindings: {json.dumps(safe,sort_keys=True)}")
+            out.append(f"  - Assets config: {json.dumps(config,sort_keys=True)}")
+            out.append(f"  - Modules: {json.dumps(mod_rows,sort_keys=True)}")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/CURRENT_ACTIVE_WORKER.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+          print("[ACTIVE_AUDIT] completed")
+
+      - name: Commit sanitized report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/CURRENT_ACTIVE_WORKER.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: inspect current active Worker version"
+          git push
