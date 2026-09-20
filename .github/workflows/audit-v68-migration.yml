@@ -1,0 +1,63 @@
+name: Audit Stable v68 Migration Metadata
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/audit-v68-migration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect migration metadata
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+
+          aid="3c0bf44ff86c9587390f09b6d0bc42dd"
+          vid="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+
+          req=urllib.request.Request(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{vid}?include=modules",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=35) as r:
+            d=json.loads(r.read().decode("utf-8")).get("result") or {}
+
+          safe={
+            "version_id":d.get("id"),
+            "number":d.get("number"),
+            "migration_tag":d.get("migration_tag"),
+            "migrations":d.get("migrations"),
+            "compatibility_date":d.get("compatibility_date"),
+            "main_module":d.get("main_module"),
+          }
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/V68_MIGRATION_METADATA.md").write_text(
+            "# Stable v68 Migration Metadata\n\n~~~json\n"+
+            json.dumps(safe,indent=2,sort_keys=True)+"\n~~~\n",
+            encoding="utf-8"
+          )
+          print("[MIGRATION_AUDIT] "+json.dumps(safe,sort_keys=True))
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/V68_MIGRATION_METADATA.md
+          git commit -m "audit: capture stable v68 migration metadata"
+          git push
