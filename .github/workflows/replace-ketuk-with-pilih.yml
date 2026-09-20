@@ -1,0 +1,174 @@
+name: Replace Ketuk with Pilih
+
+on:
+  push:
+    branches:
+      - fix/ketuk-to-pilih
+    paths:
+      - ".github/workflows/replace-ketuk-with-pilih.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace standalone UI term across public assets
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, json
+
+          root=Path("public")
+          text_ext={".html",".htm",".js",".mjs",".css",".json",".txt",".md",".svg",".xml"}
+          before=[]
+          changed=[]
+
+          patterns=[
+            (re.compile(r'\bKetuk\b'),"Pilih"),
+            (re.compile(r'\bketuk\b'),"pilih"),
+            (re.compile(r'\bKETUK\b'),"PILIH"),
+          ]
+
+          for p in sorted(root.rglob("*")):
+            if not p.is_file() or p.suffix.lower() not in text_ext:
+              continue
+            try:
+              s=p.read_text(encoding="utf-8")
+            except Exception:
+              continue
+
+            matches=[]
+            for rx,_ in patterns:
+              for m in rx.finditer(s):
+                line=s.count("\n",0,m.start())+1
+                matches.append({"line":line,"term":m.group(0)})
+            if matches:
+              before.append({"file":p.as_posix(),"matches":matches})
+
+            ns=s
+            for rx,repl in patterns:
+              ns=rx.sub(repl,ns)
+
+            if ns!=s:
+              p.write_text(ns,encoding="utf-8")
+              changed.append(p.as_posix())
+
+          remaining=[]
+          old_rx=re.compile(r'\b(?:Ketuk|ketuk|KETUK)\b')
+          for p in sorted(root.rglob("*")):
+            if not p.is_file() or p.suffix.lower() not in text_ext:
+              continue
+            try:
+              s=p.read_text(encoding="utf-8")
+            except Exception:
+              continue
+            for m in old_rx.finditer(s):
+              remaining.append({"file":p.as_posix(),"line":s.count("\n",0,m.start())+1,"term":m.group(0)})
+
+          if remaining:
+            raise SystemExit("Standalone Ketuk terms remain: "+json.dumps(remaining[:50],ensure_ascii=False))
+
+          report=[
+            "# UI Terminology Replacement: Ketuk to Pilih",
+            "",
+            f"- Files changed: {len(changed)}",
+            f"- Files containing term before replacement: {len(before)}",
+            f"- Remaining standalone Ketuk/ketuk/KETUK in public: {len(remaining)}",
+            "",
+            "## Changed files",
+            ""
+          ]
+          for name in changed:
+            report.append("- "+name)
+          report += ["","## Original occurrences",""]
+          for item in before:
+            report.append("### "+item["file"])
+            for m in item["matches"]:
+              report.append("- line "+str(m["line"])+": "+m["term"])
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/KETUK_TO_PILIH.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+          print("[TERM_REPLACE] changed="+str(len(changed)))
+          print("[TERM_REPLACE] occurrences_before="+str(sum(len(x["matches"]) for x in before)))
+          print("[TERM_REPLACE] remaining=0")
+
+      - name: Validate inline JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          Path("/tmp/all-inline.js").write_text("\n".join(blocks),encoding="utf-8")
+          PY
+          node --check /tmp/all-inline.js
+
+      - name: Browser smoke
+        shell: bash
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+          python3 -m http.server 4173 --directory public >/tmp/omodos-term-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true; rm -f term-smoke.mjs package.json package-lock.json' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+
+          cat > term-smoke.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser=await chromium.launch({headless:true});
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:30000});
+            const result=await page.evaluate(()=>{
+              const body=(document.body?.innerText||'');
+              return {
+                oldTerm:/\bketuk\b/i.test(body),
+                copilotHelp:!!document.getElementById('copilot-help'),
+                machineDropdown:!!document.getElementById('filter-machine'),
+                omodos4:!!document.getElementById('view-omodos4')
+              };
+            });
+            const relevant=errors.filter(x=>/TypeError|ReferenceError|SyntaxError/i.test(x));
+            if(result.oldTerm) throw new Error('Visible term Ketuk still found in rendered DOM');
+            if(!result.copilotHelp || !result.machineDropdown || !result.omodos4){
+              throw new Error('Regression in key OMODOS UI: '+JSON.stringify(result));
+            }
+            if(relevant.length) throw new Error('Runtime errors: '+JSON.stringify(relevant));
+            console.log('[TERM_BROWSER_QA] '+JSON.stringify({result,relevant}));
+          } finally {
+            await browser.close();
+          }
+          JS
+          node --check term-smoke.mjs
+          timeout -k 5s 60s node term-smoke.mjs
+
+      - name: Commit replacement
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public audit/KETUK_TO_PILIH.md
+          if git diff --cached --quiet; then
+            echo "No replacement needed."
+            exit 0
+          fi
+          git commit -m "fix: replace Ketuk with Pilih across UI"
+          git push
