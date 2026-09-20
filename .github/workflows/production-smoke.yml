@@ -41,7 +41,7 @@ jobs:
             JS="$(curl -fsS "$JS_URL" || true)"
             STATUS="$(curl -sS -o /tmp/login.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}' "$API_URL" || true)"
 
-            if printf '%s' "$HTML" | grep -q 'id="form-login"' && printf '%s' "$HTML" | grep -q 'OMODOS4_FRONTEND_SAFE_V3' && printf '%s' "$HTML" | grep -q '/omodos4/hotfix.css' && printf '%s' "$HTML" | grep -q '/omodos4/hotfix.js' && printf '%s' "$JS" | grep -q 'frontend-only recovery' && [ "$STATUS" = "200" ]; then
+            if grep -q 'id="form-login"' <<< "$HTML" && grep -q 'OMODOS4_FRONTEND_SAFE_V3' <<< "$HTML" && grep -q '/omodos4/hotfix.css' <<< "$HTML" && grep -q '/omodos4/hotfix.js' <<< "$HTML" && grep -q 'frontend-only recovery' <<< "$JS" && [ "$STATUS" = "200" ]; then
               if node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));if(!x||typeof x!=='object'||x.ok!==false)process.exit(1)"; then
                 passed=1
                 break
@@ -51,7 +51,7 @@ jobs:
           done
 
           test "$passed" = "1"
-          printf '%s' "$HTML" | grep -q 'id="v4-nav-group"'
+          grep -q 'id="v4-nav-group"' <<< "$HTML"
           test "$(printf '%s' "$HTML" | grep -o 'OMODOS4_FRONTEND_SAFE_V3' | wc -l | tr -d ' ')" = "1"
           test "$(printf '%s' "$HTML" | grep -o '/omodos4/hotfix.css' | wc -l | tr -d ' ')" = "1"
           printf '%s' "$JS" > /tmp/omodos-hotfix.js
