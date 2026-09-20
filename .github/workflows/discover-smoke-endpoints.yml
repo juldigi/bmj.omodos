@@ -1,0 +1,85 @@
+name: Discover Safe Backend Smoke Endpoints
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/discover-smoke-endpoints.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Discover read-only API routes from v68 source
+        shell: python
+        run: |
+          import os,json,base64,re,urllib.request
+          from pathlib import Path
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid="3c0bf44ff86c9587390f09b6d0bc42dd"
+          vid="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          d=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{vid}?include=modules").get("result") or {}
+          mods=d.get("modules") or []
+          if not mods:
+            raise SystemExit("v68 module missing")
+          raw=base64.b64decode(max(mods,key=lambda m:len(m.get("content_base64") or "")).get("content_base64") or "")
+          src=raw.decode("utf-8",errors="replace")
+
+          routes=sorted(set(re.findall(r"/api/[A-Za-z0-9_./?=&:-]{1,160}",src)))
+          cleaned=[]
+          for r in routes:
+            r=r.rstrip(".,;:)]}")
+            if r and r not in cleaned:
+              cleaned.append(r)
+
+          rows=[]
+          for route in cleaned:
+            pos=src.find(route)
+            win=src[max(0,pos-1200):min(len(src),pos+1800)].lower()
+            score=0
+            if "get" in win:
+              score+=2
+            if any(k in route.lower() for k in ("health","status","session","me","ping","bootstrap","config")):
+              score+=3
+            if any(k in win for k in ("post","put","patch","delete")):
+              score-=1
+            if any(k in route.lower() for k in ("delete","update","create","save","logout","reset","setup")):
+              score-=4
+            rows.append((score,route,"session" in win or "auth" in win,"get" in win,any(x in win for x in ("post","put","patch","delete"))))
+
+          rows.sort(key=lambda x:(-x[0],x[1]))
+          out=["# Safe Backend Smoke Endpoint Discovery","",f"- Literal /api routes found: {len(cleaned)}","","## Ranked read-only candidates",""]
+          for score,route,auth,get_hint,write_hint in rows[:60]:
+            out.append(f"- score={score} route={route} auth_near={'YES' if auth else 'NO'} get_hint={'YES' if get_hint else 'NO'} write_hint={'YES' if write_hint else 'NO'}")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/SAFE_SMOKE_ENDPOINTS.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+          print("[SMOKE_DISCOVERY] report generated")
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/SAFE_SMOKE_ENDPOINTS.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: discover safe backend smoke endpoints"
+          git push
