@@ -1,16 +1,16 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-09-20T13:42:17.747835+00:00
-- File bytes: 1642987
-- Lines: 28627
-- SHA-256: bb5ca4a28b1cb0db5da099749bfb426a049154d7997102b9e4f97d370d6c380c
+- Audited UTC: 2026-09-20T13:51:57.668045+00:00
+- File bytes: 1642417
+- Lines: 28621
+- SHA-256: f5b9e2fd1905c16f00a42b7411af040abd1342b3b40266bebac5ca5f6fadcef5
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
 - L7287: const $ = (sel, root=document) => root.querySelector(sel);
 
 ## Potential jQuery-like chained calls
-### ).forEach( — 318 match(es)
+### ).forEach( — 319 match(es)
 - L6095: (changed||[]).forEach(item=>{ if(item && item[idField]!==undefined) byId[item[idField]] = item; });
 - L6096: (deletedIds||[]).forEach(id=>{ delete byId[id]; });
 - L6385: clone.querySelectorAll('.ico, .chev, .count, .ihc-desc').forEach(el=> el.remove());
@@ -214,13 +214,13 @@
 ### omodos4.view — 3 match(es)
 - L6467: if(!discovered.some(f=>f.PermissionKey==='omodos4.view')){
 - L6468: discovered.push({PermissionKey:'omodos4.view',Label:'OMODOS 4.0 (Superadmin Root)',Group:'OMODOS 4.0'});
-- L28468: const V4_PERMISSION_ROOT = 'omodos4.view';
+- L28462: const V4_PERMISSION_ROOT = 'omodos4.view';
 ### OMODOS 4.0 — 6 match(es)
 - L3409: <button class="nav-parent-btn" data-group="omodos4"><span class="ico"><i class="ph-bold ph-cpu"></i></span> OMODOS 4.0 <span class="v4-badge">SUPERADMIN</span> <span class="chev"><i class="ph-bold ph-caret-down"></i></span></button>
 - L4198: <h1 style="margin-top:4px;">OMODOS 4.0</h1>
 - L8415: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L23069: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
-- L28623: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
+- L28617: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
 ### Superadmin — 45 match(es)
 - L4199: <div class="sub">Command Center Superadmin yang membaca data existing tanpa membuat duplikasi sumber data.</div>
 - L5420: <div class="setting-tab-empty" id="rbac-empty-hint" style="display:none;">Memuat data user... Jika tetap kosong, pastikan kamu login sebagai Superadmin.</div>
@@ -259,12 +259,12 @@
 - L26266: // sekali), beri penanda visual kecil "Baru" supaya Superadmin sadar ini
 - L27963: // ternyata tidak diizinkan (mis. baru diubah Superadmin), otomatis
 - L28002: // restore sesi, dan setiap kali Superadmin menyimpan perubahan Role
-- L28470: function v4IsSuperadmin(){
-- L28472: return typeof isSuperadmin === 'function'
-- L28473: ? isSuperadmin()
-- L28474: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
-- L28572: if(!v4IsSuperadmin()){
-- L28617: isAllowed:v4IsSuperadmin,
+- L28464: function v4IsSuperadmin(){
+- L28466: return typeof isSuperadmin === 'function'
+- L28467: ? isSuperadmin()
+- L28468: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
+- L28566: if(!v4IsSuperadmin()){
+- L28611: isAllowed:v4IsSuperadmin,
 
 ## Copilot & Bantuan
 ### Copilot — 367 match(es)
@@ -318,13 +318,14 @@
 - L1260: .copilot-record-top{display:flex;align-items:flex-start;gap:7px;margin-bottom:7px;}
 - L1261: .copilot-record-index{flex:0 0 auto;border-radius:5px;background:color-mix(in srgb,var(--copilot-accent) 12%,transparent);color:var(--copilot-accent);padding:2px 5px;font:700 9px/1.2 var(--font-mono);}
 - L1262: .copilot-record-title{font-weight:700;font-size:11.5px;line-height:1.35;color:var(--text);min-width:0;overflow-wrap:anywhere;}
-### Bantuan — 6 match(es)
+### Bantuan — 7 match(es)
 - L5882: <button class="btn btn-sm" type="button" id="copilot-help" title="Buka bantuan untuk halaman yang sedang digunakan"><i class="ph-bold ph-question"></i> Bantuan</button>
 - L12129: { key:'ai',             icon:'✦',  title:'Analisa AI', sub:'Minta bantuan AI membaca data dan memberi saran. Tetap periksa hasilnya.', enabled:true },
 - L23074: return helpMap[view] || {title:'Bantuan Halaman',steps:[
 - L23094: <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
 - L24243: <div class="sub" style="margin-top:10px;">Rekomendasi dihasilkan 100% lokal dari data Logbook, Hard Skill/Soft Skill Assessment, Kaizen/Project Improvement, dan Meeting Action Item yang sudah tersimpan di aplikasi ini (tanpa API/LLM eksternal) — gunakan sebagai bantuan pengambilan keputusan, tetap verifikasi di lapangan.</div>
-- L28265: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
+- L28226: /* BANTUAN_PAGE_CARD_REMOVAL_V1 */
+- L28267: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
 
 ## Machine status
 ### machineStatus — 7 match(es)
@@ -350,7 +351,7 @@
 - L23041: dashboard:{title:'Home & Status Mesin',steps:[
 - L23042: 'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
 - L25201: dashboard:'Semua staf shift, untuk memantau status mesin secara real-time',
-- L28495: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
+- L28489: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
 ### latestLogbook — 2 match(es)
 - L16370: function latestLogbookForMachine_(machine){
 - L19249: const log=latestLogbookForMachine_(machine), patrol=latestPatrolForMachine_(machine);
