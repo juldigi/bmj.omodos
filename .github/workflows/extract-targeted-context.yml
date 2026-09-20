@@ -1,0 +1,76 @@
+name: Extract Targeted OMODOS Context
+
+on:
+  push:
+    branches:
+      - audit/deep-production-regression
+    paths:
+      - ".github/workflows/extract-targeted-context.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract targeted code context
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src=Path("public/index.html").read_text(encoding="utf-8",errors="replace")
+          lines=src.splitlines()
+
+          terms=[
+            "latestLogbookForMachine_",
+            "latestPatrolForMachine_",
+            "machine status",
+            "status mesin",
+            "filter-status",
+            "filter-group",
+            "patrol-machine-select",
+            "User Management",
+            "Role Access",
+            "user-management",
+            "role-access",
+            "Bantuan",
+            "copilot-help",
+            "copilot-panel",
+            "data-view=\"setting",
+            "data-view='setting",
+          ]
+
+          out=["# Targeted OMODOS Context",""]
+          for term in terms:
+            hits=[i for i,l in enumerate(lines) if term.lower() in l.lower()]
+            out.append(f"## {term} — {len(hits)} hit(s)")
+            for idx in hits[:20]:
+              start=max(0,idx-15)
+              end=min(len(lines),idx+30)
+              out.append(f"### Around L{idx+1}")
+              out.append("~~~text")
+              for j in range(start,end):
+                line=lines[j]
+                if len(line)>900: line=line[:900]+"…"
+                out.append(f"{j+1:05d}: {line}")
+              out.append("~~~")
+              out.append("")
+            if not hits:
+              out.append("- No match.")
+              out.append("")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/TARGETED_OMODOS_CONTEXT.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/TARGETED_OMODOS_CONTEXT.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: extract targeted OMODOS feature context"
+          git push
