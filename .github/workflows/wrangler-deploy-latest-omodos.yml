@@ -89,9 +89,6 @@ jobs:
                       }
                   ]
               },
-              "secrets":{
-                  "required":["GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"]
-              },
               "dependencies_instrumentation":{"enabled":False}
           }
           if flags:
@@ -235,6 +232,55 @@ jobs:
               with urllib.request.urlopen(req,timeout=45) as r:
                   rollback_response=r.read()
               raise SystemExit("Release smoke test failed; rolled back to v68: "+json.dumps(snapshot))
+
+          # Verify critical bindings/secrets survived the deploy. If not,
+          # roll back before declaring success.
+          def cf_json(url):
+              req=urllib.request.Request(url,headers={
+                  "Authorization":"Bearer "+token,
+                  "Accept":"application/json"
+              })
+              with urllib.request.urlopen(req,timeout=35) as r:
+                  return json.loads(r.read().decode("utf-8"))
+
+          versions=(cf_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/workers/omodos/versions?per_page=5"
+          ).get("result") or [])
+          latest_id=str((versions[0] if versions else {}).get("id") or "")
+          binding_names=set()
+          if latest_id:
+              detail=(cf_json(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/workers/omodos/versions/{latest_id}?include=modules"
+              ).get("result") or {})
+              for b in detail.get("bindings") or []:
+                  if isinstance(b,dict) and b.get("name"):
+                      binding_names.add(str(b.get("name")))
+
+          required_bindings={"MAINTENANCE","ASSETS","GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"}
+          missing_bindings=sorted(required_bindings-binding_names)
+          snapshot["latest_version"]=latest_id
+          snapshot["binding_names"]=sorted(binding_names)
+          snapshot["missing_bindings"]=missing_bindings
+
+          if missing_bindings:
+              body={
+                  "strategy":"percentage",
+                  "versions":[{"version_id":rollback_version,"percentage":100}],
+                  "annotations":{"workers/message":"Auto rollback because critical bindings were missing after deploy"}
+              }
+              req=urllib.request.Request(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/omodos/deployments",
+                  data=json.dumps(body).encode("utf-8"),
+                  headers={
+                      "Authorization":"Bearer "+token,
+                      "Content-Type":"application/json",
+                      "Accept":"application/json"
+                  },
+                  method="POST"
+              )
+              with urllib.request.urlopen(req,timeout=45) as r:
+                  r.read()
+              raise SystemExit("Critical bindings missing after deploy; rolled back to v68: "+json.dumps(snapshot))
 
           Path("audit").mkdir(exist_ok=True)
           Path("audit/PRODUCTION_LOGIN_AND_BANTUAN_RESTORE.md").write_text(
