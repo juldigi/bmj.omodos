@@ -19192,7 +19192,32 @@ async function persistPmReport(report, files){
   savePmReportsLocal(list);
   if(!WEB_APP_URL) return { synced:false, reason:'NO_URL' };
   try{
-    const res = await apiPost({ action:'savePredictiveReport', report: { ...report, files: undefined }, files: files || [] });
+    // File biner/base64 dikirim HANYA lewat top-level files. Sebelumnya
+    // report.findings[].files ikut membawa base64 yang sama sehingga payload
+    // foto/video Patrol terduplikasi dan bisa membengkak hampir 2x.
+    // URL permanen non-blob tetap dipertahankan; preview blob lokal tidak dikirim.
+    const reportForBackend = {
+      ...report,
+      files: undefined,
+      findings: (report.findings||[]).map(finding=>({
+        ...finding,
+        files: (finding.files||[]).map(file=>{
+          const safe = {
+            name: file && file.name || 'lampiran',
+            mimeType: file && file.mimeType || '',
+            type: file && file.type || ''
+          };
+          const viewUrl = String(file && file.viewUrl || '');
+          if(viewUrl && !viewUrl.startsWith('blob:') && !(file && file.base64)){
+            safe.viewUrl = viewUrl;
+            if(file.previewUrl) safe.previewUrl = file.previewUrl;
+            if(file.thumbUrl) safe.thumbUrl = file.thumbUrl;
+          }
+          return safe;
+        })
+      }))
+    };
+    const res = await apiPost({ action:'savePredictiveReport', report: reportForBackend, files: files || [] });
     const stableFiles = parseAttachments((res && res.attachments) || []);
     if(stableFiles.length){
       const stableReport = sanitizePmReportForLocal_({
