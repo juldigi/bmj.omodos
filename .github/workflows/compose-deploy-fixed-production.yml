@@ -1,0 +1,290 @@
+name: Compose and Deploy Fixed OMODOS Production
+
+on:
+  push:
+    branches:
+      - fix/login-backend-json-404
+    paths:
+      - ".github/workflows/compose-deploy-fixed-production.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compose-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose version with latest assets and v68 bindings
+        shell: python
+        run: |
+          import os,json,base64,hashlib,mimetypes,uuid,urllib.request,urllib.error,time
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          worker="omodos"
+          v68_id="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          prod="https://omodos.offsetbmj.workers.dev"
+
+          def api_json(url,method="GET",body=None,auth=None):
+              data=None
+              headers={"Authorization":"Bearer "+(auth or token),"Accept":"application/json"}
+              if body is not None:
+                  data=json.dumps(body,separators=(",",":")).encode("utf-8")
+                  headers["Content-Type"]="application/json"
+              req=urllib.request.Request(url,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=60) as r:
+                      raw=r.read()
+                      return json.loads(raw.decode("utf-8")) if raw else {}
+              except urllib.error.HTTPError as e:
+                  raw=e.read()
+                  raise RuntimeError(f"HTTP {e.code}: {raw[:2500].decode('utf-8',errors='replace')}")
+
+          def multipart(url,parts,auth):
+              boundary="----OMODOS"+uuid.uuid4().hex
+              chunks=[]
+              for part in parts:
+                  content=part["content"]
+                  if isinstance(content,str):
+                      content=content.encode("utf-8")
+                  chunks.append(("--"+boundary+"\r\n").encode())
+                  chunks.append((f'Content-Disposition: form-data; name="{part["name"]}"\r\n').encode())
+                  chunks.append((f'Content-Type: {part.get("content_type") or "text/plain"}\r\n\r\n').encode())
+                  chunks.append(content)
+                  chunks.append(b"\r\n")
+              chunks.append(("--"+boundary+"--\r\n").encode())
+              req=urllib.request.Request(url,data=b"".join(chunks),headers={
+                  "Authorization":"Bearer "+auth,
+                  "Accept":"application/json",
+                  "Content-Type":"multipart/form-data; boundary="+boundary
+              },method="POST")
+              try:
+                  with urllib.request.urlopen(req,timeout=120) as r:
+                      raw=r.read()
+                      return json.loads(raw.decode("utf-8")) if raw else {}
+              except urllib.error.HTTPError as e:
+                  raw=e.read()
+                  raise RuntimeError(f"Multipart HTTP {e.code}: {raw[:2500].decode('utf-8',errors='replace')}")
+
+          beta_base=f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/workers/{worker}/versions"
+          v68=(api_json(beta_base+f"/{v68_id}?include=modules").get("result") or {})
+          if not v68.get("modules"):
+              raise SystemExit("v68 modules unavailable")
+
+          # Build latest frontend asset manifest.
+          public=Path("public")
+          manifest={}
+          files={}
+          for path in sorted(p for p in public.rglob("*") if p.is_file()):
+              rel=path.relative_to(public).as_posix()
+              data=path.read_bytes()
+              ext=path.suffix.lower().lstrip(".")
+              h=hashlib.sha256(base64.b64encode(data)+ext.encode("utf-8")).hexdigest()[:32]
+              manifest["/"+rel]={"hash":h,"size":len(data)}
+              files[h]=(data,mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+
+          index_bytes=(public/"index.html").read_bytes()
+          index_sha=hashlib.sha256(index_bytes).hexdigest()
+
+          # Register asset upload session.
+          session=(api_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/{worker}/assets-upload-session",
+              method="POST",
+              body={"manifest":manifest}
+          ).get("result") or {})
+          upload_jwt=session.get("jwt")
+          buckets=session.get("buckets")
+          if not upload_jwt or buckets is None:
+              raise SystemExit("Asset upload session missing jwt/buckets")
+
+          completion_jwt=upload_jwt
+          requested_uploads=0
+          for bucket in buckets:
+              parts=[]
+              for h in bucket:
+                  if h not in files:
+                      raise SystemExit("Unknown requested asset hash: "+h)
+                  data,ctype=files[h]
+                  parts.append({
+                      "name":h,
+                      "content":base64.b64encode(data),
+                      "content_type":ctype
+                  })
+              up=multipart(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/assets/upload?base64=true",
+                  parts,
+                  upload_jwt
+              )
+              ur=up.get("result") or {}
+              if ur.get("jwt"):
+                  completion_jwt=ur["jwt"]
+              requested_uploads += len(bucket)
+
+          # Inherit every non-asset v68 binding by exact version ID. This keeps
+          # secret values inside Cloudflare; they are never exposed here.
+          bindings=[]
+          source_binding_names=[]
+          for b in v68.get("bindings") or []:
+              if not isinstance(b,dict) or not b.get("name"):
+                  continue
+              name=str(b.get("name"))
+              typ=str(b.get("type") or "")
+              if name=="ASSETS" or typ=="assets":
+                  continue
+              bindings.append({"type":"inherit","name":name,"version_id":v68_id})
+              source_binding_names.append(name)
+          bindings.append({"type":"assets","name":"ASSETS"})
+
+          body={
+              "deploy":False,
+              "main_module":v68.get("main_module") or "worker.js",
+              "compatibility_date":v68.get("compatibility_date"),
+              "compatibility_flags":v68.get("compatibility_flags") or [],
+              "modules":v68.get("modules"),
+              "bindings":bindings,
+              "assets":{
+                  "jwt":completion_jwt,
+                  "config":{"run_worker_first":True}
+              },
+              "annotations":{
+                  "workers/message":"OMODOS latest frontend + healthy v68 backend + preserved v68 bindings",
+                  "workers/tag":"omodos-login-help-fixed"
+              }
+          }
+          body={k:v for k,v in body.items() if v not in (None,"",[])}
+
+          created=api_json(beta_base,method="POST",body=body)
+          result=created.get("result") or {}
+          new_id=str(result.get("id") or "")
+          if not new_id:
+              raise SystemExit("Cloudflare did not return a staged version ID")
+
+          detail=(api_json(beta_base+f"/{new_id}?include=modules").get("result") or {})
+          binding_names=sorted(str(b.get("name")) for b in (detail.get("bindings") or []) if isinstance(b,dict) and b.get("name"))
+          required={"MAINTENANCE","ASSETS","GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"}
+          missing=sorted(required-set(binding_names))
+          if missing:
+              raise SystemExit("Staged version missing critical bindings: "+", ".join(missing))
+
+          print("[STAGED]",new_id)
+          print("[BINDINGS]",binding_names)
+
+          # Deploy composed version 100%.
+          dep=api_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/{worker}/deployments",
+              method="POST",
+              body={
+                  "strategy":"percentage",
+                  "versions":[{"version_id":new_id,"percentage":100}],
+                  "annotations":{"workers/message":"Deploy login-safe OMODOS with Copilot-only Bantuan"}
+              }
+          )
+          dep_id=str((dep.get("result") or {}).get("id") or "")
+
+          def probe(method,path,payload=None):
+              data=None
+              headers={"User-Agent":"OMODOS-Final-QA/1.0","Accept":"application/json,text/html,*/*"}
+              if payload is not None:
+                  data=json.dumps(payload).encode("utf-8")
+                  headers["Content-Type"]="application/json"
+              req=urllib.request.Request(prod+path,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      body=r.read()
+                      return r.status,r.headers.get("Content-Type",""),body
+              except urllib.error.HTTPError as e:
+                  return e.code,e.headers.get("Content-Type",""),e.read()
+
+          def json_ok(ctype,body):
+              if "application/json" in (ctype or "").lower():
+                  return True
+              try:
+                  json.loads(body.decode("utf-8",errors="replace"))
+                  return True
+              except Exception:
+                  return False
+
+          ok=False
+          snapshot={}
+          for attempt in range(1,8):
+              time.sleep(2 if attempt==1 else 3)
+              rs,rc,rb=probe("GET","/")
+              ps,pc,pb=probe("POST","/api",{"action":"__omodos_readonly_probe__"})
+              ls,lc,lb=probe("POST","/api",{"action":"login","username":"","password":""})
+              html=rb.decode("utf-8",errors="replace")
+              root_sha=hashlib.sha256(rb).hexdigest()
+              snapshot={
+                  "attempt":attempt,
+                  "root_status":rs,
+                  "root_sha":root_sha,
+                  "root_matches_latest":root_sha==index_sha,
+                  "help_button":'id="copilot-help"' in html,
+                  "legacy_help_hidden":".legacy-simple-guide{display:none!important}" in html,
+                  "api_status":ps,
+                  "api_json":json_ok(pc,pb),
+                  "login_status":ls,
+                  "login_json":json_ok(lc,lb),
+                  "bindings":binding_names,
+              }
+              print("[FINAL_SMOKE]",json.dumps(snapshot))
+              if (
+                  rs==200 and snapshot["root_matches_latest"]
+                  and snapshot["help_button"] and snapshot["legacy_help_hidden"]
+                  and ps!=404 and snapshot["api_json"]
+                  and ls!=404 and snapshot["login_json"]
+              ):
+                  ok=True
+                  break
+
+          if not ok:
+              api_json(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/{worker}/deployments",
+                  method="POST",
+                  body={
+                      "strategy":"percentage",
+                      "versions":[{"version_id":v68_id,"percentage":100}],
+                      "annotations":{"workers/message":"Automatic rollback after composed OMODOS smoke failure"}
+                  }
+              )
+              raise SystemExit("Final smoke failed; rolled back to v68: "+json.dumps(snapshot))
+
+          report=[
+              "# OMODOS Production Login + Bantuan Fix",
+              "",
+              f"- UTC: {datetime.now(timezone.utc).isoformat()}",
+              f"- Version: {new_id}",
+              f"- Deployment: {dep_id}",
+              f"- Frontend SHA-256: {index_sha}",
+              f"- Requested asset uploads: {requested_uploads}",
+              f"- Bindings: {', '.join(binding_names)}",
+              f"- Smoke: {json.dumps(snapshot,ensure_ascii=False)}",
+              "",
+              "## Result",
+              "- PASS: login backend returns JSON.",
+              "- PASS: current frontend is deployed.",
+              "- PASS: legacy page-level Bantuan is hidden/removed.",
+              "- PASS: Bantuan button remains in Copilot.",
+              "- PASS: critical Cloudflare bindings/secrets are preserved.",
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/PRODUCTION_LOGIN_BANTUAN_FIXED.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+      - name: Commit result
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/PRODUCTION_LOGIN_BANTUAN_FIXED.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: deploy production login and Copilot-only Bantuan"
+          git push
