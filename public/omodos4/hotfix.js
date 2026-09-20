@@ -1784,3 +1784,198 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
  stopSmartFieldSensors:stopSensors
 });
 })();
+
+
+/* OMODOS4_SPAREPART_INTEL_V1
+   Progressive-enhancement views for master-prompt features 31–40.
+   Read-only: consumes v4.getSparepartRisk and never writes operational sparepart data. */
+(function(){
+'use strict';
+
+var SP_DATA=null;
+var SP_LOADED_AT=0;
+var SP_TTL=30000;
+
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openN(n){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!el&&parseInt(el.textContent,10)===Number(n);
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function note(t,kind){return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+esc(t)+'</span></div>'}
+function empty(t){return '<div class="v4-empty">'+esc(t||'Belum ada data untuk konteks ini.')+'</div>'}
+function busy(btn,on){
+ if(!btn)return;
+ if(on){btn.dataset.old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> Memuat…'}
+ else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
+}
+function val(sec,sel){var el=sec&&sec.querySelector(sel);return el?String(el.value||'').trim():''}
+function factors(f){
+ f=f||{};var p=[];
+ if(f.consumptionCount!=null)p.push('Konsumsi '+f.consumptionCount);
+ if(f.machines!=null)p.push('Mesin '+f.machines);
+ if(f.criticalMachineCount)p.push('Mesin kritis '+f.criticalMachineCount);
+ if(f.stockout)p.push('STOCKOUT');
+ else if(f.stockRisk)p.push('Stock ≤ minimum');
+ if(f.etaOverdue)p.push('ETA terlambat');
+ return p.join(' • ')||'Evidence sparepart existing';
+}
+function partName(x){return (x&&x.material)||'(nama material belum tersedia)'}
+function partNo(x){return (x&&x.materialNumber)||'No SAP belum tersedia'}
+function rows(list,renderer,limit){
+ if(!Array.isArray(list)||!list.length)return empty('Tidak ada evidence yang memenuhi kriteria fitur ini.');
+ return '<div class="v4-sf-list">'+list.slice(0,limit||50).map(renderer).join('')+'</div>';
+}
+function item(title,sub,right){
+ return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
+}
+function priorityBadge(x){
+ var p=x&&x.priority||'P3';
+ return '<span class="v4-risk-chip">'+esc(p)+(x&&x.criticalityScore!=null?' • '+esc(x.criticalityScore):'')+'</span>';
+}
+function machineOptions(data){
+ var set=new Set();
+ (data&&Array.isArray(data.machinePartGraph)?data.machinePartGraph:[]).forEach(function(x){
+  var m=String(x&&x.from||'').replace(/^machine:/,'').trim();if(m)set.add(m);
+ });
+ return '<option value="">Semua mesin</option>'+Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')}).map(function(m){return '<option value="'+esc(m)+'">'+esc(m)+'</option>'}).join('');
+}
+function mount(n){
+ var h=host();if(!h||!openN(n))return;
+ var old=h.querySelector('.v4-sparepart-intel');if(old)old.remove();
+ var titles={
+ 31:'Sparepart Criticality Matrix',32:'Stockout Risk Radar',33:'Dead Stock Museum',34:'Sparepart Consumption DNA',35:'Machine–Part Graph',
+ 36:'Equivalent Part Finder',37:'Part Photo Recognition',38:'Shelf Digital Twin',39:'Sparepart Reservation Predictor',40:'Procurement Urgency Engine'
+ };
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sparepart-intel';sec.dataset.v4SpFeature=String(n);
+ var controls='';
+ if(n===35)controls='<label>Mesin<select data-v4-sp-machine><option value="">Muat data untuk melihat mesin</option></select></label>';
+ if(n===36)controls='<label class="v4-form-wide">Cari material / nomor SAP<input data-v4-sp-query placeholder="Ketik nama material atau nomor SAP"></label>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">SPAREPART INTELLIGENCE</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">READ ONLY</span></div>'+
+ (controls?'<div class="v4-form-grid">'+controls+'</div>':'')+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sp-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button><button class="btn btn-sm" data-v4-open-existing="sparepart"><i class="ph-bold ph-package"></i> Buka Sparepart Existing</button></div>'+
+ '<div data-v4-sp-out>'+note('Menggunakan Stock Sparepart, lokasi, ETA, opname, warehouse, SAP status, dan konsumsi Logbook existing. Tidak membuat data ganda.','safe')+'</div>';
+ h.prepend(sec);
+}
+async function getData(force){
+ if(!force&&SP_DATA&&Date.now()-SP_LOADED_AT<SP_TTL)return SP_DATA;
+ if(!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function'))return null;
+ var d=await window.OMODOS4.serverRead('v4.getSparepartRisk',{});
+ if(d){SP_DATA=d;SP_LOADED_AT=Date.now()}
+ return d;
+}
+function renderCritical(data){
+ return rows(data.criticalityMatrix,function(x){
+  return item(partName(x),partNo(x)+' • '+factors(x.factors),priorityBadge(x));
+ },60)+note('Criticality score adalah derived rule-based indicator untuk prioritas review, bukan keputusan pembelian otomatis.','safe');
+}
+function renderStockout(data){
+ var list=(data.risks||[]).filter(function(x){return ['stockout','stock-risk','eta-overdue'].includes(String(x.type||''))});
+ return rows(list,function(x){
+  var label=x.type==='stockout'?'STOCKOUT':x.type==='stock-risk'?'Stock Risk':'ETA Overdue';
+  return item(partName(x),partNo(x)+' • '+factors(x.factors),'<span class="v4-risk-chip">'+esc(label)+' • '+esc(x.score==null?'—':x.score)+'</span>');
+ },60)+note('Radar hanya menandai evidence stock minimum/stockout/ETA overdue yang tercatat pada sumber existing.','safe');
+}
+function renderDead(data){
+ return rows(data.deadStockCandidates,function(x){
+  return item(partName(x),partNo(x)+' • '+(x.reason||'Candidate only'),'<span class="v4-risk-chip">CANDIDATE</span>');
+ },60)+note('Dead Stock Museum menampilkan kandidat saja. Verifikasi histori, kebutuhan engineering, dan reservation sebelum disposition.','warn');
+}
+function renderConsumption(data){
+ return rows(data.consumptionTop,function(x){
+  var machines=Array.isArray(x.machines)&&x.machines.length?x.machines.slice(0,5).join(', '):'mesin belum terhubung';
+  return item(partName(x),partNo(x)+' • '+x.count+' konsumsi • '+machines,'<span class="v4-risk-chip">'+esc(x.count)+'x</span>');
+ },60)+note('Consumption DNA dihitung dari linkage konsumsi Logbook terhadap nomor SAP/nama material existing.','safe');
+}
+function renderGraph(data,sec){
+ var sel=sec.querySelector('[data-v4-sp-machine]');
+ if(sel&&sel.options.length<=1){sel.innerHTML=machineOptions(data)}
+ var machine=val(sec,'[data-v4-sp-machine]');
+ var list=(data.machinePartGraph||[]).filter(function(x){return !machine||String(x.from||'')==='machine:'+machine});
+ return rows(list,function(x){
+  var m=String(x.from||'').replace(/^machine:/,'');
+  return item(m+' → '+partName(x),partNo(x)+' • '+(x.relation||'uses/consumed'),'<span class="v4-risk-chip">LINK</span>');
+ },80)+note('Graph berasal dari hubungan mesin ↔ sparepart yang pernah tercatat/terkonsumsi; bukan BOM engineering lengkap.','safe');
+}
+function renderEquivalent(data,sec){
+ var q=val(sec,'[data-v4-sp-query]').toLowerCase();
+ var list=(data.equivalentParts||[]).filter(function(x){
+  return !q||[x.material,x.materialNumber,x.recordedEquivalent].some(function(v){return String(v||'').toLowerCase().includes(q)});
+ });
+ return rows(list,function(x){
+  return item(partName(x)+' → '+(x.recordedEquivalent||'—'),partNo(x)+' • '+(x.validation||'engineering confirmation required'),'<span class="v4-risk-chip">VERIFY</span>');
+ },60)+note('Hanya equivalence yang memiliki field recorded source yang ditampilkan. Tetap wajib validasi engineering sebelum substitusi.','warn');
+}
+function renderPhoto(data){
+ var status=data.photoRecognition||{};
+ var list=data.partPhotoAssets||[];
+ return note('Status model: '+(status.status||'NOT AVAILABLE')+'. '+(status.note||'Tidak ada klaim visual tanpa model tervalidasi.'),status.status&&status.status!=='NOT AVAILABLE'?'safe':'warn')+
+ rows(list,function(x){return item(partName(x),partNo(x)+' • Foto referensi tercatat pada data existing','<span class="v4-risk-chip">ASSET</span>')},40)+
+ note('OMODOS tidak akan menyebut identitas part dari foto tanpa model visual tervalidasi.','safe');
+}
+function renderShelf(data){
+ return rows(data.shelfDigitalTwin,function(x){
+  return item(x.location||'Lokasi belum bernama',(x.materials||0)+' material • '+(x.records||0)+' record','<span class="v4-risk-chip">Qty '+esc(x.stockQty==null?'—':x.stockQty)+'</span>');
+ },80)+note('Shelf Digital Twin adalah ringkasan lokasi recorded pada lokasi/opname/warehouse existing.','safe');
+}
+function renderReservation(data){
+ return rows(data.reservationForecast,function(x){
+  return item(partName(x),partNo(x)+' • '+x.observedConsumptions+' konsumsi / '+x.windowDays+' hari','<span class="v4-risk-chip">Next 30d '+esc(x.expectedNext30)+' • '+esc(x.confidence)+'</span>');
+ },60)+note('Prediksi reservation adalah historical-rate projection, bukan forecast kebutuhan yang pasti.','warn');
+}
+function renderUrgency(data){
+ return rows(data.procurementUrgency,function(x){
+  return item(partName(x),partNo(x)+' • '+factors(x.factors),'<span class="v4-risk-chip">'+esc(x.priority)+' • '+esc(x.score)+'</span>');
+ },60)+note('Procurement Urgency menyusun antrean review dari criticality + stock/ETA evidence. Persetujuan pembelian tetap mengikuti proses manusia.','warn');
+}
+function render(n,data,sec){
+ if(!data)return empty('Backend V4 belum tersedia pada koneksi/sesi ini.');
+ if(n===31)return renderCritical(data);
+ if(n===32)return renderStockout(data);
+ if(n===33)return renderDead(data);
+ if(n===34)return renderConsumption(data);
+ if(n===35)return renderGraph(data,sec);
+ if(n===36)return renderEquivalent(data,sec);
+ if(n===37)return renderPhoto(data);
+ if(n===38)return renderShelf(data);
+ if(n===39)return renderReservation(data);
+ if(n===40)return renderUrgency(data);
+ return empty();
+}
+async function load(btn,n,force){
+ var sec=btn.closest('.v4-sparepart-intel'),out=sec&&sec.querySelector('[data-v4-sp-out]');
+ if(!sec||!out)return;
+ busy(btn,true);
+ try{var d=await getData(!!force);out.innerHTML=render(n,d,sec)}
+ catch(err){out.innerHTML=note(err&&err.message||String(err),'error')}
+ finally{busy(btn,false)}
+}
+document.addEventListener('click',function(ev){
+ var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
+ if(tile){
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=31&&n<=40)setTimeout(function(){if(openN(n))mount(n)},0);
+  return;
+ }
+ var b=ev.target.closest&&ev.target.closest('[data-v4-sp-load]');
+ if(b){ev.preventDefault();load(b,Number(b.getAttribute('data-v4-sp-load')),true);return}
+},false);
+document.addEventListener('change',function(ev){
+ if(ev.target&&ev.target.matches('[data-v4-sp-machine]')){
+  var sec=ev.target.closest('.v4-sparepart-intel');
+  if(sec&&SP_DATA){var n=Number(sec.dataset.v4SpFeature),out=sec.querySelector('[data-v4-sp-out]');if(out)out.innerHTML=render(n,SP_DATA,sec)}
+ }
+},false);
+document.addEventListener('input',function(ev){
+ if(ev.target&&ev.target.matches('[data-v4-sp-query]')){
+  var sec=ev.target.closest('.v4-sparepart-intel');
+  if(sec&&SP_DATA){var n=Number(sec.dataset.v4SpFeature),out=sec.querySelector('[data-v4-sp-out]');if(out)out.innerHTML=render(n,SP_DATA,sec)}
+ }
+},false);
+
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ sparepartIntelVersion:'1',
+ sparepartIntelFeatures:[31,32,33,34,35,36,37,38,39,40]
+});
+})();
+
