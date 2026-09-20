@@ -184,6 +184,55 @@ jobs:
             }
             result.phases.push('recovered-deny');
 
+            console.log('[QA] recovered module route completeness');
+            await page.evaluate(() => {
+              CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
+              SESSION_TOKEN = 'qa';
+              PERMISSIONS = {};
+              applyRbacToUi();
+              window.dispatchEvent(new Event('storage'));
+            });
+            await page.waitForTimeout(80);
+
+            const moduleCount = await page.locator('#v4-nav-group [data-v4-safe-module]').count();
+            const routeAudit = { moduleCount, tileCount: 0, emptyRoutes: [], invalidTargets: [] };
+            for (let i = 0; i < moduleCount; i++) {
+              const module = page.locator('#v4-nav-group [data-v4-safe-module]').nth(i);
+              const moduleName = (await module.getAttribute('aria-label')) || ('module-' + i);
+              await module.click();
+              await page.waitForTimeout(30);
+
+              const tiles = page.locator('#v4-safe-stage [data-v4-route]');
+              const count = await tiles.count();
+              routeAudit.tileCount += count;
+              for (let j = 0; j < count; j++) {
+                const tile = tiles.nth(j);
+                const route = (await tile.getAttribute('data-v4-route')) || '';
+                const label = ((await tile.locator('strong').textContent()) || '').trim();
+                if (!route) {
+                  routeAudit.emptyRoutes.push(moduleName + ' > ' + label);
+                  continue;
+                }
+                if (route === '@copilot') {
+                  const ok = await page.locator('#copilot-fab').count();
+                  if (!ok) routeAudit.invalidTargets.push(label + ' -> ' + route);
+                  continue;
+                }
+                if (route === '@copilot-help') {
+                  const ok = await page.locator('#copilot-fab').count() && await page.locator('#copilot-help').count();
+                  if (!ok) routeAudit.invalidTargets.push(label + ' -> ' + route);
+                  continue;
+                }
+                const exists = await page.locator('#view-' + route).count();
+                if (!exists) routeAudit.invalidTargets.push(label + ' -> ' + route);
+              }
+            }
+            result.routeAudit = routeAudit;
+            if (routeAudit.moduleCount !== 11 || routeAudit.tileCount !== 88 || routeAudit.emptyRoutes.length || routeAudit.invalidTargets.length) {
+              throw new Error('Recovered module routing audit failed: ' + JSON.stringify(routeAudit));
+            }
+            result.phases.push('route-completeness');
+
             console.log('[QA] sparepart pagination');
             const selectorQA = await page.evaluate(() => {
               const p = document.createElement('div');
