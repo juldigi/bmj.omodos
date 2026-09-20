@@ -2524,16 +2524,18 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
   function ask(body) {
     const q = lower(body.query || body.question);
     if (!q) return { ok: false, error: "VALIDATION_ERROR: query wajib" };
+    const scopedMachine = text(body.machine || body.machineCode);
     const terms = q.split(/\s+/).filter((x) => x.length > 2).slice(0, 12);
     const sources = [SHEETS.logbook, SHEETS.breakdown, SHEETS.predictive, SHEETS.rca, SHEETS.kb, SHEETS.project, SHEETS.kaizen, SHEETS.stock];
     const hits = [];
     sources.forEach((sheet) => sourceRows(sheet).forEach((r) => {
+      if (scopedMachine && !matchesMachine(r, scopedMachine)) return;
       const hay = lower(Object.values(r).filter((v) => typeof v === "string" || typeof v === "number").join(" "));
       const score = terms.reduce((n, t) => n + (hay.includes(t) ? 1 : 0), 0);
-      if (score) hits.push({ sheet, score, record: cleanRecord(r, 12) });
+      if (score) hits.push({ sheet, score, machine: machineCode(r) || machineName(r), record: cleanRecord(r, 12) });
     }));
     hits.sort((a, b) => b.score - a.score || dateValue(b.record) - dateValue(a.record));
-    return { ok: true, data: { mode: "DETERMINISTIC_EVIDENCE_SEARCH", query: body.query || body.question, answer: hits.length ? "Ditemukan " + hits.length + " record yang relevan. Tinjau evidence berikut; sistem tidak mengubah data operasional." : "Belum ditemukan evidence yang cukup pada data OMODOS saat ini.", confidence: hits.length >= 5 ? "medium" : hits.length ? "low-medium" : "low", evidence: hits.slice(0, 25), assumptions: ["Keyword similarity across current OMODOS source records"], recommendation: hits.length ? "Review evidence dan buka record sumber sebelum mengambil keputusan." : "Perlu data atau kata kunci yang lebih spesifik." } };
+    return { ok: true, data: { mode: "DETERMINISTIC_EVIDENCE_SEARCH", query: body.query || body.question, machine: scopedMachine, answer: hits.length ? "Ditemukan " + hits.length + " record yang relevan" + (scopedMachine ? " untuk mesin " + scopedMachine : "") + ". Tinjau evidence berikut; sistem tidak mengubah data operasional." : "Belum ditemukan evidence yang cukup" + (scopedMachine ? " untuk mesin " + scopedMachine : "") + " pada data OMODOS saat ini.", confidence: hits.length >= 5 ? "medium" : hits.length ? "low-medium" : "low", evidence: hits.slice(0, 25), assumptions: [scopedMachine ? "Keyword similarity restricted to the selected machine" : "Keyword similarity across current OMODOS source records"], recommendation: hits.length ? "Review evidence dan buka record sumber sebelum mengambil keputusan." : "Perlu data atau kata kunci yang lebih spesifik." } };
   }
   __name(ask, "ask");
   function getAccess(body) {
