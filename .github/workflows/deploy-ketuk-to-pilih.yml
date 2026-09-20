@@ -1,0 +1,327 @@
+name: Deploy Ketuk to Pilih UI Update
+
+on:
+  push:
+    branches:
+      - deploy/ketuk-to-pilih
+    paths:
+      - ".github/workflows/deploy-ketuk-to-pilih.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+      WORKER_NAME: omodos
+      PRODUCTION_URL: https://omodos.offsetbmj.workers.dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Recover current production backend exactly
+        shell: python
+        run: |
+          import os,json,base64,hashlib,urllib.request
+          from pathlib import Path
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={
+              "Authorization":"Bearer "+token,
+              "Accept":"application/json"
+            })
+            with urllib.request.urlopen(req,timeout=45) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments")
+          rr=dep.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No active deployment found")
+
+          active=[v for v in rows[0].get("versions") or [] if float(v.get("percentage") or 0)>0]
+          if len(active)!=1 or abs(float(active[0].get("percentage") or 0)-100)>0.001:
+            raise SystemExit("Expected exactly one active 100% version: "+json.dumps(active))
+
+          old=str(active[0].get("version_id") or "")
+          if not old:
+            raise SystemExit("Active version ID unavailable")
+
+          detail=get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/{worker}/versions/{old}?include=modules"
+          ).get("result") or {}
+
+          if detail.get("main_module")!="worker.js":
+            raise SystemExit("Active production is not expected worker.js backend")
+
+          mods=detail.get("modules") or []
+          if not mods:
+            raise SystemExit("Active production worker module unavailable")
+
+          mod=max(mods,key=lambda m:len(m.get("content_base64") or ""))
+          raw=base64.b64decode(mod.get("content_base64") or "")
+          if len(raw)<500000:
+            raise SystemExit("Recovered backend module unexpectedly small")
+
+          bindings=detail.get("bindings") or []
+          names={}
+          if isinstance(bindings,list):
+            for b in bindings:
+              if isinstance(b,dict) and b.get("name"):
+                names[str(b["name"])]=str(b.get("type") or "")
+          if "MAINTENANCE" not in names or "durable" not in names["MAINTENANCE"].lower():
+            raise SystemExit("Active production MAINTENANCE Durable Object binding missing")
+
+          assets=detail.get("assets") or {}
+          config=(assets.get("config") or {}) if isinstance(assets,dict) else {}
+          expected_routes=["/api","/api/*","/files/*"]
+          if config.get("run_worker_first")!=expected_routes:
+            raise SystemExit("Active production worker-first routing mismatch: "+repr(config))
+
+          backend_sha=hashlib.sha256(raw).hexdigest()
+
+          Path("src").mkdir(exist_ok=True)
+          Path("src/worker.js").write_bytes(raw)
+          Path("/tmp/old-version").write_text(old)
+          Path("/tmp/backend-sha").write_text(backend_sha)
+
+          with Path(os.environ["GITHUB_ENV"]).open("a") as f:
+            f.write("OLD_VERSION="+old+"\n")
+            f.write("BACKEND_SHA="+backend_sha+"\n")
+
+          compatibility_date=detail.get("compatibility_date") or "2026-09-01"
+          wrangler={
+            "$schema":"node_modules/wrangler/config-schema.json",
+            "name":"omodos",
+            "main":"src/worker.js",
+            "compatibility_date":compatibility_date,
+            "no_bundle":True,
+            "assets":{
+              "directory":"./public",
+              "binding":"ASSETS",
+              "run_worker_first":expected_routes,
+              "html_handling":"auto-trailing-slash",
+              "not_found_handling":"none"
+            },
+            "durable_objects":{
+              "bindings":[
+                {"name":"MAINTENANCE","class_name":"MaintenanceStore"}
+              ]
+            },
+            "migrations":[
+              {"tag":"v1","new_sqlite_classes":["MaintenanceStore"]}
+            ],
+            "observability":{"enabled":True}
+          }
+          Path("wrangler.ui-update.json").write_text(json.dumps(wrangler,indent=2)+"\n",encoding="utf-8")
+
+          print("[RECOVER] old="+old)
+          print("[RECOVER] backend_sha="+backend_sha)
+          print("[RECOVER] compatibility_date="+compatibility_date)
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@latest
+
+      - name: Upload candidate version without changing traffic
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions upload             --config wrangler.ui-update.json             --message "OMODOS UI terminology: Ketuk to Pilih"             --tag "ketuk-to-pilih-20260920"             2>&1 | tee /tmp/upload.log
+
+          VERSION_ID="$(grep -Eo 'Worker Version ID: [0-9a-f-]+' /tmp/upload.log | tail -1 | awk '{print $4}')"
+          if [ -z "$VERSION_ID" ]; then
+            echo "Unable to parse Worker Version ID"
+            exit 1
+          fi
+          echo "CANDIDATE_VERSION=$VERSION_ID" >> "$GITHUB_ENV"
+          printf '%s' "$VERSION_ID" > /tmp/candidate-version
+          echo "[UPLOAD] candidate=$VERSION_ID"
+
+      - name: Verify candidate preserves backend
+        shell: python
+        run: |
+          import os,json,base64,hashlib,urllib.request
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+          vid=os.environ["CANDIDATE_VERSION"]
+          expected_sha=os.environ["BACKEND_SHA"]
+
+          req=urllib.request.Request(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/{worker}/versions/{vid}?include=modules",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=45) as r:
+            d=json.loads(r.read().decode("utf-8")).get("result") or {}
+
+          mods=d.get("modules") or []
+          if not mods:
+            raise SystemExit("Candidate backend module missing")
+          raw=base64.b64decode(max(mods,key=lambda m:len(m.get("content_base64") or "")).get("content_base64") or "")
+          got_sha=hashlib.sha256(raw).hexdigest()
+          if got_sha!=expected_sha:
+            raise SystemExit("Candidate backend differs from current production backend")
+
+          bindings=d.get("bindings") or []
+          names={}
+          if isinstance(bindings,list):
+            for b in bindings:
+              if isinstance(b,dict) and b.get("name"):
+                names[str(b["name"])]=str(b.get("type") or "")
+          if "MAINTENANCE" not in names or "durable" not in names["MAINTENANCE"].lower():
+            raise SystemExit("Candidate MAINTENANCE binding missing")
+
+          assets=d.get("assets") or {}
+          config=(assets.get("config") or {}) if isinstance(assets,dict) else {}
+          if config.get("run_worker_first")!=["/api","/api/*","/files/*"]:
+            raise SystemExit("Candidate API routing changed unexpectedly")
+
+          if d.get("migration_tag")!="v1":
+            raise SystemExit("Candidate migration tag is not v1")
+
+          print("[CANDIDATE] backend preserved")
+          print("[CANDIDATE] migration v1 preserved")
+          print("[CANDIDATE] API routing preserved")
+
+      - name: Promote candidate to production
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions deploy             "$CANDIDATE_VERSION@100%"             --name "$WORKER_NAME"             -y
+          echo "[PROMOTE] candidate=$CANDIDATE_VERSION"
+
+      - name: Validate live UI and login backend
+        shell: python
+        run: |
+          import os,json,re,time,urllib.request,urllib.error,hashlib
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+          expected_bytes=Path("public/index.html").read_bytes()
+          expected_sha=hashlib.sha256(expected_bytes).hexdigest()
+
+          def fetch(path,method="GET",payload=None):
+            headers={
+              "User-Agent":"OMODOS-Ketuk-Pilih-QA/1.0",
+              "Cache-Control":"no-cache"
+            }
+            data=None
+            if payload is not None:
+              data=json.dumps(payload).encode("utf-8")
+              headers["Content-Type"]="text/plain;charset=utf-8"
+            req=urllib.request.Request(base+path,data=data,method=method,headers=headers)
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                return r.status,r.headers,r.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          last=None
+          for attempt in range(1,8):
+            root_status,root_h,root_body=fetch("/?ui_term_verify="+str(attempt))
+            root_text=root_body.decode("utf-8",errors="replace")
+
+            login_status,login_h,login_body=fetch(
+              "/api",
+              "POST",
+              {
+                "action":"login",
+                "username":"__omodos_qa_nonexistent_user__",
+                "password":"__omodos_qa_invalid_password__"
+              }
+            )
+            login_ct=(login_h.get("Content-Type") or "").lower()
+            login_text=login_body.decode("utf-8",errors="replace").lstrip()
+            try:
+              login_json=json.loads(login_text)
+              login_valid_json=True
+            except Exception:
+              login_json={}
+              login_valid_json=False
+
+            last={
+              "root_status":root_status,
+              "exact_html":hashlib.sha256(root_body).hexdigest()==expected_sha,
+              "old_term_remaining":bool(re.search(r'\b(?:Ketuk|ketuk|KETUK)\b',root_text)),
+              "pilih_present":bool(re.search(r'\b(?:Pilih|pilih|PILIH)\b',root_text)),
+              "copilot_help":'id="copilot-help"' in root_text,
+              "login_status":login_status,
+              "login_content_type":login_ct,
+              "login_valid_json":login_valid_json,
+              "dummy_login_ok":login_json.get("ok") is True
+            }
+
+            ok=(
+              root_status==200 and
+              last["exact_html"] and
+              not last["old_term_remaining"] and
+              last["pilih_present"] and
+              last["copilot_help"] and
+              login_status!=404 and
+              login_valid_json and
+              not last["dummy_login_ok"]
+            )
+            if ok:
+              break
+            time.sleep(2)
+          else:
+            raise SystemExit("Live validation failed: "+json.dumps(last,sort_keys=True))
+
+          report=[
+            "# OMODOS Ketuk to Pilih Production Deployment",
+            "",
+            f"- Validated UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Previous production version: {os.environ['OLD_VERSION']}",
+            f"- Current production version: {os.environ['CANDIDATE_VERSION']}",
+            f"- Backend SHA-256 preserved: {os.environ['BACKEND_SHA']}",
+            f"- Root HTTP: {last['root_status']}",
+            f"- Exact GitHub frontend HTML: {last['exact_html']}",
+            f"- Standalone Ketuk remaining: {last['old_term_remaining']}",
+            f"- Pilih present: {last['pilih_present']}",
+            f"- Copilot Bantuan present: {last['copilot_help']}",
+            f"- Login handler HTTP: {last['login_status']}",
+            f"- Login handler Content-Type: {last['login_content_type']}",
+            f"- Login handler valid JSON: {last['login_valid_json']}",
+            "- Login/backend preserved: YES",
+            "- Production verdict: PASS"
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/KETUK_TO_PILIH_PRODUCTION.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[LIVE_QA] PASS "+json.dumps(last,sort_keys=True))
+
+      - name: Roll back on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          OLD="${OLD_VERSION:-}"
+          if [ -z "$OLD" ] && [ -f /tmp/old-version ]; then OLD="$(cat /tmp/old-version)"; fi
+          if [ -n "$OLD" ]; then
+            echo "[ROLLBACK] restoring $OLD"
+            npx wrangler versions deploy "$OLD@100%" --name "$WORKER_NAME" -y
+          else
+            echo "[ROLLBACK] previous version unavailable"
+          fi
+
+      - name: Commit sanitized production report
+        if: success()
+        shell: bash
+        run: |
+          rm -rf src wrangler.ui-update.json node_modules package-lock.json package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/KETUK_TO_PILIH_PRODUCTION.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "deploy: record Ketuk to Pilih production rollout"
+          git push
