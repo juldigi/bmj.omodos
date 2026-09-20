@@ -1,0 +1,187 @@
+name: Probe Cloudflare Latest Version Modules
+
+on:
+  push:
+    branches:
+      - recovery/cloudflare-version-safe
+    paths:
+      - ".github/workflows/probe-cloudflare-version-modules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read latest Worker version with modules
+        shell: python
+        run: |
+          import os, json, base64, hashlib, urllib.request
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          token=os.environ.get("CLOUDFLARE_DEPLOY_TOKEN","").strip()
+          if not token:
+            raise SystemExit("CLOUDFLARE_DEPLOY_TOKEN missing")
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={
+              "Authorization":"Bearer "+token,
+              "Accept":"application/json"
+            })
+            with urllib.request.urlopen(req,timeout=35) as r:
+              body=r.read()
+              return json.loads(body.decode("utf-8"))
+
+          accounts=get_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []
+          if not accounts:
+            raise SystemExit("No Cloudflare accounts visible to deploy token")
+
+          account_id=None
+          for a in accounts:
+            aid=a.get("id")
+            if not aid:
+              continue
+            try:
+              versions=get_json(
+                f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions?per_page=5"
+              )
+              rows=versions.get("result") or []
+              if rows:
+                account_id=aid
+                break
+            except Exception:
+              continue
+
+          if not account_id:
+            raise SystemExit("Worker omodos versions not found with deploy token")
+
+          latest=get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/omodos/versions/latest?include=modules"
+          )
+          result=latest.get("result") or {}
+          modules=result.get("modules") or []
+
+          module_rows=[]
+          for m in modules:
+            if not isinstance(m,dict):
+              continue
+            name=str(m.get("name") or "")
+            ctype=str(m.get("content_type") or "")
+            raw=b""
+            b64=m.get("content_base64")
+            if isinstance(b64,str) and b64:
+              try:
+                raw=base64.b64decode(b64,validate=False)
+              except Exception:
+                raw=b""
+            module_rows.append({
+              "name":name,
+              "content_type":ctype,
+              "bytes":len(raw),
+              "sha256":hashlib.sha256(raw).hexdigest() if raw else "",
+              "contains_omodos4": (b"omodos4" in raw.lower()) if raw else False,
+              "contains_maintenance_store": (b"maintenancestore" in raw.lower()) if raw else False,
+              "contains_sqlite": (b"sqlite" in raw.lower()) if raw else False,
+            })
+
+          binding_rows=[]
+          bindings=result.get("bindings")
+          if isinstance(bindings,list):
+            for b in bindings:
+              if isinstance(b,dict):
+                binding_rows.append({
+                  "name":str(b.get("name") or ""),
+                  "type":str(b.get("type") or "")
+                })
+          elif isinstance(bindings,dict):
+            for name,val in bindings.items():
+              typ=""
+              if isinstance(val,dict):
+                typ=str(val.get("type") or val.get("kind") or "")
+              binding_rows.append({"name":str(name),"type":typ})
+
+          exports=result.get("exports") or {}
+          export_rows=[]
+          if isinstance(exports,dict):
+            for name,val in exports.items():
+              if isinstance(val,dict):
+                export_rows.append({
+                  "name":str(name),
+                  "type":str(val.get("type") or ""),
+                  "storage":str(val.get("storage") or ""),
+                  "state":str(val.get("state") or "")
+                })
+
+          report=[
+            "# Cloudflare Latest Worker Version Probe",
+            "",
+            f"- Probed UTC: {datetime.now(timezone.utc).isoformat()}",
+            "- Worker: omodos",
+            f"- Version ID: {result.get('id') or 'unknown'}",
+            f"- Version number: {result.get('number') if result.get('number') is not None else 'unknown'}",
+            f"- Created on: {result.get('created_on') or 'unknown'}",
+            f"- Main module: {result.get('main_module') or 'unknown'}",
+            f"- Compatibility date: {result.get('compatibility_date') or 'unknown'}",
+            f"- Modules returned: {len(module_rows)}",
+            "",
+            "## Modules (fingerprints only)",
+            ""
+          ]
+
+          for m in sorted(module_rows,key=lambda x:x["bytes"],reverse=True):
+            report.append(
+              f"- {m['name']} — {m['content_type']} — {m['bytes']} bytes — SHA-256 {m['sha256']} "
+              f"— OMODOS4={'YES' if m['contains_omodos4'] else 'NO'} "
+              f"— MaintenanceStore={'YES' if m['contains_maintenance_store'] else 'NO'} "
+              f"— SQLite={'YES' if m['contains_sqlite'] else 'NO'}"
+            )
+
+          report += ["","## Bindings (names/types only)",""]
+          if binding_rows:
+            for b in binding_rows:
+              report.append(f"- {b['name']} — {b['type']}")
+          else:
+            report.append("- No binding metadata exposed in this response.")
+
+          report += ["","## Exports (names/types only)",""]
+          if export_rows:
+            for e in export_rows:
+              report.append(f"- {e['name']} — type={e['type']} — storage={e['storage']} — state={e['state']}")
+          else:
+            report.append("- No export metadata exposed in this response.")
+
+          largest=max(module_rows,key=lambda x:x["bytes"],default=None)
+          report += ["","## Recovery readiness",""]
+          if largest and largest["bytes"] > 100000 and largest["contains_maintenance_store"] and largest["contains_sqlite"]:
+            report.append("- PASS: latest version source modules are retrievable through the Version API.")
+          elif largest and largest["bytes"] > 100000:
+            report.append("- PARTIAL: a substantial source module is retrievable, but expected architecture markers were not all found.")
+          else:
+            report.append("- FAIL: latest version source modules were not returned with usable content.")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/CLOUDFLARE_LATEST_VERSION_MODULES.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[VERSION_PROBE] sanitized latest-version module report generated.")
+
+      - name: Commit sanitized probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/CLOUDFLARE_LATEST_VERSION_MODULES.md
+          if git diff --cached --quiet; then
+            echo "No report changes."
+            exit 0
+          fi
+          git commit -m "audit: verify Cloudflare latest version modules are recoverable"
+          git push
