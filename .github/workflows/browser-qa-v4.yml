@@ -760,6 +760,146 @@ jobs:
             }
             result.phases.push('daily-collection-contract');
 
+            console.log('[QA] Master Machine manual PDF contract');
+            const machineMediaQA = await page.evaluate(async () => {
+              const oldApiPost=apiPost, oldLoadAll=loadAll;
+              const oldEdit=MACHINE_EDIT_KODE, oldPdf=PENDING_MANUAL_PDF;
+              const calls=[];
+              const wait=async n=>{const st=Date.now();while(calls.length<n&&Date.now()-st<1500)await new Promise(r=>setTimeout(r,20));};
+              const fill=(name)=>{
+                MACHINE_EDIT_KODE=null;
+                document.getElementById('new-kode-mesin').value='QA-MEDIA-1';
+                document.getElementById('new-nama-mesin').value=name;
+                const loc=document.getElementById('new-lokasi-mesin'); if(loc) loc.value='QA Area';
+                document.getElementById('new-kategori-mesin').value='QA';
+                document.getElementById('new-spesifikasi-mesin').value='QA Spec';
+              };
+              try{
+                apiPost=async p=>{calls.push(JSON.parse(JSON.stringify(p)));return {ok:true};};
+                loadAll=async()=>({ok:true});
+                fill('QA Machine No PDF'); PENDING_MANUAL_PDF=null;
+                document.getElementById('btn-add-machine').click(); await wait(1);
+                fill('QA Machine PDF');
+                PENDING_MANUAL_PDF={name:'qa-manual.pdf',mimeType:'application/pdf',base64:'JVBERi0xLjQ='};
+                document.getElementById('btn-add-machine').click(); await wait(2);
+                return {calls};
+              }finally{
+                apiPost=oldApiPost; loadAll=oldLoadAll;
+                MACHINE_EDIT_KODE=oldEdit; PENDING_MANUAL_PDF=oldPdf;
+                try{resetMachineForm();}catch{}
+              }
+            });
+            result.machineMediaQA=machineMediaQA;
+            if(machineMediaQA.calls?.length!==2 ||
+               machineMediaQA.calls?.[0]?.action!=='addMachine' ||
+               machineMediaQA.calls?.[0]?.manualFile!==null ||
+               machineMediaQA.calls?.[0]?.machine?.namaMesin!=='QA Machine No PDF' ||
+               machineMediaQA.calls?.[1]?.action!=='addMachine' ||
+               machineMediaQA.calls?.[1]?.manualFile?.name!=='qa-manual.pdf' ||
+               machineMediaQA.calls?.[1]?.manualFile?.mimeType!=='application/pdf' ||
+               machineMediaQA.calls?.[1]?.manualFile?.base64!=='JVBERi0xLjQ=') {
+              throw new Error('Machine manual PDF contract failed: '+JSON.stringify(machineMediaQA));
+            }
+            result.phases.push('machine-media-contract');
+
+            console.log('[QA] Master Personil photo contract');
+            const personilMediaQA = await page.evaluate(async () => {
+              const oldApiPost=apiPost, oldLoadAll=loadAll;
+              const oldEdit=PERSONIL_EDIT_NAMA, oldPhoto=PENDING_PERSONIL_PHOTO;
+              const calls=[];
+              const wait=async n=>{const st=Date.now();while(calls.length<n&&Date.now()-st<1500)await new Promise(r=>setTimeout(r,20));};
+              const fill=(name)=>{
+                PERSONIL_EDIT_NAMA=null;
+                document.getElementById('new-nama-personil').value=name;
+                const team=document.getElementById('new-team-personil');
+                if(team){ if(![...team.options].some(o=>o.value==='A')) team.add(new Option('A','A')); team.value='A'; }
+                document.getElementById('new-jabatan-personil').value='QA Technician';
+              };
+              try{
+                apiPost=async p=>{calls.push(JSON.parse(JSON.stringify(p)));return {ok:true};};
+                loadAll=async()=>({ok:true});
+                fill('QA Person No Photo'); PENDING_PERSONIL_PHOTO=null;
+                document.getElementById('btn-add-personil').click(); await wait(1);
+                fill('QA Person Photo');
+                PENDING_PERSONIL_PHOTO={name:'qa-person.jpg',mimeType:'image/jpeg',base64:'AQID'};
+                document.getElementById('btn-add-personil').click(); await wait(2);
+                return {calls};
+              }finally{
+                apiPost=oldApiPost; loadAll=oldLoadAll;
+                PERSONIL_EDIT_NAMA=oldEdit; PENDING_PERSONIL_PHOTO=oldPhoto;
+                try{resetPersonilForm();}catch{}
+              }
+            });
+            result.personilMediaQA=personilMediaQA;
+            if(personilMediaQA.calls?.length!==2 ||
+               personilMediaQA.calls?.[0]?.action!=='addPersonil' ||
+               personilMediaQA.calls?.[0]?.photoFile!==null ||
+               personilMediaQA.calls?.[0]?.personil?.namaPersonil!=='QA Person No Photo' ||
+               personilMediaQA.calls?.[1]?.action!=='addPersonil' ||
+               personilMediaQA.calls?.[1]?.photoFile?.name!=='qa-person.jpg' ||
+               personilMediaQA.calls?.[1]?.photoFile?.mimeType!=='image/jpeg' ||
+               personilMediaQA.calls?.[1]?.photoFile?.base64!=='AQID') {
+              throw new Error('Personil photo contract failed: '+JSON.stringify(personilMediaQA));
+            }
+            result.phases.push('personil-media-contract');
+
+            console.log('[QA] Meeting attachment contract');
+            const meetingMediaQA = await page.evaluate(async () => {
+              const oldApiPost=apiPost;
+              const oldSave=mtgWizardSaveStepInputs;
+              const oldLoad=mtgLoadAll;
+              const oldPop=mtgPopulateFilterOptions;
+              const oldDash=mtgRenderDashboard;
+              const oldCurrent=mtgRenderCurrentMode;
+              const oldClose=closeModal;
+              const oldWizard=JSON.parse(JSON.stringify(MTG_STATE.wizard||{}));
+              const calls=[];
+              const baseWizard=()=>({
+                step:1, editId:null, jenis:'Daily Meeting',
+                info:{judul:'QA Meeting',tanggal:'2026-09-20',jam:'13:00',lokasi:'QA',moderator:'QA',notulen:'QA',department:'MTC',status:'OPEN'},
+                peserta:[],agenda:[],diskusi:'',keputusan:[],ringkasan:'QA',catatan:'',
+                links:{factory:[],kaizen:[],sga:[],mesin:[]},
+                existingAttachments:[],attachments:[],actionItems:[]
+              });
+              try{
+                apiPost=async p=>{calls.push(JSON.parse(JSON.stringify(p)));return {ok:true,id:'MTG-QA'};};
+                mtgWizardSaveStepInputs=()=>{};
+                mtgLoadAll=async()=>{};
+                mtgPopulateFilterOptions=()=>{};
+                mtgRenderDashboard=()=>{};
+                mtgRenderCurrentMode=()=>{};
+                closeModal=()=>{};
+
+                MTG_STATE.wizard=baseWizard();
+                await mtgWizardSubmit();
+
+                MTG_STATE.wizard=baseWizard();
+                MTG_STATE.wizard.attachments=[{name:'qa-meeting.pdf',mimeType:'application/pdf',base64:'JVBERg==',_localUrl:'blob:qa-meeting'}];
+                await mtgWizardSubmit();
+
+                const saveCalls=calls.filter(x=>x.action==='saveMeeting');
+                return {
+                  saveCalls,
+                  secondHasLocalUrl:Object.prototype.hasOwnProperty.call(saveCalls?.[1]?.attachmentFiles?.[0]||{},'_localUrl')
+                };
+              }finally{
+                apiPost=oldApiPost; mtgWizardSaveStepInputs=oldSave; mtgLoadAll=oldLoad;
+                mtgPopulateFilterOptions=oldPop; mtgRenderDashboard=oldDash; mtgRenderCurrentMode=oldCurrent; closeModal=oldClose;
+                MTG_STATE.wizard=oldWizard;
+              }
+            });
+            result.meetingMediaQA=meetingMediaQA;
+            if(meetingMediaQA.saveCalls?.length!==2 ||
+               meetingMediaQA.saveCalls?.[0]?.attachmentFiles?.length!==0 ||
+               meetingMediaQA.saveCalls?.[1]?.attachmentFiles?.length!==1 ||
+               meetingMediaQA.saveCalls?.[1]?.attachmentFiles?.[0]?.name!=='qa-meeting.pdf' ||
+               meetingMediaQA.saveCalls?.[1]?.attachmentFiles?.[0]?.mimeType!=='application/pdf' ||
+               meetingMediaQA.saveCalls?.[1]?.attachmentFiles?.[0]?.base64!=='JVBERg==' ||
+               meetingMediaQA.secondHasLocalUrl!==false) {
+              throw new Error('Meeting attachment contract failed: '+JSON.stringify(meetingMediaQA));
+            }
+            result.phases.push('meeting-media-contract');
+
             console.log('[QA] sparepart pagination');
             const selectorQA = await page.evaluate(() => {
               const p = document.createElement('div');
