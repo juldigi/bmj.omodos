@@ -206,11 +206,26 @@ jobs:
             const physicalCount = await physicalModules.count();
             const sidebarClickQA = { moduleCount: physicalCount, failures: [], modules: [] };
             for (let i = 0; i < physicalCount; i++) {
+              await page.evaluate(() => {
+                try { if(typeof goToView === 'function') goToView('omodos4'); } catch {}
+                const app=document.getElementById('app-root');
+                const sidebar=document.querySelector('.sidebar');
+                if(app){
+                  app.classList.remove('dash-mode');
+                  app.classList.add('sidebar-drawer-open','menu-visible');
+                }
+                if(sidebar) sidebar.classList.add('open');
+                const sub=document.querySelector('#v4-nav-group [data-submenu="omodos4"]');
+                const parent=document.querySelector('#v4-nav-group .nav-parent-btn[data-group="omodos4"]');
+                if(sub){sub.classList.add('open');sub.style.maxHeight='none';sub.style.overflow='visible';}
+                if(parent) parent.classList.add('open');
+              });
+              await page.waitForTimeout(15);
               const btn = physicalModules.nth(i);
               const name = (await btn.getAttribute('aria-label')) || ('module-' + i);
               try {
                 console.log('[QA] sidebar module:', name);
-                await btn.click({force:true, timeout:1000});
+                await btn.click({timeout:1500});
                 await page.waitForTimeout(40);
                 const state = await page.evaluate((expectedName) => {
                   const view = document.getElementById('view-omodos4');
