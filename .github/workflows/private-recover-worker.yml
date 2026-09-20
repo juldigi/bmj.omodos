@@ -1,0 +1,155 @@
+name: Private Recover OMODOS Worker Source
+
+on:
+  push:
+    branches:
+      - recovery/backend-private-audit
+    paths:
+      - ".github/workflows/private-recover-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recover-encrypted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Worker source to ephemeral runner
+        shell: python
+        run: |
+          import os, json, urllib.request
+          from email.parser import BytesParser
+          from email.policy import default
+          from pathlib import Path
+
+          token=os.environ.get("CLOUDFLARE_API_TOKEN","").strip()
+          if not token:
+            raise SystemExit("CLOUDFLARE_API_TOKEN missing")
+
+          def req_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=25) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          def req_raw(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"*/*"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return r.read(), r.headers.get("Content-Type","")
+
+          account_id=None
+          for a in req_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []:
+            aid=a.get("id")
+            if not aid: continue
+            try:
+              scripts=req_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts").get("result") or []
+            except Exception:
+              continue
+            if any(str(x.get("id") or "")=="omodos" for x in scripts):
+              account_id=aid
+              break
+
+          if not account_id:
+            raise SystemExit("Worker omodos not found")
+
+          raw,ctype=req_raw(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2")
+
+          source=None
+          source_name="worker.js"
+          if "multipart/" in ctype.lower():
+            pseudo=(f"Content-Type: {ctype}\r\nMIME-Version: 1.0\r\n\r\n").encode()+raw
+            msg=BytesParser(policy=default).parsebytes(pseudo)
+            for p in msg.iter_parts():
+              payload=p.get_payload(decode=True) or b""
+              name=str(p.get_param("name",header="content-disposition") or p.get_filename() or "")
+              pct=p.get_content_type()
+              if pct.startswith("application/javascript") or name.lower().endswith((".js",".mjs",".ts")):
+                source=payload
+                source_name=name or "worker.js"
+                break
+          else:
+            source=raw
+
+          if not source:
+            raise SystemExit("Worker source part not found")
+
+          Path("/tmp/omodos-worker.js").write_bytes(source)
+          Path("/tmp/source-name.txt").write_text(source_name,encoding="utf-8")
+          print(f"[PRIVATE_RECOVERY] source captured in ephemeral runner: {len(source)} bytes")
+
+      - name: Encrypt source before repository write
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/recovery-public.pem <<'PUB'
+-----BEGIN PUBLIC KEY-----
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAl3hRLncuADhrGIfayz4f
+Wp276dGETOSKyd57E2sjcZmbFOaF3YRsBF251qy+EUFIo3tdpgg7ZZfFS9isXqC9
+qZm963NHltHrpuv7eEZ6KCBl3FNF8FgrCNzTQur7VYDT3zc4ABBcScGKtFyi1vLX
+i0MLpbq+rsNLjeeradOk5koJfQ2/Ht1jk+7csbi687ohrhpJVlvv2ok8QIgGOEHe
+jICrJEdq7b5ffL+J9tOkOAmlsDssimgaJ/n5ZT1GK/v2+jTPagcTaTO6rZdnPT6R
+IwEfq5pWqnlQSYo2hfoLL/Vj+C3liXaGPyhx+9SIYdEjUnqJzUlgmyCZrtCv/4Si
+ESLNsN63agSYF821MqOQnPLBA92p8g2XDxh7Nw1lZwTyaR6iQ3ckXkYHFEUqeRFV
+hS5T4ibM4gkm0Ck6xv8e+UvLWDOYCrUCg96WwTDGzWBCKBuijeDfmliCMil1+AER
+WeKd416Gj4WKz6qFKJZxAcFSHxzOenro3NQxUIhSWo2dAgMBAAE=
+-----END PUBLIC KEY-----
+          PUB
+
+          mkdir -p recovery/private-backend
+          rm -f recovery/private-backend/worker.enc.b64.part-* recovery/private-backend/key.enc.b64 recovery/private-backend/METADATA.txt
+
+          SOURCE_SHA="$(sha256sum /tmp/omodos-worker.js | awk '{print $1}')"
+          SOURCE_BYTES="$(wc -c < /tmp/omodos-worker.js | tr -d ' ')"
+          SOURCE_NAME="$(cat /tmp/source-name.txt)"
+
+          PASS="$(openssl rand -hex 32)"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 250000 -salt             -in /tmp/omodos-worker.js             -out /tmp/omodos-worker.enc             -pass pass:"$PASS"
+
+          printf '%s' "$PASS" | openssl pkeyutl -encrypt             -pubin             -inkey /tmp/recovery-public.pem             -pkeyopt rsa_padding_mode:oaep             -pkeyopt rsa_oaep_md:sha256             -out /tmp/key.enc
+
+          unset PASS
+
+          base64 -w0 /tmp/omodos-worker.enc > /tmp/worker.enc.b64
+          base64 -w0 /tmp/key.enc > recovery/private-backend/key.enc.b64
+          split -b 120000 -d -a 3 /tmp/worker.enc.b64 recovery/private-backend/worker.enc.b64.part-
+
+          CIPHER_SHA="$(sha256sum /tmp/omodos-worker.enc | awk '{print $1}')"
+          CHUNKS="$(find recovery/private-backend -name 'worker.enc.b64.part-*' | wc -l | tr -d ' ')"
+
+          {
+            echo "format=OMODOS_PRIVATE_RECOVERY_V1"
+            echo "cipher=aes-256-cbc"
+            echo "kdf=pbkdf2"
+            echo "iterations=250000"
+            echo "key_wrap=rsa-oaep-sha256"
+            echo "source_name=$SOURCE_NAME"
+            echo "source_bytes=$SOURCE_BYTES"
+            echo "source_sha256=$SOURCE_SHA"
+            echo "cipher_sha256=$CIPHER_SHA"
+            echo "chunks=$CHUNKS"
+            echo "public_key_sha256=f3ab0bdd93bdf80a79992bc81cc31d62013507dfba02b07fada6d8ce108e559e"
+          } > recovery/private-backend/METADATA.txt
+
+          rm -f /tmp/omodos-worker.js /tmp/omodos-worker.enc /tmp/worker.enc.b64 /tmp/key.enc /tmp/recovery-public.pem /tmp/source-name.txt
+
+          echo "[PRIVATE_RECOVERY] encrypted chunks prepared; plaintext removed."
+
+      - name: Commit encrypted recovery only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add recovery/private-backend
+          if git diff --cached --quiet; then
+            echo "Encrypted recovery unchanged."
+            exit 0
+          fi
+          git commit -m "chore: store encrypted Worker recovery snapshot"
+          git push
