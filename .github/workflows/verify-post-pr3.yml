@@ -1,0 +1,280 @@
+name: Verify Post-PR3 Production and Access Split
+
+on:
+  push:
+    branches:
+      - verify/post-pr3-production
+    paths:
+      - ".github/workflows/verify-post-pr3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait until production matches main
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/juldigi/bmj.omodos/main/public/index.html -o /tmp/main.html
+          MAIN_SHA="$(sha256sum /tmp/main.html | awk '{print $1}')"
+          echo "MAIN_SHA=$MAIN_SHA" >> "$GITHUB_ENV"
+          echo "MAIN_BYTES=$(wc -c < /tmp/main.html | tr -d ' ')" >> "$GITHUB_ENV"
+
+          MATCHED=0
+          for i in $(seq 1 18); do
+            curl -fsSL --retry 3 --retry-delay 1 https://omodos.offsetbmj.workers.dev/ -o /tmp/live.html
+            LIVE_SHA="$(sha256sum /tmp/live.html | awk '{print $1}')"
+            echo "attempt=$i live=$LIVE_SHA main=$MAIN_SHA"
+            if [ "$LIVE_SHA" = "$MAIN_SHA" ]; then
+              MATCHED=1
+              echo "LIVE_SHA=$LIVE_SHA" >> "$GITHUB_ENV"
+              echo "LIVE_BYTES=$(wc -c < /tmp/live.html | tr -d ' ')" >> "$GITHUB_ENV"
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$MATCHED" != "1" ]; then
+            echo "Production did not converge to main during verification window."
+            exit 1
+          fi
+
+      - name: Static verify access-management split
+        shell: python
+        run: |
+          from pathlib import Path
+          import re,json
+
+          s=Path("/tmp/main.html").read_text(encoding="utf-8",errors="replace")
+          lines=s.splitlines()
+
+          terms=[
+            "User Management",
+            "Role Access Management",
+            "User & Akses",
+            "user management",
+            "role access",
+          ]
+          rows={}
+          for term in terms:
+            hits=[]
+            for i,l in enumerate(lines,1):
+              if term.lower() in l.lower():
+                hits.append({"line":i,"text":l.strip()[:900]})
+            rows[term]=hits[:50]
+
+          # Find DOM IDs/classes on lines around the exact headings.
+          anchors=[]
+          for exact in ("User Management","Role Access Management"):
+            for i,l in enumerate(lines):
+              if exact.lower() in l.lower():
+                chunk="\n".join(lines[max(0,i-12):min(len(lines),i+25)])
+                ids=re.findall(r'id=["\']([^"\']+)["\']',chunk,re.I)
+                classes=re.findall(r'class=["\']([^"\']+)["\']',chunk,re.I)
+                anchors.append({"heading":exact,"line":i+1,"ids":ids[:30],"classes":classes[:20]})
+
+          out={
+            "term_hits":{k:len(v) for k,v in rows.items()},
+            "anchors":anchors,
+            "samples":rows,
+          }
+          Path("/tmp/access-static.json").write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding="utf-8")
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser verify live fixes and Master Koneksi
+        shell: bash
+        run: |
+          cat > post-pr3.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser=await chromium.launch({headless:true});
+          const result={errors:[],failedRequests:[]};
+
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            page.setDefaultTimeout(10000);
+            page.on('pageerror',e=>result.errors.push(String(e)));
+            page.on('requestfailed',req=>{
+              if(req.url().startsWith('https://omodos.offsetbmj.workers.dev')){
+                result.failedRequests.push({url:req.url(),error:req.failure()?.errorText||''});
+              }
+            });
+            page.on('dialog',async d=>{try{await d.dismiss();}catch{}});
+
+            await page.goto('https://omodos.offsetbmj.workers.dev/',{
+              waitUntil:'domcontentloaded',timeout:25000
+            });
+
+            result.structure=await page.evaluate(()=>({
+              filterMachine:!!document.getElementById('filter-machine'),
+              help:!!document.getElementById('copilot-help'),
+              helpInsideCopilot:!!document.getElementById('copilot-help')?.closest('#copilot-panel'),
+              helpOutsideCopilot:[...document.querySelectorAll('#copilot-help')].some(x=>!x.closest('#copilot-panel')),
+              machineSnapshot:typeof machineLatestStatusSnapshot_==='function',
+              latestLogbook:typeof latestLogbookForMachine_==='function',
+              latestPatrol:typeof latestPatrolForMachine_==='function',
+            }));
+
+            if(!result.structure.filterMachine || !result.structure.help ||
+               !result.structure.helpInsideCopilot || result.structure.helpOutsideCopilot ||
+               !result.structure.machineSnapshot || !result.structure.latestLogbook || !result.structure.latestPatrol){
+              throw new Error('Live structure failed: '+JSON.stringify(result.structure));
+            }
+
+            result.logbook=await page.evaluate(()=>{
+              MACHINES=[
+                {'Kode Mesin':'O5','Nama Mesin':'Offset 5'},
+                {'Kode Mesin':'O6','Nama Mesin':'Offset 6'}
+              ];
+              ENTRIES=[
+                {'Kode Mesin':'O5','Nama Mesin':'Offset 5','Status':'Proses','Jenis Pekerjaan':'Corrective','Grouping Pekerjaan':'Mechanical','Tanggal':'2026-09-20','Timestamp Input':'2026-09-20T10:00:00','Nama Pelapor':'QA','Deskripsi Masalah':'Uji O5'},
+                {'Kode Mesin':'O6','Nama Mesin':'Offset 6','Status':'Proses','Jenis Pekerjaan':'Corrective','Grouping Pekerjaan':'Mechanical','Tanggal':'2026-09-20','Timestamp Input':'2026-09-20T09:00:00','Nama Pelapor':'QA','Deskripsi Masalah':'Uji O6'}
+              ];
+              LOGBOOK_CARD_FILTER='total';
+              renderUtama();
+              const sel=document.getElementById('filter-machine');
+              sel.value='O5';
+              sel.dispatchEvent(new Event('change',{bubbles:true}));
+              const text=document.getElementById('list-utama').textContent||'';
+              return {
+                options:[...sel.options].map(o=>({value:o.value,text:o.textContent})),
+                selected:sel.value,
+                hasO5:text.includes('Offset 5')||text.includes('O5'),
+                hasO6:text.includes('Offset 6')||text.includes('O6')
+              };
+            });
+            if(result.logbook.selected!=='O5' || !result.logbook.hasO5 || result.logbook.hasO6){
+              throw new Error('Live Logbook filter failed: '+JSON.stringify(result.logbook));
+            }
+
+            result.help=await page.evaluate(()=>{
+              CURRENT_USER={username:'qa-super',displayName:'QA Superadmin',role:'Superadmin'};
+              SESSION_TOKEN='qa';
+              try{ FEATURE_REGISTRY=mergeFeatureRegistry([]); PERMISSIONS={}; applyRbacToUi(); }catch{}
+              goToView('utama');
+              openCopilot();
+              document.getElementById('copilot-help').click();
+              const cards=[...document.querySelectorAll('[data-copilot-help-card]')];
+              const last=cards[cards.length-1];
+              return {
+                count:cards.length,
+                text:last?.textContent?.replace(/\s+/g,' ').trim()||''
+              };
+            });
+            if(result.help.count<1 || !/Bantuan/.test(result.help.text) || !/View Logbook/.test(result.help.text)){
+              throw new Error('Live Copilot help failed: '+JSON.stringify(result.help));
+            }
+
+            result.access=await page.evaluate(()=>{
+              CURRENT_USER={username:'qa-super',displayName:'QA Superadmin',role:'Superadmin'};
+              SESSION_TOKEN='qa';
+              try{ FEATURE_REGISTRY=mergeFeatureRegistry([]); PERMISSIONS={}; applyRbacToUi(); }catch{}
+              goToView('setting');
+
+              const els=[...document.querySelectorAll('#view-setting *')];
+              const matching=els.filter(el=>{
+                const t=String(el.textContent||'').replace(/\s+/g,' ').trim();
+                return /User Management|Role Access Management|User & Akses/i.test(t) && t.length<500;
+              }).map(el=>({
+                tag:el.tagName,
+                id:el.id||'',
+                cls:String(el.className||'').slice(0,160),
+                text:String(el.textContent||'').replace(/\s+/g,' ').trim().slice(0,450)
+              })).slice(0,80);
+
+              const exactText=(needle)=>els.filter(el=>
+                String(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase()===needle.toLowerCase()
+              ).map(el=>({tag:el.tagName,id:el.id||'',cls:String(el.className||'').slice(0,160)}));
+
+              return {
+                matching,
+                userExact:exactText('User Management'),
+                roleExact:exactText('Role Access Management'),
+                settingActive:document.getElementById('view-setting')?.classList.contains('active')||false
+              };
+            });
+
+            result.helpOutside=await page.evaluate(()=>{
+              return [...document.querySelectorAll('button,a,[role="button"],.card,.panel')]
+                .filter(el=>/\bBantuan\b/i.test(el.textContent||'') && !el.closest('#copilot-panel'))
+                .map(el=>({tag:el.tagName,id:el.id||'',text:String(el.textContent||'').trim().slice(0,180)}));
+            });
+
+            console.log('[POST_PR3] '+JSON.stringify(result));
+            if(result.errors.length) throw new Error('Live page errors: '+JSON.stringify(result.errors));
+            if(result.failedRequests.length) throw new Error('Live failed requests: '+JSON.stringify(result.failedRequests));
+            if(result.helpOutside.length) throw new Error('Bantuan outside Copilot: '+JSON.stringify(result.helpOutside));
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          node --check post-pr3.mjs
+          timeout -k 5s 70s node post-pr3.mjs | tee /tmp/post-pr3.txt
+
+      - name: Generate verification report
+        shell: python
+        run: |
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import os,re,json
+
+          static=json.loads(Path("/tmp/access-static.json").read_text())
+          txt=Path("/tmp/post-pr3.txt").read_text(encoding="utf-8",errors="replace")
+          m=re.search(r"\[POST_PR3\]\s*(\{.*\})",txt)
+          live=json.loads(m.group(1)) if m else {}
+
+          report=[
+            "# OMODOS Post-PR3 Production Verification",
+            "",
+            f"- Verified UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Main SHA-256: {os.environ.get('MAIN_SHA')}",
+            f"- Live SHA-256: {os.environ.get('LIVE_SHA')}",
+            f"- Main bytes: {os.environ.get('MAIN_BYTES')}",
+            f"- Live bytes: {os.environ.get('LIVE_BYTES')}",
+            f"- Live equals main: {'YES' if os.environ.get('MAIN_SHA')==os.environ.get('LIVE_SHA') else 'NO'}",
+            "",
+            "## Live fixes",
+            "",
+            f"- Structure: {json.dumps(live.get('structure') or {},ensure_ascii=False)}",
+            f"- Logbook machine filter: {json.dumps(live.get('logbook') or {},ensure_ascii=False)}",
+            f"- Copilot contextual help: {json.dumps(live.get('help') or {},ensure_ascii=False)}",
+            f"- Bantuan outside Copilot: {len(live.get('helpOutside') or [])}",
+            f"- Page errors: {len(live.get('errors') or [])}",
+            f"- Failed requests: {len(live.get('failedRequests') or [])}",
+            "",
+            "## Master Koneksi — access split",
+            "",
+            f"- Static term hits: {json.dumps(static.get('term_hits') or {},ensure_ascii=False)}",
+            f"- Static heading anchors: {json.dumps(static.get('anchors') or [],ensure_ascii=False)}",
+            f"- Live matching controls: {json.dumps((live.get('access') or {}).get('matching') or [],ensure_ascii=False)}",
+            f"- Exact User Management nodes: {json.dumps((live.get('access') or {}).get('userExact') or [],ensure_ascii=False)}",
+            f"- Exact Role Access Management nodes: {json.dumps((live.get('access') or {}).get('roleExact') or [],ensure_ascii=False)}",
+          ]
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/POST_PR3_PRODUCTION_VERIFY.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+      - name: Commit sanitized verification
+        shell: bash
+        run: |
+          rm -f package.json package-lock.json post-pr3.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/POST_PR3_PRODUCTION_VERIFY.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "test: verify PR3 live and access-management split"
+          git push
