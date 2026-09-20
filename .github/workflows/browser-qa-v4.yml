@@ -349,6 +349,14 @@ jobs:
                   deskripsiTemuan:'Patrol lebih baru'
                 }];
                 const machineIdentity = { kode:'QA-STATUS-1', nama:'QA Status Machine' };
+                const patrolRecord = PM_REPORTS[0];
+                const patrolDiag = {
+                  eventTs: typeof patrolEventTs_ === 'function' ? patrolEventTs_(patrolRecord) : null,
+                  sot: typeof isSotPatrolRecord_ === 'function' ? isSotPatrolRecord_(patrolRecord) : null,
+                  match: typeof machineMatchRecord_ === 'function' ? machineMatchRecord_(patrolRecord, machineIdentity) : null,
+                  homeCount: typeof homePatrolRecords_ === 'function' ? homePatrolRecords_().length : null,
+                  keys: Object.keys(patrolRecord)
+                };
                 const patrolNewer = machineLatestStatusSnapshot_(machineIdentity);
 
                 ENTRIES = [{
@@ -363,6 +371,7 @@ jobs:
                 }];
                 const logNewer = machineLatestStatusSnapshot_(machineIdentity);
                 return {
+                  patrolDiag,
                   patrolNewer: {
                     source: patrolNewer?.source,
                     sourceLabel: patrolNewer?.sourceLabel,
