@@ -1,0 +1,308 @@
+name: Restore OMODOS Login Backend
+
+on:
+  push:
+    branches:
+      - deploy/backend-login-restore
+    paths:
+      - ".github/workflows/restore-login-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+      WORKER_NAME: omodos
+      PRODUCTION_URL: https://omodos.offsetbmj.workers.dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Recover stable backend and build config
+        shell: python
+        run: |
+          import os,json,base64,hashlib,urllib.request
+          from pathlib import Path
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          v68="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+
+          req=urllib.request.Request(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{v68}?include=modules",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=35) as r:
+            d=json.loads(r.read().decode("utf-8")).get("result") or {}
+          mods=d.get("modules") or []
+          if not mods:
+            raise SystemExit("Stable v68 module unavailable")
+          raw=base64.b64decode(max(mods,key=lambda m:len(m.get("content_base64") or "")).get("content_base64") or "")
+          sha=hashlib.sha256(raw).hexdigest()
+          if sha!="fd8ae6b16ad8d60218d99f8590694647bab90edd7422c391450a0bdeb38b640b":
+            raise SystemExit("Stable backend hash mismatch")
+
+          Path("src").mkdir(exist_ok=True)
+          Path("src/worker.js").write_bytes(raw)
+
+          config={
+            "$schema":"node_modules/wrangler/config-schema.json",
+            "name":"omodos",
+            "main":"src/worker.js",
+            "compatibility_date":"2026-09-01",
+            "no_bundle":True,
+            "assets":{
+              "directory":"./public",
+              "binding":"ASSETS",
+              "run_worker_first":["/api","/api/*","/files/*"],
+              "html_handling":"auto-trailing-slash",
+              "not_found_handling":"none"
+            },
+            "durable_objects":{
+              "bindings":[
+                {"name":"MAINTENANCE","class_name":"MaintenanceStore"}
+              ]
+            },
+            "migrations":[
+              {"tag":"v1","new_sqlite_classes":["MaintenanceStore"]}
+            ],
+            "observability":{"enabled":True}
+          }
+          Path("wrangler.login-restore.json").write_text(json.dumps(config,indent=2)+"\n")
+          print("[BUILD] recovered backend sha="+sha)
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@latest
+
+      - name: Capture active version
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          url=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments"
+          req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+          with urllib.request.urlopen(req,timeout=35) as r:
+            d=json.loads(r.read().decode("utf-8"))
+          rr=d.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No active deployment")
+          versions=rows[0].get("versions") or []
+          active=[v for v in versions if float(v.get("percentage") or 0)>0]
+          if len(active)!=1:
+            raise SystemExit("Expected one active version: "+json.dumps(active))
+          old=str(active[0].get("version_id") or "")
+          Path("/tmp/old-version").write_text(old)
+          with Path(os.environ["GITHUB_ENV"]).open("a") as f:
+            f.write("OLD_VERSION="+old+"\n")
+          print("[ACTIVE] old="+old)
+
+      - name: Upload backend candidate without deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions upload             --config wrangler.login-restore.json             --message "Restore OMODOS login backend and keep current frontend"             --tag "login-backend-restore-20260920"             2>&1 | tee /tmp/upload.log
+
+          VERSION_ID="$(grep -Eo 'Worker Version ID: [0-9a-f-]+' /tmp/upload.log | tail -1 | awk '{print $4}')"
+          PREVIEW_URL="$(grep -Eo 'Version Preview URL: https://[^ ]+' /tmp/upload.log | tail -1 | sed 's/^Version Preview URL: //')"
+          if [ -z "$VERSION_ID" ] || [ -z "$PREVIEW_URL" ]; then
+            echo "Unable to parse candidate version/preview URL"
+            exit 1
+          fi
+          echo "CANDIDATE_VERSION=$VERSION_ID" >> "$GITHUB_ENV"
+          echo "PREVIEW_URL=$PREVIEW_URL" >> "$GITHUB_ENV"
+          echo "[UPLOAD] candidate=$VERSION_ID"
+          echo "[UPLOAD] preview=$PREVIEW_URL"
+
+      - name: Verify candidate metadata
+        shell: python
+        run: |
+          import os,json,urllib.request
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          vid=os.environ["CANDIDATE_VERSION"]
+
+          req=urllib.request.Request(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{vid}?include=modules",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=35) as r:
+            d=json.loads(r.read().decode("utf-8")).get("result") or {}
+
+          bindings=d.get("bindings") or []
+          names={}
+          if isinstance(bindings,list):
+            for b in bindings:
+              if isinstance(b,dict) and b.get("name"):
+                names[str(b["name"])]=str(b.get("type") or "")
+          assets=d.get("assets") or {}
+          config=(assets.get("config") or {}) if isinstance(assets,dict) else {}
+
+          if "MAINTENANCE" not in names or "durable" not in names["MAINTENANCE"].lower():
+            raise SystemExit("Candidate MAINTENANCE binding missing")
+          if "ASSETS" not in names:
+            raise SystemExit("Candidate ASSETS binding missing")
+          if config.get("run_worker_first")!=["/api","/api/*","/files/*"]:
+            raise SystemExit("Candidate worker-first routing mismatch: "+repr(config))
+          if d.get("main_module")!="worker.js":
+            raise SystemExit("Candidate worker.js missing")
+
+          print("[META] migration_tag="+str(d.get("migration_tag")))
+          print("[META] migrations="+json.dumps(d.get("migrations")))
+          print("[META] bindings="+json.dumps(names,sort_keys=True))
+
+      - name: Preview HTTP QA
+        shell: python
+        run: |
+          import os,json,urllib.request,urllib.error,hashlib,time
+          from pathlib import Path
+
+          base=os.environ["PREVIEW_URL"].rstrip("/")
+          expected=hashlib.sha256(Path("public/index.html").read_bytes()).hexdigest()
+
+          def req(path,method="GET",payload=None):
+            headers={"User-Agent":"OMODOS-Login-Restore-Preview/1.0","Cache-Control":"no-cache"}
+            data=None
+            if payload is not None:
+              data=json.dumps(payload).encode()
+              headers["Content-Type"]="text/plain;charset=utf-8"
+            r=urllib.request.Request(base+path,data=data,method=method,headers=headers)
+            try:
+              with urllib.request.urlopen(r,timeout=30) as x:
+                return x.status,x.headers,x.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          status,h,body=req("/?login_restore_preview=1")
+          text=body.decode("utf-8",errors="replace")
+          front={
+            "http_200":status==200,
+            "exact_html":hashlib.sha256(body).hexdigest()==expected,
+            "copilot_help":'id="copilot-help"' in text,
+            "cleanup_marker":"BANTUAN_PAGE_CARD_REMOVAL_V1" in text,
+            "machine_dropdown":'id="filter-machine"' in text
+          }
+          if not all(front.values()):
+            raise SystemExit("Preview frontend failed: "+json.dumps(front))
+
+          p_status,p_h,p_body=req("/api","POST",{"action":"__omodos_readonly_smoke_probe__"})
+          p_ct=(p_h.get("Content-Type") or "").lower()
+          p_text=p_body.decode("utf-8",errors="replace").lstrip()
+          p_json=("json" in p_ct) or p_text.startswith("{") or p_text.startswith("[")
+          if p_status==404 or not p_json:
+            raise SystemExit(f"Preview POST /api failed: status={p_status} ct={p_ct!r} prefix={p_text[:160]!r}")
+
+          g_status,g_h,g_body=req("/api/backup/config")
+          g_ct=(g_h.get("Content-Type") or "").lower()
+          g_text=g_body.decode("utf-8",errors="replace").lstrip()
+          g_json=("json" in g_ct) or g_text.startswith("{") or g_text.startswith("[")
+          if g_status==404 or not g_json:
+            raise SystemExit(f"Preview GET API failed: status={g_status} ct={g_ct!r} prefix={g_text[:160]!r}")
+
+          print("[PREVIEW_QA] frontend="+json.dumps(front,sort_keys=True))
+          print("[PREVIEW_QA] POST /api status="+str(p_status)+" json="+str(p_json))
+          print("[PREVIEW_QA] GET backup config status="+str(g_status)+" json="+str(g_json))
+
+      - name: Deploy candidate to production
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions deploy "$CANDIDATE_VERSION@100%"             --name "$WORKER_NAME"             -y
+          echo "[DEPLOY] candidate promoted"
+
+      - name: Validate live production
+        shell: python
+        run: |
+          import os,json,time,urllib.request,urllib.error
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+
+          def req(path,method="GET",payload=None):
+            headers={"User-Agent":"OMODOS-Login-Restore-Live/1.0","Cache-Control":"no-cache"}
+            data=None
+            if payload is not None:
+              data=json.dumps(payload).encode()
+              headers["Content-Type"]="text/plain;charset=utf-8"
+            r=urllib.request.Request(base+path,data=data,method=method,headers=headers)
+            try:
+              with urllib.request.urlopen(r,timeout=30) as x:
+                return x.status,x.headers,x.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          last=None
+          for attempt in range(1,7):
+            root_status,root_h,root_body=req("/?login_restore_live="+str(attempt))
+            root_text=root_body.decode("utf-8",errors="replace")
+            p_status,p_h,p_body=req("/api","POST",{"action":"__omodos_readonly_smoke_probe__"})
+            p_ct=(p_h.get("Content-Type") or "").lower()
+            p_text=p_body.decode("utf-8",errors="replace").lstrip()
+            p_json=("json" in p_ct) or p_text.startswith("{") or p_text.startswith("[")
+            last={
+              "root_status":root_status,
+              "copilot_help":'id="copilot-help"' in root_text,
+              "bantuan_cleanup":"BANTUAN_PAGE_CARD_REMOVAL_V1" in root_text,
+              "post_api_status":p_status,
+              "post_api_json":p_json
+            }
+            if root_status==200 and last["copilot_help"] and last["bantuan_cleanup"] and p_status!=404 and p_json:
+              break
+            time.sleep(3)
+          else:
+            raise SystemExit("Live login backend validation failed: "+json.dumps(last))
+
+          report=[
+            "# OMODOS Login Backend Restore",
+            "",
+            f"- Validated UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Production version: {os.environ['CANDIDATE_VERSION']}",
+            f"- Previous version: {os.environ['OLD_VERSION']}",
+            "- Frontend: GitHub main latest",
+            "- Backend: stable worker.js recovered from v68",
+            "- Durable Object: MAINTENANCE -> MaintenanceStore",
+            "- Migration config: v1 / MaintenanceStore SQLite",
+            "- API routing: /api, /api/*, /files/* worker-first",
+            f"- Live root HTTP: {last['root_status']}",
+            f"- Live POST /api HTTP: {last['post_api_status']}",
+            f"- Live POST /api JSON-like: {last['post_api_json']}",
+            "- Login 404 condition: FIXED",
+            "- Bantuan remains Copilot-only: YES",
+            "- Production verdict: PASS"
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/LOGIN_BACKEND_RESTORE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[LIVE_QA] PASS "+json.dumps(last,sort_keys=True))
+
+      - name: Roll back if live validation fails
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${OLD_VERSION:-}" ]; then
+            echo "[ROLLBACK] restoring $OLD_VERSION"
+            npx wrangler versions deploy "$OLD_VERSION@100%" --name "$WORKER_NAME" -y
+          else
+            echo "[ROLLBACK] old version unavailable; no action"
+          fi
+
+      - name: Commit deployment report
+        if: success()
+        shell: bash
+        run: |
+          rm -rf src wrangler.login-restore.json node_modules package-lock.json package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/LOGIN_BACKEND_RESTORE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "deploy: record OMODOS login backend restore"
+          git push
