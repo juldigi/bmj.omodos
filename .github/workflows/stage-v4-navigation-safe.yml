@@ -35,7 +35,7 @@ jobs:
               if pos<0: raise SystemExit("Final </body> not found")
               text=text[:pos]+js+"\n"+text[pos:]
           if text.count("OMODOS4_FRONTEND_SAFE_V3")!=1: raise SystemExit("Loader marker count must be 1")
-          if text.index("OMODOS4_FRONTEND_SAFE_V3")<text.rfind("</script>"): raise SystemExit("Loader must be after final inline script")
+          loader_pos=text.index(js)\n          tail=text[loader_pos+len(js):].lower()\n          if "<script" in tail: raise SystemExit("Loader must be the final script before </body>")\n          if text.lower().rfind("</body>")<loader_pos: raise SystemExit("Loader must be before final </body>")
           p.write_text(text,encoding="utf-8")
           PY
       - name: Validate every inline script
