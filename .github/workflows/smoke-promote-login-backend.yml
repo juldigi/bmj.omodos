@@ -1,0 +1,210 @@
+name: Smoke Promote Login Backend Candidate
+
+on:
+  push:
+    branches:
+      - deploy/backend-login-restore
+    paths:
+      - ".github/workflows/smoke-promote-login-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+      WORKER_NAME: omodos
+      CANDIDATE_VERSION: c92c749a-0494-4243-9497-0f3f180c7cfc
+      PRODUCTION_URL: https://omodos.offsetbmj.workers.dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@latest
+
+      - name: Capture active production version
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          url=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments"
+          req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+          with urllib.request.urlopen(req,timeout=35) as r:
+            d=json.loads(r.read().decode("utf-8"))
+          rr=d.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No active deployment")
+          active=[v for v in rows[0].get("versions") or [] if float(v.get("percentage") or 0)>0]
+          if len(active)!=1:
+            raise SystemExit("Expected one active version: "+json.dumps(active))
+          old=str(active[0].get("version_id") or "")
+          Path("/tmp/old-version").write_text(old)
+          with Path(os.environ["GITHUB_ENV"]).open("a") as f:
+            f.write("OLD_VERSION="+old+"\n")
+          print("[ACTIVE] old="+old)
+
+      - name: Deploy candidate at 0.01 percent
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions deploy             "$OLD_VERSION@99.99%"             "$CANDIDATE_VERSION@0.01%"             --name "$WORKER_NAME"             -y
+          echo "[SMOKE_DEPLOY] candidate at 0.01%"
+
+      - name: Force QA requests to candidate
+        shell: python
+        run: |
+          import os,json,time,urllib.request,urllib.error
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+          override=os.environ["WORKER_NAME"]+'="'+os.environ["CANDIDATE_VERSION"]+'"'
+
+          def req(path,method="GET",payload=None):
+            h={
+              "User-Agent":"OMODOS-Login-Candidate-QA/1.0",
+              "Cache-Control":"no-cache",
+              "Cloudflare-Workers-Version-Overrides":override
+            }
+            data=None
+            if payload is not None:
+              data=json.dumps(payload).encode()
+              h["Content-Type"]="text/plain;charset=utf-8"
+            r=urllib.request.Request(base+path,data=data,method=method,headers=h)
+            try:
+              with urllib.request.urlopen(r,timeout=30) as x:
+                return x.status,x.headers,x.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          root_status,root_h,root_body=req("/?forced_login_candidate=1")
+          root_text=root_body.decode("utf-8",errors="replace")
+          front={
+            "http_200":root_status==200,
+            "copilot_help":'id="copilot-help"' in root_text,
+            "cleanup_marker":"BANTUAN_PAGE_CARD_REMOVAL_V1" in root_text,
+            "machine_dropdown":'id="filter-machine"' in root_text,
+            "omodos4":"OMODOS 4.0" in root_text
+          }
+          if not all(front.values()):
+            raise SystemExit("Candidate frontend failed: "+json.dumps(front))
+
+          post_status,post_h,post_body=req("/api","POST",{"action":"__omodos_readonly_smoke_probe__"})
+          post_ct=(post_h.get("Content-Type") or "").lower()
+          post_text=post_body.decode("utf-8",errors="replace").lstrip()
+          post_json=("json" in post_ct) or post_text.startswith("{") or post_text.startswith("[")
+          if post_status==404 or not post_json:
+            raise SystemExit(f"Candidate POST /api failed: status={post_status} ct={post_ct!r} prefix={post_text[:180]!r}")
+
+          get_status,get_h,get_body=req("/api/backup/config")
+          get_ct=(get_h.get("Content-Type") or "").lower()
+          get_text=get_body.decode("utf-8",errors="replace").lstrip()
+          get_json=("json" in get_ct) or get_text.startswith("{") or get_text.startswith("[")
+          if get_status==404 or not get_json:
+            raise SystemExit(f"Candidate GET API failed: status={get_status} ct={get_ct!r} prefix={get_text[:180]!r}")
+
+          print("[FORCED_QA] frontend="+json.dumps(front,sort_keys=True))
+          print("[FORCED_QA] POST /api status="+str(post_status)+" json="+str(post_json))
+          print("[FORCED_QA] GET backup config status="+str(get_status)+" json="+str(get_json))
+
+      - name: Promote candidate to 100 percent
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions deploy             "$CANDIDATE_VERSION@100%"             --name "$WORKER_NAME"             -y
+          echo "[PROMOTE] backend candidate at 100%"
+
+      - name: Validate live production
+        shell: python
+        run: |
+          import os,json,time,urllib.request,urllib.error
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+
+          def req(path,method="GET",payload=None):
+            h={"User-Agent":"OMODOS-Live-Login-QA/1.0","Cache-Control":"no-cache"}
+            data=None
+            if payload is not None:
+              data=json.dumps(payload).encode()
+              h["Content-Type"]="text/plain;charset=utf-8"
+            r=urllib.request.Request(base+path,data=data,method=method,headers=h)
+            try:
+              with urllib.request.urlopen(r,timeout=30) as x:
+                return x.status,x.headers,x.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          last=None
+          for attempt in range(1,7):
+            root_status,root_h,root_body=req("/?live_login_backend="+str(attempt))
+            root_text=root_body.decode("utf-8",errors="replace")
+            post_status,post_h,post_body=req("/api","POST",{"action":"__omodos_readonly_smoke_probe__"})
+            post_ct=(post_h.get("Content-Type") or "").lower()
+            post_text=post_body.decode("utf-8",errors="replace").lstrip()
+            post_json=("json" in post_ct) or post_text.startswith("{") or post_text.startswith("[")
+            last={
+              "root_status":root_status,
+              "copilot_help":'id="copilot-help"' in root_text,
+              "bantuan_cleanup":"BANTUAN_PAGE_CARD_REMOVAL_V1" in root_text,
+              "post_api_status":post_status,
+              "post_api_json":post_json
+            }
+            if root_status==200 and last["copilot_help"] and last["bantuan_cleanup"] and post_status!=404 and post_json:
+              break
+            time.sleep(3)
+          else:
+            raise SystemExit("Live login backend validation failed: "+json.dumps(last))
+
+          report=[
+            "# OMODOS Login Backend Production Restore",
+            "",
+            f"- Validated UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Production version: {os.environ['CANDIDATE_VERSION']}",
+            f"- Previous version: {os.environ['OLD_VERSION']}",
+            "- Backend: recovered stable v68 worker.js",
+            "- Durable Object: MAINTENANCE -> MaintenanceStore",
+            "- Migration: v1",
+            "- API routing: worker-first for /api, /api/* and /files/*",
+            f"- Live root HTTP: {last['root_status']}",
+            f"- Live POST /api HTTP: {last['post_api_status']}",
+            f"- Live POST /api JSON-like: {last['post_api_json']}",
+            "- API login route 404: FIXED",
+            "- Bantuan remains inside Copilot only: YES",
+            "- Production verdict: PASS"
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/LOGIN_BACKEND_PRODUCTION_RESTORE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[LIVE_QA] PASS "+json.dumps(last,sort_keys=True))
+
+      - name: Roll back on any failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${OLD_VERSION:-}" ]; then
+            echo "[ROLLBACK] restoring $OLD_VERSION"
+            npx wrangler versions deploy "$OLD_VERSION@100%" --name "$WORKER_NAME" -y
+          else
+            echo "[ROLLBACK] old version unavailable"
+          fi
+
+      - name: Commit production report
+        if: success()
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/LOGIN_BACKEND_PRODUCTION_RESTORE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "deploy: record OMODOS login backend production restore"
+          git push
