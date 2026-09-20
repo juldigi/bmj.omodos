@@ -2898,3 +2898,244 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
 });
 })();
 
+
+/* OMODOS4_IMPROVEMENT_INTEL_V1
+   Progressive-enhancement views for master-prompt features 81–90.
+   Read-only evidence + draft-only AI. Project/Kaizen/SGA source records are never auto-created or overwritten. */
+(function(){
+'use strict';
+
+var IMP_CACHE=null,IMP_AT=0,IMP_TTL=30000;
+
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openN(n){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!el&&parseInt(el.textContent,10)===Number(n);
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function note(t,kind){return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+esc(t)+'</span></div>'}
+function empty(t){return '<div class="v4-empty">'+esc(t||'Belum ada evidence yang cukup.')+'</div>'}
+function fmt(v,d){
+ if(v==null||v==='')return '—';
+ var n=Number(v);if(!Number.isFinite(n))return String(v);
+ try{return new Intl.NumberFormat('id-ID',{maximumFractionDigits:d==null?1:d}).format(n)}catch(e){return String(n)}
+}
+function chip(t){return '<span class="v4-risk-chip">'+esc(t||'EVIDENCE')+'</span>'}
+function item(title,sub,right){
+ return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
+}
+function list(arr,fn,limit,msg){
+ if(!Array.isArray(arr)||!arr.length)return empty(msg);
+ return '<div class="v4-sf-list">'+arr.slice(0,limit||60).map(fn).join('')+'</div>';
+}
+function metrics(rows){
+ return '<div class="v4-statline">'+rows.map(function(x){return '<div><b>'+esc(x[1])+'</b><span>'+esc(x[0])+'</span></div>'}).join('')+'</div>';
+}
+function first(o,keys){
+ if(!o||typeof o!=='object')return '';
+ for(var i=0;i<keys.length;i++){var k=keys[i];if(o[k]!=null&&String(o[k]).trim())return String(o[k])}
+ return '';
+}
+function val(sec,sel){var e=sec&&sec.querySelector(sel);return e?String(e.value||'').trim():''}
+function busy(btn,on,label){
+ if(!btn)return;
+ if(on){btn.dataset.old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> '+esc(label||'Memuat…')}
+ else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
+}
+function machineNames(){
+ var set=new Set();
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function machineOptions(){return '<option value="">Semua mesin / tidak dibatasi</option>'+machineNames().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('')}
+function read(action,payload){
+ if(!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function'))return Promise.resolve(null);
+ return window.OMODOS4.serverRead(action,payload||{});
+}
+function act(action,payload){
+ if(!(window.OMODOS4&&typeof window.OMODOS4.interactiveAction==='function'))return Promise.reject(new Error('Backend V4 interaction belum tersedia.'));
+ return window.OMODOS4.interactiveAction(action,payload||{});
+}
+async function getImprovement(force){
+ if(!force&&IMP_CACHE&&Date.now()-IMP_AT<IMP_TTL)return IMP_CACHE;
+ var d=await read('v4.getImprovement',{});
+ if(d){IMP_CACHE=d;IMP_AT=Date.now()}
+ return d;
+}
+function removeOlder(n,h){
+ Array.from(h.querySelectorAll('.v4-interaction[data-v4-interaction-feature="'+n+'"],.v4-improvement-intel')).forEach(function(x){x.remove()});
+}
+function intro(n){
+ var t={
+ 81:'Mencari recurring/loss evidence yang belum tampak ter-cover oleh improvement open existing. Hasil adalah kandidat review, bukan perintah membuat project baru.',
+ 82:'Auto Kaizen hanya membuat DRAFT berbasis evidence. Penyimpanan tetap melalui modul Kaizen/Project existing setelah review manusia.',
+ 83:'Benefit Verification memeriksa kelengkapan field evidence yang tercatat; coverage bukan bukti bahwa benefit finansial atau operasional sudah terealisasi.',
+ 84:'Timeline menampilkan before/after Kaizen yang benar-benar tercatat, tanpa membuat foto atau hasil baru.',
+ 85:'Idea Marketplace mengumpulkan improvement open existing agar mudah ditelusuri; tidak menggandakan record.',
+ 86:'Similarity hanya menandai kemungkinan overlap. Sistem tidak boleh menyatakan dua Kaizen duplicate secara otomatis.',
+ 87:'Risk Radar menonjolkan project overdue/open dari source existing; keputusan eskalasi tetap manusia.',
+ 88:'SGA Story Builder menyusun cerita dari field SGA recorded saja dan tidak mengarang achievement.',
+ 89:'Knowledge Graph memakai Factory Brain derived graph dari Project/Kaizen/SGA ↔ mesin/failure/knowledge existing.',
+ 90:'Legacy mengelompokkan histori improvement existing per tahun untuk melihat continuity, bukan memberi ranking tim.'
+ };
+ return note(t[n]||'Read-only improvement intelligence.','safe');
+}
+function controls(n){
+ if(n===82)return '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-imp-machine>'+machineOptions()+'</select></label><label class="v4-form-wide">Masalah / opportunity<textarea rows="4" maxlength="4000" data-v4-imp-query placeholder="Tuliskan masalah, evidence, atau opportunity yang ingin dibuatkan draft Kaizen."></textarea></label></div>';
+ if(n===86)return '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-imp-machine>'+machineOptions()+'</select></label><label class="v4-form-wide">Ide / judul / masalah<input maxlength="1000" data-v4-imp-query placeholder="Contoh: Mengurangi recurring register error pada Offset 5"></label></div>';
+ return '';
+}
+function mount(n){
+ n=Number(n);var h=host();if(!h||!openN(n))return;
+ removeOlder(n,h);
+ var titles={
+  81:'Improvement Opportunity Radar',82:'Auto Kaizen Draft',83:'Project Benefit Verification',84:'Kaizen Before–After Timeline',85:'Idea Marketplace',
+  86:'Duplicate Kaizen Detector',87:'Project Risk Radar',88:'SGA Story Builder',89:'Improvement Knowledge Graph',90:'Improvement Legacy'
+ };
+ var sec=document.createElement('section');sec.className='v4-interaction v4-improvement-intel';sec.setAttribute('data-v4-imp-feature',String(n));
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">IMPROVEMENT INTELLIGENCE</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===82?'DRAFT ONLY':'READ ONLY')+'</span></div>'+
+ intro(n)+controls(n)+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-imp-load="'+n+'"><i class="ph-bold '+(n===82?'ph-sparkle':'ph-arrows-clockwise')+'"></i> '+(n===82?'Buat Draft':'Muat Analisis')+'</button>'+
+ '<button class="btn btn-sm" data-v4-open-existing="project-center"><i class="ph-bold ph-kanban"></i> Buka Project Center Existing</button>'+
+ (n===84||n===85||n===88?'<button class="btn btn-sm" data-v4-open-existing="knowledge"><i class="ph-bold ph-books"></i> Buka Knowledge Existing</button>':'')+
+ '</div><div data-v4-imp-out></div>';
+ h.prepend(sec);
+}
+function render81(d){
+ var c=d.counts||{};
+ return metrics([['Project',fmt(c.project,0)],['Kaizen',fmt(c.kaizen,0)],['SGA',fmt(c.sga,0)],['Open',fmt(c.open,0)]])+
+ list(d.opportunityRadar,function(x){
+  return item(x.machine||'Mesin','Health '+fmt(x.healthIndex,0)+' • Recurring '+fmt(x.recurring,0)+' • Downtime '+fmt(x.downtimeMinutes,0)+' min • Open issue '+fmt(x.openIssues,0)+' • '+(x.reason||''),chip((x.priority||'P2')+' • '+(x.existingImprovementCoverage||'')));
+ },50)+note('NO_MACHINE_NAME_MATCH hanya berarti nama mesin tidak ditemukan pada teks improvement open; tetap lakukan duplicate review sebelum membuat record baru.','warn');
+}
+function aiHtml(d){
+ d=d||{};
+ var ev=Array.isArray(d.evidence)?d.evidence:[];
+ var assumptions=Array.isArray(d.assumptions)?d.assumptions:[];
+ return '<div class="v4-ai-result"><div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(d.mode||'OMODOS AI')+'</span><span>Confidence: '+esc(d.confidence||'not stated')+'</span></div>'+
+ '<div class="v4-ai-answer">'+esc(first(d,['summary','answer'])||'Belum ada draft.').replace(/\n/g,'<br>')+'</div>'+
+ (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi / batasan</strong><ul>'+assumptions.slice(0,8).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>':'')+
+ metrics([['Evidence',fmt(ev.length,0)],['Human approval','Wajib'],['Operational write','NONE']])+
+ note('Draft belum menjadi Kaizen/Project record. Gunakan workflow existing untuk review dan commit.','warn')+'</div>';
+}
+async function render82(sec){
+ var q=val(sec,'[data-v4-imp-query]'),m=val(sec,'[data-v4-imp-machine]');
+ if(!q)return note('Isi masalah / opportunity terlebih dahulu.','warn');
+ var d=await act('v4.aiAsk',{query:q,purpose:'kaizen-draft',machine:m||''});
+ return aiHtml(d);
+}
+function render83(d){
+ return list(d.benefitEvidence,function(x){
+  var cost=(x.budget!=null&&String(x.budget)!=='')?'Budget '+x.budget:'Budget —';
+  if(x.actualCost!=null&&String(x.actualCost)!=='')cost+=' • Actual '+x.actualCost;
+  return item(x.title||x.id||'Project','Status '+(x.status||'—')+' • '+cost+' • Evidence field '+fmt(x.evidenceFields,0)+'/'+fmt(x.totalEvidenceFields,0),chip(fmt(x.evidenceCoverage,0)+'% coverage'));
+ },80)+note('Coverage hanya mengukur keberadaan field Safety/Quality/Cost/Delivery/Environment/People/Achievement/Lesson Learned, bukan validasi nilai benefit.','warn');
+}
+function render84(d){
+ return list(d.beforeAfterTimeline,function(x){
+  var evidence=[];
+  if(x.beforeAfter)evidence.push('Before–After text');
+  if(x.beforePhoto)evidence.push('Before photo');
+  if(x.afterPhoto)evidence.push('After photo');
+  if(x.benefit)evidence.push('Benefit');
+  return item(x.theme||x.id||'Kaizen',(x.date||'Tanggal —')+' • '+(x.machine||x.area||'')+' • '+evidence.join(', ')+' • Status '+(x.status||'—'),chip('RECORDED'));
+ },80)+note('Foto hanya ditandai sebagai recorded evidence; tampilan ini tidak membuat atau memodifikasi asset before/after.','safe');
+}
+function render85(d){
+ return list(d.ideaMarketplace,function(x){
+  var detail=(x.type||'Improvement')+' • '+(x.area||x.machine||'')+' • PIC '+(x.pic||'—')+' • Status '+(x.status||'—')+(x.progress!==''&&x.progress!=null?' • Progress '+x.progress:'');
+  var content=[x.problem?('Problem: '+x.problem):'',x.idea?('Idea: '+x.idea):''].filter(Boolean).join(' • ');
+  return item(x.title||x.id||x.type,detail+(content?' • '+content:''),chip('EXISTING'));
+ },100)+note('Marketplace adalah katalog read-only dari improvement open existing; tidak ada copy/duplicate record.','safe');
+}
+async function render86(sec){
+ var q=val(sec,'[data-v4-imp-query]'),m=val(sec,'[data-v4-imp-machine]');
+ if(!q)return note('Isi ide / judul / masalah untuk mencari kemungkinan overlap.','warn');
+ var query=(m?m+' ':'')+q,d=await read('v4.findSimilarImprovement',{query:query});
+ if(!d)return empty('Similarity endpoint belum tersedia.');
+ return list(d.hits,function(x){
+  return item(x.title||x.type,(x.type||'')+' • '+(x.machine||x.area||'')+' • Status '+(x.status||'—'),chip('Similarity '+fmt(x.score,2)));
+ },40,'Tidak ada potential overlap dari text similarity saat ini.')+note(d.note||'Potential overlap memerlukan human review.','warn');
+}
+function render87(d){
+ var c=d.counts||{};
+ return metrics([['Overdue',fmt(c.overdue,0)],['Open improvement',fmt(c.open,0)]])+
+ list(d.overdueProjects,function(r){
+  var title=first(r,['Judul','Nama Project','Title','ID'])||'Project overdue';
+  var due=first(r,['Target Finish','Due Date','Deadline'])||'Due date tercatat';
+  var status=first(r,['Status'])||'OPEN';
+  var pic=first(r,['PIC','Project Leader'])||'PIC —';
+  return item(title,'Due '+due+' • '+pic,chip(status+' • OVERDUE'));
+ },60,'Tidak ada project overdue yang terdeteksi dari due date existing.')+
+ note('Overdue ditentukan dari due date yang sudah lewat dan status belum closed. Risk business/technical tetap perlu assessment manusia.','safe');
+}
+function render88(d){
+ return list(d.sgaStories,function(x){
+  var team=x.team||'SGA';
+  var members=x.members?' • Members '+x.members:'';
+  var result=x.result||x.achievement||'Hasil/Achievement belum tercatat';
+  return item((x.theme||'Tema belum tercatat')+' — '+team,'Leader '+(x.leader||'—')+members+' • Target '+(x.target||'—')+' • Progress '+(x.progress||'—')+' • '+result,chip(x.status||'RECORDED'));
+ },80)+note('Story Builder hanya merangkai field recorded. Jika achievement/result kosong, sistem tidak mengarang narasi keberhasilan.','safe');
+}
+async function render89(){
+ var g=await read('v4.getFactoryBrain',{maxMachines:60});
+ if(!g)return empty('Factory Brain graph belum tersedia.');
+ var allowed=new Set(['project','kaizen','sga','machine','failure','symptom','knowledge','manual','rca','corrective_action']);
+ var nodes=(g.nodes||[]).filter(function(n){return allowed.has(String(n.type||''))});
+ var ids=new Set(nodes.map(function(n){return n.id}));
+ var edges=(g.edges||[]).filter(function(e){return ids.has(e.from)&&ids.has(e.to)});
+ var by={};nodes.forEach(function(n){by[n.type]=(by[n.type]||0)+1});
+ var top=edges.slice(0,80);
+ return metrics([
+  ['Nodes',fmt(nodes.length,0)],['Edges',fmt(edges.length,0)],['Project',fmt(by.project,0)],
+  ['Kaizen',fmt(by.kaizen,0)],['SGA',fmt(by.sga,0)],['Knowledge/RCA',fmt((by.knowledge||0)+(by.manual||0)+(by.rca||0),0)]
+ ])+
+ list(top,function(e){
+  var from=nodes.find(function(n){return n.id===e.from}),to=nodes.find(function(n){return n.id===e.to});
+  return item((from&&from.label||e.from)+' → '+(to&&to.label||e.to),e.relation||'related',chip('DERIVED EDGE'));
+ },80)+note('Graph adalah derived relationship dari source existing sejak source-truth cutoff; bukan database source-of-truth baru.','safe');
+}
+function render90(d){
+ return list(d.improvementLegacy,function(x){
+  return item(String(x.year||'Unknown'),'Project '+fmt(x.projects,0)+' • Kaizen '+fmt(x.kaizen,0)+' • SGA '+fmt(x.sga,0)+' • Completed '+fmt(x.completed,0),chip(fmt((x.records||[]).length,0)+' sample record'));
+ },40)+note('Legacy mengelompokkan record per tahun berdasarkan field Tahun/tanggal yang tersedia. Tidak melakukan ranking individu/tim.','safe');
+}
+async function load(btn,n){
+ var sec=btn.closest('.v4-improvement-intel'),out=sec&&sec.querySelector('[data-v4-imp-out]');
+ if(!sec||!out)return;
+ busy(btn,true,n===82?'Menyusun draft':'Memuat');
+ try{
+  if(n===82){out.innerHTML=await render82(sec);return}
+  if(n===86){out.innerHTML=await render86(sec);return}
+  if(n===89){out.innerHTML=await render89();return}
+  var d=await getImprovement(true);
+  if(!d){out.innerHTML=empty('Backend Improvement Intelligence belum tersedia.');return}
+  if(n===81)out.innerHTML=render81(d);
+  else if(n===83)out.innerHTML=render83(d);
+  else if(n===84)out.innerHTML=render84(d);
+  else if(n===85)out.innerHTML=render85(d);
+  else if(n===87)out.innerHTML=render87(d);
+  else if(n===88)out.innerHTML=render88(d);
+  else if(n===90)out.innerHTML=render90(d);
+ }catch(e){out.innerHTML=note(e&&e.message||String(e),'error')}
+ finally{busy(btn,false)}
+}
+document.addEventListener('click',function(ev){
+ var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
+ if(tile){
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=81&&n<=90)setTimeout(function(){if(openN(n))mount(n)},0);
+  return;
+ }
+ var b=ev.target.closest&&ev.target.closest('[data-v4-imp-load]');
+ if(b){ev.preventDefault();load(b,Number(b.getAttribute('data-v4-imp-load')));return}
+},false);
+
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ improvementIntelVersion:'1',
+ improvementIntelFeatures:[81,82,83,84,85,86,87,88,89,90],
+ improvementWritePolicy:'EXISTING_MODULE_HUMAN_APPROVAL_ONLY'
+});
+})();
+
