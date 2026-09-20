@@ -37,30 +37,18 @@ jobs:
                   1
               )
 
-              old="""  function ensureGuide(view){
-            if(!view||!view.id||view.id==='view-omodos4'||view.querySelector(':scope > .legacy-simple-guide'))return;
-            const key=view.id.replace(/^view-/,'');
-            const g=VIEW_GUIDES[key];if(!g)return;
-            const guide=document.createElement('div');guide.className='legacy-simple-guide';guide.dataset.simpleGuide=key;
-            guide.innerHTML='<div class="legacy-simple-guide-title">'+g[0]+'</div>'+
-              '<div class="legacy-simple-guide-purpose">'+g[1]+'</div>'+
-              '<div class="legacy-simple-guide-steps"><div class="legacy-simple-step"><b>1</b>'+g[2]+'</div><div class="legacy-simple-step"><b>2</b>'+g[3]+'</div></div>'+
-              glossaryHtml();
-            const top=view.querySelector(':scope > .topbar');
-            if(top)top.insertAdjacentElement('afterend',guide);else view.prepend(guide);
-          }
-          """
-              new="""  function ensureGuide(view){
+              func_start=s.find("  function ensureGuide(view){")
+              func_end=s.find("\n  function connectLabels(",func_start)
+              if func_start < 0 or func_end < 0:
+                  raise SystemExit("Unable to locate ensureGuide function boundaries")
+              current=s[func_start:func_end]
+              replacement="""  function ensureGuide(view){
             if(!view||!view.querySelectorAll)return;
             view.querySelectorAll(':scope > .legacy-simple-guide').forEach(el=>el.remove());
           }
           """
-              if old in s:
-                  s=s.replace(old,new,1)
-              elif "top.insertAdjacentElement('afterend',guide)" in s:
-                  raise SystemExit("A different legacy guide injector still exists; refusing blind replacement")
-              else:
-                  print("Legacy guide injector already absent; preserving current implementation.")
+              s=s[:func_start]+replacement+s[func_end:]
+              print("Replaced ensureGuide structurally; previous length:",len(current))
 
           checks={
               "marker": marker in s,
