@@ -1,0 +1,128 @@
+name: Audit Live vs Main Auth Configuration
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/audit-live-main-auth.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare auth/API configuration without credentials
+        shell: python
+        run: |
+          from pathlib import Path
+          import urllib.request,re,hashlib,json
+
+          repo=Path("public/index.html").read_bytes()
+          req=urllib.request.Request(
+            "https://omodos.offsetbmj.workers.dev/?auth_audit=1",
+            headers={"User-Agent":"OMODOS-Auth-Audit/1.0","Cache-Control":"no-cache"}
+          )
+          with urllib.request.urlopen(req,timeout=35) as r:
+            live=r.read()
+
+          rt=repo.decode("utf-8",errors="replace")
+          lt=live.decode("utf-8",errors="replace")
+
+          terms=[
+            "API_BASE","apiBase","BACKEND_URL","backendUrl",
+            "login","/api/","fetch(","apiCall(","api("
+          ]
+
+          def normalized_contexts(text,term):
+            rows=[]
+            low=text.lower()
+            needle=term.lower()
+            pos=0
+            while len(rows)<40:
+              i=low.find(needle,pos)
+              if i<0:break
+              frag=text[max(0,i-300):min(len(text),i+500)]
+              # Redact anything that resembles an inline token/key value.
+              frag=re.sub(r'(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*["\'][^"\']+["\']',r'\1=[redacted]',frag)
+              frag=re.sub(r'\s+',' ',frag)
+              rows.append(frag)
+              pos=i+len(needle)
+            return rows
+
+          # Extract literal HTTPS origins only; safe for configuration comparison.
+          url_rx=r'https://[A-Za-z0-9._-]+(?:/[A-Za-z0-9_./?=&%-]*)?'
+          repo_urls=sorted(set(re.findall(url_rx,rt)))
+          live_urls=sorted(set(re.findall(url_rx,lt)))
+
+          # Function-level login neighborhood hashes, not raw source.
+          def neighborhood_hashes(text,term):
+            out=[]
+            low=text.lower()
+            pos=0
+            while len(out)<30:
+              i=low.find(term.lower(),pos)
+              if i<0:break
+              frag=text[max(0,i-500):min(len(text),i+1500)]
+              out.append(hashlib.sha256(frag.encode()).hexdigest())
+              pos=i+len(term)
+            return out
+
+          report=[
+            "# Live vs GitHub Main Auth Configuration Audit","",
+            f"- Live bytes: {len(live)}",
+            f"- Live SHA-256: {hashlib.sha256(live).hexdigest()}",
+            f"- Repo bytes: {len(repo)}",
+            f"- Repo SHA-256: {hashlib.sha256(repo).hexdigest()}",
+            f"- Exact HTML match: {'YES' if live==repo else 'NO'}","",
+            "## Literal HTTPS URLs only in live",""
+          ]
+          for u in sorted(set(live_urls)-set(repo_urls)):
+            report.append("- "+u)
+          report += ["","## Literal HTTPS URLs only in repo",""]
+          for u in sorted(set(repo_urls)-set(live_urls)):
+            report.append("- "+u)
+
+          report += ["","## Shared likely backend/API origins",""]
+          shared=[u for u in sorted(set(repo_urls)&set(live_urls)) if any(x in u.lower() for x in ("worker","script","api","omodos"))]
+          for u in shared:
+            report.append("- "+u)
+
+          report += ["","## Auth/API marker counts",""]
+          for term in terms:
+            report.append(f"- {term}: live={lt.lower().count(term.lower())}, repo={rt.lower().count(term.lower())}")
+
+          report += ["","## Login neighborhood hashes",""]
+          report.append("- live: "+json.dumps(neighborhood_hashes(lt,"login")[:20]))
+          report.append("- repo: "+json.dumps(neighborhood_hashes(rt,"login")[:20]))
+
+          # Compare important exact configuration literals.
+          indicators={
+            "worker_url":"https://omodos.offsetbmj.workers.dev",
+            "copilot_help":'id="copilot-help"',
+            "bantuan_cleanup":"BANTUAN_PAGE_CARD_REMOVAL_V1",
+            "machine_dropdown":'id="filter-machine"'
+          }
+          report += ["","## Indicators",""]
+          for name,val in indicators.items():
+            report.append(f"- {name}: live={'YES' if val in lt else 'NO'}, repo={'YES' if val in rt else 'NO'}")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/LIVE_MAIN_AUTH_CONFIG.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[AUTH_COMPARE] generated")
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/LIVE_MAIN_AUTH_CONFIG.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: compare live and main auth configuration"
+          git push
