@@ -17,7 +17,7 @@ const allowed=()=>{try{return !!(window.OMODOS4&&window.OMODOS4.isAllowed&&windo
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function syncAccess(){
  const group=document.getElementById('v4-nav-group'); if(!group)return;
- const ok=allowed(); group.dataset.v4Denied=ok?'0':'1'; group.style.display=ok?'':'none';
+ const ok=allowed(), flag=ok?'0':'1', display=ok?'':'none'; if(group.dataset.v4Denied!==flag)group.dataset.v4Denied=flag; if(group.style.display!==display)group.style.display=display;
  if(!ok){
    document.querySelectorAll('[data-v4-module]').forEach(n=>n.remove());
    if(document.querySelector('#view-omodos4.active')){document.querySelector('[data-view="dashboard"]')?.click()}
