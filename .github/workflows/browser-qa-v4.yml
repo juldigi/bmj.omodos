@@ -779,6 +779,10 @@ jobs:
                 loadAll=async()=>({ok:true});
                 fill('QA Machine No PDF'); PENDING_MANUAL_PDF=null;
                 document.getElementById('btn-add-machine').click(); await wait(1);
+                {
+                  const st=Date.now(), btn=document.getElementById('btn-add-machine');
+                  while(btn.disabled && Date.now()-st<1500) await new Promise(r=>setTimeout(r,20));
+                }
                 fill('QA Machine PDF');
                 PENDING_MANUAL_PDF={name:'qa-manual.pdf',mimeType:'application/pdf',base64:'JVBERi0xLjQ='};
                 document.getElementById('btn-add-machine').click(); await wait(2);
