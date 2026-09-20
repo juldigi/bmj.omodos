@@ -1,0 +1,102 @@
+name: Audit Production Login Path
+
+on:
+  push:
+    branches:
+      - audit/login-production-failure
+    paths:
+      - ".github/workflows/audit-login-production.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract login implementation and probe production
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, json, urllib.request, urllib.error, hashlib
+
+          src=Path("public/index.html").read_text(encoding="utf-8",errors="replace")
+          lines=src.splitlines()
+
+          needles=[
+            "Respon backend bukan JSON valid",
+            "response backend",
+            "login",
+            "fetch(",
+            "workers.dev",
+            "api/",
+            "Content-Type",
+            "credentials:",
+          ]
+
+          out=["# Production Login Path Audit",""]
+
+          for needle in needles:
+            hits=[i for i,l in enumerate(lines) if needle.lower() in l.lower()]
+            out.append(f"## {needle} — {len(hits)} hit(s)")
+            for idx in hits[:60]:
+              out.append(f"### Around line {idx+1}")
+              out.append("~~~text")
+              for j in range(max(0,idx-10),min(len(lines),idx+22)):
+                line=lines[j]
+                line=re.sub(r'(?i)(password|token|secret|api[_-]?key)\s*[:=]\s*["\'][^"\']+["\']',r'\1=[redacted]',line)
+                out.append(f"{j+1:05d}: {line}")
+              out.append("~~~")
+              out.append("")
+
+          # Pull production root and compare.
+          req=urllib.request.Request(
+            "https://omodos.offsetbmj.workers.dev/?login_audit=1",
+            headers={"User-Agent":"OMODOS-Login-Audit/1.0","Cache-Control":"no-cache"}
+          )
+          with urllib.request.urlopen(req,timeout=30) as r:
+            body=r.read()
+            headers=dict(r.headers.items())
+            status=r.status
+          out += [
+            "## Production root",
+            "",
+            f"- HTTP: {status}",
+            f"- Content-Type: {headers.get('Content-Type') or headers.get('content-type')}",
+            f"- Cache-Control: {headers.get('Cache-Control') or headers.get('cache-control')}",
+            f"- Build: {headers.get('X-OMODOS-Build') or headers.get('x-omodos-build')}",
+            f"- SHA-256: {hashlib.sha256(body).hexdigest()}",
+            f"- Matches repo index: {'YES' if body==Path('public/index.html').read_bytes() else 'NO'}",
+            "",
+          ]
+
+          # Extract likely literal endpoints from code.
+          urls=sorted(set(re.findall(r'https://[A-Za-z0-9._:-]+(?:/[A-Za-z0-9_./?=&%{}$:-]*)?',src)))
+          paths=sorted(set(re.findall(r'["\'](/[^"\']{1,180})["\']',src)))
+          out += ["## Literal URLs likely relevant to auth/API",""]
+          for u in urls:
+            if any(k in u.lower() for k in ("worker","api","omodos","login","auth")):
+              out.append("- "+u)
+          out += ["","## Literal relative paths likely relevant to auth/API",""]
+          for p in paths:
+            if any(k in p.lower() for k in ("api","login","auth","session")):
+              out.append("- "+p)
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/LOGIN_PRODUCTION_PATH.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+          print("[LOGIN_AUDIT] report generated")
+
+      - name: Commit audit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/LOGIN_PRODUCTION_PATH.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: inspect production login path"
+          git push
