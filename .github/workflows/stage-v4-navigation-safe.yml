@@ -31,11 +31,12 @@ jobs:
           text=text.replace(css+"\n","").replace(css,"")
           text=text.replace(js+"\n","").replace(js,"")
 
-          lower=text.lower()
-          head_close=lower.find("</head>")
-          body_open=lower.find("<body")
-          if head_close<0 or body_open<0 or head_close>body_open:
-              raise SystemExit("Real document head boundary not found before body")
+          # Use the real application shell anchor, not generic tag searches that may match export templates.
+          shell_anchor='\n</head>\n<body>\n<div class="scanline-overlay"></div>'
+          if text.count(shell_anchor)!=1:
+              raise SystemExit("Unique OMODOS document head/body shell anchor not found")
+          anchor_pos=text.index(shell_anchor)
+          head_close=anchor_pos+1
           text=text[:head_close]+css+"\n"+text[head_close:]
 
           body_close=text.lower().rfind("</body>")
@@ -45,9 +46,8 @@ jobs:
           if text.count(css)!=1: raise SystemExit("V3 stylesheet loader count must be 1")
           if text.count("OMODOS4_FRONTEND_SAFE_V3")!=1: raise SystemExit("Loader marker count must be 1")
           css_pos=text.index(css)
-          first_head_close=text.lower().find("</head>")
-          first_body_open=text.lower().find("<body")
-          if not (css_pos < first_head_close < first_body_open):
+          shell_body=text.index('<body>\n<div class="scanline-overlay"></div>')
+          if css_pos>shell_body:
               raise SystemExit("Stylesheet loader must be inside the real document head")
           loader_pos=text.index(js)
           tail=text[loader_pos+len(js):].lower()
