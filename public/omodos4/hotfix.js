@@ -2017,10 +2017,12 @@ function machineOptions(){
  return '<option value="">Semua mesin</option>'+machineNames().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('');
 }
 function fmtNum(v,d){
+ if(v==null||v==='')return '—';
  var n=Number(v);if(!Number.isFinite(n))return '—';
  try{return new Intl.NumberFormat('id-ID',{maximumFractionDigits:d==null?1:d}).format(n)}catch(e){return String(Math.round(n*10)/10)}
 }
 function rupiah(v){
+ if(v==null||v==='')return '—';
  var n=Number(v);if(!Number.isFinite(n))return '—';
  try{return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n)}catch(e){return 'Rp '+fmtNum(n,0)}
 }
