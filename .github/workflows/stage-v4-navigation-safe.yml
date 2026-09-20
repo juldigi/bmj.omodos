@@ -1,21 +1,22 @@
-# validator registered on main; this push starts the staged patch
 name: Stage V4 navigation safely
 
 on:
-  push:
-    branches: [stage/v4-navigation-safe]
-    paths: [.github/workflows/stage-v4-navigation-safe.yml]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   patch:
+    if: github.head_ref == 'stage/v4-navigation-safe' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: stage/v4-navigation-safe
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Insert external assets at final document boundaries
         run: |
           python3 - <<'PY'
