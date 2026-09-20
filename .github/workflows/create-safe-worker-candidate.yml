@@ -1,0 +1,305 @@
+name: Create Safe Worker Candidate with Inherited Bindings
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/create-safe-worker-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create asset-backed Worker version with v68 bindings inherited
+        shell: python
+        run: |
+          import os, json, base64, hashlib, mimetypes, uuid, urllib.request
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          token=os.environ.get("CLOUDFLARE_API_TOKEN","").strip()
+          if not token:
+            raise SystemExit("CLOUDFLARE_DEPLOY_TOKEN missing")
+
+          V68="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          WORKER="omodos"
+
+          def request_json(method,url,payload=None,auth=None,headers=None):
+            h={"Accept":"application/json"}
+            if auth:
+              h["Authorization"]="Bearer "+auth
+            if headers:
+              h.update(headers)
+            body=None
+            if payload is not None:
+              body=json.dumps(payload,separators=(",",":")).encode()
+              h["Content-Type"]="application/json"
+            req=urllib.request.Request(url,data=body,method=method,headers=h)
+            with urllib.request.urlopen(req,timeout=60) as r:
+              raw=r.read()
+              if not raw:
+                return {}
+              return json.loads(raw.decode("utf-8"))
+
+          accounts=request_json("GET","https://api.cloudflare.com/client/v4/accounts?per_page=50",auth=token).get("result") or []
+          aid=None
+          for a in accounts:
+            candidate=a.get("id")
+            if not candidate:
+              continue
+            try:
+              d=request_json("GET",f"https://api.cloudflare.com/client/v4/accounts/{candidate}/workers/workers/{WORKER}/versions/{V68}?include=modules",auth=token)
+              if d.get("result"):
+                aid=candidate
+                break
+            except Exception:
+              continue
+          if not aid:
+            raise SystemExit("Cloudflare account / v68 not accessible")
+
+          # Capture currently active deployment only (newest deployment row).
+          dep=request_json("GET",f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{WORKER}/deployments",auth=token)
+          dep_result=dep.get("result")
+          if isinstance(dep_result,dict):
+            deployments=dep_result.get("deployments") or []
+          elif isinstance(dep_result,list):
+            deployments=dep_result
+          else:
+            deployments=[]
+          active_before=[]
+          if deployments:
+            for v in deployments[0].get("versions") or []:
+              if v.get("version_id"):
+                active_before.append({
+                  "version_id":str(v.get("version_id")),
+                  "percentage":v.get("percentage")
+                })
+          if not active_before:
+            raise SystemExit("Unable to resolve active deployment before candidate creation")
+
+          # Recover exact stable backend module.
+          v68=request_json(
+            "GET",
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/{WORKER}/versions/{V68}?include=modules",
+            auth=token
+          ).get("result") or {}
+          mods=v68.get("modules") or []
+          if not mods:
+            raise SystemExit("v68 module unavailable")
+          source_mod=max(mods,key=lambda m:len(m.get("content_base64") or ""))
+          source_b64=source_mod.get("content_base64") or ""
+          source=base64.b64decode(source_b64)
+          source_sha=hashlib.sha256(source).hexdigest()
+          if source_sha!="fd8ae6b16ad8d60218d99f8590694647bab90edd7422c391450a0bdeb38b640b":
+            raise SystemExit("Stable backend source hash mismatch")
+
+          # Build static-assets manifest exactly as Cloudflare documents:
+          # SHA256(base64(file bytes) + extension), first 32 hex characters.
+          manifest={}
+          asset_by_hash={}
+          root=Path("public")
+          for file in sorted(root.rglob("*")):
+            if not file.is_file():
+              continue
+            rel=file.relative_to(root).as_posix()
+            data=file.read_bytes()
+            ext=Path(rel).suffix[1:]
+            digest=hashlib.sha256(base64.b64encode(data)+ext.encode()).hexdigest()[:32]
+            manifest["/"+rel]={"hash":digest,"size":len(data)}
+            asset_by_hash[digest]=(file,data,mimetypes.guess_type(str(file))[0] or "application/octet-stream")
+
+          if "/index.html" not in manifest:
+            raise SystemExit("public/index.html missing from assets manifest")
+
+          index_bytes=(root/"index.html").read_bytes()
+          index_sha=hashlib.sha256(index_bytes).hexdigest()
+
+          session=request_json(
+            "POST",
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{WORKER}/assets-upload-session",
+            {"manifest":manifest},
+            auth=token
+          ).get("result") or {}
+
+          upload_jwt=session.get("jwt")
+          buckets=session.get("buckets")
+          if not upload_jwt or buckets is None:
+            raise SystemExit("Asset upload session did not return jwt/buckets")
+
+          def upload_bucket(bucket,current_jwt):
+            boundary="----omodos-"+uuid.uuid4().hex
+            chunks=[]
+            for digest in bucket:
+              if digest not in asset_by_hash:
+                raise SystemExit("Cloudflare requested unknown asset hash: "+digest)
+              file,data,ctype=asset_by_hash[digest]
+              b64=base64.b64encode(data)
+              chunks.extend([
+                ("--"+boundary+"\r\n").encode(),
+                (f'Content-Disposition: form-data; name="{digest}"; filename="{digest}"\r\n').encode(),
+                (f"Content-Type: {ctype}\r\n\r\n").encode(),
+                b64,
+                b"\r\n",
+              ])
+            chunks.append(("--"+boundary+"--\r\n").encode())
+            body=b"".join(chunks)
+            req=urllib.request.Request(
+              f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/assets/upload?base64=true",
+              data=body,
+              method="POST",
+              headers={
+                "Authorization":"Bearer "+current_jwt,
+                "Content-Type":"multipart/form-data; boundary="+boundary,
+                "Accept":"application/json"
+              }
+            )
+            with urllib.request.urlopen(req,timeout=120) as r:
+              return json.loads(r.read().decode("utf-8")).get("result") or {}
+
+          completion_jwt=upload_jwt
+          for bucket in buckets:
+            result=upload_bucket(bucket,upload_jwt)
+            if result.get("jwt"):
+              completion_jwt=result["jwt"]
+          if not completion_jwt:
+            raise SystemExit("No assets completion token")
+
+          body={
+            "main_module":"worker.js",
+            "compatibility_date":"2026-09-01",
+            "annotations":{
+              "workers/message":"OMODOS production candidate: GitHub main frontend sync; backend/bindings inherited from v68",
+              "workers/tag":"omodos-github-main-sync"
+            },
+            "bindings":[
+              {"name":"ASSETS","type":"assets"},
+              {"name":"MAINTENANCE","type":"inherit","version_id":V68},
+              {"name":"GEMINI_API_KEY","type":"inherit","version_id":V68},
+              {"name":"GROQ_API_KEY","type":"inherit","version_id":V68},
+              {"name":"SETUP_TOKEN","type":"inherit","version_id":V68}
+            ],
+            "assets":{
+              "jwt":completion_jwt,
+              "config":{
+                "html_handling":"auto-trailing-slash",
+                "not_found_handling":"none",
+                "run_worker_first":["/api","/api/*","/files/*"]
+              }
+            },
+            "modules":[
+              {
+                "name":"worker.js",
+                "content_type":"application/javascript+module",
+                "content_base64":source_b64
+              }
+            ]
+          }
+
+          created=request_json(
+            "POST",
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/{WORKER}/versions",
+            body,
+            auth=token
+          )
+          result=created.get("result") or {}
+          new_id=str(result.get("id") or "")
+          if not new_id:
+            raise SystemExit("Version create did not return an id")
+
+          # Verify candidate contents and resolved bindings.
+          detail=request_json(
+            "GET",
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/{WORKER}/versions/{new_id}?include=modules",
+            auth=token
+          ).get("result") or {}
+
+          resolved=detail.get("bindings") or []
+          binding_map={}
+          if isinstance(resolved,list):
+            for b in resolved:
+              if isinstance(b,dict) and b.get("name"):
+                binding_map[str(b["name"])]=str(b.get("type") or "")
+          elif isinstance(resolved,dict):
+            for name,b in resolved.items():
+              binding_map[str(name)]=str((b or {}).get("type") or "") if isinstance(b,dict) else ""
+
+          required={"ASSETS","MAINTENANCE","GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"}
+          missing=sorted(required-set(binding_map))
+          if missing:
+            raise SystemExit("Candidate missing inherited binding(s): "+", ".join(missing))
+          if "durable" not in binding_map["MAINTENANCE"].lower():
+            raise SystemExit("Candidate MAINTENANCE did not resolve to Durable Object")
+          for n in ("GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"):
+            if "secret" not in binding_map[n].lower():
+              raise SystemExit(f"Candidate {n} did not resolve to secret binding")
+
+          candidate_mods=detail.get("modules") or []
+          if not candidate_mods:
+            raise SystemExit("Candidate source module unavailable")
+          cmod=max(candidate_mods,key=lambda m:len(m.get("content_base64") or ""))
+          csource=base64.b64decode(cmod.get("content_base64") or "")
+          csha=hashlib.sha256(csource).hexdigest()
+          if csha!=source_sha:
+            raise SystemExit("Candidate backend module differs from v68")
+
+          assets=detail.get("assets") or {}
+          config=(assets.get("config") or {}) if isinstance(assets,dict) else {}
+          rwf=config.get("run_worker_first")
+          if rwf!=["/api","/api/*","/files/*"]:
+            raise SystemExit("Candidate run_worker_first routing mismatch: "+repr(rwf))
+
+          # Confirm candidate creation did not alter active deployment.
+          dep2=request_json("GET",f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{WORKER}/deployments",auth=token)
+          rr=dep2.get("result")
+          rows2=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          active_after=[]
+          if rows2:
+            for v in rows2[0].get("versions") or []:
+              if v.get("version_id"):
+                active_after.append({"version_id":str(v.get("version_id")),"percentage":v.get("percentage")})
+          if active_after!=active_before:
+            raise SystemExit("Safety failure: candidate creation changed active deployment")
+
+          report=[
+            "# OMODOS Safe Worker Candidate",
+            "",
+            f"- Created UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Candidate version ID: {new_id}",
+            f"- Candidate version number: {detail.get('number') or result.get('number')}",
+            f"- Backend SHA-256: {csha}",
+            f"- Frontend index SHA-256: {index_sha}",
+            f"- Asset files in manifest: {len(manifest)}",
+            f"- Asset upload buckets required: {len(buckets)}",
+            f"- Required bindings: {json.dumps(binding_map,sort_keys=True)}",
+            f"- run_worker_first: {json.dumps(rwf)}",
+            f"- Active deployment before: {json.dumps(active_before)}",
+            f"- Active deployment after: {json.dumps(active_after)}",
+            "- Production changed by candidate creation: NO",
+            "- Ready for controlled smoke deployment: YES"
+          ]
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/SAFE_WORKER_CANDIDATE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[SAFE_CANDIDATE] version="+new_id)
+          print("[SAFE_CANDIDATE] active production unchanged")
+
+      - name: Commit sanitized candidate report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/SAFE_WORKER_CANDIDATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: record safe Worker candidate"
+          git push
