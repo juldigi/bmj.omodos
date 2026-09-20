@@ -2213,3 +2213,226 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
 });
 })();
 
+
+/* OMODOS4_OPERATION_INTEL_V1
+   Progressive-enhancement views for master-prompt features 51–60.
+   Read-only intelligence plus non-persistent scenario runs; existing KPI/Energy/IPAL records are never overwritten. */
+(function(){
+'use strict';
+
+var OP_CACHE=new Map();
+var OP_TTL=30000;
+
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openN(n){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!el&&parseInt(el.textContent,10)===Number(n);
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function note(t,kind){return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+esc(t)+'</span></div>'}
+function empty(t){return '<div class="v4-empty">'+esc(t||'Belum ada evidence yang cukup.')+'</div>'}
+function fmt(v,d){
+ if(v==null||v==='')return '—';
+ var n=Number(v);if(!Number.isFinite(n))return String(v);
+ try{return new Intl.NumberFormat('id-ID',{maximumFractionDigits:d==null?2:d}).format(n)}catch(e){return String(n)}
+}
+function value(sec,sel){var e=sec&&sec.querySelector(sel);return e?String(e.value||'').trim():''}
+function busy(btn,on,label){
+ if(!btn)return;
+ if(on){btn.dataset.old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> '+esc(label||'Memuat…')}
+ else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
+}
+function machineNames(){
+ var set=new Set();
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){
+  var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n));
+ })}catch(e){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function machineOptions(){
+ return '<option value="">Semua / level departemen</option>'+machineNames().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('');
+}
+function chip(t){return '<span class="v4-risk-chip">'+esc(t||'EVIDENCE')+'</span>'}
+function item(title,sub,right){
+ return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
+}
+function list(arr,fn,limit,msg){
+ if(!Array.isArray(arr)||!arr.length)return empty(msg);
+ return '<div class="v4-sf-list">'+arr.slice(0,limit||60).map(fn).join('')+'</div>';
+}
+function metrics(rows){
+ return '<div class="v4-statline">'+rows.map(function(x){return '<div><b>'+esc(x[1])+'</b><span>'+esc(x[0])+'</span></div>'}).join('')+'</div>';
+}
+function scopePayload(sec){
+ var p={},m=value(sec,'[data-v4-op-machine]');if(m)p.machine=m;return p;
+}
+function cacheKey(p){return p.machine||'*'}
+async function getOperation(p,force){
+ if(!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function'))return null;
+ var k=cacheKey(p),c=OP_CACHE.get(k);
+ if(!force&&c&&Date.now()-c.at<OP_TTL)return c.data;
+ var d=await window.OMODOS4.serverRead('v4.getKpiStory',p||{});
+ if(d)OP_CACHE.set(k,{at:Date.now(),data:d});
+ return d;
+}
+function mount(n){
+ var h=host();if(!h||!openN(n))return;
+ var old=h.querySelector('.v4-operation-intel');if(old)old.remove();
+ var titles={
+  51:'KPI Story Mode',52:'KPI Cause Tree',53:'KPI Forecast',54:'Target Recovery Simulator',55:'Maintenance–Production Correlation',
+  56:'Energy Anomaly Radar',57:'Energy per Good Output',58:'Utility Digital Twin',59:'IPAL Intelligence',60:'Executive One-Minute Brief'
+ };
+ var sec=document.createElement('section');sec.className='v4-interaction v4-operation-intel';sec.dataset.v4OpFeature=String(n);
+ var machine=n<=55?'<label>Konteks mesin<select data-v4-op-machine>'+machineOptions()+'</select></label>':'';
+ var simulator=n===54?'<div class="v4-form-grid">'+
+  '<label>Downtime reduction %<input type="number" min="0" max="100" step="1" value="10" data-v4-op-down></label>'+
+  '<label>Recurring reduction %<input type="number" min="0" max="100" step="1" value="10" data-v4-op-rec></label>'+
+  '<label>Stock-risk reduction %<input type="number" min="0" max="100" step="1" value="10" data-v4-op-stock></label>'+
+  '<label>High-priority action closure %<input type="number" min="0" max="100" step="1" value="20" data-v4-op-close></label>'+
+  '</div>':'';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OPERATION INTELLIGENCE</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===54?'SCENARIO ONLY':'READ ONLY')+'</span></div>'+
+ (machine?'<div class="v4-form-grid">'+machine+'</div>':'')+simulator+
+ '<div class="v4-interaction-actions">'+
+ (n===54?'<button class="btn btn-primary btn-sm" data-v4-op-sim><i class="ph-bold ph-function"></i> Jalankan Simulasi</button>':'<button class="btn btn-primary btn-sm" data-v4-op-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>')+
+ (n===51||n===52||n===53?'<button class="btn btn-sm" data-v4-open-existing="kpi-department"><i class="ph-bold ph-target"></i> Buka KPI Existing</button>':'')+
+ (n===56||n===57||n===58?'<button class="btn btn-sm" data-v4-open-existing="energy-utility"><i class="ph-bold ph-lightning"></i> Buka Energy Existing</button>':'')+
+ (n===59?'<button class="btn btn-sm" data-v4-open-existing="report"><i class="ph-bold ph-file-text"></i> Buka Report Existing</button>':'')+
+ '</div><div data-v4-op-out>'+note('OMODOS 4.0 memakai source of truth existing sejak 1 September 2026. Nilai lama tidak ditulis ulang dan simulasi tidak menyimpan perubahan.','safe')+'</div>';
+ h.prepend(sec);
+}
+function render51(d){
+ return list(d.kpiStories,function(x){
+  var sub=(x.story||'')+(x.unit?' • '+x.unit:'');
+  return item(x.name||'KPI',sub,chip(x.atRisk?'PERLU PERHATIAN':'OK / DATA'));
+ },80)+note('Story menjelaskan actual, target periode, gap, dan status berdasarkan data yang tersedia sejak source-of-truth cutoff.','safe');
+}
+function render52(d){
+ var rows=(d.kpiAtRisk||[]).map(function(x){
+  var ev=x.causeTree&&Array.isArray(x.causeTree.evidence)?x.causeTree.evidence:[];
+  return {name:x.name,status:x.status,evidence:ev};
+ });
+ return list(rows,function(x){
+  var e=x.evidence.map(function(v){return (v.domain||'domain')+': '+(v.records||0)+' record • '+(v.reason||'')}).join(' | ');
+  return item(x.name||'KPI at risk',(x.status||'')+(e?' • '+e:''),chip('ASSOCIATION'));
+ },50)+note('Cause Tree hanya menunjukkan hubungan evidence/domain. Korelasi atau keterkaitan data bukan bukti sebab-akibat.','warn');
+}
+function render53(d){
+ var rows=(d.kpiStories||[]).filter(function(x){return x.forecast&&x.forecast.nextValue!=null});
+ return list(rows,function(x){
+  var f=x.forecast||{};
+  return item(x.name||'KPI','Latest '+fmt(x.actual)+' • Target '+fmt(x.target)+' • Trend/bulan '+fmt(f.trendPerMonth),chip('Next '+fmt(f.nextValue)+' • '+(f.confidence||'rendah')));
+ },60,'Belum cukup titik data sejak 1 September 2026 untuk membuat proyeksi tren.')+
+ note('Forecast adalah proyeksi linear tren, bukan komitmen hasil atau prediksi kausal.','warn');
+}
+function render55(d){
+ var c=d.maintenanceProductionCorrelation||{};
+ if(typeof c.pearson!=='number')return empty('Data maintenance–production belum cukup untuk korelasi.')+note('Minimal perlu periode berpasangan breakdown dan good output.','safe');
+ return metrics([
+  ['Pasangan periode',fmt(c.pairs,0)],['Pearson r',fmt(c.pearson,3)],['X','Jam breakdown'],['Y','Good output']
+ ])+note('Pearson r hanya mengukur asosiasi linear pada periode yang berpasangan. KORELASI BUKAN SEBAB-AKIBAT.','warn');
+}
+function render56(d){
+ return list(d.energyAnomalies,function(x){
+  return item((x.area||'Area')+' • '+(x.type||'Energy'), 'Value '+fmt(x.value)+' • baseline mean '+fmt(x.baselineMean),chip('z '+fmt(x.zScore,2)));
+ },60,'Tidak ada statistical outlier |z| ≥ 2 pada data energi yang cukup.')+
+ note('Radar menggunakan z-score terhadap grup area/jenis yang memiliki minimal data memadai; outlier perlu investigasi manusia.','safe');
+}
+function render57(d){
+ return list(d.energyPerGoodOutput,function(x){
+  var label=(x.month||'')+' '+(x.year||'');
+  var ratio=x.energyPerGoodSheet!=null?x.energyPerGoodSheet:x.ratio;
+  var sub=(x.area?x.area+' • ':'')+(x.type?x.type+' • ':'')+'Output '+fmt(x.goodOutput!=null?x.goodOutput:x.output)+' • Source '+(x.source||'');
+  return item(label.trim()||'Periode',sub,chip('Energy/Good '+fmt(ratio,6)));
+ },80,'Belum ada pasangan energy + good output yang valid.')+
+ note('Rasio mengikuti unit sumber masing-masing; bandingkan hanya record dengan definisi/unit yang konsisten.','warn');
+}
+function render58(d){
+ return list(d.utilityDigitalTwin,function(x){
+  return item((x.area||'Area')+' • '+(x.type||'Utility'),fmt(x.records,0)+' record pada source existing',chip('Avg '+fmt(x.average,3)));
+ },80)+note('Utility Digital Twin adalah ringkasan data recorded per area dan jenis utility, bukan model fisik engineering.','safe');
+}
+function render59(d){
+ return list(d.ipalIntelligence,function(x){
+  var nums=Array.isArray(x.numericMetrics)?x.numericMetrics.slice(0,5):[];
+  var sub=nums.map(function(m){return m.metric+'='+fmt(m.value,3)}).join(' • ');
+  return item((x.outlet||'IPAL')+' • '+(x.month||''),String(x.timestamp||'').slice(0,16)+(sub?' • '+sub:''),chip(nums.length+' metric'));
+ },80,'Belum ada IPAL report pada source-of-truth window.')+
+ note('IPAL Intelligence menampilkan metric numeric yang benar-benar tercatat; interpretasi kepatuhan tetap mengikuti limit/standar resmi existing.','warn');
+}
+function render60(d){
+ if(!d)return empty('Executive brief belum tersedia.');
+ var summary=Array.isArray(d.summary)?d.summary:[];
+ var look=Array.isArray(d.thingsToLookAt)?d.thingsToLookAt:[];
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>'+esc(d.headline||'Executive One-Minute Brief')+'</strong><span>'+esc(d.confidence||'')+'</span></div>'+
+ '<div class="v4-sf-list">'+summary.map(function(x){return item(String(x),'','')}).join('')+'</div></section>'+
+ (look.length?'<section class="v4-server-section"><div class="v4-server-section-head"><strong>Things To Look At</strong><span>'+look.length+'</span></div>'+
+ list(look,function(x){return item(x.title||x.machine||x.type||'Attention',x.reason||x.note||x.description||'',chip(x.priority||x.severity||'REVIEW'))},12)+'</section>':'')+
+ note('Brief deterministic berasal dari evidence internal; tidak memerlukan generative provider untuk menyusun prioritas ringkas.','safe');
+}
+function render(n,d){
+ if(!d)return empty('Backend V4 belum tersedia pada sesi/koneksi ini.');
+ if(n===51)return render51(d);
+ if(n===52)return render52(d);
+ if(n===53)return render53(d);
+ if(n===55)return render55(d);
+ if(n===56)return render56(d);
+ if(n===57)return render57(d);
+ if(n===58)return render58(d);
+ if(n===59)return render59(d);
+ if(n===60)return render60(d);
+ return empty();
+}
+async function load(btn,n,force){
+ var sec=btn.closest('.v4-operation-intel'),out=sec&&sec.querySelector('[data-v4-op-out]');
+ if(!sec||!out)return;
+ busy(btn,true,'Memuat');
+ try{
+  var d;
+  if(n===60){
+   d=window.OMODOS4&&typeof window.OMODOS4.serverRead==='function'?await window.OMODOS4.serverRead('v4.getBrief',{}):null;
+  }else d=await getOperation(scopePayload(sec),!!force);
+  out.innerHTML=render(n,d);
+ }catch(err){out.innerHTML=note(err&&err.message||String(err),'error')}
+ finally{busy(btn,false)}
+}
+function pct(sec,sel){var n=Number(value(sec,sel));return Math.max(0,Math.min(100,Number.isFinite(n)?n:0))}
+async function simulate(btn){
+ var sec=btn.closest('.v4-operation-intel'),out=sec&&sec.querySelector('[data-v4-op-out]');
+ if(!sec||!out)return;
+ if(!(window.OMODOS4&&typeof window.OMODOS4.interactiveAction==='function')){out.innerHTML=note('Scenario engine belum tersedia pada sesi ini.','warn');return}
+ var p=scopePayload(sec);
+ p.downtimeReductionPct=pct(sec,'[data-v4-op-down]');
+ p.recurringReductionPct=pct(sec,'[data-v4-op-rec]');
+ p.stockRiskReductionPct=pct(sec,'[data-v4-op-stock]');
+ p.actionClosurePct=pct(sec,'[data-v4-op-close]');
+ busy(btn,true,'Menghitung');
+ try{
+  var d=await window.OMODOS4.interactiveAction('v4.runScenario',p);
+  var b=d&&d.baseline||{},q=d&&d.projected||{};
+  out.innerHTML=metrics([
+   ['Downtime baseline',fmt(b.downtimeMinutes,0)+' min'],['Downtime scenario',fmt(q.downtimeMinutes,0)+' min'],
+   ['Avoided downtime',fmt(q.avoidedDowntimeMinutes,0)+' min'],['Recurring baseline',fmt(b.recurringPatterns,0)],
+   ['Recurring scenario',fmt(q.recurringPatterns,0)],['Sparepart risk scenario',fmt(q.sparepartRisks,0)]
+  ])+note('Semua persentase adalah asumsi yang Anda masukkan. Hasil adalah WHAT-IF SCENARIO, bukan prediksi dan tidak disimpan ke KPI asli.','warn');
+ }catch(err){out.innerHTML=note(err&&err.message||String(err),'error')}
+ finally{busy(btn,false)}
+}
+document.addEventListener('click',function(ev){
+ var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
+ if(tile){
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=51&&n<=60)setTimeout(function(){if(openN(n))mount(n)},0);
+  return;
+ }
+ var b=ev.target.closest&&ev.target.closest('[data-v4-op-load]');
+ if(b){ev.preventDefault();load(b,Number(b.getAttribute('data-v4-op-load')),true);return}
+ var sim=ev.target.closest&&ev.target.closest('[data-v4-op-sim]');
+ if(sim){ev.preventDefault();simulate(sim);return}
+},false);
+
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ operationIntelVersion:'1',
+ operationIntelFeatures:[51,52,53,54,55,56,57,58,59,60]
+});
+})();
+
