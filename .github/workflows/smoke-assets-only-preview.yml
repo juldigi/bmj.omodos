@@ -1,0 +1,150 @@
+name: Smoke Test Assets Only Candidate Preview
+
+on:
+  push:
+    branches:
+      - deploy/assets-only-fresh-shell
+    paths:
+      - ".github/workflows/smoke-assets-only-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PREVIEW_URL: https://2ec6941c-omodos.offsetbmj.workers.dev
+      CANDIDATE_VERSION: 2ec6941c-3f9d-433f-8646-bbd9858df1fc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: HTTP preview smoke
+        shell: python
+        run: |
+          import os,urllib.request,urllib.error,hashlib,json,time
+          from pathlib import Path
+
+          base=os.environ["PREVIEW_URL"].rstrip("/")
+          repo=Path("public/index.html").read_bytes()
+          expected_sha=hashlib.sha256(repo).hexdigest()
+
+          last=None
+          for attempt in range(1,6):
+            req=urllib.request.Request(
+              base+"/?preview_smoke="+str(attempt),
+              headers={"User-Agent":"OMODOS-Assets-Preview-QA/1.0","Cache-Control":"no-cache"}
+            )
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                status=r.status
+                headers=dict(r.headers.items())
+                body=r.read()
+            except urllib.error.HTTPError as e:
+              status=e.code
+              headers=dict(e.headers.items())
+              body=e.read()
+
+            text=body.decode("utf-8",errors="replace")
+            checks={
+              "http_200":status==200,
+              "exact_html":hashlib.sha256(body).hexdigest()==expected_sha,
+              "copilot_help":'id="copilot-help"' in text,
+              "machine_dropdown":'id="filter-machine"' in text,
+              "bantuan_cleanup":"BANTUAN_PAGE_CARD_REMOVAL_V1" in text,
+              "legacy_injector_absent":"top.insertAdjacentElement('afterend',guide)" not in text,
+              "omodos4":"OMODOS 4.0" in text,
+            }
+            cache=(headers.get("Cache-Control") or headers.get("cache-control") or "")
+            build=(headers.get("X-OMODOS-Build") or headers.get("x-omodos-build") or "")
+            checks["no_store_header"]="no-store" in cache.lower()
+            checks["build_header"]=build=="bantuan-copilot-20260920"
+            last={"status":status,"checks":checks,"cache_control":cache,"build_header":build}
+            if all(checks.values()):
+              break
+            time.sleep(3)
+          else:
+            raise SystemExit("Preview HTTP smoke failed: "+json.dumps(last,sort_keys=True))
+
+          Path("/tmp/http-preview.json").write_text(json.dumps(last,sort_keys=True))
+          print("[ASSETS_PREVIEW_HTTP] PASS "+json.dumps(last,sort_keys=True))
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Browser preview smoke
+        shell: bash
+        run: |
+          cat > preview-smoke.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            page.on('dialog',async d=>{try{await d.dismiss();}catch{}});
+            const response=await page.goto(process.env.PREVIEW_URL+'/?browser_smoke=1',{
+              waitUntil:'domcontentloaded',
+              timeout:30000
+            });
+            const result=await page.evaluate(()=>({
+              help:!!document.getElementById('copilot-help'),
+              helpInside:!!document.getElementById('copilot-help')?.closest('#copilot-panel'),
+              visibleLegacy:[...document.querySelectorAll('.legacy-simple-guide')].filter(x=>getComputedStyle(x).display!=='none').length,
+              pageGuideNodes:document.querySelectorAll('.view > .legacy-simple-guide').length,
+              machineDropdown:!!document.getElementById('filter-machine'),
+              omodos4:!!document.getElementById('view-omodos4')
+            }));
+            const relevant=errors.filter(x=>/TypeError|ReferenceError|SyntaxError/i.test(x));
+            if(!response || response.status()!==200 || !result.help || !result.helpInside || result.visibleLegacy!==0 || result.pageGuideNodes!==0 || !result.machineDropdown || !result.omodos4 || relevant.length){
+              throw new Error('Browser preview QA failed: '+JSON.stringify({status:response?.status(),result,relevant}));
+            }
+            console.log('[ASSETS_PREVIEW_BROWSER] PASS '+JSON.stringify({status:response.status(),result,relevant}));
+          } finally {
+            await browser.close();
+          }
+          JS
+          node --check preview-smoke.mjs
+          timeout -k 5s 60s node preview-smoke.mjs
+          rm -f preview-smoke.mjs package.json package-lock.json
+
+      - name: Write sanitized preview report
+        shell: python
+        run: |
+          import os,json
+          from pathlib import Path
+          d=json.loads(Path("/tmp/http-preview.json").read_text())
+          report=[
+            "# OMODOS Assets-Only Preview Smoke",
+            "",
+            f"- Candidate version: {os.environ['CANDIDATE_VERSION']}",
+            f"- Preview root HTTP: {d['status']}",
+            f"- Exact GitHub HTML: {'YES' if d['checks']['exact_html'] else 'NO'}",
+            f"- Copilot Bantuan present: {'YES' if d['checks']['copilot_help'] else 'NO'}",
+            f"- Legacy Bantuan injector absent: {'YES' if d['checks']['legacy_injector_absent'] else 'NO'}",
+            f"- Machine dropdown present: {'YES' if d['checks']['machine_dropdown'] else 'NO'}",
+            f"- OMODOS 4.0 present: {'YES' if d['checks']['omodos4'] else 'NO'}",
+            f"- Cache-Control: {d['cache_control']}",
+            f"- X-OMODOS-Build: {d['build_header']}",
+            "- Chromium runtime QA: PASS",
+            "- Preview verdict: PASS",
+            "- Production traffic changed by preview test: NO"
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/ASSETS_ONLY_PREVIEW_SMOKE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+      - name: Commit sanitized report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/ASSETS_ONLY_PREVIEW_SMOKE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "test: record assets-only preview smoke"
+          git push
