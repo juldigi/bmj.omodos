@@ -15,7 +15,101 @@ var GROUPS=[
 ['Factory Brain','ph-cpu',['Knowledge Graph','Maintenance Wikipedia','Knowledge Base','Correlation Engine','Data Mesin','Data Terpadu','Search Intelligence','Source Traceability']],
 ['Maintenance War Room','ph-monitor-play',['Digital War Room','Critical Machines','Open Logbook','Patrol Alert','Sparepart Pending','Downtime Watch','KPI Watch','Time Machine']]
 ];
-var ROUTES={'Input Logbook':'input','View Logbook':'utama','Patrol Digital':'patrol','Corrective Report':'corrective-report','Project Center':'project-center','Master Sparepart':'sparepart','Daily Collection':'sparepart','MTBF':'machine-breakdown','MTTR':'machine-breakdown','Lost Time':'kpi-department','Breakdown':'machine-breakdown','Downtime Detail':'downtime','Durasi Pekerjaan':'durasi','Record YTD':'record-ytd','Run Hour Comparison':'run-hour-comparison','Energy & Utility':'energy-utility','Biaya Energi':'energy-cost-toe','KPI Department':'kpi-department','Input KPI':'kpi-input','WTP / IPAL':'energy-utility','Machine Breakdown':'machine-breakdown','PI Dashboard':'pi-dashboard','Master Personil':'pi-personnel','Soft Skill':'pi-softskill','Hard Skill':'pi-hardskill','Smart Resume':'pi-smart-resume','Expert Finder':'expert-finder','People Hub':'people-hub','Meeting':'meeting','Diagnostic Wizard':'diagnostic','Knowledge Graph':'knowledge-graph','Maintenance Wikipedia':'wiki','Knowledge Base':'knowledge','Data Mesin':'database','Digital War Room':'analitik','Open Logbook':'utama','Sparepart Pending':'sparepart'};
+var ROUTES={
+ 'Ringkasan Eksekutif':'dashboard',
+ 'Things to Look At':'analitik',
+ 'What Changed?':'downtime',
+ 'Latest Intelligence':'insights-hub',
+ 'Alert Prioritas':'diagnostic',
+ 'Status Mesin Terkini':'dashboard',
+ 'Aktivitas Hari Ini':'report',
+ 'KPI Utama':'kpi-department',
+ 'Machine Health Passport':'database',
+ 'Status Mesin Real-time':'dashboard',
+ 'Riwayat Mesin':'utama',
+ 'Failure Memory':'knowledge',
+ 'Knowledge Graph Mesin':'knowledge-graph',
+ 'Korelasi Kerusakan':'correlation',
+ 'Diagnostic Wizard':'diagnostic',
+ 'Expert Finder':'expert-finder',
+ 'Prediksi Risiko':'analitik',
+ 'Tren Downtime':'downtime',
+ 'Pola Kerusakan':'correlation',
+ 'Prediksi Sparepart':'sparepart',
+ 'Anomali Mesin':'diagnostic',
+ 'Early Warning':'dashboard',
+ 'Forecast KPI':'kpi-department',
+ 'Reliability Trend':'machine-breakdown',
+ 'Input Logbook':'input',
+ 'View Logbook':'utama',
+ 'Patrol Digital':'patrol',
+ 'Corrective Report':'corrective-report',
+ 'Project Center':'project-center',
+ 'Foto Lapangan':'input',
+ 'Riwayat Patrol':'patrol',
+ 'Temuan Lapangan':'patrol',
+ 'Master Sparepart':'sparepart',
+ 'Pencarian Material':'sparepart',
+ 'Daily Collection':'sparepart',
+ 'Kebutuhan Material':'sparepart',
+ 'Riwayat Pemakaian':'sparepart',
+ 'Lokasi Sparepart':'sparepart',
+ 'Status SAP':'sparepart',
+ 'Analisis Konsumsi':'sparepart',
+ 'MTBF':'machine-breakdown',
+ 'MTTR':'machine-breakdown',
+ 'Lost Time':'kpi-department',
+ 'Breakdown':'machine-breakdown',
+ 'Pareto Loss':'analitik',
+ 'Downtime Detail':'downtime',
+ 'Durasi Pekerjaan':'durasi',
+ 'Record YTD':'record-ytd',
+ 'Run Hour Comparison':'run-hour-comparison',
+ 'Energy & Utility':'energy-utility',
+ 'Biaya Energi':'energy-cost-toe',
+ 'KPI Department':'kpi-department',
+ 'Input KPI':'kpi-input',
+ 'WTP / IPAL':'energy-utility',
+ 'Machine Breakdown':'machine-breakdown',
+ 'Operation Trend':'analitik',
+ 'PI Dashboard':'pi-dashboard',
+ 'Master Personil':'pi-personnel',
+ 'Soft Skill':'pi-softskill',
+ 'Hard Skill':'pi-hardskill',
+ 'Smart Resume':'pi-smart-resume',
+ 'People Hub':'people-hub',
+ 'Meeting':'meeting',
+ 'Ask OMODOS':'@copilot',
+ 'AI Internal':'@copilot',
+ 'Diagnostic AI':'diagnostic',
+ 'Knowledge Assistant':'knowledge',
+ 'Analisis Korelasi':'correlation',
+ 'Ringkasan Halaman':'@copilot',
+ 'Bantuan Kontekstual':'@copilot-help',
+ 'Improvement Backlog':'project-center',
+ 'Corrective Action':'corrective-report',
+ 'Opportunity Finder':'analitik',
+ 'Before / After':'project-center',
+ 'Benefit Tracking':'project-center',
+ 'Lesson Learned':'knowledge',
+ 'Meeting Action':'meeting',
+ 'Knowledge Graph':'knowledge-graph',
+ 'Maintenance Wikipedia':'wiki',
+ 'Knowledge Base':'knowledge',
+ 'Correlation Engine':'correlation',
+ 'Data Mesin':'database',
+ 'Data Terpadu':'insights-hub',
+ 'Search Intelligence':'knowledge',
+ 'Source Traceability':'knowledge-graph',
+ 'Digital War Room':'analitik',
+ 'Critical Machines':'dashboard',
+ 'Open Logbook':'utama',
+ 'Patrol Alert':'patrol',
+ 'Sparepart Pending':'sparepart',
+ 'Downtime Watch':'downtime',
+ 'KPI Watch':'kpi-department',
+ 'Time Machine':'record-ytd'
+};
 function esc(v){return String(v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function permitted(){try{return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed())}catch(e){return false}}
 function group(){return document.getElementById('v4-nav-group')}
@@ -44,9 +138,25 @@ function render(n){
  cards+='<button type="button" class="v4-feature-tile" data-v4-route="'+esc(route)+'"><span class="n">'+String(i+1).padStart(2,'0')+'</span><strong>'+esc(name)+'</strong><small>'+(route?'Buka data/fungsi existing.':'Ringkasan intelligence dari data existing.')+'</small></button>'}
  s.innerHTML='<div class="v4-card"><div class="v4-module-head"><div><div class="v4-eyebrow">OMODOS 4.0</div><h2><i class="ph-bold '+data[1]+'"></i> '+esc(data[0])+'</h2><p>Menggunakan sumber data existing tanpa input ganda.</p></div></div><div class="v4-feature-grid">'+cards+'</div></div>'
 }
+function openCopilot(showHelp){
+ var bg=document.querySelector('.copilot-bg'),fab=document.getElementById('copilot-fab');
+ if(fab&&(!bg||!bg.classList.contains('active')))fab.click();
+ if(showHelp)setTimeout(function(){var help=document.getElementById('copilot-help');if(help)help.click()},80);
+ return !!(fab||bg)
+}
+function openRoute(route){
+ if(!route)return false;
+ if(route==='@copilot')return openCopilot(false);
+ if(route==='@copilot-help')return openCopilot(true);
+ var target=document.querySelector('.nav-btn[data-view="'+route+'"],.bottom-nav-btn[data-view="'+route+'"]');
+ if(target){target.click();return true}
+ if(typeof window.goToView==='function')return window.goToView(route)!==false;
+ if(typeof goToView==='function')return goToView(route)!==false;
+ return false
+}
 document.addEventListener('click',function(e){
  var m=e.target.closest&&e.target.closest('[data-v4-safe-module]');if(m){if(!permitted()){e.preventDefault();e.stopImmediatePropagation();return}var root=document.querySelector('#v4-nav-group [data-view="omodos4"]');if(root)root.click();setTimeout(function(){render(Number(m.getAttribute('data-v4-safe-module')))},0);return}
- var tile=e.target.closest&&e.target.closest('[data-v4-route]');if(tile){var route=tile.getAttribute('data-v4-route');if(!route)return;var target=document.querySelector('.nav-btn[data-view="'+route+'"],.bottom-nav-btn[data-view="'+route+'"]');if(target)target.click()}
+ var tile=e.target.closest&&e.target.closest('[data-v4-route]');if(tile){var route=tile.getAttribute('data-v4-route');if(!openRoute(route)&&typeof window.toast==='function')window.toast('Fitur belum dapat dibuka dari OMODOS 4.0.');return}
 },true);
 window.addEventListener('storage',sync);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)sync()});
