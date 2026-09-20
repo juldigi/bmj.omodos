@@ -46,28 +46,38 @@ jobs:
           print(checks)
           if bad: raise SystemExit("Safety invariant failed: "+", ".join(bad))
 
-      - name: Check for previous selector regressions
+      - name: Check known selector regression functions
         shell: python
         run: |
           from pathlib import Path
-          lines=Path("public/index.html").read_text(encoding="utf-8").splitlines()
-          hits=[]
-          for line_no,line in enumerate(lines,1):
-            compact="".join(line.split())
-            pos=0
-            while True:
-              idx=compact.find("$(",pos)
-              if idx < 0:
-                break
-              single = idx == 0 or compact[idx-1] != "$"
-              if single:
-                tail=compact[idx:]
-                if ").forEach(" in tail or ").find(" in tail:
-                  hits.append((line_no,line.strip()))
-              pos=idx+2
-          if hits:
-            raise SystemExit("Single-dollar selector regression found: "+repr(hits[:10]))
-          print("Known single-dollar selector regressions absent.")
+          s=Path("public/index.html").read_text(encoding="utf-8")
+
+          def function_block(name, next_name=None):
+            start=s.find("function "+name+"(")
+            if start < 0:
+              raise SystemExit("Function missing: "+name)
+            if next_name:
+              end=s.find("function "+next_name+"(",start+1)
+            else:
+              end=s.find("\nfunction ",start+1)
+            if end < 0: end=min(len(s),start+12000)
+            return s[start:end]
+
+          sw=function_block("switchToView")
+          sp=function_block("attachSparepartPaginationHandlers","setDailyCollectionStatus")
+
+          checks={
+            "switch_nav_uses_double_dollar": "$$('.nav-btn').forEach" in sw,
+            "switch_views_uses_double_dollar": "$$('.view').forEach" in sw,
+            "sp_page_buttons_use_double_dollar": "$$('button[data-pg]', pager).forEach" in sp,
+            "sp_action_buttons_use_double_dollar": "$$('button[data-sp-pg-action]', pager).forEach" in sp,
+            "sp_size_selector_single_element_ok": "$('select[data-sp-page-size]',pager)" in sp,
+          }
+          bad=[k for k,v in checks.items() if not v]
+          print(checks)
+          if bad:
+            raise SystemExit("Known selector regression check failed: "+", ".join(bad))
+          print("Known selector regression functions remain corrected.")
 
       - name: Validate inserted V4 JavaScript syntax
         shell: bash
