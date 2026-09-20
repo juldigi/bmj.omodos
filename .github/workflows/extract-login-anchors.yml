@@ -1,0 +1,59 @@
+name: Extract Login Connection Anchors
+
+on:
+  push:
+    branches:
+      - audit/login-production-failure
+    paths:
+      - ".github/workflows/extract-login-anchors.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract exact login connection anchors
+        shell: python
+        run: |
+          from pathlib import Path
+          src=Path("public/index.html").read_text(encoding="utf-8",errors="replace").splitlines()
+          needles=[
+            "WEB_APP_URL",
+            "parseApiResponse_",
+            "fetchWithTimeout_",
+            "form-login",
+            "localStorage",
+            "workers.dev",
+            "nama-aplikasi.workers.dev/api",
+            "URL Web App",
+          ]
+          out=["# Login Connection Anchors",""]
+          seen=set()
+          for needle in needles:
+            hits=[i for i,l in enumerate(src) if needle.lower() in l.lower()]
+            out.append(f"## {needle} — {len(hits)}")
+            for idx in hits[:50]:
+              start=max(0,idx-16); end=min(len(src),idx+34)
+              key=(start,end)
+              if key in seen: continue
+              seen.add(key)
+              out.append(f"### Around line {idx+1}")
+              out.append("~~~text")
+              for j in range(start,end):
+                line=src[j]
+                out.append(f"{j+1:05d}: {line}")
+              out.append("~~~")
+              out.append("")
+          Path("audit/LOGIN_CONNECTION_ANCHORS.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/LOGIN_CONNECTION_ANCHORS.md
+          git commit -m "audit: extract login connection anchors"
+          git push
