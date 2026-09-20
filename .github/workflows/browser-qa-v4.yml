@@ -320,6 +320,110 @@ jobs:
             }
             result.phases.push('critical-controls');
 
+            console.log('[QA] latest machine status source ordering');
+            const statusOrdering = await page.evaluate(() => {
+              const oldEntries = Array.isArray(ENTRIES) ? ENTRIES.slice() : ENTRIES;
+              const oldPm = Array.isArray(PM_REPORTS) ? PM_REPORTS.slice() : PM_REPORTS;
+              const oldMachines = Array.isArray(MACHINES) ? MACHINES.slice() : MACHINES;
+              try {
+                MACHINES = [{ 'Kode Mesin':'QA-STATUS-1', 'Nama Mesin':'QA Status Machine' }];
+                ENTRIES = [{
+                  'ID':'QA-LOG-1',
+                  'Kode Mesin':'QA-STATUS-1',
+                  'Nama Mesin':'QA Status Machine',
+                  'Tanggal':'2026-09-20',
+                  'Waktu':'10:00',
+                  'Timestamp Input':'2026-09-20T10:00:00+07:00',
+                  'Status':'OPEN',
+                  'Deskripsi Masalah':'Logbook lebih lama'
+                }];
+                PM_REPORTS = [{
+                  id:'QA-PATROL-1',
+                  kodeMesin:'QA-STATUS-1',
+                  namaMesin:'QA Status Machine',
+                  tanggal:'2026-09-20',
+                  waktu:'11:00',
+                  createdAt:'2026-09-20T11:00:00+07:00',
+                  timestamp:'2026-09-20T11:00:00+07:00',
+                  severity:'Kritikal',
+                  deskripsiTemuan:'Patrol lebih baru'
+                }];
+                const patrolNewer = machineLatestStatusSnapshot_('QA Status Machine');
+
+                ENTRIES = [{
+                  'ID':'QA-LOG-2',
+                  'Kode Mesin':'QA-STATUS-1',
+                  'Nama Mesin':'QA Status Machine',
+                  'Tanggal':'2026-09-20',
+                  'Waktu':'12:00',
+                  'Timestamp Input':'2026-09-20T12:00:00+07:00',
+                  'Status':'SELESAI',
+                  'Deskripsi Masalah':'Logbook lebih baru'
+                }];
+                const logNewer = machineLatestStatusSnapshot_('QA Status Machine');
+                return {
+                  patrolNewer: {
+                    source: patrolNewer?.source,
+                    sourceLabel: patrolNewer?.sourceLabel,
+                    description: patrolNewer?.description,
+                    ts: patrolNewer?.ts
+                  },
+                  logNewer: {
+                    source: logNewer?.source,
+                    sourceLabel: logNewer?.sourceLabel,
+                    description: logNewer?.description,
+                    ts: logNewer?.ts
+                  }
+                };
+              } finally {
+                ENTRIES = oldEntries;
+                PM_REPORTS = oldPm;
+                MACHINES = oldMachines;
+              }
+            });
+            result.statusOrdering = statusOrdering;
+            if (statusOrdering.patrolNewer.source !== 'patrol' || statusOrdering.patrolNewer.description !== 'Patrol lebih baru' ||
+                statusOrdering.logNewer.source !== 'logbook' || statusOrdering.logNewer.description !== 'Logbook lebih baru' ||
+                !(statusOrdering.logNewer.ts > statusOrdering.patrolNewer.ts)) {
+              throw new Error('Latest machine status ordering failed: ' + JSON.stringify(statusOrdering));
+            }
+            result.phases.push('machine-status-ordering');
+
+            console.log('[QA] report category internal flows');
+            const reportFlows = {};
+            for (const cat of ['rca','ai','report-hub']) {
+              await page.evaluate(() => goToView('report'));
+              await page.waitForTimeout(30);
+              const card = page.locator('#view-report .report-cat-card[data-cat="' + cat + '"]');
+              if (await card.count()) {
+                await card.evaluate(el => el.click());
+                await page.waitForTimeout(30);
+                reportFlows[cat] = await page.evaluate(c => !!document.getElementById('view-' + c)?.classList.contains('active'), cat);
+              } else {
+                reportFlows[cat] = false;
+              }
+            }
+            await page.evaluate(() => goToView('report'));
+            await page.waitForTimeout(30);
+            const ipalCard = page.locator('#view-report .report-cat-card[data-cat="ipal"]');
+            if (await ipalCard.count()) {
+              await ipalCard.evaluate(el => el.click());
+              await page.waitForTimeout(30);
+              reportFlows.ipal = await page.evaluate(() => {
+                const grid = document.getElementById('report-cat-grid');
+                const form = document.getElementById('ipal-form-wrap');
+                const back = document.getElementById('btn-report-back-cat');
+                return !!form && !!back && getComputedStyle(grid).display === 'none' && getComputedStyle(back).display !== 'none';
+              });
+            } else {
+              reportFlows.ipal = false;
+            }
+            result.reportFlows = reportFlows;
+            if (!reportFlows.rca || !reportFlows.ai || !reportFlows['report-hub'] || !reportFlows.ipal) {
+              throw new Error('Report category flow failed: ' + JSON.stringify(reportFlows));
+            }
+            result.phases.push('report-flows');
+
             console.log('[QA] sparepart pagination');
             const selectorQA = await page.evaluate(() => {
               const p = document.createElement('div');
