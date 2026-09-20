@@ -1,4 +1,4 @@
-name: Deploy OMODOS V4 RBAC Toast Recovery
+name: Deploy OMODOS V4 RBAC Toast Recovery v2
 on:
   push:
     branches:
