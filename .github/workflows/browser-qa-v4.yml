@@ -349,22 +349,22 @@ jobs:
                   const state = await page.evaluate(expected => {
                     const view = document.getElementById('view-omodos4');
                     const stage = document.getElementById('v4-safe-stage');
-                    const no = Number(stage?.querySelector('.v4-feature-no')?.textContent || 0);
+                    const heading = stage?.querySelector('.v4-detail-card .v4-module-head h2')?.textContent?.trim() || '';
                     return {
                       active: !!view?.classList.contains('active'),
                       featureOpen: !!view?.classList.contains('v4-feature-open'),
-                      number: no,
+                      heading,
                       detail: !!stage?.querySelector('.v4-detail-card'),
                       serverPanelCount: stage?.querySelectorAll('#v4-server-intel').length || 0,
                       expected
                     };
-                  }, featureNo);
+                  }, featureLabel);
                   const newErrors = errors.slice(beforeErr).filter(x =>
                     !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError|Failed to load resource/i.test(x)
                   );
                   featureClickQA.checked++;
                   if (!featureNo || !state.active || !state.featureOpen || !state.detail ||
-                      state.number !== featureNo || state.serverPanelCount > 1 ||
+                      state.heading !== featureLabel || state.serverPanelCount > 1 ||
                       newErrors.some(x => /TypeError|ReferenceError|SyntaxError|insertBefore/i.test(x))) {
                     featureClickQA.failures.push({ featureNo, featureLabel, state, errors: newErrors.slice(0, 5) });
                   }
