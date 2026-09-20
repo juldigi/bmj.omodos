@@ -1,0 +1,129 @@
+name: Verify Live OMODOS After Full Worker Config
+
+on:
+  push:
+    branches:
+      - deploy/ketuk-to-pilih
+    paths:
+      - ".github/workflows/verify-live-full-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify active Worker and production behavior
+        shell: python
+        run: |
+          import os,json,re,urllib.request,urllib.error
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+
+          def cf_get(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          dep=cf_get(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments")
+          rr=dep.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No active deployment")
+          active=[v for v in rows[0].get("versions") or [] if float(v.get("percentage") or 0)>0]
+          if len(active)!=1 or abs(float(active[0].get("percentage") or 0)-100)>0.001:
+            raise SystemExit("Unexpected active deployment: "+json.dumps(active))
+          vid=str(active[0].get("version_id") or "")
+
+          detail=cf_get(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{vid}?include=modules").get("result") or {}
+          if detail.get("main_module")!="worker.js":
+            raise SystemExit("Active production is still not full Worker backend")
+          if detail.get("migration_tag")!="v1":
+            raise SystemExit("Active migration tag is not v1")
+
+          bindings=detail.get("bindings") or []
+          names={}
+          if isinstance(bindings,list):
+            for b in bindings:
+              if isinstance(b,dict) and b.get("name"):
+                names[str(b["name"])]=str(b.get("type") or "")
+          if "MAINTENANCE" not in names or "durable" not in names["MAINTENANCE"].lower():
+            raise SystemExit("Active MAINTENANCE Durable Object missing")
+
+          assets=detail.get("assets") or {}
+          config=(assets.get("config") or {}) if isinstance(assets,dict) else {}
+          if config.get("run_worker_first")!=["/api","/api/*","/files/*"]:
+            raise SystemExit("Active API routing incorrect: "+repr(config))
+
+          def live(path,method="GET",payload=None):
+            h={"User-Agent":"OMODOS-Final-Term-QA/1.0","Cache-Control":"no-cache"}
+            data=None
+            if payload is not None:
+              data=json.dumps(payload).encode("utf-8")
+              h["Content-Type"]="text/plain;charset=utf-8"
+            req=urllib.request.Request("https://omodos.offsetbmj.workers.dev"+path,data=data,method=method,headers=h)
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                return r.status,r.headers,r.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          root_status,root_h,root_body=live("/?final_term_verify=1")
+          root_text=root_body.decode("utf-8",errors="replace")
+          old_terms=re.findall(r'\b(?:Ketuk|ketuk|KETUK)\b',root_text)
+          pilih_terms=re.findall(r'\b(?:Pilih|pilih|PILIH)\b',root_text)
+
+          login_status,login_h,login_body=live(
+            "/api",
+            "POST",
+            {
+              "action":"login",
+              "username":"__omodos_qa_nonexistent_user__",
+              "password":"__omodos_qa_invalid_password__"
+            }
+          )
+          login_ct=(login_h.get("Content-Type") or "").lower()
+          login_text=login_body.decode("utf-8",errors="replace").lstrip()
+          try:
+            login_json=json.loads(login_text)
+            login_valid=True
+          except Exception:
+            login_json={}
+            login_valid=False
+
+          result={
+            "active_version":vid,
+            "root_http":root_status,
+            "old_terms_count":len(old_terms),
+            "pilih_terms_count":len(pilih_terms),
+            "copilot_help":'id="copilot-help"' in root_text,
+            "login_http":login_status,
+            "login_content_type":login_ct,
+            "login_valid_json":login_valid,
+            "dummy_authenticated":login_json.get("ok") is True,
+            "main_module":detail.get("main_module"),
+            "migration_tag":detail.get("migration_tag"),
+            "maintenance_binding":names.get("MAINTENANCE"),
+            "run_worker_first":config.get("run_worker_first")
+          }
+
+          if root_status!=200:
+            raise SystemExit("Root not HTTP 200: "+json.dumps(result))
+          if old_terms:
+            raise SystemExit("Ketuk terminology still present: "+json.dumps(result))
+          if not pilih_terms:
+            raise SystemExit("Pilih terminology not present: "+json.dumps(result))
+          if login_status==404 or not login_valid or login_json.get("ok") is True:
+            raise SystemExit("Login handler verification failed: "+json.dumps(result))
+
+          print("[FINAL_LIVE_QA] PASS "+json.dumps(result,sort_keys=True))
