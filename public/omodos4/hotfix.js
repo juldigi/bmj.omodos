@@ -51,6 +51,133 @@ var WORKSPACES = [
  ]}
 ];
 
+
+/* OMODOS4_LOW_COGNITIVE_V1 — plain-language labels only; feature numbers and behavior stay unchanged. */
+var SIMPLE_WORKSPACE = {
+  1:{name:'Mesin',help:'Lihat kondisi, riwayat, dan bagian mesin.'},
+  2:{name:'Prediksi Masalah',help:'Lihat tanda awal agar masalah bisa dicek lebih cepat.'},
+  3:{name:'Pekerjaan Lapangan',help:'Bantu teknisi saat memeriksa dan mencatat pekerjaan.'},
+  4:{name:'Sparepart',help:'Lihat stok, pemakaian, dan kebutuhan sparepart.'},
+  5:{name:'Keandalan & Kerugian',help:'Lihat mesin yang sering bermasalah dan dampaknya.'},
+  6:{name:'Operasi & KPI',help:'Lihat target, energi, IPAL, dan kondisi operasi.'},
+  7:{name:'Teknisi & Keahlian',help:'Lihat pengalaman, keahlian, dan kebutuhan belajar.'},
+  8:{name:'Asisten OMODOS',help:'Tanya OMODOS dengan bahasa biasa berdasarkan data yang ada.'},
+  9:{name:'Perbaikan',help:'Cari peluang perbaikan, Kaizen, project, dan SGA.'},
+ 10:{name:'Ringkasan Pabrik',help:'Lihat gambaran besar maintenance dalam satu tempat.'}
+};
+
+var SIMPLE_FEATURE = {
+  1:{name:'Profil Mesin',help:'Lihat identitas, kondisi, dan riwayat mesin di satu tempat.'},
+  2:{name:'Nilai Kesehatan Mesin',help:'Lihat nilai kesehatan mesin dan alasan di balik nilainya.'},
+  3:{name:'Hubungan Data Mesin',help:'Lihat hubungan mesin dengan masalah, orang, dan data lainnya.'},
+  4:{name:'Bagian-Bagian Mesin',help:'Lihat susunan bagian mesin yang sudah tercatat.'},
+  5:{name:'Umur Komponen',help:'Lihat umur dan riwayat komponen dari data yang tersedia.'},
+  6:{name:'Riwayat Masalah',help:'Cari masalah yang pernah terjadi dan kasus yang berulang.'},
+  7:{name:'Kebiasaan Mesin',help:'Lihat pola masalah yang sering muncul pada mesin.'},
+  8:{name:'Perubahan Kondisi Mesin',help:'Lihat perubahan kondisi mesin dari waktu ke waktu.'},
+  9:{name:'Putar Ulang Kejadian Mesin',help:'Lihat kembali urutan kejadian yang pernah tercatat.'},
+ 10:{name:'Ruang Mesin Virtual',help:'Lihat hubungan informasi penting tiap mesin.'},
+
+ 11:{name:'Risiko Kerusakan',help:'Lihat mesin yang punya tanda risiko dan perlu dicek.'},
+ 12:{name:'Peringatan Dini',help:'Lihat tanda masalah sebelum menjadi gangguan lebih besar.'},
+ 13:{name:'Tanda Sebelum Rusak',help:'Cari tanda yang pernah muncul sebelum kerusakan.'},
+ 14:{name:'Masalah Berulang',help:'Temukan masalah yang muncul lagi dan lagi.'},
+ 15:{name:'Masalah Mirip Antar Mesin',help:'Bandingkan masalah serupa pada mesin yang berbeda.'},
+ 16:{name:'Penurunan Diam-Diam',help:'Cari perubahan kecil yang mungkin luput dari perhatian.'},
+ 17:{name:'Ciri Khas Kerusakan',help:'Lihat pola gejala yang sering muncul bersama.'},
+ 18:{name:'Keyakinan Prediksi',help:'Lihat seberapa kuat bukti yang mendukung suatu risiko.'},
+ 19:{name:'Perkiraan Sisa Umur',help:'Lihat perkiraan berbasis data, bukan kepastian kerusakan.'},
+ 20:{name:'Bagian yang Perlu Dicek',help:'Lihat bagian atau mesin yang paling perlu diperiksa.'},
+
+ 21:{name:'Tugas Teknisi',help:'Lihat pekerjaan yang perlu dilakukan teknisi.'},
+ 22:{name:'Panduan Cari Masalah',help:'Ikuti langkah sederhana untuk mencari penyebab masalah.'},
+ 23:{name:'Daftar Pemeriksaan',help:'Lihat daftar hal yang perlu diperiksa satu per satu.'},
+ 24:{name:'Isi Logbook dengan Suara',help:'Gunakan suara untuk membantu menulis catatan Logbook.'},
+ 25:{name:'Bantuan dari Foto',help:'Gunakan foto sebagai bahan bantu pemeriksaan.'},
+ 26:{name:'Bukti Sebelum & Sesudah',help:'Bandingkan kondisi sebelum dan sesudah pekerjaan.'},
+ 27:{name:'Buka Mesin lewat QR',help:'Pindai QR untuk membuka mesin yang tepat.'},
+ 28:{name:'Buka Mesin lewat NFC',help:'Gunakan NFC untuk membuka data mesin.'},
+ 29:{name:'Urutan Pekerjaan Maintenance',help:'Lihat urutan pekerjaan dari awal sampai selesai.'},
+ 30:{name:'Mode Tanpa Internet',help:'Bantu pekerjaan lapangan saat koneksi internet terbatas.'},
+
+ 31:{name:'Tingkat Penting Sparepart',help:'Lihat sparepart mana yang paling penting untuk diperhatikan.'},
+ 32:{name:'Risiko Stok Habis',help:'Lihat sparepart yang berisiko habis.'},
+ 33:{name:'Sparepart Tidak Terpakai',help:'Cari sparepart yang lama tidak terlihat dipakai.'},
+ 34:{name:'Pemakaian Sparepart',help:'Lihat sparepart yang paling sering digunakan.'},
+ 35:{name:'Mesin & Sparepart Terkait',help:'Lihat sparepart yang tercatat terkait dengan mesin.'},
+ 36:{name:'Cari Sparepart Pengganti',help:'Cari kandidat sparepart pengganti untuk ditinjau manusia.'},
+ 37:{name:'Kenali Sparepart dari Foto',help:'Gunakan foto untuk membantu mengenali sparepart.'},
+ 38:{name:'Peta Rak Sparepart',help:'Lihat posisi dan hubungan data rak sparepart.'},
+ 39:{name:'Perkiraan Kebutuhan Sparepart',help:'Lihat kebutuhan sparepart berdasarkan catatan pemakaian.'},
+ 40:{name:'Urutan Pembelian Sparepart',help:'Lihat sparepart mana yang perlu dibeli lebih dulu.'},
+
+ 41:{name:'Ringkasan Keandalan',help:'Lihat gambaran umum keandalan mesin.'},
+ 42:{name:'Mesin yang Sering Bermasalah',help:'Lihat mesin dengan masalah terbanyak atau berulang.'},
+ 43:{name:'Masalah Terbanyak',help:'Lihat masalah yang paling banyak menyumbang gangguan.'},
+ 44:{name:'Masalah Sering vs Mendadak',help:'Bedakan masalah yang sering terjadi dan yang muncul tiba-tiba.'},
+ 45:{name:'Kerugian yang Tersembunyi',help:'Lihat waktu atau gangguan yang sering tidak terlihat.'},
+ 46:{name:'Perubahan Keandalan',help:'Lihat apakah kondisi keandalan membaik atau memburuk.'},
+ 47:{name:'Riwayat RCA',help:'Cari RCA lama yang berkaitan dengan masalah sekarang.'},
+ 48:{name:'Efek Tindakan Perbaikan',help:'Bandingkan kondisi sebelum dan sesudah tindakan.'},
+ 49:{name:'Biaya Kerusakan',help:'Lihat biaya kerusakan yang memang tercatat.'},
+ 50:{name:'Biaya per Menit Berhenti',help:'Lihat dampak biaya dari waktu mesin berhenti jika datanya ada.'},
+
+ 51:{name:'Cerita KPI',help:'Baca KPI dalam bentuk ringkasan yang mudah dipahami.'},
+ 52:{name:'Penyebab KPI',help:'Lihat faktor yang mungkin berkaitan dengan perubahan KPI.'},
+ 53:{name:'Arah KPI',help:'Lihat arah perubahan KPI dari data yang tersedia.'},
+ 54:{name:'Simulasi Capai Target',help:'Coba asumsi untuk melihat kemungkinan pemulihan target.'},
+ 55:{name:'Hubungan Maintenance & Produksi',help:'Lihat apakah perubahan maintenance bergerak bersama data produksi.'},
+ 56:{name:'Keanehan Energi',help:'Cari pemakaian energi yang tidak biasa.'},
+ 57:{name:'Energi per Hasil Baik',help:'Bandingkan energi dengan hasil produksi yang baik.'},
+ 58:{name:'Ringkasan Utilitas',help:'Lihat kondisi utilitas dari data yang tersedia.'},
+ 59:{name:'Kondisi IPAL',help:'Lihat ringkasan data dan tanda yang perlu diperiksa pada IPAL.'},
+ 60:{name:'Ringkasan 1 Menit',help:'Baca hal penting hari ini secara cepat.'},
+
+ 61:{name:'Peta Keahlian Teknisi',help:'Lihat bukti keahlian dan pengalaman yang tercatat.'},
+ 62:{name:'Teknisi & Mesin yang Dikuasai',help:'Lihat hubungan teknisi dengan mesin dari riwayat kerja.'},
+ 63:{name:'Cari Orang Berpengalaman',help:'Cari orang yang pernah menangani masalah atau mesin serupa.'},
+ 64:{name:'Riwayat Pengalaman Teknisi',help:'Lihat pengalaman teknisi yang tercatat di OMODOS.'},
+ 65:{name:'Risiko Hilangnya Pengetahuan',help:'Lihat area yang pengetahuannya hanya dimiliki sedikit orang.'},
+ 66:{name:'Keahlian yang Perlu Dipelajari',help:'Lihat gap keahlian yang memang tercatat.'},
+ 67:{name:'Saran Belajar',help:'Lihat saran belajar dari gap keahlian yang tercatat.'},
+ 68:{name:'Cari Mentor',help:'Cari kandidat mentor berdasarkan pengalaman yang tercatat.'},
+ 69:{name:'Latihan Cari Masalah',help:'Belajar dari kasus nyata tanpa mengubah data.'},
+ 70:{name:'Bukti Kompetensi',help:'Lihat bukti kompetensi yang sudah tercatat.'},
+
+ 71:{name:'Tanya OMODOS',help:'Tanyakan sesuatu dengan bahasa biasa dan lihat sumber datanya.'},
+ 72:{name:'Tanya Tentang Mesin',help:'Tanyakan kondisi satu mesin tanpa mencampur data mesin lain.'},
+ 73:{name:'Ringkasan Pergantian Shift',help:'Buat ringkasan hal penting untuk diteruskan ke shift berikutnya.'},
+ 74:{name:'Ringkasan Pagi',help:'Lihat hal penting yang perlu diperhatikan pagi ini.'},
+ 75:{name:'Buat Draf RCA',help:'Buat draf awal RCA untuk diperiksa manusia.'},
+ 76:{name:'Cari Kasus Mirip',help:'Cari kasus lama yang mirip dengan masalah sekarang.'},
+ 77:{name:'Tanya Manual',help:'Tanyakan isi pengetahuan atau manual yang benar-benar tersedia.'},
+ 78:{name:'Cari Pengetahuan Baru',help:'Cari kasus yang layak dijadikan artikel pengetahuan.'},
+ 79:{name:'Terjemahkan Istilah Maintenance',help:'Ubah istilah teknis menjadi bahasa yang lebih mudah.'},
+ 80:{name:'Periksa Ulang Asumsi',help:'Cari kelemahan asumsi sebelum mengambil keputusan.'},
+
+ 81:{name:'Peluang Perbaikan',help:'Cari masalah berulang yang mungkin perlu improvement.'},
+ 82:{name:'Buat Draf Kaizen',help:'Buat draf Kaizen tanpa langsung menyimpan project baru.'},
+ 83:{name:'Cek Bukti Manfaat Project',help:'Lihat apakah bukti manfaat project sudah cukup terisi.'},
+ 84:{name:'Lihat Sebelum & Sesudah Kaizen',help:'Lihat bukti perubahan Kaizen yang sudah tercatat.'},
+ 85:{name:'Kumpulan Ide Perbaikan',help:'Lihat semua ide dan improvement yang masih terbuka.'},
+ 86:{name:'Cari Kaizen yang Mirip',help:'Cari improvement yang mungkin mirip agar tidak membuat duplikat.'},
+ 87:{name:'Project yang Perlu Perhatian',help:'Lihat project terlambat atau masih terbuka.'},
+ 88:{name:'Cerita SGA',help:'Baca ringkasan SGA dari data yang sudah dicatat.'},
+ 89:{name:'Hubungan Pengetahuan Perbaikan',help:'Lihat hubungan improvement dengan mesin, masalah, dan pengetahuan.'},
+ 90:{name:'Riwayat Perbaikan',help:'Lihat perjalanan project, Kaizen, dan SGA dari tahun ke tahun.'},
+
+ 91:{name:'Gambaran Pabrik dari Data',help:'Lihat hubungan mesin dan maintenance sebagai gambaran besar.'},
+ 92:{name:'Pusat Pantau Maintenance',help:'Lihat hal paling penting yang perlu diperhatikan sekarang.'},
+ 93:{name:'Apa yang Berubah?',help:'Lihat data apa saja yang berubah dalam waktu tertentu.'},
+ 94:{name:'Lihat Kondisi Masa Lalu',help:'Lihat kondisi terbaik yang bisa direkonstruksi pada waktu tertentu.'},
+ 95:{name:'Rekaman Kejadian Maintenance',help:'Lihat urutan kejadian maintenance berdasarkan waktu.'},
+ 96:{name:'Peta Hubungan Pengetahuan',help:'Lihat hubungan mesin, masalah, RCA, manual, dan data lain.'},
+ 97:{name:'Coba Skenario',help:'Ubah asumsi untuk melihat hasil simulasi, bukan ramalan.'},
+ 98:{name:'Ruang Koordinasi Masalah',help:'Koordinasikan masalah besar tanpa mengubah Logbook lama.'},
+ 99:{name:'Saran Tugas Maintenance',help:'Lihat antrean hal yang perlu dicek manusia.'},
+ 100:{name:'Ringkasan Besar OMODOS',help:'Gabungkan informasi penting maintenance dalam satu halaman.'}
+};
+
 var SOURCE_BY_WORKSPACE = {
   1:['Master Mesin','Logbook','Patrol','Breakdown','Sparepart','RCA','Project','People','Knowledge'],
   2:['Logbook','Patrol','Breakdown','RCA','Machine'],
@@ -294,8 +421,9 @@ function syncNav(){
   b.type='button';b.className='nav-btn v4-nav-btn v4-module-btn';
   b.setAttribute('data-v4-safe-module',String(i));
   b.setAttribute('data-view','omodos4');
-  b.setAttribute('aria-label',WORKSPACES[i].name);
-  b.innerHTML='<span class="ico"><i class="ph-bold '+WORKSPACES[i].icon+'"></i></span> '+esc(WORKSPACES[i].name);
+  var simpleWs=SIMPLE_WORKSPACE[i]||{name:WORKSPACES[i].name};
+  b.setAttribute('aria-label',simpleWs.name);
+  b.innerHTML='<span class="ico"><i class="ph-bold '+WORKSPACES[i].icon+'"></i></span> '+esc(simpleWs.name);
   sub.appendChild(b);
  }
 }
@@ -323,12 +451,12 @@ function renderCommandCenter(){
  var bd=getBreakdown(),pr=highPatrolRows(),sp=sparePending(),ka=kpiAtRisk();
  var summary=document.getElementById('v4-summary');
  if(summary)summary.innerHTML=[
-  card('Critical Machines',cm.size,'Mesin dengan sinyal kritis aktif dari data existing.','ph-warning'),
-  card('Active Breakdown',bd.length||critical.length,'Breakdown/critical maintenance records yang tersedia.','ph-wrench'),
-  card('Predictive Risks',pr.length,'Temuan Patrol/Predictive dengan sinyal abnormal atau prioritas tinggi.','ph-waveform'),
-  card('Sparepart Risks',sp==null?'—':sp,sp==null?'Sumber sparepart belum dimuat.':'Transaksi/collection yang belum selesai.','ph-package'),
-  card('KPI at Risk',ka==null?'—':ka,ka==null?'Capaian KPI belum cukup untuk dibandingkan.':'Record achievement di bawah 100%.','ph-target'),
-  card('Open High-Priority Actions',critical.length,'Derived dari record maintenance kritis yang belum selesai.','ph-list-checks')
+  card('Mesin Perlu Dicek',cm.size,'Mesin dengan sinyal kritis aktif dari data existing.','ph-warning'),
+  card('Masalah Aktif',bd.length||critical.length,'Breakdown/critical maintenance records yang tersedia.','ph-wrench'),
+  card('Tanda Awal Masalah',pr.length,'Temuan Patrol/Predictive dengan sinyal abnormal atau prioritas tinggi.','ph-waveform'),
+  card('Sparepart Perlu Dicek',sp==null?'—':sp,sp==null?'Sumber sparepart belum dimuat.':'Transaksi/collection yang belum selesai.','ph-package'),
+  card('Target Perlu Dicek',ka==null?'—':ka,ka==null?'Capaian KPI belum cukup untuk dibandingkan.':'Record achievement di bawah 100%.','ph-target'),
+  card('Tugas Penting Belum Selesai',critical.length,'Derived dari record maintenance kritis yang belum selesai.','ph-list-checks')
  ].join('');
  var look=document.getElementById('v4-look-at');
  var attention=critical.concat(pr).sort(function(a,b){return dateValue(b)-dateValue(a)}).slice(0,10);
@@ -346,16 +474,24 @@ function renderWorkspace(idx){
  if(!permitted())return false;
  idx=Number(idx)||0;if(idx<=0)return renderCommandCenter();
  var ws=WORKSPACES[idx];if(!ws)return false;
+ var simpleWs=SIMPLE_WORKSPACE[idx]||{name:ws.name,help:'Pilih fitur yang ingin dilihat.'};
  ACTIVE_WORKSPACE=idx;ACTIVE_FEATURE=0;setActiveNav(idx);
  var view=document.getElementById('view-omodos4'),s=stage();if(!view||!s)return false;
- view.classList.add('v4-master-active','v4-safe-module-open');view.classList.remove('v4-feature-open');
+ view.classList.add('v4-master-active','v4-safe-module-open','v4-low-cognitive');view.classList.remove('v4-feature-open','v4-show-technical');
  var sources=SOURCE_BY_WORKSPACE[idx]||[];
  var sourceChips=sources.map(function(x){return '<span class="v4-source-chip">'+esc(x)+' <b>'+sourceCount(x)+'</b></span>'}).join('');
  var tiles=ws.features.map(function(name,i){
-  var n=featureNumber(idx,i);
-  return '<button type="button" class="v4-feature-tile" data-v4-feature="'+n+'" data-v4-route="omodos4"><span class="n">'+String(n).padStart(3,'0')+'</span><strong>'+esc(name)+'</strong><small>Analisis V4 dari data existing • tanpa double input</small></button>';
+  var n=featureNumber(idx,i),info=SIMPLE_FEATURE[n]||{name:name,help:'Buka untuk melihat informasi.'};
+  return '<button type="button" class="v4-feature-tile" data-v4-feature="'+n+'" data-v4-route="omodos4">'+
+   '<span class="n">'+String(n).padStart(3,'0')+'</span>'+
+   '<span class="v4-tile-copy"><strong>'+esc(info.name)+'</strong><small>'+esc(info.help)+'</small></span>'+
+   '<span class="v4-tile-arrow" aria-hidden="true"><i class="ph-bold ph-caret-right"></i></span></button>';
  }).join('');
- s.innerHTML='<div class="v4-card v4-workspace-card"><div class="v4-module-head"><div><div class="v4-eyebrow">OMODOS 4.0 • WORKSPACE</div><h2><i class="ph-bold '+ws.icon+'"></i> '+esc(ws.name)+'</h2><p>Workspace intelligence yang menghubungkan data existing. Modul lama tetap menjadi source of truth.</p></div><button class="btn btn-sm" data-v4-back-command><i class="ph-bold ph-house"></i> Command Center</button></div><div class="v4-source-strip">'+sourceChips+'</div><div class="v4-feature-grid">'+tiles+'</div></div>';
+ s.innerHTML='<div class="v4-card v4-workspace-card">'+
+  '<div class="v4-module-head"><div><div class="v4-simple-kicker">Pilih yang ingin dilihat</div><h2><i class="ph-bold '+ws.icon+'"></i> '+esc(simpleWs.name)+'</h2><p>'+esc(simpleWs.help)+' Pilih satu kartu di bawah.</p></div>'+
+  '<button class="btn btn-sm" data-v4-back-command><i class="ph-bold ph-house"></i> Ringkasan Utama</button></div>'+
+  '<details class="v4-simple-details"><summary><i class="ph-bold ph-database"></i> Data yang dipakai</summary><div class="v4-source-strip">'+sourceChips+'</div></details>'+
+  '<div class="v4-feature-grid">'+tiles+'</div></div>';
  s.style.display='block';
  try{s.scrollIntoView({block:'start',behavior:'auto'})}catch(e){}
  return true;
@@ -368,10 +504,11 @@ function featureByNumber(n){
 }
 function sourcePanel(f){
  var src=SOURCE_BY_WORKSPACE[f.wi]||[];
- return '<div class="v4-evidence-grid">'+src.map(function(name){
-  var c=sourceCount(name),state=c>0?'RECORDED':'NOT AVAILABLE';
+ var grid='<div class="v4-evidence-grid">'+src.map(function(name){
+  var c=sourceCount(name),state=c>0?'Ada data':'Belum ada data';
   return '<div class="v4-evidence"><span>'+esc(name)+'</span><strong>'+esc(c)+'</strong><small>'+state+'</small></div>';
  }).join('')+'</div>';
+ return '<details class="v4-simple-details v4-source-details"><summary><i class="ph-bold ph-database"></i> Lihat sumber data</summary>'+grid+'</details>';
 }
 function openButtons(f){
  var used=new Set(),html='';
@@ -379,8 +516,9 @@ function openButtons(f){
   var v=VIEW_BY_SOURCE[name];if(!v||used.has(v))return;used.add(v);
   html+='<button class="btn btn-sm" data-v4-open-existing="'+esc(v)+'"><i class="ph-bold ph-arrow-square-out"></i> Buka '+esc(name)+'</button>';
  });
- if(f.wi===8)html+='<button class="btn btn-sm" data-v4-open-copilot><i class="ph-bold ph-brain"></i> Buka Copilot Existing</button>';
- return '<div class="v4-actions">'+html+'</div>';
+ if(f.wi===8)html+='<button class="btn btn-sm" data-v4-open-copilot><i class="ph-bold ph-brain"></i> Buka Copilot</button>';
+ if(!html)return '';
+ return '<details class="v4-simple-details v4-data-links"><summary><i class="ph-bold ph-folder-open"></i> Buka data asal</summary><div class="v4-actions">'+html+'</div></details>';
 }
 function genericEvidence(f){
  var rows=[];
@@ -530,9 +668,11 @@ function renderWarRoom(){
 function renderFeature(n){
  if(!permitted())return false;
  var f=featureByNumber(n);if(!f)return false;
+ var simpleWs=SIMPLE_WORKSPACE[f.wi]||{name:f.workspace.name};
+ var info=SIMPLE_FEATURE[f.n]||{name:f.name,help:'Lihat informasi dari data OMODOS yang tersedia.'};
  ACTIVE_WORKSPACE=f.wi;ACTIVE_FEATURE=f.n;setActiveNav(f.wi);
  var s=stage(),view=document.getElementById('view-omodos4');if(!s||!view)return false;
- view.classList.add('v4-master-active','v4-safe-module-open','v4-feature-open');
+ view.classList.add('v4-master-active','v4-safe-module-open','v4-feature-open','v4-low-cognitive');view.classList.remove('v4-show-technical');
  var body='';
  if(f.n===1)body=renderMachinePassport(f);
  else if(f.n===6)body=renderFailureMemory();
@@ -547,7 +687,13 @@ function renderFeature(n){
  else if(f.n===96||f.n===100)body=renderBrain();
  else if(f.n===98)body=renderWarRoom();
  else body=genericEvidence(f);
- s.innerHTML='<div class="v4-card v4-detail-card"><div class="v4-module-head"><div><div class="v4-eyebrow">OMODOS 4.0 • '+esc(f.workspace.name)+'</div><h2><span class="v4-feature-no">'+String(f.n).padStart(3,'0')+'</span> '+esc(f.name)+'</h2><p>Read • connect • analyze dari source-of-truth existing. Tidak ada random/fake production data.</p></div><button class="btn btn-sm" data-v4-back-workspace="'+f.wi+'"><i class="ph-bold ph-arrow-left"></i> Kembali</button></div>'+sourcePanel(f)+'<div class="v4-detail-body">'+body+'</div>'+openButtons(f)+'</div>';
+ s.innerHTML='<div class="v4-card v4-detail-card">'+
+  '<div class="v4-module-head"><div><div class="v4-simple-kicker">'+esc(simpleWs.name)+' • Fitur '+String(f.n).padStart(3,'0')+'</div>'+
+  '<h2>'+esc(info.name)+'</h2><p>'+esc(info.help)+'</p><div class="v4-tech-name">Nama teknis: '+esc(f.name)+'</div></div>'+
+  '<div class="v4-head-actions"><button class="btn btn-sm" data-v4-tech-toggle><i class="ph-bold ph-sliders-horizontal"></i> Detail teknis</button>'+
+  '<button class="btn btn-sm" data-v4-back-workspace="'+f.wi+'"><i class="ph-bold ph-arrow-left"></i> Kembali</button></div></div>'+
+  '<div class="v4-simple-steps"><div><b>1</b><span>Baca ringkasan</span></div><div><b>2</b><span>Pilih mesin atau filter jika ada</span></div><div><b>3</b><span>Buka data asal bila perlu</span></div></div>'+
+  sourcePanel(f)+'<div class="v4-detail-body">'+body+'</div>'+openButtons(f)+'</div>';
  s.style.display='block';
  try{s.scrollIntoView({block:'start',behavior:'auto'})}catch(e){}
  return true;
@@ -594,6 +740,8 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
  version:'4.0-master-recovery-100',
  cutoff:'2026-09-01 WIB',
  workspaces:WORKSPACES,
+ simpleWorkspaces:SIMPLE_WORKSPACE,
+ simpleFeatures:SIMPLE_FEATURE,
  featureCount:100,
  isAllowed:(window.OMODOS4&&window.OMODOS4.isAllowed)||permitted,
  render:renderCommandCenter,
@@ -3386,5 +3534,84 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
  factoryBrainPreservedInteractions:[97,98],
  autonomousOperationalWrites:'NONE'
 });
+})();
+
+
+/* OMODOS4_LOW_COGNITIVE_DOM_V1
+   Keeps later feature-specific panels plain-language without changing their actions. */
+(function(){
+'use strict';
+var busy=false;
+var EXACT={
+ 'Command Center':'Ringkasan Utama',
+ 'Things to Look At':'Perlu Dilihat',
+ 'What Changed?':'Apa yang Berubah?',
+ 'What Changed':'Apa yang Berubah?',
+ 'Latest Intelligence':'Data Terbaru',
+ 'Current Condition':'Kondisi Sekarang',
+ 'Reliability Evidence':'Riwayat Mesin',
+ 'Identity':'Data Mesin',
+ 'Machine-scoped context':'Ringkasan Mesin',
+ 'Deterministic brief baseline':'Ringkasan dari Data',
+ 'Historical similarity':'Kasus Lama yang Mirip',
+ 'Human review queue':'Hal yang Perlu Dicek',
+ 'Deterministic Executive Brief':'Ringkasan Singkat',
+ 'READ ONLY':'HANYA LIHAT',
+ 'NO AUTO WRITE':'DATA AMAN',
+ 'DRAFT ONLY':'DRAF SAJA',
+ 'NOT A PREDICTION':'BUKAN RAMALAN',
+ 'ISOLATED V4 STATE':'AREA KHUSUS V4',
+ 'REVIEW ONLY':'HANYA CEK',
+ 'USES EXISTING DATA':'PAKAI DATA YANG ADA',
+ 'INTERACTIVE • EVIDENCE-FIRST':'BERDASARKAN DATA',
+ 'AI INTELLIGENCE • EVIDENCE-FIRST':'ASISTEN OMODOS',
+ 'IMPROVEMENT INTELLIGENCE':'PERBAIKAN',
+ 'FACTORY BRAIN • SOURCE-OF-TRUTH CONNECTED':'RINGKASAN PABRIK',
+ 'KNOWLEDGE HARVEST':'PENGETAHUAN',
+ 'EXPERT FINDER':'CARI ORANG BERPENGALAMAN',
+ 'EXPERIENCE PASSPORT':'RIWAYAT PENGALAMAN'
+};
+function currentNo(){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ if(el){var n=parseInt(el.textContent,10);if(Number.isFinite(n))return n}
+ var sec=document.querySelector('#v4-safe-stage [data-v4-interaction-feature],#v4-safe-stage [data-v4-ai2-feature],#v4-safe-stage [data-v4-imp-feature],#v4-safe-stage [data-v4-fb-feature]');
+ if(sec){
+  var raw=sec.getAttribute('data-v4-interaction-feature')||sec.getAttribute('data-v4-ai2-feature')||sec.getAttribute('data-v4-imp-feature')||sec.getAttribute('data-v4-fb-feature');
+  var x=parseInt(raw,10);if(Number.isFinite(x))return x
+ }
+ return 0;
+}
+function apply(){
+ busy=false;
+ var view=document.getElementById('view-omodos4');if(!view)return;
+ view.classList.add('v4-low-cognitive');
+ var info=window.OMODOS4&&window.OMODOS4.simpleFeatures||{},n=currentNo(),fi=info[n];
+ if(fi){
+  document.querySelectorAll('#v4-safe-stage .v4-interaction-head h3').forEach(function(h){h.textContent=fi.name});
+ }
+ document.querySelectorAll('#view-omodos4 h1,#view-omodos4 h2,#view-omodos4 h3,#view-omodos4 h4,#view-omodos4 strong,#view-omodos4 span,#view-omodos4 small').forEach(function(el){
+  var t=String(el.textContent||'').trim();
+  if(EXACT[t])el.textContent=EXACT[t];
+ });
+ document.querySelectorAll('#view-omodos4 .v4-no-write').forEach(function(el){
+  var t=String(el.textContent||'').trim();
+  if(EXACT[t])el.textContent=EXACT[t];
+ });
+}
+function queue(){if(busy)return;busy=true;requestAnimationFrame(apply)}
+document.addEventListener('click',function(e){
+ var t=e.target.closest&&e.target.closest('[data-v4-tech-toggle]');
+ if(t){
+  e.preventDefault();
+  var view=document.getElementById('view-omodos4');if(!view)return;
+  var show=view.classList.toggle('v4-show-technical');
+  t.innerHTML='<i class="ph-bold ph-sliders-horizontal"></i> '+(show?'Sembunyikan detail':'Detail teknis');
+  return;
+ }
+ if(e.target.closest&&e.target.closest('[data-v4-feature],#v4-nav-group [data-v4-safe-module],[data-v4-back-workspace],[data-v4-back-command]'))setTimeout(queue,0);
+},false);
+var target=document.getElementById('view-omodos4')||document.body;
+new MutationObserver(queue).observe(target,{childList:true,subtree:true});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',queue);else queue();
 })();
 
