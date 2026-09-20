@@ -1,0 +1,70 @@
+name: Apply OMODOS 4 Phase 1 Safe Patch
+
+on:
+  push:
+    branches:
+      - recovery/omodos4-phase1-safe
+    paths:
+      - "tools/patch_omodos4_phase1.py"
+      - ".github/workflows/apply-omodos4-phase1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record baseline hash
+        run: sha256sum public/index.html | tee /tmp/before.sha256
+
+      - name: Apply additive V4 Phase 1 patch
+        run: python tools/patch_omodos4_phase1.py
+
+      - name: Validate safety invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          checks={
+            "one_v4_nav": s.count('id="v4-nav-group"')==1,
+            "one_v4_view": s.count('id="view-omodos4"')==1,
+            "hard_superadmin_gate": "if(view === 'omodos4' || view.startsWith('omodos4-')) return isSuperadmin();" in s,
+            "root_permission": "omodos4.view" in s,
+            "namespace": "window.OMODOS4" in s,
+            "existing_logbook": 'id="view-input"' in s and 'id="view-utama"' in s,
+            "existing_patrol": 'id="view-patrol"' in s,
+            "existing_sparepart": 'id="view-sparepart"' in s,
+            "existing_dashboard": 'id="view-dashboard"' in s,
+            "existing_setting": 'id="view-setting"' in s,
+            "selector_helpers": "const $ = (sel, root=document) => root.querySelector(sel);" in s and "const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));" in s,
+          }
+          bad=[k for k,v in checks.items() if not v]
+          print(checks)
+          if bad: raise SystemExit("Safety invariant failed: "+", ".join(bad))
+
+      - name: Check for previous selector regressions
+        shell: python
+        run: |
+          from pathlib import Path
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          bad=["$('button[data-pg]', pager).forEach", "$('.nav-btn').forEach", "$('.nav-btn').find"]
+          hits=[x for x in bad if x in s]
+          if hits: raise SystemExit("Selector regression reintroduced: "+", ".join(hits))
+          print("Known selector regressions absent.")
+
+      - name: Commit patched frontend
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          if git diff --cached --quiet; then
+            echo "No patch changes."
+            exit 0
+          fi
+          git commit -m "feat: add safe Superadmin-only OMODOS 4 Phase 1 shell"
+          git push
