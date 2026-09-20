@@ -3271,6 +3271,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
 @media(max-width:560px){.v4-summary{grid-template-columns:1fr}.v4-row{grid-template-columns:1fr;gap:3px}}
 </style>
 
+<link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="2">
 </head>
 <body>
 <div class="scanline-overlay"></div>
@@ -12110,6 +12111,7 @@ function downloadRcaDoc(machineName){
 
 
 
+<!-- OMODOS4_FRONTEND_SAFE_V2 --><script src="/omodos4/hotfix.js" defer></script>
 </body></html>`;
   const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
   const url = URL.createObjectURL(blob);
