@@ -608,3 +608,325 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 else{boot();setTimeout(syncNav,800)}
 setInterval(syncNav,5000);
 })();
+
+/* OMODOS4_SERVER_BRIDGE_V1
+   Read-only bridge to the existing server-side V4 intelligence engine.
+   It never queues requests and never writes operational source-of-truth data. */
+(function(){
+'use strict';
+
+var READ_ACTIONS=new Set([
+ 'v4.getOverview','v4.getWhatChanged','v4.getMachineHealth','v4.getMachinePassport','v4.getMachineGraph',
+ 'v4.getFactoryBrain','v4.getFailureMemory','v4.getPredictiveRisk','v4.getFieldMission','v4.getSparepartRisk',
+ 'v4.getReliability','v4.getKpiStory','v4.getPeopleSkillGraph','v4.getExpertFinder','v4.getExperiencePassport',
+ 'v4.getImprovement','v4.findSimilarImprovement','v4.getBrief','v4.getScenarios','v4.getKnowledgeCandidates',
+ 'v4.getTimeMachine','v4.getBlackBox','v4.getWarRoom'
+]);
+
+var FEATURE_ACTIONS={};
+[11,12,13,14,15,16,17,18,19,20].forEach(function(n){FEATURE_ACTIONS[n]='v4.getPredictiveRisk'});
+[21,22,23,24,25,26,27,28,29,30].forEach(function(n){FEATURE_ACTIONS[n]='v4.getFieldMission'});
+[31,32,33,34,35,36,37,38,39,40].forEach(function(n){FEATURE_ACTIONS[n]='v4.getSparepartRisk'});
+[41,42,43,44,45,46,48,49,50].forEach(function(n){FEATURE_ACTIONS[n]='v4.getReliability'});
+[51,52,53,54,55,56,57,58,59,60].forEach(function(n){FEATURE_ACTIONS[n]='v4.getKpiStory'});
+[61,62,65,66,67,68,69,70].forEach(function(n){FEATURE_ACTIONS[n]='v4.getPeopleSkillGraph'});
+[81,82,83,84,85,86,87,88,89,90].forEach(function(n){FEATURE_ACTIONS[n]='v4.getImprovement'});
+Object.assign(FEATURE_ACTIONS,{
+ 1:'v4.getMachinePassport',
+ 2:'v4.getMachineHealth',
+ 3:'v4.getMachineGraph',
+ 4:'v4.getMachineGraph',
+ 5:'v4.getMachinePassport',
+ 6:'v4.getFailureMemory',
+ 7:'v4.getMachinePassport',
+ 8:'v4.getMachineHealth',
+ 9:'v4.getMachinePassport',
+ 10:'v4.getMachineGraph',
+ 47:'v4.getFailureMemory',
+ 63:'v4.getExpertFinder',
+ 64:'v4.getPeopleSkillGraph',
+ 73:'v4.getBrief',
+ 74:'v4.getBrief',
+ 75:'v4.getKnowledgeCandidates',
+ 78:'v4.getKnowledgeCandidates',
+ 80:'v4.getBrief',
+ 91:'v4.getFactoryBrain',
+ 92:'v4.getOverview',
+ 93:'v4.getWhatChanged',
+ 95:'v4.getBlackBox',
+ 96:'v4.getFactoryBrain',
+ 97:'v4.getScenarios',
+ 98:'v4.getWarRoom',
+ 99:'v4.getOverview',
+ 100:'v4.getFactoryBrain'
+});
+
+var HYDRATE_SEQ=0;
+
+function h(v){
+ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});
+}
+function label(k){
+ return String(k||'').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ').replace(/\b\w/g,function(x){return x.toUpperCase()});
+}
+function isLocalQa(){
+ try{return /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname)}catch(e){return false}
+}
+function allowed(){
+ try{return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed())}catch(e){return false}
+}
+function ready(){
+ try{
+  return allowed()&&!isLocalQa()&&typeof WEB_APP_URL!=='undefined'&&!!WEB_APP_URL&&
+   typeof SESSION_TOKEN!=='undefined'&&!!SESSION_TOKEN&&typeof fetch==='function';
+ }catch(e){return false}
+}
+function requestToken(){
+ try{
+  if(typeof SETTING_AUTH_OK!=='undefined'&&SETTING_AUTH_OK&&typeof SETTING_SESSION_TOKEN!=='undefined'&&SETTING_SESSION_TOKEN)return SETTING_SESSION_TOKEN;
+  return typeof SESSION_TOKEN!=='undefined'?SESSION_TOKEN:'';
+ }catch(e){return ''}
+}
+async function serverRead(action,payload){
+ if(!READ_ACTIONS.has(action))throw new Error('READ_ACTION_NOT_ALLOWED');
+ if(!ready())return null;
+ var body=Object.assign({},payload||{},{action:action,sessionToken:requestToken()});
+ var opts={
+  method:'POST',mode:'cors',credentials:'omit',redirect:'follow',cache:'no-store',
+  headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)
+ };
+ var res;
+ if(typeof fetchWithTimeout_==='function')res=await fetchWithTimeout_(WEB_APP_URL,opts,45000);
+ else res=await fetch(WEB_APP_URL,opts);
+ var json=typeof parseApiResponse_==='function'?await parseApiResponse_(res):await res.json();
+ if(!json||json.ok!==true){
+  var err=json&&json.error;
+  var msg=typeof err==='string'?err:(err&&err.message)||'V4 server read failed';
+  throw new Error(msg);
+ }
+ return json.data==null?null:json.data;
+}
+function machineNames(){
+ try{
+  if(window.OMODOS4&&Array.isArray(window.OMODOS4.workspaces)&&typeof getMachineNames==='function')return getMachineNames();
+ }catch(e){}
+ var set=new Set();
+ try{
+  (Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){
+   var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;
+   if(n)set.add(String(n));
+  });
+ }catch(e){}
+ return Array.from(set);
+}
+function currentMachine(){
+ var a=document.getElementById('v4-machine-select');
+ if(a&&a.value)return a.value;
+ var b=document.querySelector('[data-v4-server-machine]');
+ if(b&&b.value)return b.value;
+ var names=machineNames();
+ return names[0]||'';
+}
+function actionNeedsMachine(action,n){
+ return action==='v4.getMachinePassport'||action==='v4.getMachineGraph'||(action==='v4.getExpertFinder'&&n===63);
+}
+function payloadFor(action,n){
+ var p={};
+ if(actionNeedsMachine(action,n)){
+  var m=currentMachine();
+  if(m)p.machine=m;
+ }
+ return p;
+}
+function simpleValue(v){
+ if(v==null||v==='')return '—';
+ if(typeof v==='boolean')return v?'Ya':'Tidak';
+ if(typeof v==='number')return Number.isFinite(v)?String(Math.round(v*100)/100):'—';
+ return String(v);
+}
+function headline(o){
+ if(!o||typeof o!=='object')return simpleValue(o);
+ var keys=['title','headline','machine','name','label','event','problem','description','theme','category','type','source','id','ID'];
+ for(var i=0;i<keys.length;i++)if(o[keys[i]]!=null&&String(o[keys[i]]).trim())return String(o[keys[i]]);
+ var first=Object.keys(o).find(function(k){return ['string','number','boolean'].includes(typeof o[k])&&String(o[k]).trim()});
+ return first?String(o[first]):'Evidence';
+}
+function subline(o){
+ if(!o||typeof o!=='object')return '';
+ var parts=[];
+ ['risk','status','priority','confidence','reason','note','logicVersion','label'].forEach(function(k){
+  if(o[k]!=null&&String(o[k]).trim()&&!parts.includes(String(o[k])))parts.push(String(o[k]));
+ });
+ ['healthIndex','riskScore','count','eventCount','openIssues','downtimeMinutes','recurrence','score'].forEach(function(k){
+  if(o[k]!=null&&String(o[k]).trim())parts.push(label(k)+': '+simpleValue(o[k]));
+ });
+ return parts.slice(0,4).join(' • ');
+}
+function collectionHtml(name,list){
+ if(!Array.isArray(list)||!list.length)return '';
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>'+h(label(name))+'</strong><span>'+list.length+' record</span></div>'+
+ '<div class="v4-server-list">'+list.slice(0,12).map(function(x){
+  if(x==null||typeof x!=='object')return '<div class="v4-server-item"><strong>'+h(simpleValue(x))+'</strong></div>';
+  return '<div class="v4-server-item"><strong>'+h(headline(x))+'</strong><small>'+h(subline(x)||'RECORDED / DERIVED FROM SERVER')+'</small></div>';
+ }).join('')+'</div></section>';
+}
+function objectMetrics(data){
+ if(!data||typeof data!=='object')return '';
+ var rows=[];
+ Object.keys(data).forEach(function(k){
+  var v=data[k];
+  if(v==null)return;
+  if(['string','number','boolean'].includes(typeof v)){
+   var txt=simpleValue(v);
+   if(txt.length<=140)rows.push([k,txt]);
+  }
+ });
+ if(!rows.length)return '';
+ return '<div class="v4-server-metrics">'+rows.slice(0,12).map(function(x){
+  return '<div><span>'+h(label(x[0]))+'</span><b>'+h(x[1])+'</b></div>';
+ }).join('')+'</div>';
+}
+function preferredCollections(data){
+ var keys=['thingsToLookAt','criticalMachines','topRisks','topOpportunities','latestIntelligence','machines','risks','missions',
+  'badActors','pareto','recurring','failureMemory','kpiStories','stories','personnel','experts','opportunityRadar','opportunity',
+  'candidates','categories','events','topMachines','nodes','edges','wars','scenarios'];
+ var out=[],seen=new Set();
+ keys.forEach(function(k){if(Array.isArray(data&&data[k])&&data[k].length){out.push([k,data[k]]);seen.add(k)}});
+ if(data&&typeof data==='object')Object.keys(data).forEach(function(k){
+  if(!seen.has(k)&&Array.isArray(data[k])&&data[k].length&&out.length<5)out.push([k,data[k]]);
+ });
+ return out.slice(0,5);
+}
+function serverHtml(action,data){
+ if(!data||typeof data!=='object')return '<div class="v4-empty">Server tidak mengembalikan evidence terstruktur.</div>';
+ var html='<div class="v4-server-head"><div><span class="v4-server-badge">SERVER VERIFIED</span><strong>'+h(action)+'</strong></div><small>Session + Superadmin gate • existing OMODOS source-of-truth</small></div>';
+ if(data.summary&&typeof data.summary==='object'&&!Array.isArray(data.summary)){
+  html+='<div class="v4-server-metrics">'+Object.keys(data.summary).slice(0,12).map(function(k){
+   var v=data.summary[k];
+   if(v&&typeof v==='object')v=Object.keys(v).length+' fields';
+   return '<div><span>'+h(label(k))+'</span><b>'+h(simpleValue(v))+'</b></div>';
+  }).join('')+'</div>';
+ }else html+=objectMetrics(data);
+ preferredCollections(data).forEach(function(x){html+=collectionHtml(x[0],x[1])});
+ if(data.lineage||data.sourceTruth){
+  var l=data.lineage||data.sourceTruth;
+  html+='<div class="v4-server-lineage"><i class="ph-bold ph-shield-check"></i> '+h(typeof l==='string'?l:JSON.stringify(l).slice(0,600))+'</div>';
+ }
+ return html;
+}
+function serverPanel(){
+ var card=document.querySelector('#v4-safe-stage .v4-detail-card');
+ if(!card)return null;
+ var panel=card.querySelector('#v4-server-intel');
+ if(!panel){
+  panel=document.createElement('section');
+  panel.id='v4-server-intel';panel.className='v4-server-intel';
+  var actions=card.querySelector('.v4-actions');
+  if(actions)card.insertBefore(panel,actions);else card.appendChild(panel);
+ }
+ return panel;
+}
+function machinePicker(panel,action,n){
+ if(!actionNeedsMachine(action,n)||n===1)return '';
+ var names=machineNames();if(!names.length)return '';
+ var cur=currentMachine()||names[0];
+ return '<label class="v4-server-machine-label">Konteks Mesin<select data-v4-server-machine data-v4-feature-context="'+n+'">'+
+  names.map(function(x){return '<option'+(x===cur?' selected':'')+'>'+h(x)+'</option>'}).join('')+
+ '</select></label>';
+}
+async function hydrateFeature(n){
+ n=Number(n);var action=FEATURE_ACTIONS[n];if(!action)return;
+ var panel=serverPanel();if(!panel)return;
+ var picker=machinePicker(panel,action,n);
+ if(!ready()){
+  panel.innerHTML=picker+'<div class="v4-server-state"><i class="ph-bold ph-cloud-slash"></i><span>Server intelligence belum tersedia pada koneksi ini. Tampilan di atas tetap memakai fallback read-only dari data yang sudah dimuat.</span></div>';
+  return;
+ }
+ if(actionNeedsMachine(action,n)&&!currentMachine()){
+  panel.innerHTML='<div class="v4-server-state">Belum ada mesin yang dapat dipakai sebagai konteks server.</div>';return;
+ }
+ var seq=++HYDRATE_SEQ;
+ panel.innerHTML=picker+'<div class="v4-server-state"><i class="ph-bold ph-spinner-gap v4-spin"></i><span>Memuat intelligence terverifikasi dari backend V4…</span></div>';
+ try{
+  var data=await serverRead(action,payloadFor(action,n));
+  if(seq!==HYDRATE_SEQ||!document.querySelector('[data-v4-feature-context="'+n+'"], #v4-server-intel'))return;
+  panel=serverPanel();if(!panel)return;
+  panel.innerHTML=machinePicker(panel,action,n)+serverHtml(action,data);
+ }catch(err){
+  panel=serverPanel();if(!panel)return;
+  panel.innerHTML=machinePicker(panel,action,n)+'<div class="v4-server-state v4-server-error"><i class="ph-bold ph-warning-circle"></i><span>Backend V4 tidak dapat dimuat saat ini. Fallback lokal tetap aktif. '+h(err&&err.message||err)+'</span></div>';
+ }
+}
+function overviewCard(name,value,note,icon){
+ return '<div class="v4-card"><div class="v4-k"><i class="ph-bold '+icon+'"></i> '+h(name)+'</div><div class="v4-v">'+h(value)+'</div><div class="v4-note">'+h(note)+'</div></div>';
+}
+function rowsFromServer(list,badge){
+ if(!Array.isArray(list)||!list.length)return '<div class="v4-empty">Tidak ada evidence server pada window aktif.</div>';
+ return list.slice(0,12).map(function(x){
+  var title=headline(x),sub=subline(x);
+  return '<div class="v4-mp-row"><div><strong>'+h(title)+'</strong><small>'+h(x.timestamp||x.generatedAt||'SERVER EVIDENCE')+'</small></div><div>'+h(sub||'Existing OMODOS record')+'<div class="v4-chip-row"><span class="v4-risk-chip">'+h(badge)+'</span></div></div></div>';
+ }).join('');
+}
+async function hydrateOverview(){
+ if(!ready()||!document.getElementById('view-omodos4')||!document.getElementById('view-omodos4').classList.contains('active'))return;
+ try{
+  var data=await serverRead('v4.getOverview',{});
+  if(!data||!data.summary)return;
+  var s=data.summary,sum=document.getElementById('v4-summary');
+  if(sum)sum.innerHTML=[
+   overviewCard('Critical Machines',s.criticalMachines==null?'—':s.criticalMachines,'Backend V4 • rule-based health/open issue evidence.','ph-warning'),
+   overviewCard('Active Breakdown',s.activeBreakdown==null?'—':s.activeBreakdown,'Backend V4 • active breakdown/corrective evidence.','ph-wrench'),
+   overviewCard('Predictive Risks',s.predictiveRisks==null?'—':s.predictiveRisks,'Backend V4 • predictive/open risk evidence.','ph-waveform'),
+   overviewCard('Sparepart Risks',s.sparepartRisks==null?'—':s.sparepartRisks,'Backend V4 • stock minimum + overdue ETA.','ph-package'),
+   overviewCard('KPI at Risk',s.kpiAtRisk==null?'—':s.kpiAtRisk,'Backend V4 • KPI source after SOT cutoff.','ph-target'),
+   overviewCard('Open High-Priority Actions',s.openHighPriorityActions==null?'—':s.openHighPriorityActions,'Backend V4 • open high-priority maintenance/project evidence.','ph-list-checks')
+  ].join('');
+  var look=document.getElementById('v4-look-at');
+  if(look&&Array.isArray(data.thingsToLookAt))look.innerHTML=rowsFromServer(data.thingsToLookAt,'SERVER VERIFIED');
+  var latest=document.getElementById('v4-latest');
+  if(latest&&Array.isArray(data.latestIntelligence))latest.innerHTML=rowsFromServer(data.latestIntelligence,'SERVER VERIFIED');
+  var hero=document.querySelector('#view-omodos4 .v4-hero');
+  if(hero&&!hero.querySelector('.v4-server-overview-badge')){
+   var b=document.createElement('div');b.className='v4-server-overview-badge';b.innerHTML='<i class="ph-bold ph-shield-check"></i> Backend V4 aktif • '+h(data.logicVersion||'server intelligence');
+   hero.appendChild(b);
+  }
+ }catch(e){}
+}
+async function hydrateTimeMachine(){
+ var input=document.getElementById('v4-time-machine-at'),out=document.getElementById('v4-time-machine-result');
+ if(!input||!out||!ready())return;
+ var d=new Date(input.value);if(!Number.isFinite(d.getTime()))return;
+ try{
+  var data=await serverRead('v4.getTimeMachine',{at:d.toISOString()});
+  if(data)out.innerHTML='<section class="v4-server-intel v4-time-server">'+serverHtml('v4.getTimeMachine',data)+'</section>';
+ }catch(e){
+  out.insertAdjacentHTML('beforeend','<div class="v4-server-state v4-server-error">Server Time Machine tidak tersedia; rekonstruksi lokal di atas tetap dipertahankan.</div>');
+ }
+}
+document.addEventListener('click',function(e){
+ var feature=e.target.closest&&e.target.closest('[data-v4-feature]');
+ if(feature){var n=Number(feature.getAttribute('data-v4-feature'));setTimeout(function(){hydrateFeature(n)},0);return}
+ if(e.target.closest&&e.target.closest('#v4-nav-group [data-v4-root]')){setTimeout(hydrateOverview,0);return}
+ if(e.target.closest&&e.target.closest('[data-v4-time-machine-run]')){setTimeout(hydrateTimeMachine,0);return}
+},false);
+document.addEventListener('change',function(e){
+ if(e.target&&e.target.matches('[data-v4-server-machine]')){
+  var n=Number(e.target.getAttribute('data-v4-feature-context'));setTimeout(function(){hydrateFeature(n)},0);
+ }else if(e.target&&e.target.id==='v4-machine-select'){setTimeout(function(){hydrateFeature(1)},0)}
+},false);
+
+var baseRender=window.renderOmodos4;
+if(typeof baseRender==='function'&&!baseRender.__v4ServerBridge){
+ var wrapped=function(){var out=baseRender.apply(this,arguments);setTimeout(hydrateOverview,0);return out};
+ wrapped.__v4ServerBridge=true;window.renderOmodos4=wrapped;
+}
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ serverBridgeVersion:'1',
+ serverRead:serverRead,
+ serverReady:ready,
+ serverActionForFeature:function(n){return FEATURE_ACTIONS[Number(n)]||''},
+ serverReadActions:Array.from(READ_ACTIONS)
+});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(hydrateOverview,900)});
+else setTimeout(hydrateOverview,900);
+})();
