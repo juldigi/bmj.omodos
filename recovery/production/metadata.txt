@@ -1,0 +1,5 @@
+captured_at_utc=2026-09-20T12:30:47Z
+source=https://omodos.offsetbmj.workers.dev
+root_status=200
+setup_status=307
+recovery_mode=public-read-only
