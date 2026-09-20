@@ -4,9 +4,9 @@ name: Browser QA OMODOS 4 Phase 1
 on:
   push:
     branches:
-      - recovery/omodos4-phase1-safe
+      - main
     paths:
-      - "public/index.html"
+      - "public/**"
       - ".github/workflows/browser-qa-v4.yml"
   workflow_dispatch:
 
@@ -126,6 +126,62 @@ jobs:
               throw new Error('Superadmin V4 access failed: ' + JSON.stringify(sup));
             }
             result.phases.push('superadmin');
+
+            console.log('[QA] frontend recovery + UI safety');
+            await page.evaluate(() => window.dispatchEvent(new Event('storage')));
+            await page.waitForTimeout(100);
+            const uiSafety = await page.evaluate(() => {
+              const v4 = document.getElementById('v4-nav-group');
+              const help = document.getElementById('copilot-help');
+              const helpInside = !!help?.closest('#copilot-panel');
+              const helpOutside = [...document.querySelectorAll('#copilot-help')].some(x => !x.closest('#copilot-panel'));
+              const filterMachine = !!document.getElementById('filter-machine');
+              const recoveredModules = document.querySelectorAll('#v4-nav-group [data-v4-safe-module]').length;
+
+              try { toast('QA toast layer'); } catch {}
+              const toastEl = document.querySelector('.toast');
+              const copilot = document.getElementById('copilot-panel');
+              const toastStyle = toastEl ? getComputedStyle(toastEl) : null;
+              const copilotStyle = copilot ? getComputedStyle(copilot) : null;
+              const toastZ = Number.parseInt(toastStyle?.zIndex || '0', 10) || 0;
+              const copilotZ = Number.parseInt(copilotStyle?.zIndex || '0', 10) || 0;
+
+              return {
+                authorizedClass: !!v4?.classList.contains('v4-authorized'),
+                recoveredModules,
+                helpInside,
+                helpOutside,
+                filterMachine,
+                toastZ,
+                copilotZ,
+                toastTop: toastStyle?.top || '',
+                toastBottom: toastStyle?.bottom || ''
+              };
+            });
+            result.uiSafety = uiSafety;
+            if (!uiSafety.authorizedClass || uiSafety.recoveredModules < 11 || !uiSafety.helpInside || uiSafety.helpOutside || !uiSafety.filterMachine || uiSafety.toastZ <= uiSafety.copilotZ || uiSafety.toastBottom !== 'auto') {
+              throw new Error('Frontend recovery/UI safety failed: ' + JSON.stringify(uiSafety));
+            }
+            result.phases.push('ui-safety');
+
+            console.log('[QA] non-superadmin recovered menu fail-closed');
+            const recoveredDeny = await page.evaluate(() => {
+              CURRENT_USER = { username: 'qa-tech', displayName: 'QA Tech', role: 'Tech' };
+              PERMISSIONS = {};
+              applyRbacToUi();
+              window.dispatchEvent(new Event('storage'));
+              const v4 = document.getElementById('v4-nav-group');
+              return {
+                allowed: canAccessView_('omodos4'),
+                authorizedClass: !!v4?.classList.contains('v4-authorized'),
+                recoveredModules: document.querySelectorAll('#v4-nav-group [data-v4-safe-module]').length
+              };
+            });
+            result.recoveredDeny = recoveredDeny;
+            if (recoveredDeny.allowed !== false || recoveredDeny.authorizedClass !== false || recoveredDeny.recoveredModules !== 0) {
+              throw new Error('Recovered V4 fail-closed check failed: ' + JSON.stringify(recoveredDeny));
+            }
+            result.phases.push('recovered-deny');
 
             console.log('[QA] sparepart pagination');
             const selectorQA = await page.evaluate(() => {
