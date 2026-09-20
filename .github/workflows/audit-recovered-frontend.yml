@@ -1,0 +1,144 @@
+name: Audit OMODOS Recovered Frontend
+
+on:
+  push:
+    paths:
+      - "public/index.html"
+      - ".github/workflows/audit-recovered-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Static audit recovered production frontend
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, hashlib, datetime
+
+          path = Path("public/index.html")
+          text = path.read_text(encoding="utf-8", errors="replace")
+          lines = text.splitlines()
+
+          patterns = {
+              "Dollar helper definitions": [
+                  r"(?<![\\w$])(?:const|let|var)\\s+\\$\\s*=",
+                  r"function\\s+\\$\\s*\\(",
+                  r"window\\.\\$\\s*=",
+              ],
+              "Potential jQuery-like chained calls": [
+                  r"\\$\\([^\\n]*\\)\\.forEach\\s*\\(",
+                  r"\\$\\([^\\n]*\\)\\.find\\s*\\(",
+                  r"\\$\\([^\\n]*\\)\\.map\\s*\\(",
+                  r"\\$\\([^\\n]*\\)\\.filter\\s*\\(",
+              ],
+              "Known regression functions": [
+                  r"attachSparepartPaginationHandlers",
+                  r"renderSparepartCollectTable",
+                  r"applySparepartFilters",
+                  r"switchToView",
+              ],
+              "OMODOS 4 RBAC": [
+                  r"omodos4\\.view",
+                  r"OMODOS\\s*4\\.0",
+                  r"Superadmin",
+              ],
+              "Copilot & Bantuan": [
+                  r"Copilot",
+                  r"Bantuan",
+              ],
+              "Machine status": [
+                  r"machineStatus",
+                  r"statusMachine",
+                  r"status mesin",
+                  r"latest.*(?:logbook|patrol)",
+                  r"(?:logbook|patrol).*latest",
+              ],
+              "Pagination controls": [
+                  r"pageSize",
+                  r"Halaman Sebelumnya",
+                  r"Halaman Selanjutnya",
+                  r"Halaman Awal",
+                  r"Halaman Akhir",
+              ],
+          }
+
+          def matches_for(regex):
+              rx = re.compile(regex, re.I)
+              return [(i, l) for i,l in enumerate(lines, 1) if rx.search(l)]
+
+          out = []
+          out.append("# OMODOS Recovered Frontend — Static Audit")
+          out.append("")
+          out.append(f"- Audited UTC: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")
+          out.append(f"- File bytes: {path.stat().st_size}")
+          out.append(f"- Lines: {len(lines)}")
+          out.append(f"- SHA-256: {hashlib.sha256(path.read_bytes()).hexdigest()}")
+          out.append("")
+
+          for title, regs in patterns.items():
+              out.append(f"## {title}")
+              total = 0
+              seen = set()
+              for reg in regs:
+                  ms = matches_for(reg)
+                  total += len(ms)
+                  if ms:
+                      out.append(f"### Pattern {reg} — {len(ms)} match(es)")
+                      for i,l in ms[:40]:
+                          key=(i,l)
+                          if key in seen:
+                              continue
+                          seen.add(key)
+                          compact = l.strip()
+                          if len(compact) > 500:
+                              compact = compact[:500] + "…"
+                          out.append(f"- L{i}: {compact}")
+              if total == 0:
+                  out.append("- No matches.")
+              out.append("")
+
+          dollar_defs = []
+          for i,l in enumerate(lines,1):
+              if re.search(r"(?:const|let|var)\\s+\\$\\s*=|function\\s+\\$\\s*\\(", l):
+                  dollar_defs.append((i,l.strip()))
+          risky = []
+          for i,l in enumerate(lines,1):
+              if re.search(r"\\$\\([^\\n]*\\)\\.(?:forEach|find)\\s*\\(", l):
+                  risky.append((i,l.strip()))
+
+          out.append("## Regression risk summary")
+          if risky:
+              out.append(f"- HIGH: found {len(risky)} direct dollar-helper .forEach/.find call(s).")
+              for i,l in risky[:50]:
+                  out.append(f"  - L{i}: {l[:600]}")
+          else:
+              out.append("- No direct dollar-helper .forEach or .find patterns found.")
+          if dollar_defs:
+              out.append("- Dollar helper candidates:")
+              for i,l in dollar_defs[:20]:
+                  out.append(f"  - L{i}: {l[:600]}")
+          out.append("")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/RECOVERED_FRONTEND_STATIC_AUDIT.md").write_text("\\n".join(out)+"\\n", encoding="utf-8")
+
+      - name: Commit audit report
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/RECOVERED_FRONTEND_STATIC_AUDIT.md
+          if git diff --cached --quiet; then
+            echo "No audit change."
+            exit 0
+          fi
+          git commit -m "audit: inspect recovered OMODOS production frontend"
+          git push
