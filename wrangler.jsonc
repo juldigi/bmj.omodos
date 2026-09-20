@@ -3,7 +3,7 @@
   "name": "omodos",
   "main": "src/entry.js",
   "compatibility_date": "2026-09-01",
-  "no_bundle": true,
+  "no_bundle": false,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
