@@ -121,7 +121,18 @@ function sync(){
  g.setAttribute('aria-hidden',ok?'false':'true');
  if(!ok){removeRecovered();return}
  var sub=g.querySelector('[data-submenu="omodos4"]');
- if(!sub||sub.querySelector('[data-v4-safe-module]'))return;
+ if(!sub)return;
+ var parent=g.querySelector('.nav-parent-btn[data-group="omodos4"]');
+ if(parent)parent.classList.add('open');
+ sub.classList.add('open');
+ sub.style.maxHeight='none';
+ sub.style.overflow='visible';
+ sub.style.display='flex';
+ if(sub.querySelector('[data-v4-safe-module]')){
+  var existing=sub.querySelectorAll('[data-v4-safe-module]');
+  for(var e=0;e<existing.length;e++){existing[e].hidden=false;existing[e].style.display='flex'}
+  return
+ }
  for(var i=1;i<GROUPS.length;i++){
   var b=document.createElement('button');b.type='button';b.className='nav-btn v4-nav-btn v4-module-btn';
   b.setAttribute('data-v4-safe-module',String(i));b.setAttribute('aria-label',GROUPS[i][0]);
