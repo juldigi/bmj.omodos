@@ -1,0 +1,132 @@
+name: Persist Full Worker Source
+
+on:
+  push:
+    branches:
+      - fix/persist-worker-backend
+    paths:
+      - ".github/workflows/persist-full-worker-source.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  persist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Recover verified stable Worker source
+        shell: python
+        run: |
+          import os,json,base64,hashlib,urllib.request
+          from pathlib import Path
+
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          stable_version="c92c749a-0494-4243-9497-0f3f180c7cfc"
+          expected_sha="fd8ae6b16ad8d60218d99f8590694647bab90edd7422c391450a0bdeb38b640b"
+
+          req=urllib.request.Request(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{stable_version}?include=modules",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=45) as r:
+            d=json.loads(r.read().decode("utf-8")).get("result") or {}
+
+          mods=d.get("modules") or []
+          if not mods:
+            raise SystemExit("Stable Worker source unavailable")
+          mod=max(mods,key=lambda m:len(m.get("content_base64") or ""))
+          raw=base64.b64decode(mod.get("content_base64") or "")
+          sha=hashlib.sha256(raw).hexdigest()
+          if sha!=expected_sha:
+            raise SystemExit("Stable Worker SHA mismatch: "+sha)
+
+          Path("src").mkdir(exist_ok=True)
+          Path("src/worker.js").write_bytes(raw)
+
+          config={
+            "$schema":"node_modules/wrangler/config-schema.json",
+            "name":"omodos",
+            "main":"src/worker.js",
+            "compatibility_date":"2026-09-01",
+            "no_bundle":True,
+            "assets":{
+              "directory":"./public",
+              "binding":"ASSETS",
+              "run_worker_first":["/api","/api/*","/files/*"],
+              "html_handling":"auto-trailing-slash",
+              "not_found_handling":"none"
+            },
+            "durable_objects":{
+              "bindings":[
+                {"name":"MAINTENANCE","class_name":"MaintenanceStore"}
+              ]
+            },
+            "migrations":[
+              {"tag":"v1","new_sqlite_classes":["MaintenanceStore"]}
+            ],
+            "observability":{"enabled":True}
+          }
+          Path("wrangler.jsonc").write_text(json.dumps(config,indent=2)+"\n",encoding="utf-8")
+
+          package={
+            "name":"omodos-worker",
+            "private":True,
+            "scripts":{
+              "deploy":"wrangler deploy",
+              "check":"wrangler deploy --dry-run"
+            },
+            "devDependencies":{
+              "wrangler":"4.135.0"
+            }
+          }
+          Path("package.json").write_text(json.dumps(package,indent=2)+"\n",encoding="utf-8")
+
+          print("[PERSIST] stable source bytes="+str(len(raw)))
+          print("[PERSIST] stable source sha="+sha)
+
+      - name: Validate frontend terminology
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          old=re.findall(r'\b(?:Ketuk|ketuk|KETUK)\b',s)
+          if old:
+            raise SystemExit("Old Ketuk terminology still present: "+repr(old[:20]))
+          if not re.search(r'\b(?:Pilih|pilih|PILIH)\b',s):
+            raise SystemExit("Pilih terminology not found")
+          print("[UI] Ketuk remaining=0")
+
+      - name: Install pinned Wrangler
+        run: npm install
+
+      - name: Dry-run full Worker package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --dry-run --outdir /tmp/omodos-dry-run
+          test -n "$(find /tmp/omodos-dry-run -type f -print -quit)"
+          echo "[DRY_RUN] PASS"
+
+      - name: Commit permanent Worker source and config
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/worker.js wrangler.jsonc package.json
+          if git diff --cached --quiet; then
+            echo "Worker source/config already present."
+            exit 0
+          fi
+          git commit -m "fix: persist full Cloudflare Worker backend configuration"
+          git push
