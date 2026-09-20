@@ -1,60 +1,50 @@
 name: Stage V4 navigation safely
 
 on:
-  push:
-    branches:
-      - stage/v4-navigation-safe
-    paths:
-      - .github/workflows/stage-v4-navigation-safe.yml
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   patch:
+    if: github.head_ref == 'stage/v4-navigation-safe' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: stage/v4-navigation-safe
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Insert external assets at final document boundaries
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path("public/index.html")
-          text = p.read_text(encoding="utf-8")
-          css = '<link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="3">'
-          js = '<!-- OMODOS4_FRONTEND_SAFE_V3 --><script src="/omodos4/hotfix.js" defer></script>'
-          if "OMODOS4_FRONTEND_SAFE_V2" in text:
-              raise SystemExit("Unsafe V2 marker unexpectedly present")
+          p=Path("public/index.html")
+          text=p.read_text(encoding="utf-8")
+          css='<link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="3">'
+          js='<!-- OMODOS4_FRONTEND_SAFE_V3 --><script src="/omodos4/hotfix.js" defer></script>'
+          if "OMODOS4_FRONTEND_SAFE_V2" in text: raise SystemExit("Unsafe V2 marker unexpectedly present")
           if css not in text:
-              pos = text.lower().rfind("</head>")
-              if pos < 0: raise SystemExit("Final </head> not found")
-              text = text[:pos] + css + "\n" + text[pos:]
+              pos=text.lower().rfind("</head>")
+              if pos<0: raise SystemExit("Final </head> not found")
+              text=text[:pos]+css+"\n"+text[pos:]
           if js not in text:
-              pos = text.lower().rfind("</body>")
-              if pos < 0: raise SystemExit("Final </body> not found")
-              text = text[:pos] + js + "\n" + text[pos:]
-          if text.count("OMODOS4_FRONTEND_SAFE_V3") != 1:
-              raise SystemExit("Loader marker count must be 1")
-          if text.index("OMODOS4_FRONTEND_SAFE_V3") < text.rfind("</script>"):
-              raise SystemExit("Loader must be after final inline script")
-          p.write_text(text, encoding="utf-8")
+              pos=text.lower().rfind("</body>")
+              if pos<0: raise SystemExit("Final </body> not found")
+              text=text[:pos]+js+"\n"+text[pos:]
+          if text.count("OMODOS4_FRONTEND_SAFE_V3")!=1: raise SystemExit("Loader marker count must be 1")
+          if text.index("OMODOS4_FRONTEND_SAFE_V3")<text.rfind("</script>"): raise SystemExit("Loader must be after final inline script")
+          p.write_text(text,encoding="utf-8")
           PY
       - name: Validate every inline script
         run: |
           node - <<'NODE'
-          const fs=require('fs');
-          const h=fs.readFileSync('public/index.html','utf8');
-          const rx=/<script([^>]*)>([\s\S]*?)<\/script>/gi;
+          const fs=require('fs'),h=fs.readFileSync('public/index.html','utf8'),rx=/<script([^>]*)>([\s\S]*?)<\/script>/gi;
           let m,n=0,fail=[];
-          while((m=rx.exec(h))){
-            n++;
-            if(/\bsrc=/.test(m[1])) continue;
-            try { new Function(m[2]); } catch(e) { fail.push({script:n,error:e.message}); }
-          }
-          if(fail.length) { console.error(fail); process.exit(1); }
-          console.log('inline scripts valid:',n);
+          while((m=rx.exec(h))){n++;if(/\bsrc=/.test(m[1]))continue;try{new Function(m[2])}catch(e){fail.push({script:n,error:e.message})}}
+          if(fail.length){console.error(fail);process.exit(1)} console.log('inline scripts valid:',n);
           NODE
       - name: Guard login and V4 boundaries
         run: |
