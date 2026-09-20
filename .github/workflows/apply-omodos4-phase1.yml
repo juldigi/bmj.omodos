@@ -50,11 +50,34 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
           s=Path("public/index.html").read_text(encoding="utf-8")
-          bad=["$('button[data-pg]', pager).forEach", "$('.nav-btn').forEach", "$('.nav-btn').find"]
-          hits=[x for x in bad if x in s]
-          if hits: raise SystemExit("Selector regression reintroduced: "+", ".join(hits))
-          print("Known selector regressions absent.")
+          # Match a single-dollar selector only. Do not misclassify the valid $()
+          # helper (querySelectorAll -> Array) as the old $() crash pattern.
+          patterns=[
+            r"(?<!\\$)\\$\\([^\\n;]*\\)\\.forEach\\s*\\(",
+            r"(?<!\\$)\\$\\([^\\n;]*\\)\\.find\\s*\\("
+          ]
+          hits=[]
+          for p in patterns:
+            hits.extend(m.group(0) for m in re.finditer(p,s))
+          if hits:
+            raise SystemExit("Selector regression reintroduced: "+repr(hits[:10]))
+          print("Known single-dollar selector regressions absent.")
+
+      - name: Validate inserted V4 JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          m=re.search(r'<script id="omodos4-phase1-script">(.*?)</script>',s,re.S)
+          if not m:
+              raise SystemExit("V4 script block missing")
+          Path("/tmp/omodos4-phase1.js").write_text(m.group(1),encoding="utf-8")
+          PY
+          node --check /tmp/omodos4-phase1.js
 
       - name: Commit patched frontend
         shell: bash
