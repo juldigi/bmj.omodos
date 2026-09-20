@@ -1,0 +1,290 @@
+name: Audit OMODOS Feature Contracts
+
+on:
+  push:
+    branches:
+      - audit/feature-contracts
+    paths:
+      - ".github/workflows/audit-feature-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Static feature-contract scan
+        shell: python
+        run: |
+          from pathlib import Path
+          import re,json,collections
+
+          s=Path("public/index.html").read_text(encoding="utf-8",errors="replace")
+          lines=s.splitlines()
+
+          terms={
+            "daily_collection":"Daily Collection",
+            "tandai":"Tandai",
+            "lihat_detail":"Lihat Detail",
+            "technician":"Technician",
+            "pic":"PIC",
+            "sap_doc_no":"SAP Doc No",
+            "status_sap":"Status SAP",
+            "material_number":"Material Number",
+            "material_name":"Material Name",
+            "sparepart_search":"sparepart-search",
+            "search_sparepart":"Cari",
+            "ipal":"IPAL",
+            "kpi_department":"KPI Department",
+            "chart_js":"new Chart(",
+            "media_modal":"media-modal",
+            "blob":"blob:",
+            "back_to_top":"scroll-to-top-btn",
+            "page_size":"page-size",
+            "halaman_awal":"Halaman Awal",
+            "halaman_akhir":"Halaman Akhir",
+            "user_activity":"rbac-user-activity",
+            "audit_log":"Audit Log",
+            "login_action":"login",
+            "logout_action":"logout",
+          }
+
+          hits={}
+          for key,term in terms.items():
+            rows=[{"line":i,"text":l.strip()[:1000]} for i,l in enumerate(lines,1) if term.lower() in l.lower()]
+            hits[key]=rows[:120]
+
+          # Capture compact contexts around feature headings.
+          anchors=["Daily Collection","KPI Department","view-ipal","rbac-user-activity","scroll-to-top-btn"]
+          contexts=[]
+          used=set()
+          for term in anchors:
+            for idx,l in enumerate(lines):
+              if term.lower() in l.lower():
+                if any(abs(idx-u)<25 for u in used): continue
+                used.add(idx)
+                start=max(0,idx-14); end=min(len(lines),idx+35)
+                contexts.append({
+                  "term":term,
+                  "line":idx+1,
+                  "lines":[f"{j+1:05d}: {lines[j][:1200]}" for j in range(start,end)]
+                })
+                if sum(1 for x in contexts if x["term"]==term)>=8: break
+
+          # Inventory pagination controls / functions.
+          page_ids=sorted(set(re.findall(r'id=["\']([^"\']*(?:page|pagination|pager)[^"\']*)["\']',s,re.I)))
+          page_attrs=sorted(set(re.findall(r'data-([a-z0-9_-]*(?:page|pagination|pager)[a-z0-9_-]*)',s,re.I)))
+
+          # Candidate media/open functions.
+          fn_names=re.findall(r'function\s+([A-Za-z_$][\w$]*)\s*\(',s)
+          media_fns=sorted(set(n for n in fn_names if re.search(r'media|preview|file|blob|attachment|foto|video',n,re.I)))
+          audit_fns=sorted(set(n for n in fn_names if re.search(r'audit|activity|login|logout|rbac',n,re.I)))
+          pagination_fns=sorted(set(n for n in fn_names if re.search(r'page|pagination|pager',n,re.I)))
+
+          out={
+            "hits":{k:{"count":sum(1 for l in lines if terms[k].lower() in l.lower()),"samples":v} for k,v in hits.items()},
+            "contexts":contexts,
+            "page_ids":page_ids,
+            "page_attrs":page_attrs,
+            "media_functions":media_fns,
+            "audit_functions":audit_fns,
+            "pagination_functions":pagination_fns,
+          }
+          Path("/tmp/contracts-static.json").write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding="utf-8")
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser feature-contract audit
+        shell: bash
+        run: |
+          cat > contracts.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser=await chromium.launch({headless:true});
+          const result={errors:[],failedRequests:[],desktop:{},mobile:{}};
+
+          async function auditPage(page,label){
+            page.setDefaultTimeout(10000);
+            page.on('pageerror',e=>result.errors.push(label+': '+String(e)));
+            page.on('requestfailed',req=>{
+              if(req.url().startsWith('https://omodos.offsetbmj.workers.dev')){
+                result.failedRequests.push({label,url:req.url(),error:req.failure()?.errorText||''});
+              }
+            });
+            page.on('dialog',async d=>{try{await d.dismiss();}catch{}});
+
+            await page.goto('https://omodos.offsetbmj.workers.dev/',{waitUntil:'domcontentloaded',timeout:25000});
+            await page.evaluate(()=>{
+              CURRENT_USER={username:'qa-super',displayName:'QA Superadmin',role:'Superadmin'};
+              SESSION_TOKEN='qa-feature-contracts';
+              try{ FEATURE_REGISTRY=mergeFeatureRegistry([]); PERMISSIONS={}; applyRbacToUi(); }catch{}
+            });
+
+            const snapshot=await page.evaluate(()=>{
+              const text=(sel)=>document.querySelector(sel)?.textContent?.replace(/\s+/g,' ').trim()||'';
+              const allText=(root)=>root?.textContent?.replace(/\s+/g,' ').trim()||'';
+
+              const views=[...document.querySelectorAll('.view[id]')].map(x=>x.id);
+              const spare=document.getElementById('view-sparepart');
+              const ipal=document.getElementById('view-ipal');
+              const setting=document.getElementById('view-setting');
+
+              const findByText=(root,rx)=>[...(root||document).querySelectorAll('button,th,td,label,span,div,input,select')]
+                .filter(el=>rx.test(String(el.textContent||el.getAttribute('placeholder')||'')))
+                .slice(0,80)
+                .map(el=>({tag:el.tagName,id:el.id||'',cls:String(el.className||'').slice(0,140),text:String(el.textContent||el.getAttribute('placeholder')||'').replace(/\s+/g,' ').trim().slice(0,220)}));
+
+              const paginationEls=[...document.querySelectorAll('[id*="page" i],[class*="pagination" i],[class*="pager" i],[data-pg],[data-sp-pg-action],[data-page-size],[data-sp-page-size]')]
+                .slice(0,200).map(el=>({
+                  tag:el.tagName,id:el.id||'',cls:String(el.className||'').slice(0,140),
+                  text:String(el.textContent||'').replace(/\s+/g,' ').trim().slice(0,180),
+                  attrs:[...el.attributes].filter(a=>/page|pg/.test(a.name)).map(a=>[a.name,a.value])
+                }));
+
+              const mediaEls=[...document.querySelectorAll('[id*="media" i],[class*="media" i],[id*="preview" i],[class*="preview" i],[id*="attachment" i],[class*="attachment" i]')]
+                .slice(0,120).map(el=>({tag:el.tagName,id:el.id||'',cls:String(el.className||'').slice(0,160)}));
+
+              const activity=[...document.querySelectorAll('#view-setting *')]
+                .filter(el=>/Audit Log|Aktivitas User|User Activity|login|logout/i.test(String(el.textContent||'')) && String(el.textContent||'').trim().length<500)
+                .slice(0,100)
+                .map(el=>({tag:el.tagName,id:el.id||'',cls:String(el.className||'').slice(0,150),text:String(el.textContent||'').replace(/\s+/g,' ').trim().slice(0,350)}));
+
+              return {
+                views,
+                dailyCollectionMatches:findByText(spare,/Daily Collection|Tandai|Lihat Detail|Material Number|Material Name|PIC|Technician|SAP Doc No|Status SAP/i),
+                sparepartSearchMatches:findByText(spare,/cari|material number|nama material/i),
+                ipalPresent:!!ipal,
+                ipalText:allText(ipal).slice(0,1200),
+                kpiDepartmentMatches:findByText(document,/KPI Department/i),
+                paginationEls,
+                mediaEls,
+                activity,
+                backToTop:!!document.getElementById('scroll-to-top-btn'),
+                copilot:!!document.getElementById('copilot-fab'),
+                chartGlobal:typeof window.Chart==='function'
+              };
+            });
+
+            // Force both floating buttons visible only in QA, then measure overlap.
+            const floating=await page.evaluate(()=>{
+              const a=document.getElementById('scroll-to-top-btn');
+              const b=document.getElementById('copilot-fab');
+              if(a){a.style.opacity='1';a.style.visibility='visible';a.style.pointerEvents='auto';a.style.transform='none';}
+              const rect=(el)=>{
+                if(!el)return null;
+                const r=el.getBoundingClientRect();
+                return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};
+              };
+              const ra=rect(a), rb=rect(b);
+              const overlap=!!(ra&&rb&&ra.left<rb.right&&ra.right>rb.left&&ra.top<rb.bottom&&ra.bottom>rb.top);
+              return {backToTop:ra,copilot:rb,overlap};
+            });
+            snapshot.floating=floating;
+
+            // Navigate representative views to catch renderer errors.
+            for(const v of ['sparepart','ipal','setting']){
+              try{
+                await page.evaluate(view=>{ try{goToView(view)}catch{} },v);
+                await page.waitForTimeout(150);
+              }catch{}
+            }
+
+            return snapshot;
+          }
+
+          try{
+            const desktop=await browser.newPage({viewport:{width:1440,height:1000}});
+            result.desktop=await auditPage(desktop,'desktop');
+
+            const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true});
+            result.mobile=await auditPage(mobile,'mobile');
+
+            console.log('[FEATURE_CONTRACTS] '+JSON.stringify(result));
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          node --check contracts.mjs
+          timeout -k 5s 100s node contracts.mjs | tee /tmp/contracts-browser.txt
+
+      - name: Generate audit report
+        shell: python
+        run: |
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import json,re
+
+          static=json.loads(Path("/tmp/contracts-static.json").read_text())
+          txt=Path("/tmp/contracts-browser.txt").read_text(encoding="utf-8",errors="replace")
+          m=re.search(r"\[FEATURE_CONTRACTS\]\s*(\{.*\})",txt)
+          live=json.loads(m.group(1)) if m else {}
+
+          report=[
+            "# OMODOS Feature Contract Audit",
+            "",
+            f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Page errors: {len(live.get('errors') or [])}",
+            f"- Same-origin failed requests: {len(live.get('failedRequests') or [])}",
+            "",
+            "## Daily Collection / Sparepart",
+            ""
+          ]
+          d=live.get("desktop") or {}
+          report.append("- Daily Collection matches: "+json.dumps(d.get("dailyCollectionMatches") or [],ensure_ascii=False))
+          report.append("- Sparepart search matches: "+json.dumps(d.get("sparepartSearchMatches") or [],ensure_ascii=False))
+
+          report += ["","## IPAL / KPI",""]
+          report.append(f"- IPAL view present: {d.get('ipalPresent')}")
+          report.append(f"- IPAL sample text: {(d.get('ipalText') or '')[:1200]}")
+          report.append("- KPI Department matches: "+json.dumps(d.get("kpiDepartmentMatches") or [],ensure_ascii=False))
+          report.append(f"- Chart.js global available: {d.get('chartGlobal')}")
+
+          report += ["","## Pagination",""]
+          report.append(f"- Static page-related IDs: {json.dumps(static.get('page_ids') or [],ensure_ascii=False)}")
+          report.append(f"- Static pagination functions: {json.dumps(static.get('pagination_functions') or [],ensure_ascii=False)}")
+          report.append("- Rendered pagination elements: "+json.dumps(d.get("paginationEls") or [],ensure_ascii=False))
+
+          report += ["","## Media preview",""]
+          report.append(f"- Static candidate media functions: {json.dumps(static.get('media_functions') or [],ensure_ascii=False)}")
+          report.append("- Rendered media/preview elements: "+json.dumps(d.get("mediaEls") or [],ensure_ascii=False))
+
+          report += ["","## Back-to-top vs Copilot",""]
+          report.append("- Desktop: "+json.dumps(d.get("floating") or {},ensure_ascii=False))
+          report.append("- Mobile: "+json.dumps((live.get("mobile") or {}).get("floating") or {},ensure_ascii=False))
+
+          report += ["","## User activity / audit",""]
+          report.append(f"- Static audit functions: {json.dumps(static.get('audit_functions') or [],ensure_ascii=False)}")
+          report.append("- Live activity controls: "+json.dumps(d.get("activity") or [],ensure_ascii=False))
+
+          report += ["","## Static term counts",""]
+          for k,v in (static.get("hits") or {}).items():
+            report.append(f"- {k}: {v.get('count',0)}")
+
+          report += ["","## Runtime network/errors",""]
+          report.append("- Errors: "+json.dumps(live.get("errors") or [],ensure_ascii=False))
+          report.append("- Failed requests: "+json.dumps(live.get("failedRequests") or [],ensure_ascii=False))
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/FEATURE_CONTRACTS.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+      - name: Commit sanitized report
+        shell: bash
+        run: |
+          rm -f package.json package-lock.json contracts.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/FEATURE_CONTRACTS.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: verify requested feature contracts"
+          git push
