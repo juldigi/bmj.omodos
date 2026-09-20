@@ -1,0 +1,245 @@
+name: Production QA OMODOS After Recovery
+
+on:
+  push:
+    branches:
+      - recovery/cloudflare-version-safe
+    paths:
+      - ".github/workflows/production-qa-omodos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  production-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify production HTML equals repository main
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors             -D /tmp/live.headers             https://omodos.offsetbmj.workers.dev/             -o /tmp/live.html
+
+          LIVE_BYTES="$(wc -c < /tmp/live.html | tr -d ' ')"
+          REPO_BYTES="$(wc -c < public/index.html | tr -d ' ')"
+          LIVE_SHA="$(sha256sum /tmp/live.html | awk '{print $1}')"
+          REPO_SHA="$(sha256sum public/index.html | awk '{print $1}')"
+
+          echo "LIVE_BYTES=$LIVE_BYTES" >> "$GITHUB_ENV"
+          echo "REPO_BYTES=$REPO_BYTES" >> "$GITHUB_ENV"
+          echo "LIVE_SHA=$LIVE_SHA" >> "$GITHUB_ENV"
+          echo "REPO_SHA=$REPO_SHA" >> "$GITHUB_ENV"
+
+          test "$LIVE_SHA" = "$REPO_SHA"
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser QA against production Worker
+        shell: bash
+        run: |
+          cat > production-qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser = await chromium.launch({ headless: true });
+          const result = { phases: [], errors: [], requestsFailed: [] };
+
+          try {
+            const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+            page.setDefaultTimeout(12000);
+
+            page.on('pageerror', e => result.errors.push(String(e)));
+            page.on('requestfailed', req => {
+              const u=req.url();
+              if (u.startsWith('https://omodos.offsetbmj.workers.dev')) {
+                result.requestsFailed.push({url:u,error:req.failure()?.errorText || ''});
+              }
+            });
+            page.on('dialog', async d => {
+              try { await d.dismiss(); } catch {}
+            });
+            page.on('console', msg => {
+              if (msg.type() === 'error') {
+                const t = msg.text();
+                if (!/favicon|ERR_BLOCKED_BY_CLIENT/i.test(t)) result.errors.push('console: '+t);
+              }
+            });
+
+            await page.goto('https://omodos.offsetbmj.workers.dev/', {
+              waitUntil:'domcontentloaded',
+              timeout:25000
+            });
+            result.phases.push('open');
+
+            const structural=await page.evaluate(() => ({
+              title: document.title,
+              v4Nav: !!document.getElementById('v4-nav-group'),
+              v4View: !!document.getElementById('view-omodos4'),
+              v4Namespace: !!window.OMODOS4,
+              v4Renderer: typeof window.renderOmodos4 === 'function',
+              gate: typeof canAccessView_ === 'function',
+              rbac: typeof applyRbacToUi === 'function',
+              sparepartPager: typeof attachSparepartPaginationHandlers === 'function',
+              switchView: typeof switchToView === 'function'
+            }));
+            result.structural=structural;
+            if (!structural.v4Nav || !structural.v4View || !structural.v4Namespace ||
+                !structural.v4Renderer || !structural.gate || !structural.rbac ||
+                !structural.sparepartPager || !structural.switchView) {
+              throw new Error('Production structural check failed: '+JSON.stringify(structural));
+            }
+            result.phases.push('structural');
+
+            const admin=await page.evaluate(() => {
+              CURRENT_USER={username:'qa-admin',displayName:'QA Admin',role:'Admin'};
+              SESSION_TOKEN='qa';
+              FEATURE_REGISTRY=mergeFeatureRegistry([]);
+              PERMISSIONS={};
+              applyRbacToUi();
+              return {
+                allowed:canAccessView_('omodos4'),
+                display:document.getElementById('v4-nav-group').style.display,
+                go:goToView('omodos4'),
+                active:document.getElementById('view-omodos4').classList.contains('active')
+              };
+            });
+            result.admin=admin;
+            if (admin.allowed !== false || admin.display !== 'none' || admin.go !== false || admin.active !== false) {
+              throw new Error('Production non-Superadmin gate failed: '+JSON.stringify(admin));
+            }
+            result.phases.push('non-superadmin');
+
+            const superadmin=await page.evaluate(() => {
+              CURRENT_USER={username:'qa-super',displayName:'QA Superadmin',role:'Superadmin'};
+              SESSION_TOKEN='qa';
+              FEATURE_REGISTRY=mergeFeatureRegistry([]);
+              PERMISSIONS={};
+              applyRbacToUi();
+              const allowed=canAccessView_('omodos4');
+              const display=document.getElementById('v4-nav-group').style.display;
+              const go=goToView('omodos4');
+              return {
+                allowed,display,go,
+                active:document.getElementById('view-omodos4').classList.contains('active'),
+                cards:document.querySelectorAll('#v4-summary .v4-card').length
+              };
+            });
+            result.superadmin=superadmin;
+            if (superadmin.allowed !== true || superadmin.display === 'none' ||
+                superadmin.go !== true || superadmin.active !== true || superadmin.cards !== 6) {
+              throw new Error('Production Superadmin V4 check failed: '+JSON.stringify(superadmin));
+            }
+            result.phases.push('superadmin');
+
+            const pagination=await page.evaluate(() => {
+              const p=document.createElement('div');
+              p.innerHTML='<button data-pg="1">1</button><button data-sp-pg-action="next">Next</button><select data-sp-page-size><option value="10">10</option></select>';
+              document.body.appendChild(p);
+              let ok=true, message='';
+              try { attachSparepartPaginationHandlers(p); }
+              catch(e){ ok=false; message=String(e && e.stack || e); }
+              p.remove();
+              return {ok,message};
+            });
+            result.pagination=pagination;
+            if (!pagination.ok) throw new Error('Production pagination regression: '+pagination.message);
+            result.phases.push('pagination');
+
+            const fatal=result.errors.filter(x =>
+              /TypeError.*(?:forEach|find)|SyntaxError|ReferenceError.*(?:renderOmodos4|switchToView|attachSparepartPaginationHandlers)/i.test(x)
+            );
+            result.fatalErrors=fatal;
+            if (fatal.length) throw new Error('Production fatal browser errors: '+JSON.stringify(fatal));
+
+            result.phases.push('errors-checked');
+            console.log('[PRODUCTION_QA_RESULT] '+JSON.stringify(result));
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          node --check production-qa.mjs
+          timeout -k 5s 55s node production-qa.mjs | tee /tmp/qa-output.txt
+
+      - name: Probe safe backend GET endpoints
+        shell: python
+        run: |
+          import urllib.request, urllib.error, json
+          from pathlib import Path
+
+          base="https://omodos.offsetbmj.workers.dev"
+          paths=["/api/health","/health","/api/v1/health"]
+          rows=[]
+          for p in paths:
+            req=urllib.request.Request(base+p,headers={"User-Agent":"OMODOS-Production-QA/1.0"})
+            try:
+              with urllib.request.urlopen(req,timeout=15) as r:
+                body=r.read(4096)
+                rows.append((p,r.status,r.headers.get("Content-Type",""),len(body)))
+            except urllib.error.HTTPError as e:
+              rows.append((p,e.code,e.headers.get("Content-Type","") if e.headers else "",0))
+            except Exception as e:
+              rows.append((p,"ERROR",type(e).__name__,0))
+
+          Path("/tmp/backend-probes.json").write_text(json.dumps(rows),encoding="utf-8")
+
+      - name: Write sanitized production QA report
+        shell: python
+        run: |
+          import os,json,re
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          txt=Path("/tmp/qa-output.txt").read_text(encoding="utf-8",errors="replace")
+          m=re.search(r"\[PRODUCTION_QA_RESULT\]\s*(\{.*\})",txt)
+          qa=json.loads(m.group(1)) if m else {}
+          probes=json.loads(Path("/tmp/backend-probes.json").read_text())
+
+          report=[
+            "# OMODOS Production QA — Post Recovery",
+            "",
+            f"- QA UTC: {datetime.now(timezone.utc).isoformat()}",
+            "- Production: https://omodos.offsetbmj.workers.dev",
+            f"- Live bytes: {os.environ.get('LIVE_BYTES')}",
+            f"- Repo bytes: {os.environ.get('REPO_BYTES')}",
+            f"- Live SHA-256: {os.environ.get('LIVE_SHA')}",
+            f"- Repo SHA-256: {os.environ.get('REPO_SHA')}",
+            f"- Live equals repo: {'YES' if os.environ.get('LIVE_SHA')==os.environ.get('REPO_SHA') else 'NO'}",
+            "",
+            "## Browser QA",
+            "",
+            f"- Phases: {', '.join(qa.get('phases') or [])}",
+            f"- V4 structural: {json.dumps(qa.get('structural') or {},ensure_ascii=False)}",
+            f"- Non-Superadmin: {json.dumps(qa.get('admin') or {},ensure_ascii=False)}",
+            f"- Superadmin: {json.dumps(qa.get('superadmin') or {},ensure_ascii=False)}",
+            f"- Sparepart pagination: {json.dumps(qa.get('pagination') or {},ensure_ascii=False)}",
+            f"- Fatal browser errors: {len(qa.get('fatalErrors') or [])}",
+            f"- Same-origin failed requests observed: {len(qa.get('requestsFailed') or [])}",
+            "",
+            "## Safe backend GET probes",
+            ""
+          ]
+          for p,status,ctype,n in probes:
+            report.append(f"- {p}: status={status}, content_type={ctype}, sampled_bytes={n}")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/PRODUCTION_QA_POST_RECOVERY.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+      - name: Commit sanitized QA report
+        shell: bash
+        run: |
+          rm -f package.json package-lock.json production-qa.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/PRODUCTION_QA_POST_RECOVERY.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "test: record production QA after OMODOS recovery"
+          git push
