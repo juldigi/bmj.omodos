@@ -15056,7 +15056,8 @@ function sparepartExportExcel(filename, headers, rows){
   const thead = `<tr>${headers.map(h=>`<th style="border:1px solid #999;padding:5px;background:#eee;">${escapeHtml(h)}</th>`).join('')}</tr>`;
   const tbody = rows.map(r=> `<tr>${r.map(c=>`<td style="border:1px solid #999;padding:5px;">${escapeHtml(String(c??'-'))}</td>`).join('')}</tr>`).join('');
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-  <head><meta charset="utf-8"></head>
+  <head><meta charset="utf-8"><link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="3">
+</head>
   <body><table style="border-collapse:collapse;">${thead}${tbody}</table></body></html>`;
   const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
   const url = URL.createObjectURL(blob);
@@ -28617,5 +28618,6 @@ table.omodos-responsive-table>tbody>tr>td::before,#sparepart-lokasi-table td::be
   if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
 })();
 </script>
+<!-- OMODOS4_FRONTEND_SAFE_V3 --><script src="/omodos4/hotfix.js" defer></script>
 </body>
 </html>
