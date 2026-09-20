@@ -55,9 +55,12 @@ jobs:
             view.querySelectorAll(':scope > .legacy-simple-guide').forEach(el=>el.remove());
           }
           """
-              if old not in s:
-                  raise SystemExit("Legacy ensureGuide injector not found")
-              s=s.replace(old,new,1)
+              if old in s:
+                  s=s.replace(old,new,1)
+              elif "top.insertAdjacentElement('afterend',guide)" in s:
+                  raise SystemExit("A different legacy guide injector still exists; refusing blind replacement")
+              else:
+                  print("Legacy guide injector already absent; preserving current implementation.")
 
           checks={
               "marker": marker in s,
