@@ -1,0 +1,70 @@
+name: Inventory OMODOS 4 Surface
+
+on:
+  push:
+    paths:
+      - ".github/workflows/inventory-omodos4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory V4 surface and RBAC
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, json
+
+          src = Path("public/index.html").read_text(encoding="utf-8", errors="replace")
+          lines = src.splitlines()
+
+          terms = [
+            "OMODOS 4.0","omodos4.view","Command Center","Machine Intelligence",
+            "Predictive Intelligence","Smart Field","Sparepart Intelligence",
+            "Reliability & Loss","Operation Intelligence","People Intelligence 4.0",
+            "AI Intelligence","Improvement Intelligence","Factory Brain",
+            "Maintenance War Room","War Room","Time Machine","What Changed",
+            "Machine Health Passport","Failure Memory","Ask OMODOS",
+            "Role_Permissions","Feature_Registry","RBAC_ROLE_FEATURES",
+            "canAccessView_","applyRbacToNavigation_","CURRENT_USER.role"
+          ]
+
+          out = ["# OMODOS 4 Surface Inventory",""]
+          for term in terms:
+            hits=[(i+1,l.strip()) for i,l in enumerate(lines) if term.lower() in l.lower()]
+            out.append(f"## {term} — {len(hits)}")
+            for ln,line in hits[:60]:
+              if len(line)>800: line=line[:800]+"…"
+              out.append(f"- L{ln}: {line}")
+            out.append("")
+
+          # inventory views
+          views=[]
+          for i,l in enumerate(lines,1):
+            for m in re.finditer(r'data-view=["\']([^"\']+)["\']', l):
+              views.append((m.group(1),i,l.strip()))
+          out.append("## Unique data-view inventory")
+          seen={}
+          for v,ln,line in views:
+            seen.setdefault(v,(ln,line))
+          for v,(ln,line) in sorted(seen.items()):
+            out.append(f"- {v} — L{ln}")
+          out.append(f"\nTotal unique views: {len(seen)}\n")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/OMODOS4_SURFACE_INVENTORY.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+
+      - name: Commit inventory
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/OMODOS4_SURFACE_INVENTORY.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: inventory OMODOS 4 surface and RBAC"
+          git push
