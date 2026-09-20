@@ -1,4 +1,4 @@
-name: Browser QA OMODOS 4 Phase 1
+name: Browser QA OMODOS 4 Master Recovery
 # QA trigger after V4 script relocation
 
 on:
@@ -160,7 +160,7 @@ jobs:
             });
             result.uiSafety = uiSafety;
             const toastTopPx = Number.parseFloat(uiSafety.toastTop);
-            if (!uiSafety.authorizedClass || uiSafety.recoveredModules < 11 || !uiSafety.helpInside || uiSafety.helpOutside || !uiSafety.filterMachine || uiSafety.toastZ <= uiSafety.copilotZ || !Number.isFinite(toastTopPx) || toastTopPx < 0 || toastTopPx > 40) {
+            if (!uiSafety.authorizedClass || uiSafety.recoveredModules < 10 || !uiSafety.helpInside || uiSafety.helpOutside || !uiSafety.filterMachine || uiSafety.toastZ <= uiSafety.copilotZ || !Number.isFinite(toastTopPx) || toastTopPx < 0 || toastTopPx > 40) {
               throw new Error('Frontend recovery/UI safety failed: ' + JSON.stringify(uiSafety));
             }
             result.phases.push('ui-safety');
@@ -251,7 +251,7 @@ jobs:
                 }, name);
                 sidebarClickQA.modules.push(state);
                 if (!state.viewActive || !state.moduleMode || !state.stageVisible || !state.stageInViewport ||
-                    state.tiles !== 8 || state.activeLabel !== name || !state.heading.includes(name)) {
+                    state.tiles !== 10 || state.activeLabel !== name || !state.heading.includes(name)) {
                   sidebarClickQA.failures.push(state);
                 }
               } catch (e) {
@@ -275,7 +275,7 @@ jobs:
               };
             });
             result.sidebarClickQA = sidebarClickQA;
-            if (sidebarClickQA.moduleCount !== 11 || sidebarClickQA.failures.length ||
+            if (sidebarClickQA.moduleCount !== 10 || sidebarClickQA.failures.length ||
                 !sidebarClickQA.commandCenter.viewActive || sidebarClickQA.commandCenter.moduleMode ||
                 !sidebarClickQA.commandCenter.stageHidden || !sidebarClickQA.commandCenter.heroVisible ||
                 !sidebarClickQA.commandCenter.rootActive) {
@@ -327,7 +327,7 @@ jobs:
               }
             }
             result.routeAudit = routeAudit;
-            if (routeAudit.moduleCount !== 11 || routeAudit.tileCount !== 88 || routeAudit.emptyRoutes.length || routeAudit.invalidTargets.length) {
+            if (routeAudit.moduleCount !== 10 || routeAudit.tileCount !== 100 || routeAudit.emptyRoutes.length || routeAudit.invalidTargets.length) {
               throw new Error('Recovered module routing audit failed: ' + JSON.stringify(routeAudit));
             }
             result.phases.push('route-completeness');
