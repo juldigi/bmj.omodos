@@ -1,0 +1,260 @@
+name: Deploy Latest Frontend With Healthy OMODOS Backend
+
+on:
+  push:
+    branches:
+      - fix/login-backend-json-404
+    paths:
+      - ".github/workflows/wrangler-deploy-latest-omodos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Recover verified v68 Worker code
+        shell: python
+        run: |
+          import os, json, base64, hashlib, urllib.request
+          from pathlib import Path
+
+          version_id="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          expected="fd8ae6b16ad8d60218d99f8590694647bab90edd7422c391450a0bdeb38b640b"
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+
+          req=urllib.request.Request(
+              f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/workers/omodos/versions/{version_id}?include=modules",
+              headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=45) as r:
+              result=(json.loads(r.read().decode("utf-8")).get("result") or {})
+
+          mods=result.get("modules") or []
+          decoded=[]
+          for m in mods:
+              if not isinstance(m,dict):
+                  continue
+              b64=m.get("content_base64")
+              if not isinstance(b64,str) or not b64:
+                  continue
+              raw=base64.b64decode(b64)
+              decoded.append((len(raw),m,raw))
+          if not decoded:
+              raise SystemExit("Verified v68 Worker source unavailable")
+
+          _,mod,raw=max(decoded,key=lambda x:x[0])
+          sha=hashlib.sha256(raw).hexdigest()
+          if sha!=expected:
+              raise SystemExit("v68 backend SHA mismatch: "+sha)
+
+          txt=raw.decode("utf-8",errors="replace")
+          for marker in ('pathname === "/api"',"MaintenanceStore","MAINTENANCE","application/json"):
+              if marker not in txt:
+                  raise SystemExit("v68 backend marker missing: "+marker)
+
+          work=Path("/tmp/omodos-release")
+          work.mkdir(parents=True,exist_ok=True)
+          (work/"worker.js").write_bytes(raw)
+
+          compatibility=result.get("compatibility_date") or "2025-09-20"
+          flags=result.get("compatibility_flags") or []
+
+          cfg={
+              "name":"omodos",
+              "main":"./worker.js",
+              "compatibility_date":compatibility,
+              "keep_vars":True,
+              "workers_dev":True,
+              "assets":{
+                  "directory":"./public",
+                  "binding":"ASSETS",
+                  "run_worker_first":True
+              },
+              "durable_objects":{
+                  "bindings":[
+                      {
+                          "name":"MAINTENANCE",
+                          "class_name":"MaintenanceStore"
+                      }
+                  ]
+              },
+              "secrets":{
+                  "required":["GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"]
+              },
+              "dependencies_instrumentation":{"enabled":False}
+          }
+          if flags:
+              cfg["compatibility_flags"]=flags
+
+          (work/"wrangler.jsonc").write_text(json.dumps(cfg,indent=2),encoding="utf-8")
+          print("[RECOVERY] backend v68 verified:",sha)
+          print("[RECOVERY] compatibility:",compatibility)
+
+      - name: Copy latest frontend assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/omodos-release/public
+          cp -a public/. /tmp/omodos-release/public/
+          sha256sum public/index.html | tee /tmp/frontend.sha256
+          test -s /tmp/omodos-release/public/index.html
+
+      - name: Static release checks
+        shell: python
+        run: |
+          from pathlib import Path
+          s=Path("/tmp/omodos-release/public/index.html").read_text(encoding="utf-8")
+          checks={
+            "api_origin": "const DEFAULT_WEB_APP_URL = location.origin + '/api';" in s,
+            "copilot_help": 'id="copilot-help"' in s,
+            "page_help_hidden": ".legacy-simple-guide{display:none!important}" in s,
+            "legacy_help_injector_removed": "top.insertAdjacentElement('afterend',guide)" not in s,
+            "omodos4_permission": "omodos4.view" in s,
+            "sparepart_pagination": "$$('button[data-pg]', pager).forEach" in s,
+          }
+          print("[FRONTEND_CHECKS]",checks)
+          bad=[k for k,v in checks.items() if not v]
+          if bad:
+              raise SystemExit("Frontend release check failed: "+", ".join(bad))
+
+      - name: Install Wrangler
+        shell: bash
+        run: |
+          cd /tmp/omodos-release
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev wrangler@latest
+          npx wrangler --version
+
+      - name: Wrangler dry run
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/omodos-release
+          npx wrangler deploy --dry-run --config wrangler.jsonc
+
+      - name: Deploy Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/omodos-release
+          npx wrangler deploy --config wrangler.jsonc --message "Restore login backend + latest OMODOS frontend"
+
+      - name: Production smoke test and auto rollback
+        shell: python
+        run: |
+          import os, json, urllib.request, urllib.error, hashlib, time
+          from pathlib import Path
+
+          base="https://omodos.offsetbmj.workers.dev"
+          expected_index=hashlib.sha256(Path("public/index.html").read_bytes()).hexdigest()
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          rollback_version="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+
+          def probe(method,path,payload=None):
+              data=None
+              headers={"User-Agent":"OMODOS-Release-QA/1.0","Accept":"application/json,text/html,*/*"}
+              if payload is not None:
+                  data=json.dumps(payload).encode("utf-8")
+                  headers["Content-Type"]="application/json"
+              req=urllib.request.Request(base+path,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      body=r.read()
+                      return r.status,r.headers.get("Content-Type",""),body
+              except urllib.error.HTTPError as e:
+                  return e.code,e.headers.get("Content-Type",""),e.read()
+
+          def is_json(ctype,body):
+              if "application/json" in (ctype or "").lower():
+                  return True
+              try:
+                  json.loads(body.decode("utf-8",errors="replace"))
+                  return True
+              except Exception:
+                  return False
+
+          ok=False
+          snapshot={}
+          for attempt in range(1,8):
+              time.sleep(2 if attempt==1 else 3)
+              rs,rc,rb=probe("GET","/")
+              ps,pc,pb=probe("POST","/api",{"action":"__omodos_readonly_probe__"})
+              ls,lc,lb=probe("POST","/api",{"action":"login","username":"","password":""})
+              html=rb.decode("utf-8",errors="replace")
+              root_hash=hashlib.sha256(rb).hexdigest()
+              snapshot={
+                  "attempt":attempt,
+                  "root_status":rs,
+                  "root_hash":root_hash,
+                  "root_expected":root_hash==expected_index,
+                  "help_button":'id="copilot-help"' in html,
+                  "legacy_help_hidden":".legacy-simple-guide{display:none!important}" in html,
+                  "api_status":ps,
+                  "api_json":is_json(pc,pb),
+                  "login_status":ls,
+                  "login_json":is_json(lc,lb),
+              }
+              print("[SMOKE]",json.dumps(snapshot))
+              if (
+                  rs==200 and root_hash==expected_index
+                  and snapshot["help_button"] and snapshot["legacy_help_hidden"]
+                  and ps!=404 and snapshot["api_json"]
+                  and ls!=404 and snapshot["login_json"]
+              ):
+                  ok=True
+                  break
+
+          if not ok:
+              body={
+                  "strategy":"percentage",
+                  "versions":[{"version_id":rollback_version,"percentage":100}],
+                  "annotations":{"workers/message":"Auto rollback after latest OMODOS release smoke-test failure"}
+              }
+              req=urllib.request.Request(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/omodos/deployments",
+                  data=json.dumps(body).encode("utf-8"),
+                  headers={
+                      "Authorization":"Bearer "+token,
+                      "Content-Type":"application/json",
+                      "Accept":"application/json"
+                  },
+                  method="POST"
+              )
+              with urllib.request.urlopen(req,timeout=45) as r:
+                  rollback_response=r.read()
+              raise SystemExit("Release smoke test failed; rolled back to v68: "+json.dumps(snapshot))
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/PRODUCTION_LOGIN_AND_BANTUAN_RESTORE.md").write_text(
+              "# OMODOS Production Restore\n\n"
+              + "- Result: PASS\n"
+              + "- Login backend /api: JSON valid\n"
+              + "- Frontend: latest GitHub main-equivalent release\n"
+              + "- Page-level Bantuan cards: hidden/removed\n"
+              + "- Bantuan button: retained inside Copilot\n"
+              + "- Durable Object/SQLite: preserved\n"
+              + "- Smoke: "+json.dumps(snapshot,ensure_ascii=False)+"\n",
+              encoding="utf-8"
+          )
+
+      - name: Commit sanitized production report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/PRODUCTION_LOGIN_AND_BANTUAN_RESTORE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: restore production login and Copilot-only Bantuan"
+          git push
