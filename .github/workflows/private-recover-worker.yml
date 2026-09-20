@@ -58,31 +58,39 @@ jobs:
           if not account_id:
             raise SystemExit("Worker omodos not found")
 
-          raw,ctype=req_raw(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2")
+          import time
+
+          raw=b""
+          ctype=""
+          for attempt in range(1,4):
+            raw,ctype=req_raw(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2")
+            if len(raw) > 1000:
+              break
+            time.sleep(attempt)
 
           source=None
           source_name="worker.js"
+
           if "multipart/" in ctype.lower():
             pseudo=(f"Content-Type: {ctype}\r\nMIME-Version: 1.0\r\n\r\n").encode()+raw
             msg=BytesParser(policy=default).parsebytes(pseudo)
-            candidates=[]
-            for p in msg.iter_parts():
+            parsed=[]
+            for idx,p in enumerate(msg.iter_parts(),1):
               payload=p.get_payload(decode=True) or b""
-              name=str(p.get_param("name",header="content-disposition") or p.get_filename() or "")
+              name=p.get_param("name",header="content-disposition") or p.get_filename() or f"part-{idx}"
               pct=p.get_content_type()
-              candidates.append((len(payload),name,pct,payload))
-            if candidates:
-              _,name,pct,payload=max(candidates,key=lambda x:x[0])
-              source=payload
-              source_name=name or "worker.js"
-            else:
-              source=raw
-              source_name="worker-content-v2.multipart"
+              if payload:
+                parsed.append((str(name),pct,payload))
+            js_parts=[x for x in parsed if x[0].lower().endswith((".js",".mjs",".ts")) or x[1].startswith("application/javascript")]
+            pool=js_parts or parsed
+            if pool:
+              source_name,pct,source=max(pool,key=lambda x:len(x[2]))
           else:
             source=raw
+            source_name="worker.js"
 
-          if not source:
-            raise SystemExit("Worker source payload empty")
+          if not source or len(source) < 1000:
+            raise SystemExit(f"Worker source payload unavailable after retries; raw_bytes={len(raw)} content_type={ctype!r}")
 
           Path("/tmp/omodos-worker.js").write_bytes(source)
           Path("/tmp/source-name.txt").write_text(source_name,encoding="utf-8")
