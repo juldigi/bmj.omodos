@@ -20,114 +20,113 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-          import re, hashlib, datetime
+          import hashlib, datetime
 
           path = Path("public/index.html")
-          text = path.read_text(encoding="utf-8", errors="replace")
+          raw = path.read_bytes()
+          text = raw.decode("utf-8", errors="replace")
           lines = text.splitlines()
 
-          patterns = {
+          groups = {
               "Dollar helper definitions": [
-                  r"(?<![\\w$])(?:const|let|var)\\s+\\$\\s*=",
-                  r"function\\s+\\$\\s*\\(",
-                  r"window\\.\\$\\s*=",
+                  "const $ =", "const $=", "let $ =", "let $=",
+                  "var $ =", "var $=", "function $(", "window.$ ="
               ],
               "Potential jQuery-like chained calls": [
-                  r"\\$\\([^\\n]*\\)\\.forEach\\s*\\(",
-                  r"\\$\\([^\\n]*\\)\\.find\\s*\\(",
-                  r"\\$\\([^\\n]*\\)\\.map\\s*\\(",
-                  r"\\$\\([^\\n]*\\)\\.filter\\s*\\(",
+                  ").forEach(", ").find(", ").map(", ").filter("
               ],
               "Known regression functions": [
-                  r"attachSparepartPaginationHandlers",
-                  r"renderSparepartCollectTable",
-                  r"applySparepartFilters",
-                  r"switchToView",
+                  "attachSparepartPaginationHandlers",
+                  "renderSparepartCollectTable",
+                  "applySparepartFilters",
+                  "switchToView"
               ],
               "OMODOS 4 RBAC": [
-                  r"omodos4\\.view",
-                  r"OMODOS\\s*4\\.0",
-                  r"Superadmin",
+                  "omodos4.view", "OMODOS 4.0", "Superadmin"
               ],
               "Copilot & Bantuan": [
-                  r"Copilot",
-                  r"Bantuan",
+                  "Copilot", "Bantuan"
               ],
               "Machine status": [
-                  r"machineStatus",
-                  r"statusMachine",
-                  r"status mesin",
-                  r"latest.*(?:logbook|patrol)",
-                  r"(?:logbook|patrol).*latest",
+                  "machineStatus", "statusMachine", "status mesin",
+                  "latestLogbook", "latestPatrol", "latest logbook", "latest patrol"
               ],
               "Pagination controls": [
-                  r"pageSize",
-                  r"Halaman Sebelumnya",
-                  r"Halaman Selanjutnya",
-                  r"Halaman Awal",
-                  r"Halaman Akhir",
+                  "pageSize", "Halaman Sebelumnya", "Halaman Selanjutnya",
+                  "Halaman Awal", "Halaman Akhir"
               ],
           }
 
-          def matches_for(regex):
-              rx = re.compile(regex, re.I)
-              return [(i, l) for i,l in enumerate(lines, 1) if rx.search(l)]
+          def literal_matches(term):
+              low = term.lower()
+              return [(i, line) for i, line in enumerate(lines, 1) if low in line.lower()]
 
-          out = []
-          out.append("# OMODOS Recovered Frontend — Static Audit")
-          out.append("")
-          out.append(f"- Audited UTC: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")
-          out.append(f"- File bytes: {path.stat().st_size}")
-          out.append(f"- Lines: {len(lines)}")
-          out.append(f"- SHA-256: {hashlib.sha256(path.read_bytes()).hexdigest()}")
-          out.append("")
+          out = [
+              "# OMODOS Recovered Frontend — Static Audit",
+              "",
+              f"- Audited UTC: {datetime.datetime.now(datetime.timezone.utc).isoformat()}",
+              f"- File bytes: {len(raw)}",
+              f"- Lines: {len(lines)}",
+              f"- SHA-256: {hashlib.sha256(raw).hexdigest()}",
+              ""
+          ]
 
-          for title, regs in patterns.items():
-              out.append(f"## {title}")
-              total = 0
+          for title, terms in groups.items():
+              out.append("## " + title)
               seen = set()
-              for reg in regs:
-                  ms = matches_for(reg)
-                  total += len(ms)
-                  if ms:
-                      out.append(f"### Pattern {reg} — {len(ms)} match(es)")
-                      for i,l in ms[:40]:
-                          key=(i,l)
-                          if key in seen:
-                              continue
-                          seen.add(key)
-                          compact = l.strip()
-                          if len(compact) > 500:
-                              compact = compact[:500] + "…"
-                          out.append(f"- L{i}: {compact}")
-              if total == 0:
+              count = 0
+              for term in terms:
+                  ms = literal_matches(term)
+                  count += len(ms)
+                  if not ms:
+                      continue
+                  out.append(f"### {term} — {len(ms)} match(es)")
+                  for i, line in ms[:50]:
+                      key = (i, line)
+                      if key in seen:
+                          continue
+                      seen.add(key)
+                      compact = line.strip()
+                      if len(compact) > 700:
+                          compact = compact[:700] + "…"
+                      out.append(f"- L{i}: {compact}")
+              if count == 0:
                   out.append("- No matches.")
               out.append("")
 
-          dollar_defs = []
-          for i,l in enumerate(lines,1):
-              if re.search(r"(?:const|let|var)\\s+\\$\\s*=|function\\s+\\$\\s*\\(", l):
-                  dollar_defs.append((i,l.strip()))
           risky = []
-          for i,l in enumerate(lines,1):
-              if re.search(r"\\$\\([^\\n]*\\)\\.(?:forEach|find)\\s*\\(", l):
-                  risky.append((i,l.strip()))
+          for i, line in enumerate(lines, 1):
+              compact = "".join(line.split())
+              if "$(" in compact and (
+                  ").forEach(" in compact or ").find(" in compact
+              ):
+                  risky.append((i, line.strip()))
+
+          dollar_defs = []
+          for i, line in enumerate(lines, 1):
+              compact = "".join(line.split())
+              if any(x in compact for x in (
+                  "const$=", "let$=", "var$=", "function$(", "window.$="
+              )):
+                  dollar_defs.append((i, line.strip()))
 
           out.append("## Regression risk summary")
           if risky:
               out.append(f"- HIGH: found {len(risky)} direct dollar-helper .forEach/.find call(s).")
-              for i,l in risky[:50]:
-                  out.append(f"  - L{i}: {l[:600]}")
+              for i, line in risky[:80]:
+                  out.append(f"  - L{i}: {line[:700]}")
           else:
-              out.append("- No direct dollar-helper .forEach or .find patterns found.")
+              out.append("- No direct dollar-helper .forEach or .find pattern found.")
           if dollar_defs:
               out.append("- Dollar helper candidates:")
-              for i,l in dollar_defs[:20]:
-                  out.append(f"  - L{i}: {l[:600]}")
+              for i, line in dollar_defs[:30]:
+                  out.append(f"  - L{i}: {line[:700]}")
           out.append("")
 
           Path("audit").mkdir(exist_ok=True)
-          Path("audit/RECOVERED_FRONTEND_STATIC_AUDIT.md").write_text("\\n".join(out)+"\\n", encoding="utf-8")
+          Path("audit/RECOVERED_FRONTEND_STATIC_AUDIT.md").write_text(
+              "\n".join(out) + "\n", encoding="utf-8"
+          )
 
       - name: Commit audit report
         shell: bash
