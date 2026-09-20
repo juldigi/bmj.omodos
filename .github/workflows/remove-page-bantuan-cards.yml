@@ -1,0 +1,169 @@
+name: Remove Page Bantuan Cards
+
+on:
+  push:
+    branches:
+      - fix/bantuan-page-card-cleanup
+    paths:
+      - ".github/workflows/remove-page-bantuan-cards.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove legacy page-level Bantuan cards
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p=Path("public/index.html")
+          s=p.read_text(encoding="utf-8")
+
+          marker="BANTUAN_PAGE_CARD_REMOVAL_V1"
+          if marker not in s:
+              style_anchor='</style>\n<script id="legacy-low-cognitive-script">'
+              if style_anchor not in s:
+                  raise SystemExit("Low-cognitive style anchor not found")
+              s=s.replace(
+                  style_anchor,
+                  '/* BANTUAN_PAGE_CARD_REMOVAL_V1 */\n.legacy-simple-guide{display:none!important}\n</style>\n<script id="legacy-low-cognitive-script">',
+                  1
+              )
+
+              old="""  function ensureGuide(view){
+            if(!view||!view.id||view.id==='view-omodos4'||view.querySelector(':scope > .legacy-simple-guide'))return;
+            const key=view.id.replace(/^view-/,'');
+            const g=VIEW_GUIDES[key];if(!g)return;
+            const guide=document.createElement('div');guide.className='legacy-simple-guide';guide.dataset.simpleGuide=key;
+            guide.innerHTML='<div class="legacy-simple-guide-title">'+g[0]+'</div>'+
+              '<div class="legacy-simple-guide-purpose">'+g[1]+'</div>'+
+              '<div class="legacy-simple-guide-steps"><div class="legacy-simple-step"><b>1</b>'+g[2]+'</div><div class="legacy-simple-step"><b>2</b>'+g[3]+'</div></div>'+
+              glossaryHtml();
+            const top=view.querySelector(':scope > .topbar');
+            if(top)top.insertAdjacentElement('afterend',guide);else view.prepend(guide);
+          }
+          """
+              new="""  function ensureGuide(view){
+            if(!view||!view.querySelectorAll)return;
+            view.querySelectorAll(':scope > .legacy-simple-guide').forEach(el=>el.remove());
+          }
+          """
+              if old not in s:
+                  raise SystemExit("Legacy ensureGuide injector not found")
+              s=s.replace(old,new,1)
+
+          checks={
+              "marker": marker in s,
+              "legacy_hidden": ".legacy-simple-guide{display:none!important}" in s,
+              "injector_removed": "top.insertAdjacentElement('afterend',guide)" not in s,
+              "copilot_help_kept": 'id="copilot-help"' in s,
+              "copilot_help_handler_kept": "copilotShowHelp_" in s,
+          }
+          print(checks)
+          bad=[k for k,v in checks.items() if not v]
+          if bad:
+              raise SystemExit("Static checks failed: "+", ".join(bad))
+
+          p.write_text(s,encoding="utf-8")
+
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          Path("/tmp/omodos-all.js").write_text("\n".join(blocks),encoding="utf-8")
+          PY
+          node --check /tmp/omodos-all.js
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser QA
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/help-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true; rm -f help-qa.mjs package.json package-lock.json' EXIT
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+
+          cat > help-qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser=await chromium.launch({headless:true});
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            page.on('dialog',async d=>{try{await d.dismiss();}catch{}});
+
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:20000});
+
+            const structure=await page.evaluate(function(){
+              return {
+                help:!!document.getElementById('copilot-help'),
+                inside:!!document.getElementById('copilot-help')?.closest('#copilot-panel'),
+                visibleGuides:[...document.querySelectorAll('.legacy-simple-guide')].filter(function(x){return getComputedStyle(x).display!=='none';}).length,
+                pageGuideNodes:document.querySelectorAll('.view > .legacy-simple-guide').length,
+                buttons:[...document.querySelectorAll('button')].filter(function(b){return /\bBantuan\b/i.test((b.textContent||'').trim());}).map(function(b){return b.id;})
+              };
+            });
+
+            if(!structure.help || !structure.inside) throw new Error('Copilot Bantuan missing: '+JSON.stringify(structure));
+            if(structure.visibleGuides!==0 || structure.pageGuideNodes!==0) throw new Error('Page Bantuan cards remain: '+JSON.stringify(structure));
+            if(JSON.stringify(structure.buttons)!==JSON.stringify(['copilot-help'])) throw new Error('Bantuan exists outside Copilot: '+JSON.stringify(structure));
+
+            const contextual=await page.evaluate(function(){
+              document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+              document.getElementById('view-utama')?.classList.add('active');
+              openCopilot();
+              document.getElementById('copilot-help')?.click();
+              const card=document.querySelector('[data-copilot-help-card]');
+              return {
+                card:!!card,
+                text:card?.textContent?.replace(/\s+/g,' ').trim()||''
+              };
+            });
+
+            if(!contextual.card || !/Bantuan/.test(contextual.text) || !/Logbook/i.test(contextual.text)){
+              throw new Error('Contextual Copilot help failed: '+JSON.stringify(contextual));
+            }
+
+            const relevant=errors.filter(function(x){return /TypeError|ReferenceError|SyntaxError/i.test(x);});
+            if(relevant.length) throw new Error('Browser errors: '+JSON.stringify(relevant));
+
+            console.log('[PAGE_BANTUAN_QA] '+JSON.stringify({structure,contextual,relevant}));
+          }finally{
+            await browser.close();
+          }
+          JS
+
+          node --check help-qa.mjs
+          timeout -k 5s 60s node help-qa.mjs
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          rm -f package.json package-lock.json help-qa.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: remove page-level Bantuan cards"
+          git push
