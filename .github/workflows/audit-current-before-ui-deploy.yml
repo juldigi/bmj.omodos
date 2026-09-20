@@ -1,0 +1,116 @@
+name: Audit Current Worker Before UI Deploy
+
+on:
+  push:
+    branches:
+      - deploy/ketuk-to-pilih
+    paths:
+      - ".github/workflows/audit-current-before-ui-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect active version and live API
+        shell: python
+        run: |
+          import os,json,urllib.request,urllib.error
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments")
+          rr=dep.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No active deployment")
+          active=[v for v in rows[0].get("versions") or [] if float(v.get("percentage") or 0)>0]
+
+          report=[
+            "# Current Worker Before UI Deploy",
+            "",
+            f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Active entries: {json.dumps(active)}",
+            ""
+          ]
+
+          for av in active:
+            vid=str(av.get("version_id") or "")
+            d=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{vid}?include=modules").get("result") or {}
+            bindings=d.get("bindings") or []
+            safe=[]
+            if isinstance(bindings,list):
+              for b in bindings:
+                if isinstance(b,dict):
+                  safe.append({k:b.get(k) for k in ("name","type","class_name","namespace_id") if b.get(k) is not None})
+            assets=d.get("assets") or {}
+            config=(assets.get("config") or {}) if isinstance(assets,dict) else {}
+            report += [
+              f"- Version {vid}",
+              f"  - number: {d.get('number')}",
+              f"  - main_module: {d.get('main_module')}",
+              f"  - migration_tag: {d.get('migration_tag')}",
+              f"  - bindings: {json.dumps(safe,sort_keys=True)}",
+              f"  - assets config: {json.dumps(config,sort_keys=True)}",
+              f"  - modules: {len(d.get('modules') or [])}",
+            ]
+
+          def live(path,method="GET",payload=None):
+            h={"User-Agent":"OMODOS-Current-Audit/1.0","Cache-Control":"no-cache"}
+            data=None
+            if payload is not None:
+              data=json.dumps(payload).encode()
+              h["Content-Type"]="text/plain;charset=utf-8"
+            req=urllib.request.Request("https://omodos.offsetbmj.workers.dev"+path,data=data,method=method,headers=h)
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                return r.status,r.headers,r.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          root_status,root_h,root_body=live("/?current_audit=1")
+          post_status,post_h,post_body=live("/api","POST",{"action":"__omodos_readonly_smoke_probe__"})
+          post_ct=(post_h.get("Content-Type") or "").lower()
+          post_text=post_body.decode("utf-8",errors="replace").lstrip()
+          post_json=("json" in post_ct) or post_text.startswith("{") or post_text.startswith("[")
+
+          report += [
+            "",
+            "## Live probes",
+            "",
+            f"- Root HTTP: {root_status}",
+            f"- POST /api HTTP: {post_status}",
+            f"- POST /api Content-Type: {post_ct}",
+            f"- POST /api JSON-like: {post_json}",
+          ]
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/CURRENT_WORKER_BEFORE_UI_DEPLOY.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[CURRENT_AUDIT] root="+str(root_status)+" post_api="+str(post_status)+" json="+str(post_json))
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/CURRENT_WORKER_BEFORE_UI_DEPLOY.md
+          git commit -m "audit: inspect current Worker before UI deploy" || true
+          git push
