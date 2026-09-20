@@ -1,0 +1,84 @@
+name: Audit Bantuan and Copilot
+
+on:
+  push:
+    branches:
+      - fix/bantuan-copilot
+    paths:
+      - ".github/workflows/audit-bantuan-copilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Bantuan and Copilot contexts
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src=Path("public/index.html").read_text(encoding="utf-8",errors="replace")
+          lines=src.splitlines()
+
+          terms=[
+            "Bantuan",
+            "help",
+            "copilot",
+            "help-card",
+            "bantuan-card",
+            "panduan",
+            "petunjuk",
+            "how to",
+          ]
+
+          out=["# Bantuan & Copilot Audit",""]
+          seen=set()
+
+          for term in terms:
+            hits=[i for i,l in enumerate(lines) if term.lower() in l.lower()]
+            out.append(f"## {term} — {len(hits)} hit(s)")
+            for idx in hits[:120]:
+              key=(idx,term)
+              if key in seen:
+                continue
+              seen.add(key)
+              start=max(0,idx-6)
+              end=min(len(lines),idx+14)
+              out.append(f"### Around line {idx+1}")
+              out.append("~~~text")
+              for j in range(start,end):
+                out.append(f"{j+1:05d}: {lines[j]}")
+              out.append("~~~")
+              out.append("")
+            if not hits:
+              out.append("- No match.")
+              out.append("")
+
+          # Summarize likely visible help containers.
+          candidates=[]
+          for i,l in enumerate(lines,1):
+            low=l.lower()
+            if ("bantuan" in low or "help" in low or "panduan" in low) and any(x in low for x in ("class=", "id=", "data-", "<section", "<div", "<aside", "<button")):
+              candidates.append((i,l.strip()))
+          out += ["## Visible help container/button candidates",""]
+          for i,l in candidates[:250]:
+            out.append(f"- L{i}: {l[:1000]}")
+          out.append("")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/BANTUAN_COPILOT_AUDIT.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+
+      - name: Commit audit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/BANTUAN_COPILOT_AUDIT.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: inspect Bantuan and Copilot implementation"
+          git push
