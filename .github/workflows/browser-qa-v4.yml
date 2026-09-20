@@ -48,7 +48,7 @@ jobs:
           try {
             const page = await browser.newPage({viewport:{width:1440,height:1000}});
             page.setDefaultTimeout(12000);
-            page.on('pageerror', e => errors.push(String(e)));
+            page.on('pageerror', e => errors.push(String(e)));\n            page.on('dialog', async d => { console.log('[QA_DIALOG] '+d.type()+': '+d.message()); try{ await d.dismiss(); }catch(e){} });
             page.on('console', msg => {
               if(msg.type()==='error'){
                 const t=msg.text();
@@ -140,7 +140,7 @@ jobs:
           }
           JS
 
-          timeout 45s node v4-qa.mjs
+          timeout -k 5s 25s node v4-qa.mjs
 
       - name: Remove transient QA files
         if: always()
