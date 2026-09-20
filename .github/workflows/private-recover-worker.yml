@@ -33,15 +33,35 @@ jobs:
             exit 1
           fi
 
-          URL="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/omodos/content/v2"
+          CONTENT_URL="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/omodos/content/v2"
+          SCRIPT_URL="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/omodos"
           rm -f /tmp/worker-content-v2 /tmp/worker-headers
 
-          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors             --http1.1             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Accept: */*"             -D /tmp/worker-headers             -o /tmp/worker-content-v2             "$URL"
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --http1.1 \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Accept: */*" \
+            -D /tmp/worker-headers \
+            -o /tmp/worker-content-v2 \
+            "$CONTENT_URL"
 
           RAW_BYTES="$(wc -c < /tmp/worker-content-v2 | tr -d ' ')"
           echo "[PRIVATE_RECOVERY] content/v2 bytes=$RAW_BYTES"
+
           if [ "$RAW_BYTES" -lt 1000 ]; then
-            echo "Worker content/v2 returned an unexpectedly small payload."
+            echo "[PRIVATE_RECOVERY] content/v2 returned no body; trying Download Worker Script endpoint."
+            rm -f /tmp/worker-content-v2 /tmp/worker-headers
+            curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors --http1.1 \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Accept: */*" \
+              -D /tmp/worker-headers \
+              -o /tmp/worker-content-v2 \
+              "$SCRIPT_URL"
+            RAW_BYTES="$(wc -c < /tmp/worker-content-v2 | tr -d ' ')"
+            echo "[PRIVATE_RECOVERY] script download bytes=$RAW_BYTES"
+          fi
+
+          if [ "$RAW_BYTES" -lt 1000 ]; then
+            echo "Cloudflare returned an unexpectedly small Worker payload from both read endpoints."
             sed -n '1,20p' /tmp/worker-headers | sed -E 's/(authorization|cookie|set-cookie):.*/\\1: [redacted]/Ig'
             exit 1
           fi
