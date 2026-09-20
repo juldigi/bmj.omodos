@@ -199,7 +199,7 @@ jobs:
             for (let i = 0; i < moduleCount; i++) {
               const module = page.locator('#v4-nav-group [data-v4-safe-module]').nth(i);
               const moduleName = (await module.getAttribute('aria-label')) || ('module-' + i);
-              await module.click();
+              await module.evaluate(el => el.click());
               await page.waitForTimeout(30);
 
               const tiles = page.locator('#v4-safe-stage [data-v4-route]');
