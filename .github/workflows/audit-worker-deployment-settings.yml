@@ -1,0 +1,201 @@
+name: Audit Worker Deployment Settings
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/audit-worker-deployment-settings.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect Worker settings safely
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          token=os.environ.get("CLOUDFLARE_DEPLOY_TOKEN","").strip()
+          if not token:
+            raise SystemExit("CLOUDFLARE_DEPLOY_TOKEN missing")
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=30) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          accounts=get_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []
+          account_id=None
+          version_rows=[]
+          for a in accounts:
+            aid=a.get("id")
+            if not aid:
+              continue
+            try:
+              v=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions?per_page=10")
+              rows=v.get("result") or []
+            except Exception:
+              rows=[]
+            if rows:
+              account_id=aid
+              version_rows=rows
+              break
+          if not account_id:
+            raise SystemExit("omodos Worker not found")
+
+          def safe_get(url):
+            try:
+              return get_json(url).get("result")
+            except Exception as e:
+              return {"_error":type(e).__name__}
+
+          current_settings=safe_get(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/settings")
+          script_settings=safe_get(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/script-settings")
+          subdomain=safe_get(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/subdomain")
+
+          v68_id="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          v68=safe_get(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/omodos/versions/{v68_id}?include=modules")
+          latest=safe_get(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/omodos/versions/latest?include=modules")
+
+          allowed_binding_keys={
+            "name","type","class_name","namespace_id","service","environment",
+            "queue_name","dataset","index_name","workflow_name"
+          }
+          def sanitize_bindings(obj):
+            rows=[]
+            if isinstance(obj,list):
+              source=obj
+            elif isinstance(obj,dict):
+              source=[]
+              for k,v in obj.items():
+                if isinstance(v,dict):
+                  item=dict(v)
+                  item.setdefault("name",k)
+                else:
+                  item={"name":k,"type":type(v).__name__}
+                source.append(item)
+            else:
+              source=[]
+            for b in source:
+              if not isinstance(b,dict):
+                continue
+              rows.append({k:b.get(k) for k in allowed_binding_keys if b.get(k) is not None})
+            return rows
+
+          def sanitize_assets(obj):
+            if not isinstance(obj,dict):
+              return None
+            allowed=[
+              "html_handling","not_found_handling","run_worker_first",
+              "config","jwt","namespace","router_config"
+            ]
+            out={}
+            for k in allowed:
+              if k not in obj:
+                continue
+              if k=="jwt":
+                out[k]="[present]" if obj.get(k) else ""
+              else:
+                out[k]=obj.get(k)
+            return out
+
+          def top_keys(obj):
+            return sorted(obj.keys()) if isinstance(obj,dict) else []
+
+          report=[
+            "# OMODOS Worker Deployment Settings Audit",
+            "",
+            f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Recent versions: {len(version_rows)}",
+            "",
+            "## Current settings keys",
+            "",
+            "- "+", ".join(top_keys(current_settings)),
+            "",
+            "## Current bindings",
+            ""
+          ]
+
+          current_bindings=sanitize_bindings(current_settings.get("bindings") if isinstance(current_settings,dict) else None)
+          if current_bindings:
+            for b in current_bindings:
+              report.append("- "+json.dumps(b,sort_keys=True))
+          else:
+            report.append("- None or unavailable.")
+
+          report += ["","## v68 bindings",""]
+          v68_bindings=sanitize_bindings(v68.get("bindings") if isinstance(v68,dict) else None)
+          if v68_bindings:
+            for b in v68_bindings:
+              report.append("- "+json.dumps(b,sort_keys=True))
+          else:
+            report.append("- None or unavailable.")
+
+          report += ["","## Assets metadata",""]
+          for label,obj in (("current",current_settings),("latest",latest),("v68",v68)):
+            assets=obj.get("assets") if isinstance(obj,dict) else None
+            report.append(f"- {label}: "+json.dumps(sanitize_assets(assets),sort_keys=True))
+
+          report += ["","## Compatibility and module metadata",""]
+          for label,obj in (("current",current_settings),("latest",latest),("v68",v68)):
+            if isinstance(obj,dict):
+              report.append(
+                f"- {label}: compatibility_date={obj.get('compatibility_date')} "
+                f"main_module={obj.get('main_module')} "
+                f"usage_model={obj.get('usage_model')} "
+                f"migration_tag={obj.get('migration_tag')}"
+              )
+
+          report += ["","## Script settings",""]
+          if isinstance(script_settings,dict):
+            safe={k:v for k,v in script_settings.items() if k in ("logpush","observability","tags","tail_consumers")}
+            report.append("- "+json.dumps(safe,sort_keys=True))
+          else:
+            report.append("- unavailable")
+
+          report += ["","## Subdomain",""]
+          if isinstance(subdomain,dict):
+            safe={k:v for k,v in subdomain.items() if k in ("enabled","previews_enabled")}
+            report.append("- "+json.dumps(safe,sort_keys=True))
+          else:
+            report.append("- unavailable")
+
+          # Deployment safety verdict.
+          names={b.get("name") for b in v68_bindings}
+          types={b.get("type") for b in v68_bindings}
+          report += ["","## Deployment safety",""]
+          if any("durable" in str(t).lower() for t in types) or any(b.get("class_name") for b in v68_bindings):
+            report.append("- Durable Object binding metadata is available for reconstruction.")
+          else:
+            report.append("- Durable Object binding metadata is NOT sufficiently visible; do not run Wrangler deploy yet.")
+          if isinstance(current_settings,dict) and current_settings.get("assets") is not None:
+            report.append("- Current Worker settings expose an assets configuration.")
+          else:
+            report.append("- Current Worker settings do not expose assets configuration directly.")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/WORKER_DEPLOYMENT_SETTINGS.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[DEPLOY_SETTINGS] sanitized report generated.")
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/WORKER_DEPLOYMENT_SETTINGS.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: capture safe Worker deployment settings"
+          git push
