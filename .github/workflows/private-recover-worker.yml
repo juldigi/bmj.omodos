@@ -65,19 +65,24 @@ jobs:
           if "multipart/" in ctype.lower():
             pseudo=(f"Content-Type: {ctype}\r\nMIME-Version: 1.0\r\n\r\n").encode()+raw
             msg=BytesParser(policy=default).parsebytes(pseudo)
+            candidates=[]
             for p in msg.iter_parts():
               payload=p.get_payload(decode=True) or b""
               name=str(p.get_param("name",header="content-disposition") or p.get_filename() or "")
               pct=p.get_content_type()
-              if pct.startswith("application/javascript") or name.lower().endswith((".js",".mjs",".ts")):
-                source=payload
-                source_name=name or "worker.js"
-                break
+              candidates.append((len(payload),name,pct,payload))
+            if candidates:
+              _,name,pct,payload=max(candidates,key=lambda x:x[0])
+              source=payload
+              source_name=name or "worker.js"
+            else:
+              source=raw
+              source_name="worker-content-v2.multipart"
           else:
             source=raw
 
           if not source:
-            raise SystemExit("Worker source part not found")
+            raise SystemExit("Worker source payload empty")
 
           Path("/tmp/omodos-worker.js").write_bytes(source)
           Path("/tmp/source-name.txt").write_text(source_name,encoding="utf-8")
