@@ -1,0 +1,77 @@
+name: Stage V4 navigation safely
+
+on:
+  push:
+    branches:
+      - stage/v4-navigation-safe
+    paths:
+      - .github/workflows/stage-v4-navigation-safe.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stage/v4-navigation-safe
+      - name: Insert external assets at final document boundaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("public/index.html")
+          text = p.read_text(encoding="utf-8")
+          css = '<link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="3">'
+          js = '<!-- OMODOS4_FRONTEND_SAFE_V3 --><script src="/omodos4/hotfix.js" defer></script>'
+          if "OMODOS4_FRONTEND_SAFE_V2" in text:
+              raise SystemExit("Unsafe V2 marker unexpectedly present")
+          if css not in text:
+              pos = text.lower().rfind("</head>")
+              if pos < 0:
+                  raise SystemExit("Final </head> not found")
+              text = text[:pos] + css + "\n" + text[pos:]
+          if js not in text:
+              pos = text.lower().rfind("</body>")
+              if pos < 0:
+                  raise SystemExit("Final </body> not found")
+              text = text[:pos] + js + "\n" + text[pos:]
+          if text.count("OMODOS4_FRONTEND_SAFE_V3") != 1:
+              raise SystemExit("Loader marker count must be 1")
+          marker = text.index("OMODOS4_FRONTEND_SAFE_V3")
+          if marker < text.rfind("</script>"):
+              raise SystemExit("Loader must be after the final inline script")
+          p.write_text(text, encoding="utf-8")
+          PY
+      - name: Validate every inline script
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const h=fs.readFileSync('public/index.html','utf8');
+          const rx=/<script([^>]*)>([\s\S]*?)<\/script>/gi;
+          let m,n=0,fail=[];
+          while((m=rx.exec(h))){
+            n++;
+            if(/\bsrc=/.test(m[1])) continue;
+            try { new Function(m[2]); } catch(e) { fail.push({script:n,error:e.message}); }
+          }
+          if(fail.length) { console.error(fail); process.exit(1); }
+          console.log('inline scripts valid:',n);
+          NODE
+      - name: Guard login and V4 boundaries
+        run: |
+          grep -q 'id="form-login"' public/index.html
+          grep -q "action: 'login'" public/index.html
+          grep -q 'id="v4-nav-group"' public/index.html
+          grep -q 'OMODOS4_PHASE1_SAFE' public/index.html
+          grep -q 'z-index:2147483000' public/omodos4/hotfix.css
+          node --check public/omodos4/hotfix.js
+      - name: Commit staged patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "stage: attach V4 navigation at final HTML boundary"
+          git push origin HEAD:stage/v4-navigation-safe
