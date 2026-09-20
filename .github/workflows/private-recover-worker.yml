@@ -88,17 +88,17 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/recovery-public.pem <<'PUB'
------BEGIN PUBLIC KEY-----
-MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAl3hRLncuADhrGIfayz4f
-Wp276dGETOSKyd57E2sjcZmbFOaF3YRsBF251qy+EUFIo3tdpgg7ZZfFS9isXqC9
-qZm963NHltHrpuv7eEZ6KCBl3FNF8FgrCNzTQur7VYDT3zc4ABBcScGKtFyi1vLX
-i0MLpbq+rsNLjeeradOk5koJfQ2/Ht1jk+7csbi687ohrhpJVlvv2ok8QIgGOEHe
-jICrJEdq7b5ffL+J9tOkOAmlsDssimgaJ/n5ZT1GK/v2+jTPagcTaTO6rZdnPT6R
-IwEfq5pWqnlQSYo2hfoLL/Vj+C3liXaGPyhx+9SIYdEjUnqJzUlgmyCZrtCv/4Si
-ESLNsN63agSYF821MqOQnPLBA92p8g2XDxh7Nw1lZwTyaR6iQ3ckXkYHFEUqeRFV
-hS5T4ibM4gkm0Ck6xv8e+UvLWDOYCrUCg96WwTDGzWBCKBuijeDfmliCMil1+AER
-WeKd416Gj4WKz6qFKJZxAcFSHxzOenro3NQxUIhSWo2dAgMBAAE=
------END PUBLIC KEY-----
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAl3hRLncuADhrGIfayz4f
+          Wp276dGETOSKyd57E2sjcZmbFOaF3YRsBF251qy+EUFIo3tdpgg7ZZfFS9isXqC9
+          qZm963NHltHrpuv7eEZ6KCBl3FNF8FgrCNzTQur7VYDT3zc4ABBcScGKtFyi1vLX
+          i0MLpbq+rsNLjeeradOk5koJfQ2/Ht1jk+7csbi687ohrhpJVlvv2ok8QIgGOEHe
+          jICrJEdq7b5ffL+J9tOkOAmlsDssimgaJ/n5ZT1GK/v2+jTPagcTaTO6rZdnPT6R
+          IwEfq5pWqnlQSYo2hfoLL/Vj+C3liXaGPyhx+9SIYdEjUnqJzUlgmyCZrtCv/4Si
+          ESLNsN63agSYF821MqOQnPLBA92p8g2XDxh7Nw1lZwTyaR6iQ3ckXkYHFEUqeRFV
+          hS5T4ibM4gkm0Ck6xv8e+UvLWDOYCrUCg96WwTDGzWBCKBuijeDfmliCMil1+AER
+          WeKd416Gj4WKz6qFKJZxAcFSHxzOenro3NQxUIhSWo2dAgMBAAE=
+          -----END PUBLIC KEY-----
           PUB
 
           mkdir -p recovery/private-backend
