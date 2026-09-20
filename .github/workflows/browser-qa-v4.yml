@@ -38,7 +38,7 @@ jobs:
       - name: Run V4 browser regression checks
         shell: bash
         run: |
-          cat > /tmp/v4-qa.mjs <<'JS'
+          cat > v4-qa.mjs <<'JS'
           import { chromium } from 'playwright';
 
           const browser = await chromium.launch({headless:true});
@@ -129,4 +129,4 @@ jobs:
           console.log(JSON.stringify({structural,admin,sup,selectorQA:sel,relevantErrors},null,2));
           await browser.close();
           JS
-          node /tmp/v4-qa.mjs
+          node v4-qa.mjs
