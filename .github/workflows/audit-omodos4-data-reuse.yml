@@ -1,0 +1,183 @@
+name: Audit OMODOS 4 Data Reuse
+
+on:
+  push:
+    branches:
+      - recovery/omodos4-phase1-safe
+    paths:
+      - ".github/workflows/audit-omodos4-data-reuse.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit-data-reuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify V4 data reuse in memory
+        shell: python
+        run: |
+          import os, json, re, urllib.request
+          from email.parser import BytesParser
+          from email.policy import default
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"].strip()
+
+          def req_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=25) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          def req_raw(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"*/*"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return r.read(), r.headers.get("Content-Type","")
+
+          account_id=None
+          for a in req_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []:
+            aid=a.get("id")
+            if not aid: continue
+            try:
+              scripts=req_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts").get("result") or []
+            except Exception:
+              continue
+            if any(str(x.get("id") or "")=="omodos" for x in scripts):
+              account_id=aid
+              break
+
+          if not account_id:
+            raise SystemExit("Worker omodos not found")
+
+          raw,ctype=req_raw(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2")
+          if "multipart/" in ctype.lower():
+            pseudo=(f"Content-Type: {ctype}\r\nMIME-Version: 1.0\r\n\r\n").encode()+raw
+            msg=BytesParser(policy=default).parsebytes(pseudo)
+            src=""
+            for p in msg.iter_parts():
+              payload=p.get_payload(decode=True) or b""
+              name=str(p.get_param("name",header="content-disposition") or p.get_filename() or "")
+              pct=p.get_content_type()
+              if pct.startswith("application/javascript") or name.lower().endswith((".js",".mjs",".ts")):
+                try:
+                  src += "\n" + payload.decode("utf-8")
+                except Exception:
+                  pass
+          else:
+            src=raw.decode("utf-8",errors="replace")
+
+          low=src.lower()
+          v4=[m.start() for m in re.finditer(r"omodos4(?:\.view)?",src,re.I)]
+
+          nearby=[]
+          for pos in v4:
+            nearby.append(src[max(0,pos-6000):min(len(src),pos+6000)])
+          near="\n".join(nearby)
+          nearlow=near.lower()
+
+          all_api=sorted(set(re.findall(r'["\'](/api/[^"\']{1,180})["\']',src)))
+          near_api=sorted(set(re.findall(r'["\'](/api/[^"\']{1,180})["\']',near)))
+
+          write_tokens={
+            "SQL INSERT": len(re.findall(r"\binsert\s+into\b",near,re.I)),
+            "SQL UPDATE": len(re.findall(r"\bupdate\s+[a-zA-Z_]",near,re.I)),
+            "SQL DELETE": len(re.findall(r"\bdelete\s+from\b",near,re.I)),
+            "CREATE TABLE": len(re.findall(r"\bcreate\s+table\b",near,re.I)),
+            "HTTP POST": len(re.findall(r"method\s*[:=]\s*['\"]POST['\"]",near,re.I)),
+            "HTTP PUT": len(re.findall(r"method\s*[:=]\s*['\"]PUT['\"]",near,re.I)),
+            "HTTP PATCH": len(re.findall(r"method\s*[:=]\s*['\"]PATCH['\"]",near,re.I)),
+            "HTTP DELETE": len(re.findall(r"method\s*[:=]\s*['\"]DELETE['\"]",near,re.I)),
+          }
+
+          v4_table_literals=sorted(set(re.findall(
+            r"(?:create\s+table(?:\s+if\s+not\s+exists)?|insert\s+into|update|delete\s+from)\s+([a-zA-Z0-9_]*?(?:omodos4|v4)[a-zA-Z0-9_]*)",
+            src,re.I
+          )))
+
+          existing_domains={
+            "logbook": "logbook" in nearlow,
+            "patrol": "patrol" in nearlow,
+            "sparepart": "sparepart" in nearlow,
+            "kpi": "kpi" in nearlow,
+            "ipal": "ipal" in nearlow,
+            "maintenance": "maintenance" in nearlow,
+            "machine": "machine" in nearlow or "mesin" in nearlow,
+          }
+
+          permission_context={
+            "exact_key": "omodos4.view" in low,
+            "superadmin_near": "superadmin" in nearlow,
+            "rbac_near": "rbac" in nearlow or "permission" in nearlow,
+            "session_near": "session" in nearlow,
+            "403_near": "403" in near or "forbidden" in nearlow,
+          }
+
+          report=["# OMODOS 4 Data Reuse Audit",""]
+          report += [f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}"]
+          report += [f"- OMODOS 4 lexical occurrences inspected: {len(v4)}"]
+          report += [f"- Total literal API paths in Worker: {len(all_api)}"]
+          report += [f"- API paths lexically near OMODOS 4 code: {len(near_api)}",""]
+
+          report += ["## Existing data domains referenced near OMODOS 4",""]
+          for k,v in existing_domains.items():
+            report += [f"- {k}: {'YES' if v else 'NO'}"]
+          report += [""]
+
+          report += ["## Authorization context",""]
+          for k,v in permission_context.items():
+            report += [f"- {k}: {'YES' if v else 'NO'}"]
+          report += [""]
+
+          report += ["## Dedicated V4 persistence check",""]
+          if v4_table_literals:
+            report += ["- Dedicated SQL table names containing omodos4/v4 were detected:"]
+            for t in v4_table_literals[:50]:
+              report += [f"  - {t}"]
+          else:
+            report += ["- No SQL table name containing omodos4 or v4 was detected."]
+          report += [""]
+
+          report += ["## Write-operation proximity",""]
+          for k,v in write_tokens.items():
+            report += [f"- {k}: {v} lexical occurrence(s) in broad V4 proximity windows"]
+          report += ["- These are proximity counts only; they do not prove that the write belongs to OMODOS 4.",""]
+
+          report += ["## Existing API paths near OMODOS 4",""]
+          if near_api:
+            for ep in near_api[:100]:
+              report += [f"- {ep}"]
+          else:
+            report += ["- No literal API path was present in the immediate V4 lexical windows; routing may be indirect through existing handlers."]
+          report += [""]
+
+          report += ["## Conclusion",""]
+          if not v4_table_literals and sum(1 for v in existing_domains.values() if v) >= 3:
+            report += ["- Evidence supports OMODOS 4 as an intelligence layer over existing OMODOS domains rather than a duplicate V4 database."]
+          else:
+            report += ["- Data reuse is not fully proven from static lexical analysis alone; retain non-destructive deployment gate."]
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/OMODOS4_DATA_REUSE_AUDIT.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          raw=b""
+          src=""
+          near=""
+          print("[V4_DATA_REUSE] sanitized audit generated; Worker source not retained.")
+
+      - name: Commit sanitized audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/OMODOS4_DATA_REUSE_AUDIT.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: verify OMODOS 4 reuses existing data domains"
+          git push

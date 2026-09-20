@@ -1,0 +1,107 @@
+name: Apply OMODOS 4 Phase 1 Safe Patch
+
+on:
+  push:
+    branches:
+      - recovery/omodos4-phase1-safe
+    paths:
+      - "tools/patch_omodos4_phase1.py"
+      - ".github/workflows/apply-omodos4-phase1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record baseline hash
+        run: sha256sum public/index.html | tee /tmp/before.sha256
+
+      - name: Apply additive V4 Phase 1 patch
+        run: python tools/patch_omodos4_phase1.py
+
+      - name: Validate safety invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          checks={
+            "one_v4_nav": s.count('id="v4-nav-group"')==1,
+            "one_v4_view": s.count('id="view-omodos4"')==1,
+            "hard_superadmin_gate": "if(view === 'omodos4' || view.startsWith('omodos4-')) return isSuperadmin();" in s,
+            "root_permission": "omodos4.view" in s,
+            "namespace": "window.OMODOS4" in s,
+            "existing_logbook": 'id="view-input"' in s and 'id="view-utama"' in s,
+            "existing_patrol": 'id="view-patrol"' in s,
+            "existing_sparepart": 'id="view-sparepart"' in s,
+            "existing_dashboard": 'id="view-dashboard"' in s,
+            "existing_setting": 'id="view-setting"' in s,
+            "selector_helpers": "const $ = (sel, root=document) => root.querySelector(sel);" in s and "const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));" in s,
+          }
+          bad=[k for k,v in checks.items() if not v]
+          print(checks)
+          if bad: raise SystemExit("Safety invariant failed: "+", ".join(bad))
+
+      - name: Check known selector regression functions
+        shell: python
+        run: |
+          from pathlib import Path
+          s=Path("public/index.html").read_text(encoding="utf-8")
+
+          def function_block(name, next_name=None):
+            start=s.find("function "+name+"(")
+            if start < 0:
+              raise SystemExit("Function missing: "+name)
+            if next_name:
+              end=s.find("function "+next_name+"(",start+1)
+            else:
+              end=s.find("\nfunction ",start+1)
+            if end < 0: end=min(len(s),start+12000)
+            return s[start:end]
+
+          sw=function_block("switchToView")
+          sp=function_block("attachSparepartPaginationHandlers","setDailyCollectionStatus")
+
+          checks={
+            "switch_nav_uses_double_dollar": "$$('.nav-btn').forEach" in sw,
+            "switch_views_uses_double_dollar": "$$('.view').forEach" in sw,
+            "sp_page_buttons_use_double_dollar": "$$('button[data-pg]', pager).forEach" in sp,
+            "sp_action_buttons_use_double_dollar": "$$('button[data-sp-pg-action]', pager).forEach" in sp,
+            "sp_size_selector_single_element_ok": "$('select[data-sp-page-size]',pager)" in sp,
+          }
+          bad=[k for k,v in checks.items() if not v]
+          print(checks)
+          if bad:
+            raise SystemExit("Known selector regression check failed: "+", ".join(bad))
+          print("Known selector regression functions remain corrected.")
+
+      - name: Validate inserted V4 JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          m=re.search(r'<script id="omodos4-phase1-script">(.*?)</script>',s,re.S)
+          if not m:
+              raise SystemExit("V4 script block missing")
+          Path("/tmp/omodos4-phase1.js").write_text(m.group(1),encoding="utf-8")
+          PY
+          node --check /tmp/omodos4-phase1.js
+
+      - name: Commit patched frontend
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          if git diff --cached --quiet; then
+            echo "No patch changes."
+            exit 0
+          fi
+          git commit -m "feat: add safe Superadmin-only OMODOS 4 Phase 1 shell"
+          git push

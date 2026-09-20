@@ -1,0 +1,174 @@
+name: Browser QA OMODOS 4 Phase 1
+# QA trigger after V4 script relocation
+
+on:
+  push:
+    branches:
+      - recovery/omodos4-phase1-safe
+    paths:
+      - "public/index.html"
+      - ".github/workflows/browser-qa-v4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start local server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/omodos-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/omodos-http.log || true
+          exit 1
+
+      - name: Run V4 browser regression checks
+        shell: bash
+        run: |
+          cat > v4-qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser = await chromium.launch({ headless: true });
+          const errors = [];
+          const result = { phases: [] };
+
+          try {
+            const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+            page.setDefaultTimeout(10000);
+
+            page.on('pageerror', e => errors.push(String(e)));
+            page.on('dialog', async d => {
+              console.log('[QA_DIALOG] ' + d.type() + ': ' + d.message());
+              try { await d.dismiss(); } catch {}
+            });
+            page.on('console', msg => {
+              if (msg.type() === 'error') {
+                const t = msg.text();
+                if (!/Failed to load resource|ERR_CONNECTION|fetch|network/i.test(t)) {
+                  errors.push('console: ' + t);
+                }
+              }
+            });
+
+            console.log('[QA] open');
+            await page.goto('http://127.0.0.1:4173/', {
+              waitUntil: 'domcontentloaded',
+              timeout: 15000
+            });
+            result.phases.push('open');
+
+            console.log('[QA] structural');
+            const structural = await page.evaluate(() => ({
+              nav: !!document.getElementById('v4-nav-group'),
+              view: !!document.getElementById('view-omodos4'),
+              ns: !!window.OMODOS4,
+              render: typeof window.renderOmodos4 === 'function',
+              gate: typeof canAccessView_ === 'function',
+              rbac: typeof applyRbacToUi === 'function'
+            }));
+            result.structural = structural;
+            if (!Object.values(structural).every(Boolean)) {
+              throw new Error('V4 structural check failed: ' + JSON.stringify(structural));
+            }
+            result.phases.push('structural');
+
+            console.log('[QA] non-superadmin');
+            const admin = await page.evaluate(() => {
+              CURRENT_USER = { username: 'qa-admin', displayName: 'QA Admin', role: 'Admin' };
+              SESSION_TOKEN = 'qa';
+              FEATURE_REGISTRY = mergeFeatureRegistry([]);
+              PERMISSIONS = {};
+              applyRbacToUi();
+
+              const allowed = canAccessView_('omodos4');
+              const display = document.getElementById('v4-nav-group').style.display;
+              const go = goToView('omodos4');
+              const active = document.getElementById('view-omodos4').classList.contains('active');
+              return { allowed, display, go, active };
+            });
+            result.admin = admin;
+            if (admin.allowed !== false || admin.display !== 'none' || admin.go !== false || admin.active !== false) {
+              throw new Error('Non-Superadmin gate failed: ' + JSON.stringify(admin));
+            }
+            result.phases.push('non-superadmin');
+
+            console.log('[QA] superadmin');
+            const sup = await page.evaluate(() => {
+              CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
+              SESSION_TOKEN = 'qa';
+              FEATURE_REGISTRY = mergeFeatureRegistry([]);
+              PERMISSIONS = {};
+              applyRbacToUi();
+
+              const allowed = canAccessView_('omodos4');
+              const display = document.getElementById('v4-nav-group').style.display;
+              const go = goToView('omodos4');
+              const active = document.getElementById('view-omodos4').classList.contains('active');
+              const cards = document.querySelectorAll('#v4-summary .v4-card').length;
+              return { allowed, display, go, active, cards };
+            });
+            result.superadmin = sup;
+            if (sup.allowed !== true || sup.display === 'none' || sup.go !== true || sup.active !== true || sup.cards !== 6) {
+              throw new Error('Superadmin V4 access failed: ' + JSON.stringify(sup));
+            }
+            result.phases.push('superadmin');
+
+            console.log('[QA] sparepart pagination');
+            const selectorQA = await page.evaluate(() => {
+              const p = document.createElement('div');
+              p.innerHTML = '<button data-pg="1">1</button><button data-sp-pg-action="next">Next</button><select data-sp-page-size><option value="10">10</option></select>';
+              document.body.appendChild(p);
+              let ok = true;
+              let message = '';
+              try {
+                attachSparepartPaginationHandlers(p);
+              } catch (e) {
+                ok = false;
+                message = String(e && e.stack || e);
+              }
+              p.remove();
+              return { ok, message };
+            });
+            result.selectorQA = selectorQA;
+            if (!selectorQA.ok) {
+              throw new Error('Sparepart pagination handler regression: ' + selectorQA.message);
+            }
+            result.phases.push('pagination');
+
+            const relevantErrors = errors.filter(x =>
+              !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError/i.test(x)
+            );
+            result.relevantErrors = relevantErrors;
+            if (relevantErrors.some(x =>
+              /TypeError.*(?:forEach|find)|ReferenceError.*renderOmodos4|SyntaxError/i.test(x)
+            )) {
+              throw new Error('Relevant browser errors: ' + JSON.stringify(relevantErrors.slice(0, 20)));
+            }
+            result.phases.push('errors-checked');
+
+            console.log('[QA_RESULT] ' + JSON.stringify(result));
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          node --check v4-qa.mjs
+          timeout -k 5s 25s node v4-qa.mjs
+
+      - name: Remove transient QA files
+        if: always()
+        run: rm -f package.json package-lock.json v4-qa.mjs

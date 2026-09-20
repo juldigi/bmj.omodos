@@ -1,0 +1,235 @@
+name: Audit Recovered Cloudflare Backend
+
+on:
+  push:
+    branches:
+      - recovery/omodos4-phase1-safe
+    paths:
+      - ".github/workflows/audit-cloudflare-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backend-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Analyze Worker source in memory only
+        shell: python
+        run: |
+          import os, sys, json, re, hashlib, urllib.request
+          from email.parser import BytesParser
+          from email.policy import default
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          token=os.environ.get("CLOUDFLARE_API_TOKEN","").strip()
+          if not token:
+            raise SystemExit("CLOUDFLARE_API_TOKEN missing")
+
+          def req_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=25) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          def req_raw(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"*/*"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return r.read(), r.headers.get("Content-Type","")
+
+          accounts=req_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []
+          account_id=None
+          meta=None
+          for a in accounts:
+            aid=a.get("id")
+            if not aid:
+              continue
+            try:
+              scripts=req_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts").get("result") or []
+            except Exception:
+              continue
+            for item in scripts:
+              if str(item.get("id") or "")=="omodos":
+                account_id=aid
+                meta=item
+                break
+            if account_id:
+              break
+
+          if not account_id:
+            raise SystemExit("Worker omodos not found")
+
+          raw,ctype=req_raw(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2")
+          full_sha=hashlib.sha256(raw).hexdigest()
+
+          parts=[]
+          text_blobs=[]
+          metadata_obj=None
+
+          if "multipart/" in ctype.lower():
+            pseudo=(f"Content-Type: {ctype}\r\nMIME-Version: 1.0\r\n\r\n").encode()+raw
+            msg=BytesParser(policy=default).parsebytes(pseudo)
+            for idx,p in enumerate(msg.iter_parts(),1):
+              payload=p.get_payload(decode=True) or b""
+              name=p.get_param("name",header="content-disposition") or p.get_filename() or f"part-{idx}"
+              pct=p.get_content_type()
+              parts.append({
+                "name":str(name),
+                "bytes":len(payload),
+                "sha256":hashlib.sha256(payload).hexdigest(),
+                "content_type":pct
+              })
+              if pct=="application/json" or str(name).lower()=="metadata":
+                try:
+                  metadata_obj=json.loads(payload.decode("utf-8"))
+                except Exception:
+                  pass
+              if pct.startswith("text/") or str(name).lower().endswith((".js",".mjs",".ts",".json",".html",".css")):
+                try:
+                  text_blobs.append((str(name),payload.decode("utf-8")))
+                except Exception:
+                  pass
+          else:
+            try:
+              text_blobs=[("worker",raw.decode("utf-8"))]
+              parts=[{"name":"worker","bytes":len(raw),"sha256":full_sha,"content_type":ctype.split(";")[0]}]
+            except Exception:
+              pass
+
+          combined="\n".join(t for _,t in text_blobs)
+          low=combined.lower()
+
+          def count(term):
+            return low.count(term.lower())
+
+          v4_positions=[m.start() for m in re.finditer(r"omodos4(?:\.view)?",combined,re.I)]
+          proximity=[]
+          for pos in v4_positions[:100]:
+            window=combined[max(0,pos-2500):min(len(combined),pos+2500)]
+            w=window.lower()
+            proximity.append({
+              "superadmin": "superadmin" in w,
+              "permission": "permission" in w or "rbac" in w,
+              "auth": any(x in w for x in ("authorize","authorise","auth","session")),
+              "deny": any(x in w for x in ("forbidden","unauthorized","access denied","403")),
+            })
+
+          def any_near(key):
+            return any(x.get(key) for x in proximity)
+
+          endpoint_strings=sorted(set(re.findall(r'["\'](/api/[^"\']{1,180})["\']',combined)))
+          v4_endpoints=[x for x in endpoint_strings if "omodos4" in x.lower() or "/v4" in x.lower()]
+
+          secret_patterns={
+            "api_token_assignment": r"(?i)api[_-]?token\s*[:=]\s*['\"][^'\"]+",
+            "password_assignment": r"(?i)password\s*[:=]\s*['\"][^'\"]+",
+            "secret_assignment": r"(?i)(?:client_)?secret\s*[:=]\s*['\"][^'\"]+",
+            "bearer_literal": r"(?i)bearer\s+[a-z0-9_\-.]{20,}",
+          }
+          secret_counts={k:len(re.findall(p,combined)) for k,p in secret_patterns.items()}
+
+          binding_summary=[]
+          if isinstance(metadata_obj,dict):
+            for b in metadata_obj.get("bindings") or []:
+              if not isinstance(b,dict):
+                continue
+              binding_summary.append({
+                "name":str(b.get("name") or ""),
+                "type":str(b.get("type") or ""),
+              })
+
+          report=[]
+          report += ["# OMODOS Cloudflare Backend Recovery Audit",""]
+          report += [f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}"]
+          report += ["- Worker: omodos"]
+          report += [f"- Compatibility date: {(meta or {}).get('compatibility_date') or 'unknown'}"]
+          report += [f"- Downloaded bundle bytes: {len(raw)}"]
+          report += [f"- Bundle SHA-256: {full_sha}"]
+          report += [f"- Multipart parts: {len(parts)}",""]
+
+          report += ["## Recovered parts",""]
+          for p in parts:
+            report += [f"- {p['name']} — {p['bytes']} bytes — {p['content_type']} — SHA-256 {p['sha256']}"]
+          report += [""]
+
+          report += ["## Architecture fingerprints",""]
+          architecture={
+            "Durable Object": count("durable object")>0 or count("durableobject")>0,
+            "MaintenanceStore": count("maintenancestore")>0,
+            "SQLite": count("sqlite")>0,
+            "Session": count("session")>0,
+            "RBAC / permission": count("rbac")>0 or count("permission")>0,
+            "OMODOS 4": count("omodos4")>0,
+            "omodos4.view exact": count("omodos4.view")>0,
+            "Superadmin": count("superadmin")>0,
+          }
+          for k,v in architecture.items():
+            report += [f"- {k}: {'YES' if v else 'NO'}"]
+          report += [""]
+
+          report += ["## OMODOS 4 authorization audit",""]
+          report += [f"- omodos4 occurrences: {count('omodos4')}"]
+          report += [f"- omodos4.view exact occurrences: {count('omodos4.view')}"]
+          report += [f"- V4 occurrence near Superadmin check: {'YES' if any_near('superadmin') else 'NO'}"]
+          report += [f"- V4 occurrence near permission/RBAC logic: {'YES' if any_near('permission') else 'NO'}"]
+          report += [f"- V4 occurrence near auth/session logic: {'YES' if any_near('auth') else 'NO'}"]
+          report += [f"- V4 occurrence near deny/403 logic: {'YES' if any_near('deny') else 'NO'}"]
+          report += [""]
+
+          report += ["## V4 API surface",""]
+          if v4_endpoints:
+            for ep in v4_endpoints[:100]:
+              report += [f"- {ep}"]
+          else:
+            report += ["- No explicit /api/*omodos4* or /api/v4* literal endpoint strings found."]
+          report += [""]
+
+          report += ["## Bindings (names/types only)",""]
+          if binding_summary:
+            for b in binding_summary:
+              report += [f"- {b['name']} — {b['type']}"]
+          else:
+            report += ["- Metadata bindings were not parseable from the recovered multipart payload."]
+          report += [""]
+
+          report += ["## Secret-safety scan",""]
+          for k,v in secret_counts.items():
+            report += [f"- {k}: {v} candidate(s)"]
+          report += ["- Candidate values are intentionally never written to this report or workflow logs.",""]
+
+          report += ["## Recovery conclusion",""]
+          if architecture["omodos4.view exact"] and any_near("superadmin") and any_near("permission"):
+            report += ["- Backend already contains the exact omodos4.view permission key with nearby Superadmin/RBAC logic. Treat backend gate as present pending behavioral API testing."]
+          elif architecture["OMODOS 4"]:
+            report += ["- Backend contains OMODOS 4 code, but the exact root permission/gate cannot yet be considered proven. Continue with targeted behavioral audit before any frontend merge."]
+          else:
+            report += ["- Backend has no detectable OMODOS 4 implementation. A backend addition would be required before production enablement."]
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/CLOUDFLARE_BACKEND_RECOVERY_AUDIT.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+          raw=b""
+          combined=""
+          text_blobs=[]
+          print("[BACKEND_AUDIT] sanitized report generated; recovered source was not written to repository.")
+
+      - name: Commit sanitized backend audit only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/CLOUDFLARE_BACKEND_RECOVERY_AUDIT.md
+          if git diff --cached --quiet; then
+            echo "No audit changes."
+            exit 0
+          fi
+          git commit -m "audit: add sanitized Cloudflare backend recovery report"
+          git push
