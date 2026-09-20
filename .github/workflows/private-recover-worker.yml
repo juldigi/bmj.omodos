@@ -62,11 +62,18 @@ jobs:
 
           raw=b""
           ctype=""
-          for attempt in range(1,4):
-            raw,ctype=req_raw(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2")
+          endpoints=[
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2",
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content",
+          ]
+          for endpoint in endpoints:
+            for attempt in range(1,4):
+              raw,ctype=req_raw(endpoint)
+              if len(raw) > 1000:
+                break
+              time.sleep(attempt)
             if len(raw) > 1000:
               break
-            time.sleep(attempt)
 
           source=None
           source_name="worker.js"
