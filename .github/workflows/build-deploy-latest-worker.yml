@@ -1,0 +1,405 @@
+name: Build and Deploy Latest OMODOS Worker
+
+on:
+  push:
+    branches:
+      - fix/login-backend-json-404
+    paths:
+      - ".github/workflows/build-deploy-latest-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build safe Worker version from recovered backend plus latest assets
+        shell: python
+        run: |
+          import os, json, base64, hashlib, mimetypes, urllib.request, urllib.error, uuid, re, time
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          SCRIPT="omodos"
+          BACKEND_VERSION="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          EXPECTED_BACKEND_SHA="fd8ae6b16ad8d60218d99f8590694647bab90edd7422c391450a0bdeb38b640b"
+          token=os.environ.get("CLOUDFLARE_DEPLOY_TOKEN","").strip()
+          if not token:
+              raise SystemExit("CLOUDFLARE_DEPLOY_TOKEN missing")
+
+          def api_json(url,method="GET",body=None,auth=None,headers=None):
+              data=None
+              h={"Accept":"application/json"}
+              h.update(headers or {})
+              h["Authorization"]="Bearer "+(auth or token)
+              if body is not None:
+                  data=json.dumps(body,separators=(",",":")).encode("utf-8")
+                  h["Content-Type"]="application/json"
+              req=urllib.request.Request(url,data=data,headers=h,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=60) as r:
+                      raw=r.read()
+                      obj=json.loads(raw.decode("utf-8")) if raw else {}
+                      return r.status,obj
+              except urllib.error.HTTPError as e:
+                  raw=e.read()
+                  raise RuntimeError(f"HTTP {e.code} {url}: {raw[:1600].decode('utf-8',errors='replace')}")
+
+          def multipart_request(url,parts,auth):
+              boundary="----OMODOS"+uuid.uuid4().hex
+              chunks=[]
+              for part in parts:
+                  name=part["name"]
+                  content=part["content"]
+                  if isinstance(content,str):
+                      content=content.encode("utf-8")
+                  filename=part.get("filename")
+                  ctype=part.get("content_type") or "text/plain"
+                  chunks.append(("--"+boundary+"\r\n").encode())
+                  disp=f'Content-Disposition: form-data; name="{name}"'
+                  if filename:
+                      disp += f'; filename="{filename}"'
+                  chunks.append((disp+"\r\n").encode())
+                  chunks.append((f"Content-Type: {ctype}\r\n\r\n").encode())
+                  chunks.append(content)
+                  chunks.append(b"\r\n")
+              chunks.append(("--"+boundary+"--\r\n").encode())
+              data=b"".join(chunks)
+              req=urllib.request.Request(url,data=data,method="POST",headers={
+                  "Authorization":"Bearer "+auth,
+                  "Accept":"application/json",
+                  "Content-Type":"multipart/form-data; boundary="+boundary,
+              })
+              try:
+                  with urllib.request.urlopen(req,timeout=120) as r:
+                      raw=r.read()
+                      return r.status, json.loads(raw.decode("utf-8")) if raw else {}
+              except urllib.error.HTTPError as e:
+                  raw=e.read()
+                  raise RuntimeError(f"Multipart HTTP {e.code} {url}: {raw[:2000].decode('utf-8',errors='replace')}")
+
+          # Locate account.
+          _,accounts=api_json("https://api.cloudflare.com/client/v4/accounts?per_page=50")
+          account_id=None
+          backend=None
+          for a in accounts.get("result") or []:
+              aid=a.get("id")
+              if not aid: continue
+              try:
+                  _,resp=api_json(
+                      f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/{SCRIPT}/versions/{BACKEND_VERSION}?include=modules"
+                  )
+              except Exception:
+                  continue
+              if resp.get("result"):
+                  account_id=aid
+                  backend=resp["result"]
+                  break
+          if not account_id or not backend:
+              raise SystemExit("Recovered backend version unavailable")
+
+          modules=backend.get("modules") or []
+          decoded=[]
+          for m in modules:
+              if not isinstance(m,dict): continue
+              b64=m.get("content_base64")
+              if isinstance(b64,str) and b64:
+                  raw=base64.b64decode(b64)
+                  decoded.append((len(raw),m,raw))
+          if not decoded:
+              raise SystemExit("Recovered backend has no module content")
+          _,worker_mod,worker_js=max(decoded,key=lambda x:x[0])
+          backend_sha=hashlib.sha256(worker_js).hexdigest()
+          if backend_sha != EXPECTED_BACKEND_SHA:
+              raise SystemExit(f"Recovered backend hash mismatch: {backend_sha}")
+
+          worker_text=worker_js.decode("utf-8",errors="replace")
+          for marker in ('pathname === "/api"',"MaintenanceStore","MAINTENANCE","application/json"):
+              if marker not in worker_text:
+                  raise SystemExit("Recovered backend missing marker: "+marker)
+
+          # Build static asset manifest from the latest GitHub frontend.
+          public=Path("public")
+          files={}
+          manifest={}
+          for path in sorted(p for p in public.rglob("*") if p.is_file()):
+              rel=path.relative_to(public).as_posix()
+              data=path.read_bytes()
+              ext=path.suffix.lower().lstrip(".")
+              digest=hashlib.sha256(base64.b64encode(data)+ext.encode("utf-8")).hexdigest()[:32]
+              url_path="/"+rel
+              files[digest]=(path,data,mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+              manifest[url_path]={"hash":digest,"size":len(data)}
+
+          if "/index.html" not in manifest:
+              raise SystemExit("public/index.html missing from asset manifest")
+
+          repo_index=(public/"index.html").read_bytes()
+          repo_index_sha=hashlib.sha256(repo_index).hexdigest()
+
+          # Register upload session.
+          _,session=api_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{SCRIPT}/assets-upload-session",
+              method="POST",
+              body={"manifest":manifest}
+          )
+          sr=session.get("result") or {}
+          upload_jwt=sr.get("jwt")
+          buckets=sr.get("buckets")
+          if not upload_jwt or buckets is None:
+              raise SystemExit("Asset upload session did not return jwt/buckets")
+
+          completion_jwt=upload_jwt
+          uploaded=0
+
+          # Upload only hashes Cloudflare requests.
+          for bucket in buckets:
+              parts=[]
+              for hsh in bucket:
+                  if hsh not in files:
+                      raise SystemExit("Cloudflare requested unknown asset hash: "+hsh)
+                  path,data,ctype=files[hsh]
+                  parts.append({
+                      "name":hsh,
+                      "content":base64.b64encode(data),
+                      "content_type":ctype
+                  })
+              status,up=multipart_request(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/assets/upload?base64=true",
+                  parts,
+                  upload_jwt
+              )
+              ur=up.get("result") or {}
+              if ur.get("jwt"):
+                  completion_jwt=ur["jwt"]
+              uploaded += len(bucket)
+
+          if not completion_jwt:
+              raise SystemExit("No asset completion JWT")
+
+          # Preserve all non-ASSETS bindings by inheriting them from v68.
+          inherit_bindings=[]
+          for b in backend.get("bindings") or []:
+              if not isinstance(b,dict): continue
+              name=str(b.get("name") or "").strip()
+              if not name: continue
+              if name=="ASSETS":
+                  continue
+              inherit_bindings.append({
+                  "type":"inherit",
+                  "name":name,
+                  "version_id":BACKEND_VERSION
+              })
+          bindings=inherit_bindings+[{"type":"assets","name":"ASSETS"}]
+
+          metadata={
+              "main_module":str(backend.get("main_module") or worker_mod.get("name") or "worker.js"),
+              "bindings":bindings,
+              "assets":{
+                  "jwt":completion_jwt,
+                  "config":((backend.get("assets") or {}).get("config") or {})
+              },
+              "compatibility_date":backend.get("compatibility_date"),
+              "compatibility_flags":backend.get("compatibility_flags") or [],
+              "annotations":{
+                  "workers/message":"OMODOS latest frontend + verified v68 backend routing",
+                  "workers/tag":"omodos-login-recovery-latest"
+              }
+          }
+          metadata={k:v for k,v in metadata.items() if v not in (None,"",[])}
+
+          version_parts=[
+              {
+                  "name":"metadata",
+                  "content":json.dumps(metadata,separators=(",",":")),
+                  "content_type":"application/json"
+              },
+              {
+                  "name":metadata["main_module"],
+                  "filename":metadata["main_module"],
+                  "content":worker_js,
+                  "content_type":worker_mod.get("content_type") or "application/javascript+module"
+              }
+          ]
+
+          status,newver=multipart_request(
+              f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{SCRIPT}/versions?bindings_inherit=strict",
+              version_parts,
+              token
+          )
+          vr=newver.get("result") or {}
+          new_version_id=str(vr.get("id") or "")
+          if not new_version_id:
+              # Some API shapes nest version id under version.
+              new_version_id=str((vr.get("version") or {}).get("id") or "")
+          if not new_version_id:
+              raise SystemExit("Version upload succeeded without identifiable version id: "+json.dumps(vr)[:1200])
+
+          print("[STAGED_VERSION]",new_version_id)
+
+          # Resolve version-specific preview URLs from beta version detail.
+          _,detail_resp=api_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/{SCRIPT}/versions/{new_version_id}?include=modules"
+          )
+          detail=detail_resp.get("result") or {}
+          urls=[str(x) for x in (detail.get("urls") or []) if x]
+
+          def probe(base,path,method="GET",payload=None):
+              if not base.startswith("http"):
+                  base="https://"+base
+              base=base.rstrip("/")
+              data=None
+              headers={"User-Agent":"OMODOS-Staged-Version-QA/1.0","Accept":"application/json,text/html,*/*"}
+              if payload is not None:
+                  data=json.dumps(payload).encode("utf-8")
+                  headers["Content-Type"]="application/json"
+              req=urllib.request.Request(base+path,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=35) as r:
+                      body=r.read()
+                      return r.status,r.headers.get("Content-Type",""),body
+              except urllib.error.HTTPError as e:
+                  return e.code,e.headers.get("Content-Type",""),e.read()
+
+          preview_pass=False
+          preview_url=""
+          preview_root=None
+          preview_api=None
+          for base in urls:
+              try:
+                  rs,rc,rb=probe(base,"/")
+                  ps,pc,pb=probe(base,"/api","POST",{"action":"__omodos_readonly_probe__"})
+                  index_match=hashlib.sha256(rb).hexdigest()==repo_index_sha
+                  json_ok=False
+                  try:
+                      json.loads(pb.decode("utf-8",errors="replace"))
+                      json_ok=True
+                  except Exception:
+                      json_ok="application/json" in (pc or "").lower()
+                  if rs==200 and index_match and ps!=404 and json_ok:
+                      preview_pass=True
+                      preview_url=base
+                      preview_root=(rs,rc,len(rb),hashlib.sha256(rb).hexdigest())
+                      preview_api=(ps,pc,len(pb))
+                      break
+              except Exception:
+                  continue
+
+          # If no version URL is exposed, rely on static integrity checks and do
+          # not deploy automatically. This preserves production safety.
+          if not preview_pass:
+              raise SystemExit(
+                  "New Worker version staged but preview verification did not pass; NOT DEPLOYED. "
+                  + json.dumps({"version":new_version_id,"urls":urls[:5],"repo_index_sha":repo_index_sha})
+              )
+
+          # Promote verified staged version to 100%.
+          deploy_body={
+              "strategy":"percentage",
+              "versions":[{"version_id":new_version_id,"percentage":100}],
+              "annotations":{
+                  "workers/message":"Deploy verified OMODOS latest frontend with restored /api backend"
+              }
+          }
+          _,dep=api_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{SCRIPT}/deployments",
+              method="POST",
+              body=deploy_body
+          )
+          deployment=(dep.get("result") or {})
+          deployment_id=str(deployment.get("id") or "")
+
+          # Production verification.
+          production="https://omodos.offsetbmj.workers.dev"
+          prod_ok=False
+          prod_root=None
+          prod_api=None
+          login_probe=None
+          for attempt in range(1,7):
+              time.sleep(2 if attempt==1 else 3)
+              rs,rc,rb=probe(production,"/")
+              ps,pc,pb=probe(production,"/api","POST",{"action":"__omodos_readonly_probe__"})
+              ls,lc,lb=probe(production,"/api","POST",{"action":"login","username":"","password":""})
+              root_match=hashlib.sha256(rb).hexdigest()==repo_index_sha
+              api_json_ok=False
+              login_json_ok=False
+              try:
+                  json.loads(pb.decode("utf-8",errors="replace")); api_json_ok=True
+              except Exception:
+                  api_json_ok="application/json" in (pc or "").lower()
+              try:
+                  json.loads(lb.decode("utf-8",errors="replace")); login_json_ok=True
+              except Exception:
+                  login_json_ok="application/json" in (lc or "").lower()
+
+              prod_root=(rs,rc,len(rb),hashlib.sha256(rb).hexdigest(),root_match)
+              prod_api=(ps,pc,len(pb),api_json_ok)
+              login_probe=(ls,lc,len(lb),login_json_ok)
+              if rs==200 and root_match and ps!=404 and api_json_ok and ls!=404 and login_json_ok:
+                  prod_ok=True
+                  break
+
+          if not prod_ok:
+              # Automatic rollback to known-good v68 if latest-version promotion
+              # does not satisfy the production checks.
+              rollback={
+                  "strategy":"percentage",
+                  "versions":[{"version_id":BACKEND_VERSION,"percentage":100}],
+                  "annotations":{"workers/message":"Automatic rollback after failed latest-version production QA"}
+              }
+              api_json(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{SCRIPT}/deployments",
+                  method="POST",
+                  body=rollback
+              )
+              raise SystemExit(
+                  "Latest version production QA failed; automatically rolled back to v68. "
+                  + json.dumps({"root":prod_root,"api":prod_api,"login":login_probe})
+              )
+
+          report=[
+              "# OMODOS Latest Worker Deployment",
+              "",
+              f"- UTC: {datetime.now(timezone.utc).isoformat()}",
+              f"- New version ID: {new_version_id}",
+              f"- Deployment ID: {deployment_id}",
+              f"- Backend base: v68 / {BACKEND_VERSION}",
+              f"- Backend SHA-256: {backend_sha}",
+              f"- Frontend index SHA-256: {repo_index_sha}",
+              f"- Frontend files in manifest: {len(manifest)}",
+              f"- Newly requested asset uploads: {uploaded}",
+              f"- Inherited non-asset bindings: {len(inherit_bindings)}",
+              f"- Preview URL used: {preview_url}",
+              f"- Preview GET /: {preview_root}",
+              f"- Preview POST /api: {preview_api}",
+              f"- Production GET /: {prod_root}",
+              f"- Production POST /api: {prod_api}",
+              f"- Production login JSON probe: {login_probe}",
+              "",
+              "## Result",
+              "- PASS: latest GitHub frontend and recovered backend are deployed together.",
+              "- PASS: /api is no longer 404 and returns JSON.",
+              "- PASS: login action returns JSON rather than HTML/404.",
+              "- Durable Object / SQLite data was not reset.",
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/LATEST_WORKER_DEPLOYMENT.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[LATEST_WORKER_DEPLOYMENT] PASS")
+
+      - name: Commit sanitized deployment report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/LATEST_WORKER_DEPLOYMENT.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: deploy latest frontend with restored backend routing"
+          git push
