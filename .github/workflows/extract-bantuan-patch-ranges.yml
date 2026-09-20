@@ -1,0 +1,65 @@
+name: Extract Bantuan Patch Ranges
+
+on:
+  push:
+    branches:
+      - fix/bantuan-copilot
+    paths:
+      - ".github/workflows/extract-bantuan-patch-ranges.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract exact ranges
+        shell: python
+        run: |
+          from pathlib import Path
+          src=Path("public/index.html").read_text(encoding="utf-8",errors="replace").splitlines()
+
+          ranges=[
+            (28134,28340,"legacy-guide-implementation"),
+          ]
+
+          # Dynamically add compact Copilot DOM ranges.
+          for needle,label in [
+            ('id="copilot-bg"',"copilot-bg"),
+            ('id="copilot-body"',"copilot-body"),
+            ('id="copilot-close"',"copilot-close"),
+            ('id="copilot-clear-data"',"copilot-clear"),
+            ('id="copilot-question"',"copilot-question"),
+          ]:
+            hits=[i+1 for i,l in enumerate(src) if needle.lower() in l.lower()]
+            for n in hits[:3]:
+              ranges.append((max(1,n-35),min(len(src),n+55),label))
+
+          out=["# Bantuan Patch Ranges",""]
+          seen=set()
+          for start,end,label in ranges:
+            key=(start,end)
+            if key in seen: continue
+            seen.add(key)
+            out.append(f"## {label} — {start}-{end}")
+            out.append("~~~text")
+            for n in range(start,end+1):
+              out.append(f"{n:05d}: {src[n-1]}")
+            out.append("~~~")
+            out.append("")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/BANTUAN_PATCH_RANGES.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+
+      - name: Commit ranges
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/BANTUAN_PATCH_RANGES.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: extract exact Bantuan patch ranges"
+          git push
