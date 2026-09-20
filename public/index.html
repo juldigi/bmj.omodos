@@ -1274,7 +1274,7 @@ input[type="number"]{-moz-appearance:textfield;}
 @media(max-width:520px){.copilot-answer-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.copilot-kv-grid,.copilot-external-kv-grid{grid-template-columns:1fr}.copilot-category-card,.copilot-external-card{padding:9px}.copilot-count-badge{font-size:9px}}
 .copilot-composer{border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:var(--panel);}
 .copilot-composer textarea{width:100%;min-height:58px;max-height:130px;resize:vertical;margin:0;}
-.copilot-actions{display:flex;gap:8px;margin-top:8px;align-items:center;}
+.copilot-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px;align-items:center;} /* COPILOT_HELP_LOGBOOK_MACHINE_FILTER_V1 */
 .copilot-actions .btn{flex:1;justify-content:center;}
 .copilot-actions .btn[disabled]{opacity:.45;cursor:not-allowed;}
 .copilot-footnote{font-size:10.5px;color:var(--text-dim);margin-top:7px;line-height:1.35;}
@@ -3238,7 +3238,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
 }
 @media(max-width:520px){
   .copilot-actions{display:grid!important;grid-template-columns:1fr 1fr!important;}
-  #copilot-clear-data{grid-column:1/-1!important;width:100%;justify-content:center;}
+  #copilot-clear-data,#copilot-help{width:100%;justify-content:center;}
 }
 </style>
 
@@ -4120,6 +4120,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
       <div class="lb-tabbar" data-lb-tabbar></div>
       <div class="filter-bar">
         <input class="grow" type="text" id="search-utama" placeholder="Cari mesin, pelapor, deskripsi...">
+        <select id="filter-machine" aria-label="Filter mesin"><option value="">Semua Mesin</option></select>
         <select id="filter-status"><option value="">Semua Status</option><option>Selesai</option><option>Proses</option><option>Pending</option><option>Emergency</option></select>
         <select id="filter-jenis"><option value="">Semua Jenis</option></select>
         <select id="filter-group"><option value="">Semua Group</option><option>Electrical</option><option>Mechanical</option><option>Workshop</option><option>Project</option><option>Warehouse</option><option>Planning</option><option>IPAL</option></select>
@@ -5878,6 +5879,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
       <div class="copilot-actions">
         <button class="btn btn-primary btn-sm" type="button" id="copilot-ask-internal"><i class="ph-bold ph-magnifying-glass"></i> Tanya Internal</button>
         <button class="btn btn-sm" type="button" id="copilot-ask-external" disabled><i class="ph-bold ph-sparkle"></i> AI External</button>
+        <button class="btn btn-sm" type="button" id="copilot-help" title="Buka bantuan untuk halaman yang sedang digunakan"><i class="ph-bold ph-question"></i> Bantuan</button>
         <button class="btn btn-sm btn-ghost" type="button" id="copilot-clear-data" title="Bersihkan percakapan dan konteks pencarian Copilot; tidak menghapus database aplikasi"><i class="ph-bold ph-broom"></i> Bersihkan Data</button>
       </div>
       <div class="copilot-footnote">AI External hanya digunakan bila Anda memilih tombolnya. Konteks yang dikirim dibatasi pada data internal yang relevan dengan pertanyaan.</div>
@@ -9180,10 +9182,24 @@ function renderUtama(){
     LOGBOOK_CARD_FILTER = btn.dataset.logbookStat || 'total';
     // KPI card adalah shortcut filter utama: bersihkan filter lain agar jumlah
     // yang tampil benar-benar sama dengan angka pada card yang dipilih.
-    $('#search-utama').value=''; $('#filter-status').value=''; $('#filter-jenis').value=''; $('#filter-group').value='';
+    $('#search-utama').value=''; $('#filter-machine').value=''; $('#filter-status').value=''; $('#filter-jenis').value=''; $('#filter-group').value='';
     $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat===LOGBOOK_CARD_FILTER; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
     applyUtamaFilters();
   }));
+
+  const machineIdx = buildMachineIndex_();
+  const machineFilter = $('#filter-machine');
+  if(machineFilter){
+    const previousMachine = machineFilter.value || '';
+    const machineOptions = machineIdx.list.map(m=>{
+      const label = m.kode && m.nama && norm_(m.kode)!==norm_(m.nama) ? `${m.kode} — ${m.nama}` : (m.nama || m.kode);
+      return `<option value="${escapeHtml(m.key)}">${escapeHtml(label)}</option>`;
+    });
+    const hasOther = ENTRIES.some(e=>matchEntryMachineKey_(e,machineIdx)==='Lainnya');
+    if(hasOther) machineOptions.push('<option value="Lainnya">Lainnya / Belum Terpetakan</option>');
+    machineFilter.innerHTML = '<option value="">Semua Mesin</option>' + machineOptions.join('');
+    if(Array.from(machineFilter.options).some(o=>o.value===previousMachine)) machineFilter.value=previousMachine;
+  }
 
   const jenisSet = Array.from(new Set(ENTRIES.map(e=>e['Jenis Pekerjaan']).filter(Boolean)));
   $('#filter-jenis').innerHTML = '<option value="">Semua Jenis</option>' + jenisSet.map(j=>`<option>${escapeHtml(j)}</option>`).join('');
@@ -9193,6 +9209,8 @@ function renderUtama(){
 
 function applyUtamaFilters(){
   const q = ($('#search-utama').value || '').toLowerCase();
+  const mk = $('#filter-machine')?.value || '';
+  const machineIdx = mk ? buildMachineIndex_() : null;
   const st = $('#filter-status').value;
   const jn = $('#filter-jenis').value;
   const gr = $('#filter-group').value;
@@ -9201,6 +9219,7 @@ function applyUtamaFilters(){
   let filtered = ENTRIES.filter(e=>{
     if(LOGBOOK_CARD_FILTER==='today' && String(e['Tanggal']||'').slice(0,10)!==today) return false;
     if(['selesai','proses','emergency'].includes(LOGBOOK_CARD_FILTER) && statusClass(e['Status'])!==LOGBOOK_CARD_FILTER) return false;
+    if(mk && matchEntryMachineKey_(e,machineIdx)!==mk) return false;
     if(st && (e['Status']||'') !== st) return false;
     if(jn && (e['Jenis Pekerjaan']||'') !== jn) return false;
     if(gr && (e['Grouping Pekerjaan']||'') !== gr) return false;
@@ -9242,6 +9261,7 @@ function resetLogbookCardFilterForManual_(){
   }
 }
 $('#search-utama').addEventListener('input', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
+$('#filter-machine').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
 $('#filter-status').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
 $('#filter-jenis').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
 $('#filter-group').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
@@ -23010,6 +23030,79 @@ function openCopilot(){
   setTimeout(()=>$('#copilot-question')?.focus(),80);
 }
 function closeCopilot(){ $('#copilot-bg').classList.remove('active'); }
+
+function copilotActiveView_(){
+  const active = document.querySelector('.view.active');
+  if(active && String(active.id||'').startsWith('view-')) return String(active.id).slice(5);
+  return PREVIOUS_ACTIVE_VIEW || 'dashboard';
+}
+function copilotHelpForView_(view){
+  const helpMap = {
+    dashboard:{title:'Home & Status Mesin',steps:[
+      'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
+      'Klik card mesin untuk membuka status terkini terlebih dahulu.',
+      'Gunakan Lihat Detail Mesin bila ingin membuka informasi mesin yang lebih lengkap.'
+    ]},
+    utama:{title:'View Logbook',steps:[
+      'Gunakan dropdown Mesin untuk membatasi data ke satu mesin.',
+      'Filter Status, Jenis, dan Group dapat digabungkan dengan pencarian.',
+      'Card Total, Selesai, Proses, Emergency, dan Hari Ini berfungsi sebagai shortcut filter.'
+    ]},
+    mesin:{title:'Logbook per Mesin',steps:[
+      'Pilih mesin dari dropdown untuk melihat riwayat pekerjaan unit tersebut.',
+      'Data memakai mapping Kode Mesin terlebih dahulu dan Nama Mesin sebagai fallback.'
+    ]},
+    patrol:{title:'Patrol Harian',steps:[
+      'Pilih mesin dari dropdown, isi checklist, lalu simpan.',
+      'Gunakan tab Temuan, Riwayat Patrol, dan Statistik untuk meninjau hasil.'
+    ]},
+    sparepart:{title:'Sparepart',steps:[
+      'Cari berdasarkan Material Number SAP atau nama material.',
+      'Periksa lokasi dan jumlah sebelum menyimpan atau menandai pengambilan.',
+      'Daily Collection dipakai untuk proses pengambilan dan pencatatan ke SAP.'
+    ]},
+    setting:{title:'Master Koneksi',steps:[
+      'User Management digunakan untuk memantau pengguna dan aktivitas.',
+      'Role Access Management digunakan untuk mengatur akses fitur per role.',
+      'Perubahan akses sebaiknya diuji dengan role terkait setelah disimpan.'
+    ]},
+    omodos4:{title:'OMODOS 4.0 Command Center',steps:[
+      'Halaman ini khusus Superadmin dan membaca data existing tanpa input ganda.',
+      'Gunakan ringkasan Things to Look At, What Changed?, dan Latest Intelligence untuk prioritas pengecekan.'
+    ]}
+  };
+  return helpMap[view] || {title:'Bantuan Halaman',steps:[
+    'Gunakan menu dan filter yang tersedia pada halaman ini.',
+    'Bila ada data yang tidak sesuai, sebutkan nama halaman, mesin, atau record pada Tanya Internal agar Copilot membatasi konteks pencarian.',
+    'Tombol Bersihkan Data hanya membersihkan percakapan/konteks Copilot dan tidak menghapus database.'
+  ]};
+}
+function copilotShowHelp_(){
+  const body=$('#copilot-body'); if(!body) return;
+  const view=copilotActiveView_();
+  const help=copilotHelpForView_(view);
+  const items=(help.steps||[]).map((step,i)=>`
+    <div class="copilot-data-record">
+      <div class="copilot-record-top">
+        <span class="copilot-record-index">${i+1}</span>
+        <div class="copilot-record-title">${escapeHtml(step)}</div>
+      </div>
+    </div>`).join('');
+  body.insertAdjacentHTML('beforeend',`
+    <div class="copilot-msg internal" data-copilot-help-card>
+      <div class="copilot-bubble">
+        <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
+        <div class="copilot-category-card cat-default">
+          <div class="copilot-category-head">
+            <div class="copilot-category-title"><span class="copilot-category-icon">❓</span><div>${escapeHtml(help.title)}<small>Panduan singkat sesuai halaman yang sedang dibuka</small></div></div>
+          </div>
+          <div class="copilot-list">${items}</div>
+        </div>
+      </div>
+    </div>`);
+  body.scrollTop=body.scrollHeight;
+}
+
 function copilotClearData_(){
   COPILOT_LAST_MACHINE=null; COPILOT_LAST_QUESTION=''; COPILOT_LAST_CONTEXT=[]; COPILOT_LAST_CONFIDENCE='low';
   const q=$('#copilot-question'); if(q) q.value='';
@@ -23024,6 +23117,7 @@ $('#copilot-close').addEventListener('click',closeCopilot);
 $('#copilot-bg').addEventListener('click',ev=>{ if(ev.target.id==='copilot-bg') closeCopilot(); });
 $('#copilot-ask-internal').addEventListener('click',copilotAskInternal_);
 $('#copilot-ask-external').addEventListener('click',copilotAskExternal_);
+$('#copilot-help')?.addEventListener('click',copilotShowHelp_);
 $('#copilot-clear-data')?.addEventListener('click',copilotClearData_);
 $('#copilot-question').addEventListener('keydown',ev=>{
   if(ev.key==='Enter'&&!ev.shiftKey){ ev.preventDefault(); copilotAskInternal_(); }

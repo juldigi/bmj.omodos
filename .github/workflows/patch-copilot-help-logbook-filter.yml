@@ -1,0 +1,354 @@
+name: Patch Copilot Help and Logbook Machine Filter
+
+on:
+  push:
+    branches:
+      - fix/copilot-help-logbook-machine-filter
+    paths:
+      - ".github/workflows/patch-copilot-help-logbook-filter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply focused frontend patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p=Path("public/index.html")
+          s=p.read_text(encoding="utf-8")
+
+          marker="COPILOT_HELP_LOGBOOK_MACHINE_FILTER_V1"
+          if marker in s:
+            print("Patch already applied.")
+            raise SystemExit(0)
+
+          # 1. Logbook: add explicit machine dropdown to the existing filter bar.
+          old_html='''        <input class="grow" type="text" id="search-utama" placeholder="Cari mesin, pelapor, deskripsi...">
+                  <select id="filter-status"><option value="">Semua Status</option><option>Selesai</option><option>Proses</option><option>Pending</option><option>Emergency</option></select>'''
+          new_html='''        <input class="grow" type="text" id="search-utama" placeholder="Cari mesin, pelapor, deskripsi...">
+                  <select id="filter-machine" aria-label="Filter mesin"><option value="">Semua Mesin</option></select>
+                  <select id="filter-status"><option value="">Semua Status</option><option>Selesai</option><option>Proses</option><option>Pending</option><option>Emergency</option></select>'''
+          if old_html not in s:
+            raise SystemExit("Logbook filter-bar anchor not found.")
+          s=s.replace(old_html,new_html,1)
+
+          # 2. KPI/stat cards should clear machine filter too so counts remain exact.
+          old_reset="$('#search-utama').value=''; $('#filter-status').value=''; $('#filter-jenis').value=''; $('#filter-group').value='';"
+          new_reset="$('#search-utama').value=''; $('#filter-machine').value=''; $('#filter-status').value=''; $('#filter-jenis').value=''; $('#filter-group').value='';"
+          if old_reset not in s:
+            raise SystemExit("Logbook card reset anchor not found.")
+          s=s.replace(old_reset,new_reset,1)
+
+          # 3. Populate the machine dropdown from the existing machine DB and preserve selection on rerender.
+          old_pop='''  const jenisSet = Array.from(new Set(ENTRIES.map(e=>e['Jenis Pekerjaan']).filter(Boolean)));
+            $('#filter-jenis').innerHTML = '<option value="">Semua Jenis</option>' + jenisSet.map(j=>`<option>${escapeHtml(j)}</option>`).join('');
+
+            applyUtamaFilters();'''
+          new_pop='''  const machineIdx = buildMachineIndex_();
+            const machineFilter = $('#filter-machine');
+            if(machineFilter){
+              const previousMachine = machineFilter.value || '';
+              const machineOptions = machineIdx.list.map(m=>{
+                const label = m.kode && m.nama && norm_(m.kode)!==norm_(m.nama) ? `${m.kode} — ${m.nama}` : (m.nama || m.kode);
+                return `<option value="${escapeHtml(m.key)}">${escapeHtml(label)}</option>`;
+              });
+              const hasOther = ENTRIES.some(e=>matchEntryMachineKey_(e,machineIdx)==='Lainnya');
+              if(hasOther) machineOptions.push('<option value="Lainnya">Lainnya / Belum Terpetakan</option>');
+              machineFilter.innerHTML = '<option value="">Semua Mesin</option>' + machineOptions.join('');
+              if(Array.from(machineFilter.options).some(o=>o.value===previousMachine)) machineFilter.value=previousMachine;
+            }
+
+            const jenisSet = Array.from(new Set(ENTRIES.map(e=>e['Jenis Pekerjaan']).filter(Boolean)));
+            $('#filter-jenis').innerHTML = '<option value="">Semua Jenis</option>' + jenisSet.map(j=>`<option>${escapeHtml(j)}</option>`).join('');
+
+            applyUtamaFilters();'''
+          if old_pop not in s:
+            raise SystemExit("renderUtama population anchor not found.")
+          s=s.replace(old_pop,new_pop,1)
+
+          # 4. Apply selected machine using the already-existing robust Kode/Nama mapping.
+          old_vars='''  const q = ($('#search-utama').value || '').toLowerCase();
+            const st = $('#filter-status').value;
+            const jn = $('#filter-jenis').value;
+            const gr = $('#filter-group').value;'''
+          new_vars='''  const q = ($('#search-utama').value || '').toLowerCase();
+            const mk = $('#filter-machine')?.value || '';
+            const machineIdx = mk ? buildMachineIndex_() : null;
+            const st = $('#filter-status').value;
+            const jn = $('#filter-jenis').value;
+            const gr = $('#filter-group').value;'''
+          if old_vars not in s:
+            raise SystemExit("applyUtamaFilters variable anchor not found.")
+          s=s.replace(old_vars,new_vars,1)
+
+          old_filter="    if(st && (e['Status']||'') !== st) return false;"
+          new_filter="    if(mk && matchEntryMachineKey_(e,machineIdx)!==mk) return false;\n    if(st && (e['Status']||'') !== st) return false;"
+          if old_filter not in s:
+            raise SystemExit("Logbook filter predicate anchor not found.")
+          s=s.replace(old_filter,new_filter,1)
+
+          old_listeners="$('#search-utama').addEventListener('input', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });\n$('#filter-status').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });"
+          new_listeners="$('#search-utama').addEventListener('input', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });\n$('#filter-machine').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });\n$('#filter-status').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });"
+          if old_listeners not in s:
+            raise SystemExit("Logbook listener anchor not found.")
+          s=s.replace(old_listeners,new_listeners,1)
+
+          # 5. Copilot actions: compact 2x2 grid and add Bantuan only inside Copilot.
+          old_actions_css=".copilot-actions{display:flex;gap:8px;margin-top:8px;align-items:center;}"
+          new_actions_css=".copilot-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px;align-items:center;} /* COPILOT_HELP_LOGBOOK_MACHINE_FILTER_V1 */"
+          if old_actions_css not in s:
+            raise SystemExit("Copilot actions CSS anchor not found.")
+          s=s.replace(old_actions_css,new_actions_css,1)
+
+          old_mobile="#copilot-clear-data{grid-column:1/-1!important;width:100%;justify-content:center;}"
+          new_mobile="#copilot-clear-data,#copilot-help{width:100%;justify-content:center;}"
+          if old_mobile not in s:
+            raise SystemExit("Copilot mobile clear-data anchor not found.")
+          s=s.replace(old_mobile,new_mobile,1)
+
+          old_buttons='''        <button class="btn btn-primary btn-sm" type="button" id="copilot-ask-internal"><i class="ph-bold ph-magnifying-glass"></i> Tanya Internal</button>
+                  <button class="btn btn-sm" type="button" id="copilot-ask-external" disabled><i class="ph-bold ph-sparkle"></i> AI External</button>
+                  <button class="btn btn-sm btn-ghost" type="button" id="copilot-clear-data" title="Bersihkan percakapan dan konteks pencarian Copilot; tidak menghapus database aplikasi"><i class="ph-bold ph-broom"></i> Bersihkan Data</button>'''
+          new_buttons='''        <button class="btn btn-primary btn-sm" type="button" id="copilot-ask-internal"><i class="ph-bold ph-magnifying-glass"></i> Tanya Internal</button>
+                  <button class="btn btn-sm" type="button" id="copilot-ask-external" disabled><i class="ph-bold ph-sparkle"></i> AI External</button>
+                  <button class="btn btn-sm" type="button" id="copilot-help" title="Buka bantuan untuk halaman yang sedang digunakan"><i class="ph-bold ph-question"></i> Bantuan</button>
+                  <button class="btn btn-sm btn-ghost" type="button" id="copilot-clear-data" title="Bersihkan percakapan dan konteks pencarian Copilot; tidak menghapus database aplikasi"><i class="ph-bold ph-broom"></i> Bersihkan Data</button>'''
+          if old_buttons not in s:
+            raise SystemExit("Copilot action buttons anchor not found.")
+          s=s.replace(old_buttons,new_buttons,1)
+
+          # 6. Contextual Help implementation: read-only, rendered inside Copilot body.
+          old_func='''function closeCopilot(){ $('#copilot-bg').classList.remove('active'); }
+          function copilotClearData_(){'''
+          new_func='''function closeCopilot(){ $('#copilot-bg').classList.remove('active'); }
+
+          function copilotActiveView_(){
+            const active = document.querySelector('.view.active');
+            if(active && String(active.id||'').startsWith('view-')) return String(active.id).slice(5);
+            return PREVIOUS_ACTIVE_VIEW || 'dashboard';
+          }
+          function copilotHelpForView_(view){
+            const helpMap = {
+              dashboard:{title:'Home & Status Mesin',steps:[
+                'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
+                'Klik card mesin untuk membuka status terkini terlebih dahulu.',
+                'Gunakan Lihat Detail Mesin bila ingin membuka informasi mesin yang lebih lengkap.'
+              ]},
+              utama:{title:'View Logbook',steps:[
+                'Gunakan dropdown Mesin untuk membatasi data ke satu mesin.',
+                'Filter Status, Jenis, dan Group dapat digabungkan dengan pencarian.',
+                'Card Total, Selesai, Proses, Emergency, dan Hari Ini berfungsi sebagai shortcut filter.'
+              ]},
+              mesin:{title:'Logbook per Mesin',steps:[
+                'Pilih mesin dari dropdown untuk melihat riwayat pekerjaan unit tersebut.',
+                'Data memakai mapping Kode Mesin terlebih dahulu dan Nama Mesin sebagai fallback.'
+              ]},
+              patrol:{title:'Patrol Harian',steps:[
+                'Pilih mesin dari dropdown, isi checklist, lalu simpan.',
+                'Gunakan tab Temuan, Riwayat Patrol, dan Statistik untuk meninjau hasil.'
+              ]},
+              sparepart:{title:'Sparepart',steps:[
+                'Cari berdasarkan Material Number SAP atau nama material.',
+                'Periksa lokasi dan jumlah sebelum menyimpan atau menandai pengambilan.',
+                'Daily Collection dipakai untuk proses pengambilan dan pencatatan ke SAP.'
+              ]},
+              setting:{title:'Master Koneksi',steps:[
+                'User Management digunakan untuk memantau pengguna dan aktivitas.',
+                'Role Access Management digunakan untuk mengatur akses fitur per role.',
+                'Perubahan akses sebaiknya diuji dengan role terkait setelah disimpan.'
+              ]},
+              omodos4:{title:'OMODOS 4.0 Command Center',steps:[
+                'Halaman ini khusus Superadmin dan membaca data existing tanpa input ganda.',
+                'Gunakan ringkasan Things to Look At, What Changed?, dan Latest Intelligence untuk prioritas pengecekan.'
+              ]}
+            };
+            return helpMap[view] || {title:'Bantuan Halaman',steps:[
+              'Gunakan menu dan filter yang tersedia pada halaman ini.',
+              'Bila ada data yang tidak sesuai, sebutkan nama halaman, mesin, atau record pada Tanya Internal agar Copilot membatasi konteks pencarian.',
+              'Tombol Bersihkan Data hanya membersihkan percakapan/konteks Copilot dan tidak menghapus database.'
+            ]};
+          }
+          function copilotShowHelp_(){
+            const body=$('#copilot-body'); if(!body) return;
+            const view=copilotActiveView_();
+            const help=copilotHelpForView_(view);
+            const items=(help.steps||[]).map((step,i)=>`
+              <div class="copilot-data-record">
+                <div class="copilot-record-top">
+                  <span class="copilot-record-index">${i+1}</span>
+                  <div class="copilot-record-title">${escapeHtml(step)}</div>
+                </div>
+              </div>`).join('');
+            body.insertAdjacentHTML('beforeend',`
+              <div class="copilot-msg internal" data-copilot-help-card>
+                <div class="copilot-bubble">
+                  <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
+                  <div class="copilot-category-card cat-default">
+                    <div class="copilot-category-head">
+                      <div class="copilot-category-title"><span class="copilot-category-icon">❓</span><div>${escapeHtml(help.title)}<small>Panduan singkat sesuai halaman yang sedang dibuka</small></div></div>
+                    </div>
+                    <div class="copilot-list">${items}</div>
+                  </div>
+                </div>
+              </div>`);
+            body.scrollTop=body.scrollHeight;
+          }
+
+          function copilotClearData_(){'''
+          if old_func not in s:
+            raise SystemExit("Copilot function anchor not found.")
+          s=s.replace(old_func,new_func,1)
+
+          old_handler="$('#copilot-ask-external').addEventListener('click',copilotAskExternal_);\n$('#copilot-clear-data')?.addEventListener('click',copilotClearData_);"
+          new_handler="$('#copilot-ask-external').addEventListener('click',copilotAskExternal_);\n$('#copilot-help')?.addEventListener('click',copilotShowHelp_);\n$('#copilot-clear-data')?.addEventListener('click',copilotClearData_);"
+          if old_handler not in s:
+            raise SystemExit("Copilot handler anchor not found.")
+          s=s.replace(old_handler,new_handler,1)
+
+          required=[
+            'id="filter-machine"',
+            "const mk = $('#filter-machine')?.value || '';",
+            "matchEntryMachineKey_(e,machineIdx)!==mk",
+            "$('#filter-machine').addEventListener('change'",
+            'id="copilot-help"',
+            "function copilotShowHelp_()",
+            "$('#copilot-help')?.addEventListener('click',copilotShowHelp_);",
+            marker,
+          ]
+          missing=[x for x in required if x not in s]
+          if missing:
+            raise SystemExit("Post-patch check missing: "+", ".join(missing))
+
+          p.write_text(s,encoding="utf-8")
+          print("Focused Copilot Help + Logbook machine filter patch applied.")
+
+      - name: Validate JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          combined="\n".join(blocks)
+          Path("/tmp/omodos-inline.js").write_text(combined,encoding="utf-8")
+          print("inline script blocks:",len(blocks))
+          PY
+          node --check /tmp/omodos-inline.js
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser QA focused patch
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/omodos-focus-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true; rm -f focused-qa.mjs package.json package-lock.json' EXIT
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+
+          cat > focused-qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser=await chromium.launch({headless:true});
+          const result={errors:[]};
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            page.on('pageerror',e=>result.errors.push(String(e)));
+            page.on('dialog',async d=>{try{await d.dismiss();}catch{}});
+
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:20000});
+
+            const structure=await page.evaluate(()=>({
+              filterMachine:!!document.getElementById('filter-machine'),
+              help:!!document.getElementById('copilot-help'),
+              helpInsideCopilot:!!document.getElementById('copilot-help')?.closest('#copilot-panel'),
+              helpOutsideCopilot:[...document.querySelectorAll('#copilot-help')].some(x=>!x.closest('#copilot-panel')),
+              showHelp:typeof copilotShowHelp_==='function'
+            }));
+            result.structure=structure;
+            if(!structure.filterMachine || !structure.help || !structure.helpInsideCopilot || structure.helpOutsideCopilot || !structure.showHelp){
+              throw new Error('Structural patch QA failed: '+JSON.stringify(structure));
+            }
+
+            const logbook=await page.evaluate(()=>{
+              MACHINES=[
+                {'Kode Mesin':'O5','Nama Mesin':'Offset 5'},
+                {'Kode Mesin':'O6','Nama Mesin':'Offset 6'}
+              ];
+              ENTRIES=[
+                {'Kode Mesin':'O5','Nama Mesin':'Offset 5','Status':'Proses','Jenis Pekerjaan':'Corrective','Grouping Pekerjaan':'Mechanical','Tanggal':'2026-09-20','Timestamp Input':'2026-09-20T10:00:00','Nama Pelapor':'QA','Deskripsi Masalah':'Uji mesin O5'},
+                {'Kode Mesin':'O6','Nama Mesin':'Offset 6','Status':'Proses','Jenis Pekerjaan':'Corrective','Grouping Pekerjaan':'Mechanical','Tanggal':'2026-09-20','Timestamp Input':'2026-09-20T09:00:00','Nama Pelapor':'QA','Deskripsi Masalah':'Uji mesin O6'}
+              ];
+              LOGBOOK_CARD_FILTER='total';
+              renderUtama();
+              const sel=document.getElementById('filter-machine');
+              const options=[...sel.options].map(o=>({value:o.value,text:o.textContent}));
+              sel.value='O5';
+              sel.dispatchEvent(new Event('change',{bubbles:true}));
+              const text=document.getElementById('list-utama').textContent||'';
+              return {options,value:sel.value,hasO5:text.includes('Offset 5')||text.includes('O5'),hasO6:text.includes('Offset 6')||text.includes('O6')};
+            });
+            result.logbook=logbook;
+            if(!logbook.options.some(x=>x.value==='O5') || !logbook.options.some(x=>x.value==='O6') || logbook.value!=='O5' || !logbook.hasO5 || logbook.hasO6){
+              throw new Error('Logbook machine filter QA failed: '+JSON.stringify(logbook));
+            }
+
+            const help=await page.evaluate(()=>{
+              CURRENT_USER={username:'qa-super',displayName:'QA Superadmin',role:'Superadmin'};
+              SESSION_TOKEN='qa';
+              try{ FEATURE_REGISTRY=mergeFeatureRegistry([]); PERMISSIONS={}; applyRbacToUi(); }catch{}
+              goToView('utama');
+              openCopilot();
+              document.getElementById('copilot-help').click();
+              const cards=[...document.querySelectorAll('[data-copilot-help-card]')];
+              const last=cards[cards.length-1];
+              return {
+                cards:cards.length,
+                text:last?.textContent?.replace(/\s+/g,' ').trim()||'',
+                active:document.getElementById('view-utama')?.classList.contains('active')||false
+              };
+            });
+            result.help=help;
+            if(help.cards<1 || !/Bantuan/.test(help.text) || !/View Logbook/.test(help.text) || !help.active){
+              throw new Error('Copilot contextual help QA failed: '+JSON.stringify(help));
+            }
+
+            if(result.errors.length) throw new Error('Page errors: '+JSON.stringify(result.errors));
+            console.log('[FOCUSED_QA] '+JSON.stringify(result));
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          node --check focused-qa.mjs
+          timeout -k 5s 60s node focused-qa.mjs
+
+      - name: Commit focused patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f package.json package-lock.json focused-qa.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: add Copilot help and Logbook machine dropdown"
+          git push
