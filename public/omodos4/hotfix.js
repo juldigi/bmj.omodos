@@ -135,7 +135,7 @@ function sync(){
  }
  for(var i=1;i<GROUPS.length;i++){
   var b=document.createElement('button');b.type='button';b.className='nav-btn v4-nav-btn v4-module-btn';
-  b.setAttribute('data-v4-safe-module',String(i));b.setAttribute('aria-label',GROUPS[i][0]);
+  b.setAttribute('data-v4-safe-module',String(i));b.setAttribute('data-view','omodos4');b.setAttribute('aria-label',GROUPS[i][0]);
   b.innerHTML='<span class="ico"><i class="ph-bold '+GROUPS[i][1]+'"></i></span> '+esc(GROUPS[i][0]);sub.appendChild(b)
  }
 }
@@ -187,16 +187,40 @@ function openCopilot(showHelp){
  if(showHelp)setTimeout(function(){var help=document.getElementById('copilot-help');if(help)help.click()},80);
  return !!(fab||bg)
 }
+function activateView(route){
+ if(!route)return false;
+ var ok=false;
+ try{
+  if(typeof window.switchToView==='function'){window.switchToView(route);ok=true}
+  else if(typeof window.goToView==='function'){window.goToView(route);ok=true}
+  else if(typeof switchToView==='function'){switchToView(route);ok=true}
+  else if(typeof goToView==='function'){goToView(route);ok=true}
+ }catch(err){ok=false}
+ if(ok)return true;
+ var target=document.querySelector('.nav-btn[data-view="'+route+'"],.bottom-nav-btn[data-view="'+route+'"]');
+ if(target){try{target.click();return true}catch(err2){}}
+ var view=document.getElementById('view-'+route);
+ if(view){
+  var views=document.querySelectorAll('.view');
+  for(var i=0;i<views.length;i++)views[i].classList.remove('active');
+  view.classList.add('active');
+  try{view.removeAttribute('hidden');view.style.display=''}catch(err3){}
+  return true
+ }
+ return false
+}
 function openRoute(route){
  if(!route)return false;
  if(route==='@copilot')return openCopilot(false);
  if(route==='@copilot-help')return openCopilot(true);
- var target=document.querySelector('.nav-btn[data-view="'+route+'"],.bottom-nav-btn[data-view="'+route+'"]');
- if(target){target.click();return true}
- if(typeof window.goToView==='function')return window.goToView(route)!==false;
- if(typeof goToView==='function')return goToView(route)!==false;
- return false
+ return activateView(route)
 }
+document.addEventListener('pointerup',function(e){
+ var m=e.target.closest&&e.target.closest('[data-v4-safe-module]');
+ if(!m||!permitted())return;
+ var n=Number(m.getAttribute('data-v4-safe-module'));
+ if(activateView('omodos4'))render(n);
+},true);
 document.addEventListener('click',function(e){
  var root=e.target.closest&&e.target.closest('#v4-nav-group [data-v4-root]');
  if(root){if(!permitted()){e.preventDefault();e.stopImmediatePropagation();return}setTimeout(function(){showCommandCenter()},0);return}
@@ -205,12 +229,7 @@ document.addEventListener('click',function(e){
   if(!permitted()){e.preventDefault();e.stopImmediatePropagation();return}
   e.preventDefault();
   var n=Number(m.getAttribute('data-v4-safe-module'));
-  var opened=false;
-  try{if(typeof window.goToView==='function')opened=window.goToView('omodos4')!==false;else if(typeof goToView==='function')opened=goToView('omodos4')!==false}catch(err){}
-  if(!opened){
-   var view=document.getElementById('view-omodos4');
-   if(view){var views=document.querySelectorAll('.view');for(var i=0;i<views.length;i++)views[i].classList.remove('active');view.classList.add('active');opened=true}
-  }
+  var opened=activateView('omodos4');
   if(opened)render(n);
   return
  }
