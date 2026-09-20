@@ -2,7 +2,11 @@
 #v4-nav-group{display:none!important}
 #v4-nav-group.v4-authorized{display:block!important}
 #v4-nav-group .v4-module-btn{padding-left:34px}
-#v4-safe-stage{margin-top:16px}
+#v4-safe-stage{margin-top:16px;scroll-margin-top:16px}
+#view-omodos4.v4-safe-module-open>.v4-hero,
+#view-omodos4.v4-safe-module-open>.v4-summary,
+#view-omodos4.v4-safe-module-open>.v4-grid{display:none!important}
+#view-omodos4.v4-safe-module-open>#v4-safe-stage{display:block!important}
 .v4-module-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .v4-module-head h2{margin:0;font-family:var(--font-display);font-size:22px}
 .v4-module-head p{margin:5px 0 0;color:var(--text-dim);font-size:13px}
