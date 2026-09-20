@@ -38,7 +38,7 @@ jobs:
               "run_worker_first":False
             }
           }
-          Path("/tmp/wrangler.assets.json").write_text(json.dumps(config,indent=2)+"\n",encoding="utf-8")
+          Path("wrangler.assets.json").write_text(json.dumps(config,indent=2)+"\n",encoding="utf-8")
 
       - name: Install Wrangler
         run: npm install --no-save wrangler@latest
@@ -46,7 +46,7 @@ jobs:
       - name: Dry run assets-only package
         shell: bash
         run: |
-          npx wrangler deploy --config /tmp/wrangler.assets.json --dry-run
+          npx wrangler deploy --config wrangler.assets.json --dry-run
           echo "[ASSETS_ONLY] dry-run PASS"
 
       - name: Capture active deployment before upload
@@ -73,7 +73,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler versions upload             --config /tmp/wrangler.assets.json             --message "OMODOS assets-only fresh shell: GitHub main fbe122f; no-cache HTML"             --tag "assets-fresh-shell-20260920"             2>&1 | tee /tmp/assets-upload.log
+          npx wrangler versions upload             --config wrangler.assets.json             --message "OMODOS assets-only fresh shell: GitHub main fbe122f; no-cache HTML"             --tag "assets-fresh-shell-20260920"             2>&1 | tee /tmp/assets-upload.log
 
           VERSION_ID="$(grep -Eo 'Worker Version ID: [0-9a-f-]+' /tmp/assets-upload.log | tail -1 | awk '{print $4}')"
           if [ -z "$VERSION_ID" ]; then
@@ -151,7 +151,7 @@ jobs:
       - name: Commit sanitized report
         shell: bash
         run: |
-          rm -rf node_modules package-lock.json package.json
+          rm -rf node_modules package-lock.json package.json wrangler.assets.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add audit/ASSETS_ONLY_CANDIDATE.md
