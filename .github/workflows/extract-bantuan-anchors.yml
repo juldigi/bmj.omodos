@@ -1,0 +1,62 @@
+name: Extract Bantuan Integration Anchors
+
+on:
+  push:
+    branches:
+      - fix/bantuan-copilot
+    paths:
+      - ".github/workflows/extract-bantuan-anchors.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract guide and Copilot anchors
+        shell: python
+        run: |
+          from pathlib import Path
+          src=Path("public/index.html").read_text(encoding="utf-8",errors="replace").splitlines()
+          needles=[
+            "legacy-simple-guide",
+            "legacy-simple-guide-title",
+            "legacy-simple-guide-purpose",
+            "legacy-simple-step",
+            "LEGACY_SIMPLE_GUIDES",
+            "copilot-panel",
+            "copilot-header",
+            "copilot-body",
+            "copilot-input",
+            "copilot-toggle",
+            "copilot-close",
+            "function renderCopilot",
+            "function openCopilot",
+            "function closeCopilot",
+            "function switchToView",
+          ]
+          out=["# Bantuan Integration Anchors",""]
+          for needle in needles:
+            hits=[i for i,l in enumerate(src) if needle.lower() in l.lower()]
+            out.append(f"## {needle} — {len(hits)}")
+            for idx in hits[:20]:
+              out.append(f"### Around source line {idx+1}")
+              out.append("~~~text")
+              for j in range(max(0,idx-18),min(len(src),idx+60)):
+                out.append(f"{j+1:05d}: {src[j]}")
+              out.append("~~~")
+              out.append("")
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/BANTUAN_INTEGRATION_ANCHORS.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+      - name: Commit anchors
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/BANTUAN_INTEGRATION_ANCHORS.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: extract Bantuan integration anchors"
+          git push
