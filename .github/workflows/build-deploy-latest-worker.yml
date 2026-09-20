@@ -196,7 +196,7 @@ jobs:
               inherit_bindings.append({
                   "type":"inherit",
                   "name":name,
-                  "version_id":BACKEND_VERSION
+                  "version_id":"latest"
               })
           bindings=inherit_bindings+[{"type":"assets","name":"ASSETS"}]
 
