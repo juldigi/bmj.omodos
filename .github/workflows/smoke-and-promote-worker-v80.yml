@@ -1,0 +1,373 @@
+name: Smoke and Promote OMODOS Worker v80
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/smoke-and-promote-worker-v80.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CF_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+      WORKER_NAME: omodos
+      CANDIDATE_VERSION: f460d7b3-b3ce-4088-b002-c4a726da95f6
+      PRODUCTION_URL: https://omodos.offsetbmj.workers.dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create 0.01 percent smoke deployment
+        shell: python
+        run: |
+          import os,json,time,urllib.request
+          from pathlib import Path
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CF_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+          candidate=os.environ["CANDIDATE_VERSION"]
+
+          def request_json(method,url,payload=None):
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+            data=None
+            if payload is not None:
+              data=json.dumps(payload,separators=(",",":")).encode()
+              headers["Content-Type"]="application/json"
+            req=urllib.request.Request(url,data=data,method=method,headers=headers)
+            with urllib.request.urlopen(req,timeout=45) as r:
+              raw=r.read()
+              return json.loads(raw.decode("utf-8")) if raw else {}
+
+          url=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments"
+          d=request_json("GET",url)
+          result=d.get("result")
+          rows=(result.get("deployments") or []) if isinstance(result,dict) else (result if isinstance(result,list) else [])
+          if not rows:
+            raise SystemExit("No active Worker deployment found")
+
+          current=rows[0]
+          versions=current.get("versions") or []
+          active=[v for v in versions if float(v.get("percentage") or 0)>0]
+          if len(active)!=1 or abs(float(active[0].get("percentage") or 0)-100)>0.001:
+            raise SystemExit("Expected one 100% active version before smoke; got "+json.dumps(active))
+
+          old=str(active[0].get("version_id") or "")
+          if not old:
+            raise SystemExit("Unable to resolve old active version")
+          if old==candidate:
+            raise SystemExit("Candidate is already live; refusing redundant smoke deployment")
+
+          Path("/tmp/old-version").write_text(old)
+          with Path(os.environ["GITHUB_ENV"]).open("a") as f:
+            f.write("OLD_VERSION="+old+"\n")
+
+          payload={
+            "strategy":"percentage",
+            "versions":[
+              {"version_id":old,"percentage":99.99},
+              {"version_id":candidate,"percentage":0.01}
+            ],
+            "annotations":{
+              "workers/message":"OMODOS v80 smoke: 0.01% candidate, forced QA via version override",
+              "workers/triggered_by":"github-actions"
+            }
+          }
+          created=request_json("POST",url,payload)
+          if not created.get("success",True) and not created.get("result"):
+            raise SystemExit("Cloudflare deployment creation failed: "+json.dumps(created.get("errors") or []))
+
+          rr=created.get("result") or {}
+          got={str(v.get("version_id")):float(v.get("percentage") or 0) for v in rr.get("versions") or []}
+          if abs(got.get(old,0)-99.99)>0.001 or abs(got.get(candidate,0)-0.01)>0.001:
+            raise SystemExit("Unexpected smoke deployment percentages: "+json.dumps(got))
+
+          print("[SMOKE_DEPLOY] old="+old)
+          print("[SMOKE_DEPLOY] candidate="+candidate)
+          print("[SMOKE_DEPLOY] deployment_id="+str(rr.get("id") or ""))
+          time.sleep(5)
+
+      - name: HTTP QA forced to candidate
+        id: httpqa
+        shell: python
+        run: |
+          import os,json,urllib.request,urllib.error,time
+          from pathlib import Path
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+          worker=os.environ["WORKER_NAME"]
+          candidate=os.environ["CANDIDATE_VERSION"]
+          override=f'{worker}="{candidate}"'
+
+          def fetch(path):
+            headers={
+              "User-Agent":"OMODOS-v80-Smoke/1.0",
+              "Cache-Control":"no-cache",
+              "Cloudflare-Workers-Version-Overrides":override
+            }
+            req=urllib.request.Request(base+path,headers=headers)
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                return r.status,r.headers,r.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          last=None
+          for attempt in range(1,6):
+            status,h,body=fetch("/?v80_smoke="+str(attempt))
+            text=body.decode("utf-8",errors="replace")
+            checks={
+              "http_200":status==200,
+              "copilot_help":'id="copilot-help"' in text,
+              "machine_dropdown":'id="filter-machine"' in text,
+              "bantuan_cleanup":"BANTUAN_PAGE_CARD_REMOVAL_V1" in text,
+              "legacy_injector_absent":"top.insertAdjacentElement('afterend',guide)" not in text,
+              "omodos4":"OMODOS 4.0" in text
+            }
+            last=(status,checks,text[:120])
+            if all(checks.values()):
+              break
+            time.sleep(3)
+          else:
+            raise SystemExit("Forced candidate frontend failed: "+repr(last))
+
+          api_status,api_h,api_body=fetch("/api/backup/config")
+          api_ct=(api_h.get("Content-Type") or "").lower()
+          api_text=api_body.decode("utf-8",errors="replace").lstrip()
+          json_like=("json" in api_ct) or api_text.startswith("{") or api_text.startswith("[")
+          if api_status==404 or not json_like:
+            raise SystemExit(
+              "Forced candidate API routing failed: status="+str(api_status)+
+              " content_type="+repr(api_ct)+" prefix="+repr(api_text[:120])
+            )
+
+          Path("/tmp/http-smoke.json").write_text(json.dumps({
+            "root_status":status,
+            "frontend_checks":checks,
+            "api_status":api_status,
+            "api_json_like":json_like
+          }))
+          print("[HTTP_QA] PASS "+Path("/tmp/http-smoke.json").read_text())
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Browser QA forced to candidate
+        shell: bash
+        run: |
+          cat > v80-browser-smoke.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const version=process.env.CANDIDATE_VERSION;
+          const worker=process.env.WORKER_NAME;
+          const browser=await chromium.launch({headless:true});
+          try{
+            const context=await browser.newContext({
+              viewport:{width:1440,height:1000},
+              extraHTTPHeaders:{
+                'Cloudflare-Workers-Version-Overrides': worker+'="'+version+'"',
+                'Cache-Control':'no-cache'
+              }
+            });
+            const page=await context.newPage();
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            page.on('dialog',async d=>{try{await d.dismiss();}catch{}});
+            await page.goto(process.env.PRODUCTION_URL+'/?browser_v80_smoke=1',{
+              waitUntil:'domcontentloaded',
+              timeout:30000
+            });
+
+            const result=await page.evaluate(()=>({
+              helpButton:!!document.getElementById('copilot-help'),
+              helpInside:!!document.getElementById('copilot-help')?.closest('#copilot-panel'),
+              visiblePageGuides:[...document.querySelectorAll('.legacy-simple-guide')].filter(x=>getComputedStyle(x).display!=='none').length,
+              pageGuideNodes:document.querySelectorAll('.view > .legacy-simple-guide').length,
+              machineDropdown:!!document.getElementById('filter-machine'),
+              omodos4:!!document.getElementById('view-omodos4')
+            }));
+
+            if(!result.helpButton||!result.helpInside||result.visiblePageGuides!==0||result.pageGuideNodes!==0||!result.machineDropdown||!result.omodos4){
+              throw new Error('Candidate DOM QA failed: '+JSON.stringify(result));
+            }
+
+            const relevant=errors.filter(x=>/TypeError|ReferenceError|SyntaxError/i.test(x));
+            if(relevant.length){
+              throw new Error('Candidate runtime errors: '+JSON.stringify(relevant));
+            }
+            console.log('[BROWSER_QA] PASS '+JSON.stringify({result,relevant}));
+          }finally{
+            await browser.close();
+          }
+          JS
+          node --check v80-browser-smoke.mjs
+          timeout -k 5s 60s node v80-browser-smoke.mjs
+          rm -f v80-browser-smoke.mjs package.json package-lock.json
+
+      - name: Promote candidate to 100 percent
+        id: promote
+        shell: python
+        run: |
+          import os,json,time,urllib.request
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CF_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+          candidate=os.environ["CANDIDATE_VERSION"]
+          url=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments"
+
+          payload={
+            "strategy":"percentage",
+            "versions":[{"version_id":candidate,"percentage":100}],
+            "annotations":{
+              "workers/message":"OMODOS frontend sync promoted after HTTP + Chromium smoke PASS",
+              "workers/triggered_by":"github-actions"
+            }
+          }
+          req=urllib.request.Request(
+            url,
+            data=json.dumps(payload,separators=(",",":")).encode(),
+            method="POST",
+            headers={
+              "Authorization":"Bearer "+token,
+              "Accept":"application/json",
+              "Content-Type":"application/json"
+            }
+          )
+          with urllib.request.urlopen(req,timeout=45) as r:
+            d=json.loads(r.read().decode("utf-8"))
+          rr=d.get("result") or {}
+          versions=rr.get("versions") or []
+          if len(versions)!=1 or str(versions[0].get("version_id"))!=candidate or abs(float(versions[0].get("percentage") or 0)-100)>0.001:
+            raise SystemExit("Promotion response unexpected: "+json.dumps(versions))
+          print("[PROMOTE] v80 is now 100%")
+          time.sleep(5)
+
+      - name: Validate live production after promotion
+        shell: python
+        run: |
+          import os,json,urllib.request,urllib.error,time
+          from pathlib import Path
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+
+          def fetch(path):
+            req=urllib.request.Request(base+path,headers={
+              "User-Agent":"OMODOS-PostDeploy-QA/1.0",
+              "Cache-Control":"no-cache"
+            })
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                return r.status,r.headers,r.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          ok=False
+          detail={}
+          for attempt in range(1,7):
+            status,h,body=fetch("/?postdeploy="+str(attempt))
+            text=body.decode("utf-8",errors="replace")
+            detail={
+              "root_status":status,
+              "copilot_help":'id="copilot-help"' in text,
+              "machine_dropdown":'id="filter-machine"' in text,
+              "bantuan_cleanup":"BANTUAN_PAGE_CARD_REMOVAL_V1" in text,
+              "legacy_injector_absent":"top.insertAdjacentElement('afterend',guide)" not in text,
+              "omodos4":"OMODOS 4.0" in text
+            }
+            if status==200 and all(v for k,v in detail.items() if k!="root_status"):
+              ok=True
+              break
+            time.sleep(3)
+          if not ok:
+            raise SystemExit("Live frontend validation failed: "+json.dumps(detail))
+
+          api_status,api_h,api_body=fetch("/api/backup/config")
+          api_ct=(api_h.get("Content-Type") or "").lower()
+          api_text=api_body.decode("utf-8",errors="replace").lstrip()
+          api_json=("json" in api_ct) or api_text.startswith("{") or api_text.startswith("[")
+          if api_status==404 or not api_json:
+            raise SystemExit(f"Live API validation failed: status={api_status} content_type={api_ct!r}")
+
+          report=[
+            "# OMODOS Worker v80 Production Deployment",
+            "",
+            "- Candidate version: f460d7b3-b3ce-4088-b002-c4a726da95f6",
+            "- Deployment strategy: 0.01% smoke -> forced version override QA -> 100%",
+            "- Forced candidate HTTP QA: PASS",
+            "- Forced candidate Chromium QA: PASS",
+            f"- Live root HTTP: {status}",
+            f"- Live frontend checks: {json.dumps(detail,sort_keys=True)}",
+            f"- Live API /api/backup/config HTTP: {api_status}",
+            f"- Live API JSON-like: {'YES' if api_json else 'NO'}",
+            "- Page-level Bantuan cards visible: NO",
+            "- Bantuan button location: Copilot",
+            "- Backend source: unchanged from stable v68",
+            "- Durable Object and secrets: inherited from v68",
+            "- Production verdict: PASS"
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/WORKER_V80_PRODUCTION_DEPLOYMENT.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[LIVE_QA] PASS")
+
+      - name: Roll back to previous version on failure
+        if: failure()
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+
+          old=os.environ.get("OLD_VERSION","").strip()
+          if not old and Path("/tmp/old-version").exists():
+            old=Path("/tmp/old-version").read_text().strip()
+          if not old:
+            print("[ROLLBACK] old version unknown; no deployment action taken")
+            raise SystemExit(0)
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CF_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+          url=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments"
+          payload={
+            "strategy":"percentage",
+            "versions":[{"version_id":old,"percentage":100}],
+            "annotations":{
+              "workers/message":"Automatic rollback after OMODOS v80 smoke/deploy QA failure",
+              "workers/triggered_by":"github-actions"
+            }
+          }
+          req=urllib.request.Request(
+            url,
+            data=json.dumps(payload,separators=(",",":")).encode(),
+            method="POST",
+            headers={
+              "Authorization":"Bearer "+token,
+              "Accept":"application/json",
+              "Content-Type":"application/json"
+            }
+          )
+          with urllib.request.urlopen(req,timeout=45) as r:
+            d=json.loads(r.read().decode("utf-8"))
+          print("[ROLLBACK] restored old version="+old+" success="+str(d.get("success")))
+
+      - name: Commit deployment report
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/WORKER_V80_PRODUCTION_DEPLOYMENT.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "deploy: record OMODOS Worker v80 production promotion"
+          git push
