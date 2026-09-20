@@ -1,4 +1,5 @@
 name: Production QA OMODOS After Recovery
+# post-vendor-production-check: v1
 
 on:
   push:
