@@ -576,6 +576,185 @@ jobs:
             }
             result.phases.push('logbook-submit-contract');
 
+            console.log('[QA] Patrol submit payload without/with photo');
+            const patrolSubmitQA = await page.evaluate(async () => {
+              const oldApiPost = apiPost;
+              const oldUrl = WEB_APP_URL;
+              const oldMachines = Array.isArray(MACHINES) ? MACHINES.slice() : MACHINES;
+              const oldState = JSON.parse(JSON.stringify(PATROL_STATE || {}));
+              const oldFindingFiles = Array.isArray(PATROL_FINDING_FILES) ? PATROL_FINDING_FILES.slice() : PATROL_FINDING_FILES;
+              const oldPmStorage = localStorage.getItem(LS_PM_KEY);
+              const calls = [];
+
+              const waitForCalls = async n => {
+                const start = Date.now();
+                while (calls.length < n && Date.now() - start < 2000) {
+                  await new Promise(r => setTimeout(r, 20));
+                }
+              };
+              const ensureOption = (sel, value) => {
+                if (!sel) return;
+                if (![...sel.options].some(o => o.value === value)) {
+                  const opt = document.createElement('option');
+                  opt.value = value;
+                  opt.textContent = value;
+                  sel.appendChild(opt);
+                }
+                sel.value = value;
+              };
+              const prepare = withPhoto => {
+                MACHINES = [{ 'Kode Mesin':'QA-PAT-1', 'Nama Mesin':'QA Patrol Machine' }];
+                PATROL_STATE = {
+                  id:null,
+                  kodeMesin:'QA-PAT-1',
+                  namaMesin:'QA Patrol Machine',
+                  checklist:{ Elektrikal:{0:'normal'} },
+                  findings: withPhoto ? [{
+                    id:'TM-QA-1',
+                    kategori:'Elektrikal',
+                    prioritas:'Sedang',
+                    deskripsi:'QA temuan patrol',
+                    status:'Open',
+                    files:[{
+                      name:'qa-patrol.jpg',
+                      type:'image',
+                      viewUrl:'blob:qa-patrol',
+                      base64:'AQIDBAUG',
+                      mimeType:'image/jpeg'
+                    }]
+                  }] : []
+                };
+                const tanggal=document.getElementById('patrol-tanggal');
+                const waktu=document.getElementById('patrol-waktu');
+                const shift=document.getElementById('patrol-shift');
+                const team=document.getElementById('patrol-grouping-team');
+                const pelapor=document.getElementById('patrol-nama-pelapor');
+                if(tanggal) tanggal.value='2026-09-20';
+                if(waktu) waktu.value='12:30';
+                if(shift && shift.options.length) shift.selectedIndex=0;
+                if(team && team.options.length) team.selectedIndex=0;
+                ensureOption(pelapor,'QA Patrol Tech');
+              };
+
+              try {
+                WEB_APP_URL='https://qa.invalid';
+                apiPost=async payload=>{
+                  const clone=JSON.parse(JSON.stringify(payload));
+                  calls.push(clone);
+                  const attachments=(payload.files||[]).map((f,i)=>({
+                    id:'QA-FILE-'+i,
+                    name:f.name,
+                    mimeType:f.mimeType,
+                    type:String(f.mimeType||'').startsWith('video/')?'video':'image',
+                    thumbUrl:'/files/QA-FILE-'+i,
+                    viewUrl:'/files/QA-FILE-'+i,
+                    previewUrl:'/files/QA-FILE-'+i
+                  }));
+                  return {ok:true,attachments};
+                };
+
+                prepare(false);
+                document.getElementById('btn-patrol-save').click();
+                await waitForCalls(1);
+
+                prepare(true);
+                document.getElementById('btn-patrol-save').click();
+                await waitForCalls(2);
+
+                const noPhoto=calls[0]||null;
+                const withPhoto=calls[1]||null;
+                const nested=withPhoto?.report?.findings?.[0]?.files?.[0]||{};
+                return {
+                  callCount:calls.length,
+                  noPhoto:noPhoto?{
+                    action:noPhoto.action,
+                    patrolMode:noPhoto.report?.patrolMode,
+                    filesLength:Array.isArray(noPhoto.files)?noPhoto.files.length:-1,
+                    kodeMesin:noPhoto.report?.kodeMesin,
+                    namaMesin:noPhoto.report?.namaMesin,
+                    petugas:noPhoto.report?.petugas
+                  }:null,
+                  withPhoto:withPhoto?{
+                    action:withPhoto.action,
+                    filesLength:Array.isArray(withPhoto.files)?withPhoto.files.length:-1,
+                    firstFile:withPhoto.files?.[0]||null,
+                    nestedFindingFile:nested,
+                    nestedHasBase64:Object.prototype.hasOwnProperty.call(nested,'base64'),
+                    nestedHasBlob:String(nested.viewUrl||'').startsWith('blob:'),
+                    reportHasFiles:Object.prototype.hasOwnProperty.call(withPhoto.report||{},'files')
+                  }:null
+                };
+              } finally {
+                apiPost=oldApiPost;
+                WEB_APP_URL=oldUrl;
+                MACHINES=oldMachines;
+                PATROL_STATE=oldState;
+                PATROL_FINDING_FILES=oldFindingFiles;
+                if(oldPmStorage===null) localStorage.removeItem(LS_PM_KEY);
+                else localStorage.setItem(LS_PM_KEY,oldPmStorage);
+              }
+            });
+            result.patrolSubmitQA=patrolSubmitQA;
+            if (patrolSubmitQA.callCount !== 2 ||
+                patrolSubmitQA.noPhoto?.action !== 'savePredictiveReport' ||
+                patrolSubmitQA.noPhoto?.patrolMode !== true ||
+                patrolSubmitQA.noPhoto?.filesLength !== 0 ||
+                patrolSubmitQA.noPhoto?.kodeMesin !== 'QA-PAT-1' ||
+                patrolSubmitQA.noPhoto?.namaMesin !== 'QA Patrol Machine' ||
+                patrolSubmitQA.noPhoto?.petugas !== 'QA Patrol Tech' ||
+                patrolSubmitQA.withPhoto?.action !== 'savePredictiveReport' ||
+                patrolSubmitQA.withPhoto?.filesLength !== 1 ||
+                patrolSubmitQA.withPhoto?.firstFile?.name !== 'qa-patrol.jpg' ||
+                patrolSubmitQA.withPhoto?.firstFile?.mimeType !== 'image/jpeg' ||
+                patrolSubmitQA.withPhoto?.firstFile?.base64 !== 'AQIDBAUG' ||
+                patrolSubmitQA.withPhoto?.nestedHasBase64 !== false ||
+                patrolSubmitQA.withPhoto?.nestedHasBlob !== false ||
+                patrolSubmitQA.withPhoto?.reportHasFiles !== false) {
+              throw new Error('Patrol submit contract failed: '+JSON.stringify(patrolSubmitQA));
+            }
+            result.phases.push('patrol-submit-contract');
+
+            console.log('[QA] Daily Collection write contract');
+            const dailyCollectionQA = await page.evaluate(async () => {
+              const oldApiPost=apiPost;
+              const oldUrl=WEB_APP_URL;
+              const oldUser=CURRENT_USER;
+              const oldStatus=JSON.parse(JSON.stringify(SPAREPART_STATUS||{}));
+              const oldStorage=localStorage.getItem(LS_SPAREPART_KEY);
+              const calls=[];
+              try {
+                WEB_APP_URL='https://qa.invalid';
+                CURRENT_USER={username:'qa-super',displayName:'QA Superadmin',role:'Superadmin'};
+                SPAREPART_STATUS={};
+                apiPost=async payload=>{calls.push(JSON.parse(JSON.stringify(payload)));return {ok:true};};
+                await setDailyCollectionStatus('QA-LOG-1',true);
+                const afterCompleted=JSON.parse(JSON.stringify(getSparepartSapEntry('QA-LOG-1')));
+                await setDailyCollectionStatus('QA-LOG-1',false);
+                const afterPending=JSON.parse(JSON.stringify(getSparepartSapEntry('QA-LOG-1')));
+                return {calls,afterCompleted,afterPending};
+              } finally {
+                apiPost=oldApiPost;
+                WEB_APP_URL=oldUrl;
+                CURRENT_USER=oldUser;
+                SPAREPART_STATUS=oldStatus;
+                if(oldStorage===null) localStorage.removeItem(LS_SPAREPART_KEY);
+                else localStorage.setItem(LS_SPAREPART_KEY,oldStorage);
+              }
+            });
+            result.dailyCollectionQA=dailyCollectionQA;
+            if (dailyCollectionQA.calls?.length !== 2 ||
+                dailyCollectionQA.calls?.[0]?.action !== 'updateSparepartSap' ||
+                dailyCollectionQA.calls?.[0]?.id !== 'QA-LOG-1' ||
+                dailyCollectionQA.calls?.[0]?.status !== 'COMPLETED' ||
+                dailyCollectionQA.calls?.[0]?.sapDoc !== '' ||
+                dailyCollectionQA.calls?.[0]?.pic !== 'QA Superadmin' ||
+                dailyCollectionQA.afterCompleted?.status !== 'COMPLETED' ||
+                dailyCollectionQA.calls?.[1]?.status !== 'PENDING' ||
+                dailyCollectionQA.afterPending?.status !== 'PENDING') {
+              throw new Error('Daily Collection contract failed: '+JSON.stringify(dailyCollectionQA));
+            }
+            result.phases.push('daily-collection-contract');
+
             console.log('[QA] sparepart pagination');
             const selectorQA = await page.evaluate(() => {
               const p = document.createElement('div');
