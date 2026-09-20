@@ -184,6 +184,86 @@ jobs:
             }
             result.phases.push('recovered-deny');
 
+            console.log('[QA] physical OMODOS 4 sidebar module clicks');
+            await page.evaluate(() => {
+              CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
+              SESSION_TOKEN = 'qa';
+              FEATURE_REGISTRY = mergeFeatureRegistry([]);
+              PERMISSIONS = {};
+              applyRbacToUi();
+              window.dispatchEvent(new Event('storage'));
+            });
+            await page.waitForTimeout(100);
+
+            const v4Parent = page.locator('#v4-nav-group .nav-parent-btn[data-group="omodos4"]');
+            const v4Submenu = page.locator('#v4-nav-group [data-submenu="omodos4"]');
+            if (!(await v4Submenu.evaluate(el => el.classList.contains('open')))) {
+              await v4Parent.click();
+              await page.waitForTimeout(40);
+            }
+
+            const physicalModules = page.locator('#v4-nav-group [data-v4-safe-module]');
+            const physicalCount = await physicalModules.count();
+            const sidebarClickQA = { moduleCount: physicalCount, failures: [], modules: [] };
+            for (let i = 0; i < physicalCount; i++) {
+              const btn = physicalModules.nth(i);
+              const name = (await btn.getAttribute('aria-label')) || ('module-' + i);
+              try {
+                await btn.click();
+                await page.waitForTimeout(50);
+                const state = await page.evaluate((expectedName) => {
+                  const view = document.getElementById('view-omodos4');
+                  const stage = document.getElementById('v4-safe-stage');
+                  const heading = stage?.querySelector('h2')?.textContent?.trim() || '';
+                  const tiles = stage?.querySelectorAll('[data-v4-route]').length || 0;
+                  const rect = stage?.getBoundingClientRect();
+                  const activeBtn = document.querySelector('#v4-nav-group [data-v4-safe-module].active');
+                  return {
+                    viewActive: !!view?.classList.contains('active'),
+                    moduleMode: !!view?.classList.contains('v4-safe-module-open'),
+                    heading,
+                    tiles,
+                    stageVisible: !!stage && getComputedStyle(stage).display !== 'none',
+                    stageInViewport: !!rect && rect.top >= -5 && rect.top < window.innerHeight,
+                    activeLabel: activeBtn?.getAttribute('aria-label') || '',
+                    expectedName
+                  };
+                }, name);
+                sidebarClickQA.modules.push(state);
+                if (!state.viewActive || !state.moduleMode || !state.stageVisible || !state.stageInViewport ||
+                    state.tiles !== 8 || state.activeLabel !== name || !state.heading.includes(name)) {
+                  sidebarClickQA.failures.push(state);
+                }
+              } catch (e) {
+                sidebarClickQA.failures.push({ expectedName:name, thrown:String(e && e.message || e) });
+              }
+            }
+
+            const rootV4 = page.locator('#v4-nav-group [data-v4-root]');
+            await rootV4.click();
+            await page.waitForTimeout(50);
+            sidebarClickQA.commandCenter = await page.evaluate(() => {
+              const view = document.getElementById('view-omodos4');
+              const stage = document.getElementById('v4-safe-stage');
+              const hero = view?.querySelector('.v4-hero');
+              const root = document.querySelector('#v4-nav-group [data-v4-root]');
+              return {
+                viewActive: !!view?.classList.contains('active'),
+                moduleMode: !!view?.classList.contains('v4-safe-module-open'),
+                stageHidden: !stage || getComputedStyle(stage).display === 'none',
+                heroVisible: !!hero && getComputedStyle(hero).display !== 'none',
+                rootActive: !!root?.classList.contains('active')
+              };
+            });
+            result.sidebarClickQA = sidebarClickQA;
+            if (sidebarClickQA.moduleCount !== 11 || sidebarClickQA.failures.length ||
+                !sidebarClickQA.commandCenter.viewActive || sidebarClickQA.commandCenter.moduleMode ||
+                !sidebarClickQA.commandCenter.stageHidden || !sidebarClickQA.commandCenter.heroVisible ||
+                !sidebarClickQA.commandCenter.rootActive) {
+              throw new Error('Physical OMODOS 4 sidebar click QA failed: ' + JSON.stringify(sidebarClickQA));
+            }
+            result.phases.push('v4-sidebar-physical-clicks');
+
             console.log('[QA] recovered module route completeness');
             await page.evaluate(() => {
               CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
