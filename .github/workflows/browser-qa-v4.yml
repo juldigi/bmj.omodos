@@ -233,6 +233,92 @@ jobs:
             }
             result.phases.push('route-completeness');
 
+            console.log('[QA] all application views');
+            const viewInventory = await page.evaluate(() => {
+              CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
+              SESSION_TOKEN = 'qa';
+              FEATURE_REGISTRY = mergeFeatureRegistry([]);
+              PERMISSIONS = {};
+              applyRbacToUi();
+              const targets = [...new Set([...document.querySelectorAll('[data-view]')].map(x => String(x.dataset.view || '').trim()).filter(Boolean))].sort();
+              const domViews = [...document.querySelectorAll('[id^="view-"]')].map(x => x.id.slice(5)).sort();
+              const missingDom = targets.filter(v => !document.getElementById('view-' + v));
+              return { targets, domViews, missingDom };
+            });
+            result.viewInventory = viewInventory;
+            if (viewInventory.missingDom.length) {
+              throw new Error('Navigation target without DOM view: ' + JSON.stringify(viewInventory.missingDom));
+            }
+
+            const viewFailures = [];
+            for (const view of viewInventory.targets) {
+              const beforeErr = errors.length;
+              const state = await page.evaluate(v => {
+                try {
+                  const ok = typeof goToView === 'function' ? goToView(v) : switchToView(v);
+                  const el = document.getElementById('view-' + v);
+                  return { ok, active: !!el?.classList.contains('active') };
+                } catch (e) {
+                  return { ok: false, active: false, thrown: String(e && e.stack || e) };
+                }
+              }, view);
+              await page.waitForTimeout(25);
+              const newErrors = errors.slice(beforeErr).filter(x => !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError|Failed to load resource/i.test(x));
+              if (state.ok === false || !state.active || state.thrown || newErrors.some(x => /TypeError|ReferenceError|SyntaxError/i.test(x))) {
+                viewFailures.push({ view, state, errors: newErrors.slice(0, 4) });
+              }
+            }
+            result.viewFailures = viewFailures;
+            if (viewFailures.length) {
+              throw new Error('Application view navigation/render failures: ' + JSON.stringify(viewFailures.slice(0, 12)));
+            }
+            result.phases.push('all-views');
+
+            console.log('[QA] critical view controls');
+            const critical = await page.evaluate(() => {
+              const out = {};
+              const open = v => { try { goToView(v); } catch {} };
+
+              open('utama');
+              out.logbook = {
+                view: !!document.getElementById('view-utama'),
+                machineDropdown: !!document.getElementById('filter-machine'),
+                paginationTarget: !!document.getElementById('list-utama')
+              };
+
+              open('patrol');
+              const patrol = document.getElementById('view-patrol');
+              out.patrol = {
+                view: !!patrol,
+                controls: patrol ? patrol.querySelectorAll('button,select,input,textarea').length : 0
+              };
+
+              open('sparepart');
+              out.sparepart = {
+                view: !!document.getElementById('view-sparepart'),
+                search: !!document.getElementById('search-sparepart'),
+                collectionFilter: !!document.getElementById('filter-sparepart-collection'),
+                sort: !!document.getElementById('sort-sparepart'),
+                pager: !!document.getElementById('sp-collect-pagination')
+              };
+
+              const help = document.getElementById('copilot-help');
+              out.copilot = {
+                fab: !!document.getElementById('copilot-fab'),
+                help: !!help,
+                helpInside: !!help?.closest('#copilot-panel')
+              };
+              return out;
+            });
+            result.critical = critical;
+            if (!critical.logbook.view || !critical.logbook.machineDropdown || !critical.logbook.paginationTarget ||
+                !critical.patrol.view || critical.patrol.controls < 1 ||
+                !critical.sparepart.view || !critical.sparepart.search || !critical.sparepart.collectionFilter || !critical.sparepart.sort || !critical.sparepart.pager ||
+                !critical.copilot.fab || !critical.copilot.help || !critical.copilot.helpInside) {
+              throw new Error('Critical view control audit failed: ' + JSON.stringify(critical));
+            }
+            result.phases.push('critical-controls');
+
             console.log('[QA] sparepart pagination');
             const selectorQA = await page.evaluate(() => {
               const p = document.createElement('div');
