@@ -1,0 +1,309 @@
+name: Restore OMODOS API Backend v80
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/restore-api-backend-v80.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CF_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+      WORKER_NAME: omodos
+      CANDIDATE_VERSION: f460d7b3-b3ce-4088-b002-c4a726da95f6
+      PRODUCTION_URL: https://omodos.offsetbmj.workers.dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start controlled backend smoke
+        shell: python
+        run: |
+          import os,json,time,urllib.request,urllib.error
+          from pathlib import Path
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CF_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+          candidate=os.environ["CANDIDATE_VERSION"]
+          endpoint=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments"
+
+          def api(method,url,payload=None):
+            h={"Authorization":"Bearer "+token,"Accept":"application/json"}
+            data=None
+            if payload is not None:
+              data=json.dumps(payload,separators=(",",":")).encode()
+              h["Content-Type"]="application/json"
+            req=urllib.request.Request(url,data=data,method=method,headers=h)
+            try:
+              with urllib.request.urlopen(req,timeout=45) as r:
+                raw=r.read()
+                return r.status,json.loads(raw.decode("utf-8")) if raw else {}
+            except urllib.error.HTTPError as e:
+              raw=e.read().decode("utf-8",errors="replace")
+              try:d=json.loads(raw)
+              except Exception:d={"raw":raw[:1200]}
+              return e.code,d
+
+          status,d=api("GET",endpoint)
+          if status!=200:
+            raise SystemExit("Cannot read active deployment: "+json.dumps(d))
+          rr=d.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No deployment rows")
+          active=[v for v in rows[0].get("versions") or [] if float(v.get("percentage") or 0)>0]
+          if len(active)!=1 or abs(float(active[0].get("percentage") or 0)-100)>0.001:
+            raise SystemExit("Expected one active 100% version: "+json.dumps(active))
+          old=str(active[0].get("version_id") or "")
+          if not old:
+            raise SystemExit("Old version missing")
+
+          Path("/tmp/old-version").write_text(old)
+          with Path(os.environ["GITHUB_ENV"]).open("a") as f:
+            f.write("OLD_VERSION="+old+"\n")
+
+          payload={
+            "strategy":"percentage",
+            "versions":[
+              {"version_id":old,"percentage":99.99},
+              {"version_id":candidate,"percentage":0.01}
+            ],
+            "annotations":{"workers/message":"OMODOS restore API backend controlled smoke"}
+          }
+          status,created=api("POST",endpoint,payload)
+          if status<200 or status>=300:
+            raise SystemExit("Backend smoke deployment HTTP "+str(status)+": "+json.dumps(created))
+
+          time.sleep(3)
+          status,verify=api("GET",endpoint)
+          vr=verify.get("result")
+          vrows=(vr.get("deployments") or []) if isinstance(vr,dict) else (vr if isinstance(vr,list) else [])
+          if not vrows:
+            raise SystemExit("No deployment row after backend smoke")
+          got={str(v.get("version_id")):float(v.get("percentage") or 0) for v in vrows[0].get("versions") or []}
+          if abs(got.get(old,0)-99.99)>0.001 or abs(got.get(candidate,0)-0.01)>0.001:
+            raise SystemExit("Verified backend smoke percentages unexpected: "+json.dumps(got))
+
+          print("[BACKEND_SMOKE] old="+old)
+          print("[BACKEND_SMOKE] candidate="+candidate)
+          print("[BACKEND_SMOKE] verified="+json.dumps(got))
+
+      - name: Force API and frontend QA to backend candidate
+        shell: python
+        run: |
+          import os,json,urllib.request,urllib.error
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+          worker=os.environ["WORKER_NAME"]
+          candidate=os.environ["CANDIDATE_VERSION"]
+          override=worker+'="'+candidate+'"'
+
+          def req(path,method="GET",body=None):
+            headers={
+              "User-Agent":"OMODOS-Backend-Restore-QA/1.0",
+              "Cache-Control":"no-cache",
+              "Cloudflare-Workers-Version-Overrides":override
+            }
+            data=None
+            if body is not None:
+              data=json.dumps(body).encode()
+              headers["Content-Type"]="text/plain;charset=utf-8"
+            request=urllib.request.Request(base+path,data=data,method=method,headers=headers)
+            try:
+              with urllib.request.urlopen(request,timeout=30) as r:
+                return r.status,r.headers,r.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          status,h,body=req("/?backend_restore_smoke=1")
+          text=body.decode("utf-8",errors="replace")
+          front={
+            "http_200":status==200,
+            "copilot_help":'id="copilot-help"' in text,
+            "cleanup_marker":"BANTUAN_PAGE_CARD_REMOVAL_V1" in text,
+            "old_injector_absent":"top.insertAdjacentElement('afterend',guide)" not in text,
+            "machine_dropdown":'id="filter-machine"' in text,
+            "omodos4":"OMODOS 4.0" in text
+          }
+          if not all(front.values()):
+            raise SystemExit("Candidate frontend regression: "+json.dumps(front))
+
+          g_status,g_h,g_body=req("/api/backup/config")
+          g_ct=(g_h.get("Content-Type") or "").lower()
+          g_text=g_body.decode("utf-8",errors="replace").lstrip()
+          g_json=("json" in g_ct) or g_text.startswith("{") or g_text.startswith("[")
+          if g_status==404 or not g_json:
+            raise SystemExit(f"GET API smoke failed: status={g_status} ct={g_ct!r} prefix={g_text[:120]!r}")
+
+          p_status,p_h,p_body=req("/api","POST",{"action":"__omodos_readonly_smoke_probe__"})
+          p_ct=(p_h.get("Content-Type") or "").lower()
+          p_text=p_body.decode("utf-8",errors="replace").lstrip()
+          p_json=("json" in p_ct) or p_text.startswith("{") or p_text.startswith("[")
+          if p_status==404 or not p_json:
+            raise SystemExit(f"POST API smoke failed: status={p_status} ct={p_ct!r} prefix={p_text[:120]!r}")
+
+          print("[CANDIDATE_QA] frontend="+json.dumps(front,sort_keys=True))
+          print("[CANDIDATE_QA] GET config status="+str(g_status)+" json="+str(g_json))
+          print("[CANDIDATE_QA] POST api status="+str(p_status)+" json="+str(p_json))
+
+      - name: Promote backend candidate to 100 percent
+        shell: python
+        run: |
+          import os,json,time,urllib.request,urllib.error
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CF_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+          candidate=os.environ["CANDIDATE_VERSION"]
+          endpoint=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments"
+
+          payload={
+            "strategy":"percentage",
+            "versions":[{"version_id":candidate,"percentage":100}],
+            "annotations":{"workers/message":"OMODOS API backend restored after forced QA PASS"}
+          }
+          req=urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload,separators=(",",":")).encode(),
+            method="POST",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json","Content-Type":"application/json"}
+          )
+          try:
+            with urllib.request.urlopen(req,timeout=45) as r:
+              r.read()
+          except urllib.error.HTTPError as e:
+            raise SystemExit("Promotion HTTP "+str(e.code)+": "+e.read().decode("utf-8",errors="replace")[:1200])
+
+          time.sleep(3)
+          get=urllib.request.Request(endpoint,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+          with urllib.request.urlopen(get,timeout=45) as r:
+            d=json.loads(r.read().decode("utf-8"))
+          rr=d.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No deployment row after promotion")
+          versions=rows[0].get("versions") or []
+          if len(versions)!=1 or str(versions[0].get("version_id"))!=candidate or abs(float(versions[0].get("percentage") or 0)-100)>0.001:
+            raise SystemExit("Promotion verification failed: "+json.dumps(versions))
+          print("[PROMOTE_BACKEND] candidate is 100%")
+
+      - name: Validate live API after promotion
+        shell: python
+        run: |
+          import os,json,time,urllib.request,urllib.error
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          base=os.environ["PRODUCTION_URL"].rstrip("/")
+
+          def req(path,method="GET",body=None):
+            headers={"User-Agent":"OMODOS-Live-Backend-Verify/1.0","Cache-Control":"no-cache"}
+            data=None
+            if body is not None:
+              data=json.dumps(body).encode()
+              headers["Content-Type"]="text/plain;charset=utf-8"
+            r=urllib.request.Request(base+path,data=data,method=method,headers=headers)
+            try:
+              with urllib.request.urlopen(r,timeout=30) as x:
+                return x.status,x.headers,x.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          last=None
+          for attempt in range(1,7):
+            root_status,root_h,root_body=req("/?live_backend_verify="+str(attempt))
+            root_text=root_body.decode("utf-8",errors="replace")
+            get_status,get_h,get_body=req("/api/backup/config")
+            get_ct=(get_h.get("Content-Type") or "").lower()
+            get_text=get_body.decode("utf-8",errors="replace").lstrip()
+            get_json=("json" in get_ct) or get_text.startswith("{") or get_text.startswith("[")
+            post_status,post_h,post_body=req("/api","POST",{"action":"__omodos_readonly_smoke_probe__"})
+            post_ct=(post_h.get("Content-Type") or "").lower()
+            post_text=post_body.decode("utf-8",errors="replace").lstrip()
+            post_json=("json" in post_ct) or post_text.startswith("{") or post_text.startswith("[")
+            last={
+              "root":root_status,
+              "copilot_help":'id="copilot-help"' in root_text,
+              "bantuan_cleanup":"BANTUAN_PAGE_CARD_REMOVAL_V1" in root_text,
+              "get_api_status":get_status,
+              "get_api_json":get_json,
+              "post_api_status":post_status,
+              "post_api_json":post_json
+            }
+            if root_status==200 and last["copilot_help"] and last["bantuan_cleanup"] and get_status!=404 and get_json and post_status!=404 and post_json:
+              break
+            time.sleep(3)
+          else:
+            raise SystemExit("Live backend validation failed: "+json.dumps(last))
+
+          report=[
+            "# OMODOS API Backend Restore",
+            "",
+            f"- Validated UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Production version: {os.environ['CANDIDATE_VERSION']}",
+            "- Frontend: current OMODOS build with Copilot-only Bantuan",
+            "- Backend source: stable v68 worker.js",
+            "- API, API subpaths, and files: Worker-first",
+            "- Durable Object: MAINTENANCE -> MaintenanceStore",
+            "- Secret bindings: inherited",
+            f"- Live root HTTP: {last['root']}",
+            f"- GET backup config: HTTP {last['get_api_status']}, JSON-like={last['get_api_json']}",
+            f"- POST API readonly probe: HTTP {last['post_api_status']}, JSON-like={last['post_api_json']}",
+            "- API 404 condition: FIXED",
+            "- Production verdict: PASS"
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/API_BACKEND_RESTORED.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[LIVE_BACKEND_QA] PASS "+json.dumps(last,sort_keys=True))
+
+      - name: Roll back on failure
+        if: failure()
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+          old=os.environ.get("OLD_VERSION","").strip()
+          if not old and Path("/tmp/old-version").exists():
+            old=Path("/tmp/old-version").read_text().strip()
+          if not old:
+            print("[ROLLBACK] no old version recorded")
+            raise SystemExit(0)
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CF_ACCOUNT_ID"]
+          worker=os.environ["WORKER_NAME"]
+          endpoint=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/{worker}/deployments?force=true"
+          payload={
+            "strategy":"percentage",
+            "versions":[{"version_id":old,"percentage":100}],
+            "annotations":{"workers/message":"Automatic rollback after OMODOS backend restore QA failure"}
+          }
+          req=urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload,separators=(",",":")).encode(),
+            method="POST",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json","Content-Type":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=45) as r:
+            d=json.loads(r.read().decode("utf-8"))
+          print("[ROLLBACK] restored="+old+" success="+str(d.get("success")))
+
+      - name: Commit restore report
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/API_BACKEND_RESTORED.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "deploy: record restored OMODOS API backend"
+          git push
