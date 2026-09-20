@@ -87,15 +87,23 @@ jobs:
           if status<200 or status>=300:
             raise SystemExit("Smoke deployment HTTP "+str(status)+": "+json.dumps(created.get("errors") or created))
 
-          result=created.get("result") or {}
-          got={str(v.get("version_id")):float(v.get("percentage") or 0) for v in result.get("versions") or []}
+          time.sleep(3)
+          verify_status,verify=api("GET",endpoint)
+          if verify_status!=200:
+            raise SystemExit("Unable to verify smoke deployment: "+json.dumps(verify))
+          vr=verify.get("result")
+          vrows=(vr.get("deployments") or []) if isinstance(vr,dict) else (vr if isinstance(vr,list) else [])
+          if not vrows:
+            raise SystemExit("Smoke deployment verification returned no rows")
+          newest=vrows[0]
+          got={str(v.get("version_id")):float(v.get("percentage") or 0) for v in newest.get("versions") or []}
           if abs(got.get(old,0)-99.99)>0.001 or abs(got.get(candidate,0)-0.01)>0.001:
-            raise SystemExit("Unexpected smoke deployment: "+json.dumps(got))
+            raise SystemExit("Unexpected verified smoke deployment: "+json.dumps(got))
 
           print("[DEPLOY_SMOKE] old="+old)
           print("[DEPLOY_SMOKE] candidate="+candidate)
-          print("[DEPLOY_SMOKE] id="+str(result.get("id") or ""))
-          time.sleep(5)
+          print("[DEPLOY_SMOKE] id="+str(newest.get("id") or ""))
+          time.sleep(3)
 
       - name: Force HTTP QA to candidate
         shell: python
@@ -184,11 +192,22 @@ jobs:
             raw=e.read().decode("utf-8",errors="replace")
             raise SystemExit("Promotion HTTP "+str(e.code)+": "+raw[:1500])
 
-          versions=(d.get("result") or {}).get("versions") or []
+          time.sleep(3)
+          verify_req=urllib.request.Request(
+            endpoint,
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(verify_req,timeout=45) as r:
+            verify=json.loads(r.read().decode("utf-8"))
+          vr=verify.get("result")
+          rows=(vr.get("deployments") or []) if isinstance(vr,dict) else (vr if isinstance(vr,list) else [])
+          if not rows:
+            raise SystemExit("Promotion verification returned no deployment rows")
+          versions=rows[0].get("versions") or []
           if len(versions)!=1 or str(versions[0].get("version_id"))!=candidate or abs(float(versions[0].get("percentage") or 0)-100)>0.001:
-            raise SystemExit("Unexpected promotion result: "+json.dumps(versions))
+            raise SystemExit("Unexpected verified promotion result: "+json.dumps(versions))
           print("[PROMOTE] v81 at 100%")
-          time.sleep(5)
+          time.sleep(3)
 
       - name: Validate production live
         shell: python
