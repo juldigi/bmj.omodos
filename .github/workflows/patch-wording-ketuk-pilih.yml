@@ -1,0 +1,117 @@
+name: Patch UI wording Ketuk to Pilih
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-wording-ketuk-pilih.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-wording:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Replace standalone user-facing wording
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          allowed={".html",".js",".css",".json",".txt",".md"}
+          files=[]
+          total=0
+          contexts=[]
+
+          for p in Path("public").rglob("*"):
+              if not p.is_file() or p.suffix.lower() not in allowed:
+                  continue
+              try:
+                  s=p.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              matches=list(re.finditer(r"\b(?:Ketuk|ketuk|KETUK)\b",s))
+              if not matches:
+                  continue
+              total += len(matches)
+              files.append(p)
+              for m in matches[:20]:
+                  line=s.count("\n",0,m.start())+1
+                  contexts.append(f"{p}:{line}:{m.group(0)}")
+
+              s=re.sub(r"\bKETUK\b","PILIH",s)
+              s=re.sub(r"\bKetuk\b","Pilih",s)
+              s=re.sub(r"\bketuk\b","pilih",s)
+              p.write_text(s,encoding="utf-8")
+
+          print(f"[WORDING] replacements={total} files={len(files)}")
+          for c in contexts[:80]:
+              print("[WORDING_CONTEXT] "+c)
+
+          if total==0:
+              print("[WORDING] No standalone Ketuk wording remains; nothing to patch.")
+
+      - name: Validate frontend syntax and login boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/omodos4/hotfix.js
+          grep -q 'id="form-login"' public/index.html
+          grep -q "action: 'login'" public/index.html
+          grep -q 'id="v4-nav-group"' public/index.html
+          grep -q 'OMODOS4_FRONTEND_SAFE_V3' public/index.html
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile
+          s=Path("public/index.html").read_text(encoding="utf-8")
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          code="\n".join(blocks)
+          tmp=Path("/tmp/omodos-inline-wording.js")
+          tmp.write_text(code,encoding="utf-8")
+          print("[WORDING] inline_scripts=",len(blocks))
+          raise SystemExit(subprocess.call(["node","--check",str(tmp)]))
+          PY
+
+      - name: Assert wording is gone
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          allowed={".html",".js",".css",".json",".txt",".md"}
+          remaining=[]
+          for p in Path("public").rglob("*"):
+              if not p.is_file() or p.suffix.lower() not in allowed:
+                  continue
+              try:
+                  s=p.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              if re.search(r"\b(?:Ketuk|ketuk|KETUK)\b",s):
+                  remaining.append(str(p))
+          if remaining:
+              raise SystemExit("Standalone Ketuk remains in: "+", ".join(remaining))
+          print("[WORDING] all standalone Ketuk wording replaced")
+
+      - name: Commit wording-only patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public
+          if git diff --cached --quiet; then
+            echo "No public wording changes."
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m "ui: replace Ketuk wording with Pilih"
+          git push origin HEAD:main
