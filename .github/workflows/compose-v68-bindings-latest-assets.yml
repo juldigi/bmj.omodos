@@ -1,0 +1,142 @@
+name: Compose OMODOS Version With V68 Bindings
+
+on:
+  push:
+    branches:
+      - fix/login-backend-json-404
+    paths:
+      - ".github/workflows/compose-v68-bindings-latest-assets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose staged version
+        shell: python
+        run: |
+          import os,json,urllib.request,urllib.error
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          worker="omodos"
+          v68_id="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          latest_assets_version="7230ef1d-9d47-421f-8c1b-5ebbf521950f"
+
+          def request_json(url,method="GET",body=None):
+              data=None
+              headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+              if body is not None:
+                  data=json.dumps(body,separators=(",",":")).encode("utf-8")
+                  headers["Content-Type"]="application/json"
+              req=urllib.request.Request(url,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=60) as r:
+                      raw=r.read()
+                      return json.loads(raw.decode("utf-8")) if raw else {}
+              except urllib.error.HTTPError as e:
+                  raw=e.read()
+                  raise SystemExit(f"HTTP {e.code}: {raw[:2500].decode('utf-8',errors='replace')}")
+
+          base=f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/workers/{worker}/versions"
+          v68=(request_json(base+f"/{v68_id}?include=modules").get("result") or {})
+          front=(request_json(base+f"/{latest_assets_version}?include=modules").get("result") or {})
+
+          if not (v68.get("modules") or []):
+              raise SystemExit("v68 modules unavailable")
+          if not front.get("assets"):
+              raise SystemExit("Latest frontend version has no assets metadata")
+
+          # Reuse the exact healthy v68 runtime code.
+          modules=v68.get("modules") or []
+
+          # Every non-asset binding comes directly from v68. No secret value is
+          # read or written; Cloudflare resolves it server-side.
+          bindings=[]
+          inherited=[]
+          for b in v68.get("bindings") or []:
+              if not isinstance(b,dict) or not b.get("name"):
+                  continue
+              name=str(b.get("name"))
+              typ=str(b.get("type") or "")
+              if name=="ASSETS" or typ=="assets":
+                  continue
+              bindings.append({
+                  "type":"inherit",
+                  "name":name,
+                  "version_id":v68_id
+              })
+              inherited.append({"name":name,"source_type":typ})
+
+          bindings.append({"type":"assets","name":"ASSETS"})
+
+          body={
+              "deploy":False,
+              "main_module":v68.get("main_module") or "worker.js",
+              "compatibility_date":v68.get("compatibility_date"),
+              "compatibility_flags":v68.get("compatibility_flags") or [],
+              "modules":modules,
+              "bindings":bindings,
+              "assets":front.get("assets"),
+              "annotations":{
+                  "workers/message":"OMODOS healthy v68 backend + latest frontend assets + v68 binding inheritance",
+                  "workers/tag":"omodos-help-login-fixed"
+              }
+          }
+          body={k:v for k,v in body.items() if v not in (None,"",[])}
+
+          created=request_json(base,method="POST",body=body)
+          result=created.get("result") or {}
+          new_id=str(result.get("id") or "")
+          if not new_id:
+              raise SystemExit("No new staged version ID returned")
+
+          detail=(request_json(base+f"/{new_id}?include=modules").get("result") or {})
+          names=sorted(str(b.get("name")) for b in (detail.get("bindings") or []) if isinstance(b,dict) and b.get("name"))
+          required={"MAINTENANCE","ASSETS","GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"}
+          missing=sorted(required-set(names))
+
+          report=[
+              "# OMODOS Composed Staged Version",
+              "",
+              f"- UTC: {datetime.now(timezone.utc).isoformat()}",
+              f"- New version: {new_id}",
+              f"- Runtime code source: v68 / {v68_id}",
+              f"- Frontend asset source: {latest_assets_version}",
+              f"- Bindings present: {', '.join(names)}",
+              f"- Missing required bindings: {', '.join(missing) if missing else 'none'}",
+              f"- Version URLs: {json.dumps(detail.get('urls') or [])}",
+              "",
+              "## Result",
+              "- PASS" if not missing else "- FAIL",
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/COMPOSED_VERSION_RESULT.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+          Path("/tmp/composed-version-id").write_text(new_id,encoding="utf-8")
+          print("[COMPOSED_VERSION]",new_id)
+          print("[BINDINGS]",names)
+          if missing:
+              raise SystemExit("Composed version missing bindings: "+", ".join(missing))
+
+      - name: Commit sanitized staged report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/COMPOSED_VERSION_RESULT.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: stage OMODOS version with preserved v68 bindings"
+          git push
