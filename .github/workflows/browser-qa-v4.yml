@@ -243,7 +243,8 @@ jobs:
               const targets = [...new Set([...document.querySelectorAll('[data-view]')].map(x => String(x.dataset.view || '').trim()).filter(Boolean))].sort();
               const domViews = [...document.querySelectorAll('[id^="view-"]')].map(x => x.id.slice(5)).sort();
               const missingDom = targets.filter(v => !document.getElementById('view-' + v));
-              return { targets, domViews, missingDom };
+              const allViews = [...new Set([...targets, ...domViews])].sort();
+              return { targets, domViews, allViews, missingDom };
             });
             result.viewInventory = viewInventory;
             if (viewInventory.missingDom.length) {
@@ -251,7 +252,7 @@ jobs:
             }
 
             const viewFailures = [];
-            for (const view of viewInventory.targets) {
+            for (const view of viewInventory.allViews) {
               const beforeErr = errors.length;
               const state = await page.evaluate(v => {
                 try {
