@@ -1401,6 +1401,386 @@ document.addEventListener('click',function(e){
 window.OMODOS4=Object.assign(window.OMODOS4||{},{
  interactionsVersion:'1',
  interactionFeatures:Object.keys(AI_CONFIG).map(Number).concat([63,64,78,97,98]),
- actionReady:actionReady
+ actionReady:actionReady,
+ interactiveAction:v4Action
+});
+})();
+
+/* OMODOS4_SMART_FIELD_V1
+   Progressive-enhancement Smart Field tools.
+   Voice / QR / NFC are enabled only when the browser exposes a safe native API.
+   All paths end in existing Logbook/Patrol workflows; no duplicate source-of-truth is created. */
+(function(){
+'use strict';
+
+var SF_QR_STREAM=null;
+var SF_QR_RAF=0;
+var SF_NFC_ABORT=null;
+var SF_SPEECH=null;
+var SF_LAST_MACHINE='';
+
+function e(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openN(n){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!el&&parseInt(el.textContent,10)===Number(n);
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function info(t,kind){
+ return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+e(t)+'</span></div>';
+}
+function names(){
+ var set=new Set();
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(err){}
+ try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(err){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function opts(blank){
+ var o=blank?'<option value="">'+e(blank)+'</option>':'';
+ return o+names().map(function(n){return '<option value="'+e(n)+'">'+e(n)+'</option>'}).join('');
+}
+function norm(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim()}
+function findMachine(raw){
+ var value=String(raw||'').trim();
+ if(!value)return '';
+ try{
+  var obj=JSON.parse(value);
+  value=obj.machine||obj.machineCode||obj.kodeMesin||obj.kode||obj.name||obj.namaMesin||value;
+ }catch(err){}
+ try{
+  var u=new URL(value,location.href),q=u.searchParams.get('machine')||u.searchParams.get('machineCode')||u.searchParams.get('kode')||u.searchParams.get('kodeMesin');
+  if(q)value=q;
+ }catch(err){}
+ var n=norm(value),list=names();
+ var exact=list.find(function(x){return norm(x)===n});
+ if(exact)return exact;
+ return list.find(function(x){var a=norm(x);return a&&n&&(n.includes(a)||a.includes(n))})||'';
+}
+function stopQr(){
+ if(SF_QR_RAF){cancelAnimationFrame(SF_QR_RAF);SF_QR_RAF=0}
+ if(SF_QR_STREAM){try{SF_QR_STREAM.getTracks().forEach(function(t){t.stop()})}catch(err){}SF_QR_STREAM=null}
+}
+function stopNfc(){if(SF_NFC_ABORT){try{SF_NFC_ABORT.abort()}catch(err){}SF_NFC_ABORT=null}}
+function stopSpeech(){if(SF_SPEECH){try{SF_SPEECH.stop()}catch(err){}SF_SPEECH=null}}
+function stopSensors(){stopQr();stopNfc();stopSpeech()}
+function navigate(route){
+ try{
+  if(typeof window.switchToView==='function'){window.switchToView(route);return true}
+  if(typeof window.goToView==='function'){return window.goToView(route)!==false}
+  if(typeof switchToView==='function'){switchToView(route);return true}
+  if(typeof goToView==='function'){return goToView(route)!==false}
+ }catch(err){}
+ var b=document.querySelector('.nav-btn[data-view="'+route+'"],.bottom-nav-btn[data-view="'+route+'"]');
+ if(b){b.click();return true}
+ return false;
+}
+function findMachineRecord(name){
+ var n=norm(name),row=null;
+ try{row=(Array.isArray(MACHINES)?MACHINES:[]).find(function(m){
+  return norm(m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin)===n;
+ })||null}catch(err){}
+ return row;
+}
+function setSelectByText(sel,value){
+ if(!sel||!value)return false;
+ var n=norm(value),found=null;
+ Array.from(sel.options||[]).some(function(o){
+  if(norm(o.value)===n||norm(o.textContent)===n){found=o;return true}
+  return false;
+ });
+ if(!found)return false;
+ sel.value=found.value;sel.dispatchEvent(new Event('change',{bubbles:true}));return true;
+}
+function prefillLogbook(machine,draft){
+ if(!navigate('input'))return false;
+ setTimeout(function(){
+  var rec=findMachineRecord(machine)||{};
+  var code=rec['Kode Mesin']||rec.kodeMesin||rec.KodeMesin||'';
+  var name=rec['Nama Mesin']||rec.namaMesin||machine||'';
+  if(code)setSelectByText(document.getElementById('select-kodeMesin'),code);
+  if(name)setSelectByText(document.getElementById('select-namaMesin'),name);
+  var ta=document.getElementById('ta-deskripsiMasalah');
+  if(ta&&draft){
+   var old=String(ta.value||'').trim();
+   ta.value=old?old+'\n'+draft:draft;
+   ta.dispatchEvent(new Event('input',{bubbles:true}));
+   ta.focus();
+  }
+ },80);
+ return true;
+}
+function openPatrol(machine){
+ SF_LAST_MACHINE=machine||SF_LAST_MACHINE;
+ navigate('patrol');
+}
+function backendRead(action,payload){
+ if(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function')return window.OMODOS4.serverRead(action,payload||{});
+ return Promise.resolve(null);
+}
+function backendAction(action,payload){
+ if(window.OMODOS4&&typeof window.OMODOS4.interactiveAction==='function')return window.OMODOS4.interactiveAction(action,payload||{});
+ return Promise.reject(new Error('Backend interaction belum tersedia.'));
+}
+function busy(btn,on,label){
+ if(!btn)return;
+ if(on){btn.dataset.old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> '+e(label||'Memproses…')}
+ else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
+}
+function selected(sec,selector){var el=sec&&sec.querySelector(selector);return el?el.value:''}
+function missionList(data,mode){
+ if(!data)return '<div class="v4-empty">Backend V4 belum tersedia.</div>';
+ var list=[];
+ if(mode==='journey')list=Array.isArray(data.journey)?data.journey:[];
+ else list=Array.isArray(data.missions)?data.missions:[];
+ if(!list.length)return '<div class="v4-empty">BELUM CUKUP DATA untuk konteks ini.</div>';
+ return '<div class="v4-sf-list">'+list.slice(0,30).map(function(m){
+  var machine=m.machine||m.Machine||'-';
+  var title=mode==='journey'?('Mission '+(m.order||'')):((m.priority||'')+' '+machine);
+  var detail=m.reason||((m.checklist||[]).length+' checklist')||'Evidence mission';
+  return '<div class="v4-sf-item"><div><strong>'+e(title)+'</strong><small>'+e(detail)+'</small></div><button class="btn btn-sm" data-v4-sf-open-patrol="'+e(machine)+'">Buka Patrol</button></div>';
+ }).join('')+'</div>';
+}
+function checklistHtml(data,machine){
+ var missions=Array.isArray(data&&data.missions)?data.missions:[];
+ var n=norm(machine),m=missions.find(function(x){return norm(x.machine)===n})||missions[0];
+ if(!m)return '<div class="v4-empty">BELUM CUKUP DATA — checklist dinamis tidak tersedia.</div>';
+ var items=Array.isArray(m.checklist)?m.checklist:[];
+ return '<div class="v4-sf-check-head"><strong>'+e(m.machine||machine)+'</strong><span>'+e(m.priority||'')+' • '+e(m.reason||'')+'</span></div>'+
+ (items.length?'<div class="v4-sf-checklist">'+items.slice(0,40).map(function(it,i){
+  var label=it.label||it.item||it.name||it['Item Pemeriksaan']||it['Checklist']||('Check '+(i+1));
+  var source=it.source||it.labelType||it.status||'RECORDED / DERIVED';
+  return '<label><input type="checkbox" disabled><span><strong>'+e(label)+'</strong><small>'+e(source)+'</small></span></label>';
+ }).join('')+'</div>':'<div class="v4-empty">Tidak ada checklist untuk mesin ini.</div>')+
+ info('Checklist V4 adalah decision support. Pencatatan resmi tetap dilakukan di Patrol existing.','safe');
+}
+function proofHtml(data,machine){
+ var missions=Array.isArray(data&&data.missions)?data.missions:[],n=norm(machine);
+ var m=missions.find(function(x){return norm(x.machine)===n})||missions[0];
+ var rows=Array.isArray(m&&m.beforeAfterProof)?m.beforeAfterProof:[];
+ if(!rows.length)return '<div class="v4-empty">NOT AVAILABLE — belum ada Before–After Proof tercatat untuk mesin ini.</div>';
+ return '<div class="v4-sf-proof">'+rows.slice(0,16).map(function(r){
+  return '<div><strong>'+e(r.theme||r.id||'Improvement')+'</strong><span>'+e(r.date||'')+'</span><small>Status: '+e(r.status||'RECORDED')+' • Benefit: '+e(r.benefit||'NOT AVAILABLE')+'</small></div>';
+ }).join('')+'</div>';
+}
+function mountMissionFeature(n){
+ var h=host();if(!h||!openN(n))return;
+ var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
+ var titles={21:'Technician Mission Mode',23:'Dynamic Checklist',26:'Before–After Proof',29:'Maintenance Journey'};
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature=String(n);
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">SMART FIELD</span><h3>'+e(titles[n])+'</h3></div><span class="v4-no-write">USES EXISTING DATA</span></div>'+
+ '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts(n===29?'Semua mesin':'Pilih mesin')+'</select></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sf-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat '+e(titles[n])+'</button>'+
+ (n===21||n===23?'<button class="btn btn-sm" data-v4-sf-patrol-current>Buka Patrol Existing</button>':'')+
+ '</div><div data-v4-sf-output>'+info('Data berasal dari Logbook/Patrol/Project existing; tidak membuat input ganda.','safe')+'</div>';
+ h.prepend(sec);
+}
+async function loadMission(btn,n){
+ var sec=btn.closest('.v4-sf-interaction'),machine=selected(sec,'[data-v4-sf-machine]'),out=sec.querySelector('[data-v4-sf-output]');
+ if(n!==29&&!machine){out.innerHTML=info('Pilih mesin terlebih dahulu.','warn');return}
+ busy(btn,true,'Memuat');
+ try{
+  var d=await backendRead('v4.getFieldMission',machine?{machine:machine}:{});
+  if(n===23)out.innerHTML=checklistHtml(d,machine);
+  else if(n===26)out.innerHTML=proofHtml(d,machine);
+  else out.innerHTML=missionList(d,n===29?'journey':'missions');
+ }catch(err){out.innerHTML=info(err.message||String(err),'error')}
+ finally{busy(btn,false)}
+}
+function mountTroubleshoot(){
+ var h=host();if(!h||!openN(22))return;
+ var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='22';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">SMART TROUBLESHOOTING</span><h3>Symptom → Inspection → Evidence → Next Step</h3></div><span class="v4-no-write">HUMAN REVIEW</span></div>'+
+ '<div class="v4-form-grid"><label>Mesin *<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label><label class="v4-form-wide">Symptom / masalah *<textarea rows="4" data-v4-sf-symptom placeholder="Jelaskan gejala yang terlihat, terdengar, atau terukur."></textarea></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sf-troubleshoot><i class="ph-bold ph-stethoscope"></i> Susun Troubleshooting</button></div><div data-v4-sf-output>'+info('OMODOS mencari evidence internal; hasil bukan root cause final.','safe')+'</div>';
+ h.prepend(sec);
+}
+async function troubleshoot(btn){
+ var sec=btn.closest('.v4-sf-interaction'),machine=selected(sec,'[data-v4-sf-machine]'),q=selected(sec,'[data-v4-sf-symptom]'),out=sec.querySelector('[data-v4-sf-output]');
+ if(!machine||!q.trim()){out.innerHTML=info('Pilih mesin dan isi symptom terlebih dahulu.','warn');return}
+ busy(btn,true,'Menganalisis');
+ try{
+  var d=await backendAction('v4.aiAsk',{machine:machine,query:q.trim(),purpose:'troubleshooting'});
+  var sum=d&&d.summary?d.summary:(d&&d.answer)||'Evidence tersedia.';
+  out.innerHTML='<div class="v4-ai-answer">'+e(sum).replace(/\n/g,'<br>')+'</div>'+info('Confidence: '+(d&&d.confidence||'not stated')+'. Human inspection tetap wajib.','safe');
+ }catch(err){out.innerHTML=info(err.message||String(err),'error')}
+ finally{busy(btn,false)}
+}
+function mountVoice(){
+ var h=host();if(!h||!openN(24))return;
+ var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
+ var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='24';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">VOICE LOGBOOK</span><h3>Dictation Draft</h3></div><span class="v4-no-write">DRAFT ONLY</span></div>'+
+ '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-sf-machine>'+opts('Pilih jika relevan')+'</select></label><label class="v4-form-wide">Hasil dikte<textarea rows="5" data-v4-voice-text placeholder="Hasil suara muncul di sini. Bisa diedit sebelum dikirim ke form Logbook."></textarea></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-voice-start '+(SR?'':'disabled')+'><i class="ph-bold ph-microphone"></i> Mulai Dikte</button><button class="btn btn-sm" data-v4-voice-to-logbook><i class="ph-bold ph-arrow-square-out"></i> Kirim Draft ke Form Logbook</button></div>'+
+ '<div data-v4-sf-output>'+info(SR?'Speech Recognition tersedia. Tidak ada data yang disimpan sebelum form Logbook disubmit.':'Speech Recognition tidak didukung browser ini. Ketik manual pada draft lalu kirim ke form Logbook.','safe')+'</div>';
+ h.prepend(sec);
+}
+function startVoice(btn){
+ var sec=btn.closest('.v4-sf-interaction'),ta=sec.querySelector('[data-v4-voice-text]'),out=sec.querySelector('[data-v4-sf-output]');
+ var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){out.innerHTML=info('Speech Recognition tidak tersedia di browser ini.','warn');return}
+ stopSpeech();
+ try{
+  var rec=new SR();SF_SPEECH=rec;rec.lang='id-ID';rec.interimResults=true;rec.continuous=true;
+  var base=ta.value.trim();
+  rec.onresult=function(ev){
+   var finalText='',interim='';
+   for(var i=ev.resultIndex;i<ev.results.length;i++){var t=ev.results[i][0].transcript;if(ev.results[i].isFinal)finalText+=t+' ';else interim+=t}
+   if(finalText){base=(base?base+' ':'')+finalText.trim()}
+   ta.value=(base+(interim?' '+interim:'')).trim();
+  };
+  rec.onerror=function(ev){out.innerHTML=info('Dikte berhenti: '+(ev.error||'speech error')+'. Draft yang sudah ada tetap dipertahankan.','warn');stopSpeech()};
+  rec.onend=function(){if(SF_SPEECH===rec){SF_SPEECH=null;btn.disabled=false;btn.innerHTML='<i class="ph-bold ph-microphone"></i> Mulai Dikte'}};
+  btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-stop-circle"></i> Mendengarkan…';rec.start();
+  out.innerHTML=info('Mendengarkan. Ucapkan deskripsi masalah; hasil masih berupa draft.','safe');
+ }catch(err){out.innerHTML=info(err.message||String(err),'error');stopSpeech()}
+}
+function mountPhoto(){
+ var h=host();if(!h||!openN(25))return;
+ var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='25';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PHOTO DIAGNOSIS ASSISTANT</span><h3>Evidence Capture</h3></div><span class="v4-no-write">NO FALSE VISUAL CLAIM</span></div>'+
+ info('Backend V4 saat ini tidak memiliki model visual terverifikasi. OMODOS tidak akan mengarang diagnosis dari foto. Fitur ini mengarahkan foto ke attachment Logbook existing dan diagnosis berbasis symptom/evidence tetap dilakukan manusia/AI tekstual.','warn')+
+ '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label><label class="v4-form-wide">Symptom singkat<textarea rows="3" data-v4-photo-note placeholder="Contoh: suara abnormal di feeder, bekas gesekan terlihat di sisi operator."></textarea></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-photo-logbook><i class="ph-bold ph-camera"></i> Buka Logbook + Kamera</button><button class="btn btn-sm" data-v4-photo-text-ai><i class="ph-bold ph-brain"></i> Analisis Symptom Teks</button></div><div data-v4-sf-output></div>';
+ h.prepend(sec);
+}
+function photoToLogbook(btn){
+ var sec=btn.closest('.v4-sf-interaction'),machine=selected(sec,'[data-v4-sf-machine]'),draft=selected(sec,'[data-v4-photo-note]');
+ prefillLogbook(machine,draft);
+ setTimeout(function(){
+  var input=document.getElementById('file-input');
+  try{if(input&&typeof openCameraCapture==='function')openCameraCapture(input,{wantsPhoto:true,wantsVideo:false});else if(input)input.click()}catch(err){if(input)input.click()}
+ },180);
+}
+async function photoTextAi(btn){
+ var sec=btn.closest('.v4-sf-interaction'),machine=selected(sec,'[data-v4-sf-machine]'),q=selected(sec,'[data-v4-photo-note]'),out=sec.querySelector('[data-v4-sf-output]');
+ if(!q.trim()){out.innerHTML=info('Isi symptom teks terlebih dahulu.','warn');return}
+ busy(btn,true,'Menganalisis');
+ try{var d=await backendAction('v4.aiAsk',{machine:machine,query:q.trim(),purpose:'troubleshooting'});out.innerHTML='<div class="v4-ai-answer">'+e(d.summary||'Evidence tersedia.').replace(/\n/g,'<br>')+'</div>'+info('Foto tidak dianalisis oleh model visual; jawaban hanya berdasarkan teks + evidence OMODOS.','safe')}
+ catch(err){out.innerHTML=info(err.message||String(err),'error')}finally{busy(btn,false)}
+}
+function mountQr(){
+ var h=host();if(!h||!openN(27))return;
+ var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
+ var supported=!!(window.BarcodeDetector&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='27';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">QR MACHINE ENTRY</span><h3>Scan or Manual Fallback</h3></div><span class="v4-no-write">'+(supported?'QR API READY':'MANUAL FALLBACK')+'</span></div>'+
+ '<div class="v4-qr-zone"><video data-v4-qr-video playsinline muted style="display:none"></video><div data-v4-qr-status>'+info(supported?'Kamera baru aktif setelah tombol Scan dipilih.':'Browser ini tidak menyediakan BarcodeDetector QR. Gunakan fallback mesin manual.','safe')+'</div></div>'+
+ '<div class="v4-form-grid"><label>Fallback Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-qr-start '+(supported?'':'disabled')+'><i class="ph-bold ph-qr-code"></i> Scan QR</button><button class="btn btn-sm" data-v4-qr-manual>Gunakan Mesin Terpilih</button></div><div data-v4-qr-result></div>';
+ h.prepend(sec);
+}
+async function startQr(btn){
+ var sec=btn.closest('.v4-sf-interaction'),video=sec.querySelector('[data-v4-qr-video]'),status=sec.querySelector('[data-v4-qr-status]'),result=sec.querySelector('[data-v4-qr-result]');
+ if(!(window.BarcodeDetector&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){status.innerHTML=info('QR native API tidak tersedia.','warn');return}
+ stopQr();busy(btn,true,'Membuka kamera');
+ try{
+  var detector=new BarcodeDetector({formats:['qr_code']});
+  SF_QR_STREAM=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  video.srcObject=SF_QR_STREAM;video.style.display='block';await video.play();busy(btn,false);
+  status.innerHTML=info('Arahkan kamera ke QR mesin. Tidak ada foto yang disimpan.','safe');
+  async function loop(){
+   if(!SF_QR_STREAM||!document.body.contains(video))return;
+   try{
+    var codes=await detector.detect(video);
+    if(codes&&codes.length){
+     var raw=codes[0].rawValue||'',machine=findMachine(raw);stopQr();video.style.display='none';
+     if(machine){SF_LAST_MACHINE=machine;result.innerHTML=info('QR cocok dengan mesin: '+machine+'.','safe')+'<button class="btn btn-primary btn-sm" data-v4-tag-to-logbook="'+e(machine)+'">Buka Logbook Mesin</button>'}
+     else result.innerHTML=info('QR terbaca tetapi tidak cocok dengan master mesin OMODOS: '+raw,'warn');
+     return;
+    }
+   }catch(err){}
+   SF_QR_RAF=requestAnimationFrame(loop);
+  }
+  loop();
+ }catch(err){stopQr();busy(btn,false);video.style.display='none';status.innerHTML=info('Kamera/QR tidak dapat digunakan: '+(err.message||err),'warn')}
+}
+function mountNfc(){
+ var h=host();if(!h||!openN(28))return;
+ var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
+ var supported='NDEFReader' in window;
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='28';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">NFC MAINTENANCE TAG</span><h3>Read-only Tag Entry</h3></div><span class="v4-no-write">'+(supported?'WEB NFC READY':'MANUAL FALLBACK')+'</span></div>'+
+ info(supported?'NFC dibaca hanya setelah Anda memilih Scan NFC.':'Web NFC tidak didukung browser/perangkat ini. Fallback manual tetap tersedia; tidak ada error atau fitur palsu.','safe')+
+ '<div class="v4-form-grid"><label>Fallback Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-nfc-start '+(supported?'':'disabled')+'><i class="ph-bold ph-wifi-high"></i> Scan NFC</button><button class="btn btn-sm" data-v4-nfc-manual>Gunakan Mesin Terpilih</button></div><div data-v4-nfc-result></div>';
+ h.prepend(sec);
+}
+async function startNfc(btn){
+ var sec=btn.closest('.v4-sf-interaction'),out=sec.querySelector('[data-v4-nfc-result]');
+ if(!('NDEFReader' in window)){out.innerHTML=info('Web NFC tidak tersedia.','warn');return}
+ stopNfc();busy(btn,true,'Menunggu tag');
+ try{
+  var controller=new AbortController();SF_NFC_ABORT=controller;var reader=new NDEFReader();await reader.scan({signal:controller.signal});
+  out.innerHTML=info('Dekatkan perangkat ke NFC tag mesin.','safe');
+  reader.onreading=function(ev){
+   var texts=[];
+   try{
+    for(var rec of ev.message.records){
+     if(rec.recordType==='text')texts.push(new TextDecoder(rec.encoding||'utf-8').decode(rec.data));
+     else if(rec.data)texts.push(new TextDecoder().decode(rec.data));
+    }
+   }catch(err){}
+   var raw=texts.join(' ')||ev.serialNumber||'',machine=findMachine(raw);stopNfc();busy(btn,false);
+   if(machine){SF_LAST_MACHINE=machine;out.innerHTML=info('NFC cocok dengan mesin: '+machine+'.','safe')+'<button class="btn btn-primary btn-sm" data-v4-tag-to-logbook="'+e(machine)+'">Buka Logbook Mesin</button>'}
+   else out.innerHTML=info('Tag terbaca tetapi belum cocok dengan master mesin OMODOS: '+raw,'warn');
+  };
+  reader.onreadingerror=function(){out.innerHTML=info('Tag terdeteksi tetapi data tidak dapat dibaca.','warn')};
+ }catch(err){stopNfc();busy(btn,false);out.innerHTML=info('NFC tidak dapat digunakan: '+(err.message||err),'warn')}
+}
+function mountOffline(){
+ var h=host();if(!h||!openN(30))return;
+ var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
+ var q=[];
+ try{q=JSON.parse(localStorage.getItem('logbook_pending_sync_queue')||'[]')}catch(err){}
+ var online=navigator.onLine;
+ var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='30';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OFFLINE EXPEDITION MODE</span><h3>Existing Offline Queue Status</h3></div><span class="v4-no-write">'+(online?'ONLINE':'OFFLINE')+'</span></div>'+
+ '<div class="v4-statline"><div><b>'+(online?'Online':'Offline')+'</b><span>Browser network</span></div><div><b>'+q.length+'</b><span>Pending sync queue</span></div><div><b>Existing</b><span>Uses base OMODOS queue</span></div></div>'+
+ info('OMODOS existing sudah menyimpan request gagal ke antrean lokal dan menyinkron otomatis saat koneksi kembali. V4 tidak membuat antrean kedua.','safe')+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-offline-logbook><i class="ph-bold ph-notebook"></i> Buka Input Logbook</button><button class="btn btn-sm" data-v4-offline-refresh>Refresh Status</button></div>';
+ h.prepend(sec);
+}
+function mount(n){
+ if([21,23,26,29].includes(n))mountMissionFeature(n);
+ else if(n===22)mountTroubleshoot();
+ else if(n===24)mountVoice();
+ else if(n===25)mountPhoto();
+ else if(n===27)mountQr();
+ else if(n===28)mountNfc();
+ else if(n===30)mountOffline();
+}
+document.addEventListener('click',function(ev){
+ var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
+ if(tile){
+  stopSensors();
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=21&&n<=30)setTimeout(function(){if(openN(n))mount(n)},0);
+  return;
+ }
+ var load=ev.target.closest&&ev.target.closest('[data-v4-sf-load]');if(load){ev.preventDefault();loadMission(load,Number(load.getAttribute('data-v4-sf-load')));return}
+ var op=ev.target.closest&&ev.target.closest('[data-v4-sf-open-patrol]');if(op){ev.preventDefault();openPatrol(op.getAttribute('data-v4-sf-open-patrol'));return}
+ var pc=ev.target.closest&&ev.target.closest('[data-v4-sf-patrol-current]');if(pc){ev.preventDefault();var sec=pc.closest('.v4-sf-interaction');openPatrol(selected(sec,'[data-v4-sf-machine]'));return}
+ var tr=ev.target.closest&&ev.target.closest('[data-v4-sf-troubleshoot]');if(tr){ev.preventDefault();troubleshoot(tr);return}
+ var vs=ev.target.closest&&ev.target.closest('[data-v4-voice-start]');if(vs){ev.preventDefault();startVoice(vs);return}
+ var vl=ev.target.closest&&ev.target.closest('[data-v4-voice-to-logbook]');if(vl){ev.preventDefault();var sec=vl.closest('.v4-sf-interaction');prefillLogbook(selected(sec,'[data-v4-sf-machine]'),selected(sec,'[data-v4-voice-text]'));return}
+ var pl=ev.target.closest&&ev.target.closest('[data-v4-photo-logbook]');if(pl){ev.preventDefault();photoToLogbook(pl);return}
+ var pa=ev.target.closest&&ev.target.closest('[data-v4-photo-text-ai]');if(pa){ev.preventDefault();photoTextAi(pa);return}
+ var qs=ev.target.closest&&ev.target.closest('[data-v4-qr-start]');if(qs){ev.preventDefault();startQr(qs);return}
+ var qm=ev.target.closest&&ev.target.closest('[data-v4-qr-manual]');if(qm){ev.preventDefault();var sec=qm.closest('.v4-sf-interaction'),m=selected(sec,'[data-v4-sf-machine]');if(m)prefillLogbook(m,'');return}
+ var ns=ev.target.closest&&ev.target.closest('[data-v4-nfc-start]');if(ns){ev.preventDefault();startNfc(ns);return}
+ var nm=ev.target.closest&&ev.target.closest('[data-v4-nfc-manual]');if(nm){ev.preventDefault();var sec=nm.closest('.v4-sf-interaction'),m=selected(sec,'[data-v4-sf-machine]');if(m)prefillLogbook(m,'');return}
+ var tag=ev.target.closest&&ev.target.closest('[data-v4-tag-to-logbook]');if(tag){ev.preventDefault();prefillLogbook(tag.getAttribute('data-v4-tag-to-logbook'),'');return}
+ var ol=ev.target.closest&&ev.target.closest('[data-v4-offline-logbook]');if(ol){ev.preventDefault();navigate('input');return}
+ var orf=ev.target.closest&&ev.target.closest('[data-v4-offline-refresh]');if(orf){ev.preventDefault();mountOffline();return}
+},false);
+window.addEventListener('pagehide',stopSensors);
+document.addEventListener('visibilitychange',function(){if(document.hidden)stopSensors()});
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ smartFieldVersion:'1',
+ smartFieldFeatures:[21,22,23,24,25,26,27,28,29,30],
+ stopSmartFieldSensors:stopSensors
 });
 })();

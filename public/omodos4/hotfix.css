@@ -154,3 +154,15 @@
 .v4-war-detail-card h4{font-size:11px;margin:8px 0}.v4-war-context-section{margin-top:10px}.v4-war-context-section>strong{display:block;font-size:10px;margin-bottom:5px}.v4-war-update{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 @media(max-width:900px){.v4-slider-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.v4-war-columns{grid-template-columns:1fr}}
 @media(max-width:700px){.v4-form-grid,.v4-slider-grid{grid-template-columns:1fr}.v4-form-wide{grid-column:auto}.v4-save-box{grid-template-columns:1fr}.v4-compare-head,.v4-compare-row{grid-template-columns:1fr}.v4-compare-head{display:none}.v4-kv-stack>div{grid-template-columns:1fr}.v4-interaction-evidence{grid-template-columns:1fr}}
+
+
+/* OMODOS4_SMART_FIELD_V1 */
+.v4-sf-list{display:grid;gap:7px}.v4-sf-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px;border:1px solid var(--line-soft);border-radius:9px;background:var(--panel)}
+.v4-sf-item>div{display:grid;gap:3px}.v4-sf-item strong{font-size:10px}.v4-sf-item small{font-size:8px;color:var(--text-dim)}
+.v4-sf-check-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px}.v4-sf-check-head span{font-size:9px;color:var(--text-dim)}
+.v4-sf-checklist{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px}.v4-sf-checklist label{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--line-soft);border-radius:9px;background:var(--panel)}
+.v4-sf-checklist input{width:auto;margin-top:2px}.v4-sf-checklist span{display:grid;gap:3px}.v4-sf-checklist strong{font-size:10px}.v4-sf-checklist small{font-size:8px;color:var(--text-dim)}
+.v4-sf-proof{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}.v4-sf-proof>div{display:grid;gap:4px;padding:9px;border:1px solid var(--line-soft);border-radius:9px;background:var(--panel)}
+.v4-sf-proof strong{font-size:10px}.v4-sf-proof span,.v4-sf-proof small{font-size:8px;color:var(--text-dim)}
+.v4-qr-zone{margin-bottom:10px}.v4-qr-zone video{width:min(100%,520px);aspect-ratio:4/3;object-fit:cover;border:1px solid var(--line);border-radius:10px;background:#000;margin:0 auto 8px}
+@media(max-width:700px){.v4-sf-item{grid-template-columns:1fr}.v4-sf-checklist,.v4-sf-proof{grid-template-columns:1fr}}
