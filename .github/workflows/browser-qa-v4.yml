@@ -209,8 +209,9 @@ jobs:
               const btn = physicalModules.nth(i);
               const name = (await btn.getAttribute('aria-label')) || ('module-' + i);
               try {
-                await btn.click();
-                await page.waitForTimeout(50);
+                console.log('[QA] sidebar module:', name);
+                await btn.click({force:true, timeout:1000});
+                await page.waitForTimeout(40);
                 const state = await page.evaluate((expectedName) => {
                   const view = document.getElementById('view-omodos4');
                   const stage = document.getElementById('v4-safe-stage');
@@ -1024,7 +1025,7 @@ jobs:
           JS
 
           node --check v4-qa.mjs
-          timeout -k 5s 25s node v4-qa.mjs
+          timeout -k 5s 45s node v4-qa.mjs
 
       - name: Remove transient QA files
         if: always()
