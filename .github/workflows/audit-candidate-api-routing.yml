@@ -1,0 +1,107 @@
+name: Audit Candidate API Routing
+
+on:
+  push:
+    branches:
+      - deploy/backend-login-restore
+    paths:
+      - ".github/workflows/audit-candidate-api-routing.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect candidate metadata and backend routes
+        shell: python
+        run: |
+          import os,json,base64,re,urllib.request
+          from pathlib import Path
+
+          aid="3c0bf44ff86c9587390f09b6d0bc42dd"
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          candidate="c92c749a-0494-4243-9497-0f3f180c7cfc"
+          v68="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          cd=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{candidate}?include=modules").get("result") or {}
+          assets=cd.get("assets") or {}
+          bindings=cd.get("bindings") or []
+          safe_bindings=[]
+          if isinstance(bindings,list):
+            for b in bindings:
+              if isinstance(b,dict):
+                safe_bindings.append({k:b.get(k) for k in ("name","type","class_name","namespace_id") if b.get(k) is not None})
+
+          vd=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{v68}?include=modules").get("result") or {}
+          mods=vd.get("modules") or []
+          raw=base64.b64decode(max(mods,key=lambda m:len(m.get("content_base64") or "")).get("content_base64") or "")
+          src=raw.decode("utf-8",errors="replace")
+          lines=src.splitlines()
+
+          needles=[
+            "new URL(request.url)",
+            ".pathname",
+            "pathname",
+            "/api",
+            "request.method",
+            "method ===",
+            "action",
+            "async fetch",
+            "fetch(request",
+            "return new Response",
+          ]
+
+          out=[
+            "# Candidate API Routing Audit","",
+            "## Candidate metadata","",
+            f"- version: {candidate}",
+            f"- number: {cd.get('number')}",
+            f"- main_module: {cd.get('main_module')}",
+            f"- migration_tag: {cd.get('migration_tag')}",
+            f"- migrations: {json.dumps(cd.get('migrations'),sort_keys=True)}",
+            f"- assets config: {json.dumps((assets.get('config') or {}) if isinstance(assets,dict) else {},sort_keys=True)}",
+            f"- bindings: {json.dumps(safe_bindings,sort_keys=True)}",
+            "",
+            "## Backend routing contexts",""
+          ]
+
+          seen=set()
+          for needle in needles:
+            hits=[i for i,l in enumerate(lines) if needle.lower() in l.lower()]
+            out.append(f"### {needle} — {len(hits)}")
+            for idx in hits[:35]:
+              key=(max(0,idx-8),min(len(lines),idx+22))
+              if key in seen: continue
+              seen.add(key)
+              out.append("~~~text")
+              for j in range(key[0],key[1]):
+                out.append(f"{j+1:05d}: {lines[j]}")
+              out.append("~~~")
+              out.append("")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/CANDIDATE_API_ROUTING.md").write_text("\n".join(out)+"\n",encoding="utf-8")
+          print("[ROUTING_AUDIT] generated")
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/CANDIDATE_API_ROUTING.md
+          git commit -m "audit: inspect candidate API routing"
+          git push
