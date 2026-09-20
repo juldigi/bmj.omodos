@@ -1052,3 +1052,355 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(hydrateOverview,900)});
 else setTimeout(hydrateOverview,900);
 })();
+
+/* OMODOS4_INTERACTIONS_V1
+   Restores explicit master-prompt interactions on top of the read-only intelligence layer.
+   Operational source-of-truth modules are never written by these controls. */
+(function(){
+'use strict';
+
+var AI_CONFIG={
+ 71:{purpose:'ask',title:'Ask OMODOS 4.0',placeholder:'Contoh: Apa yang paling perlu diperhatikan hari ini?',defaultText:''},
+ 72:{purpose:'machine',title:'Machine Copilot',placeholder:'Tanyakan kondisi, pola, risiko, atau histori mesin.',defaultText:'Jelaskan kondisi mesin ini, pola masalah, risiko yang perlu diperiksa, dan evidence yang mendukung.'},
+ 73:{purpose:'shift',title:'Shift Copilot',placeholder:'Buat handover shift berdasarkan data OMODOS.',defaultText:'Buat brief handover shift: perubahan penting, open issue, risiko, dan tindakan yang perlu diteruskan.'},
+ 74:{purpose:'morning-brief',title:'Morning Maintenance Brief',placeholder:'Buat brief maintenance pagi.',defaultText:'Buat Morning Maintenance Brief yang ringkas, evidence-first, dan prioritaskan hal yang perlu ditindaklanjuti.'},
+ 75:{purpose:'rca-draft',title:'Auto RCA Draft',placeholder:'Tuliskan problem/symptom untuk membuat draft RCA.',defaultText:''},
+ 76:{purpose:'troubleshooting',title:'Troubleshooting Similarity Search',placeholder:'Tuliskan symptom atau problem yang sedang dihadapi.',defaultText:''},
+ 77:{purpose:'manual',title:'Manual Whisperer',placeholder:'Tanyakan hal yang ingin dipahami dari manual/knowledge yang tersedia.',defaultText:''},
+ 79:{purpose:'translate',title:'Maintenance Translator',placeholder:'Masukkan istilah/kalimat maintenance yang perlu dinormalisasi atau diterjemahkan.',defaultText:''},
+ 80:{purpose:'skeptic',title:'AI Skeptic Mode',placeholder:'Tuliskan asumsi/diagnosis yang ingin diuji secara kritis.',defaultText:''},
+ 82:{purpose:'kaizen-draft',title:'Auto Kaizen Draft',placeholder:'Tuliskan masalah atau opportunity yang ingin dibuatkan draft Kaizen.',defaultText:''}
+};
+var LAST_SCENARIO=null;
+
+function x(v){
+ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});
+}
+function localQa(){try{return /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname)}catch(e){return false}}
+function allowed(){
+ try{return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed())}catch(e){return false}
+}
+function token(){
+ try{
+  if(typeof SETTING_AUTH_OK!=='undefined'&&SETTING_AUTH_OK&&typeof SETTING_SESSION_TOKEN!=='undefined'&&SETTING_SESSION_TOKEN)return SETTING_SESSION_TOKEN;
+  return typeof SESSION_TOKEN!=='undefined'?SESSION_TOKEN:'';
+ }catch(e){return ''}
+}
+function actionReady(){
+ try{return allowed()&&!localQa()&&typeof WEB_APP_URL!=='undefined'&&!!WEB_APP_URL&&!!token()&&typeof fetch==='function'}catch(e){return false}
+}
+function errText(json){
+ var e=json&&json.error;
+ return typeof e==='string'?e:(e&&e.message)||'Request OMODOS 4.0 gagal';
+}
+async function v4Action(action,payload){
+ if(!actionReady())throw new Error('Backend V4 belum tersedia pada koneksi/sesi ini.');
+ var body=Object.assign({},payload||{},{action:action,sessionToken:token()});
+ var opts={method:'POST',mode:'cors',credentials:'omit',redirect:'follow',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)};
+ var res=typeof fetchWithTimeout_==='function'?await fetchWithTimeout_(WEB_APP_URL,opts,60000):await fetch(WEB_APP_URL,opts);
+ var json=typeof parseApiResponse_==='function'?await parseApiResponse_(res):await res.json();
+ if(!json||json.ok!==true)throw new Error(errText(json));
+ return json.data;
+}
+function tx(){
+ try{if(crypto&&typeof crypto.randomUUID==='function')return crypto.randomUUID()}catch(e){}
+ return 'v4-'+Date.now()+'-'+Math.random().toString(36).slice(2,12);
+}
+function featureOpen(n){
+ var no=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!no&&parseInt(no.textContent,10)===Number(n);
+}
+function bodyHost(){
+ return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body');
+}
+function machineNames(){
+ var set=new Set();
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function peopleNames(){
+ var set=new Set();
+ try{(Array.isArray(PI_PERSONNEL_MASTER)?PI_PERSONNEL_MASTER:[]).forEach(function(p){var n=p.Nama||p['Nama Karyawan']||p['Nama Personil'];if(n)set.add(String(n))})}catch(e){}
+ try{(Array.isArray(PERSONIL)?PERSONIL:[]).forEach(function(p){var n=p.Nama||p['Nama Karyawan']||p['Nama Personil'];if(n)set.add(String(n))})}catch(e){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function options(list,blank){
+ var html=blank?'<option value="">'+x(blank)+'</option>':'';
+ return html+list.map(function(v){return '<option value="'+x(v)+'">'+x(v)+'</option>'}).join('');
+}
+function note(text,kind){
+ return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+x(text)+'</span></div>';
+}
+function busy(btn,on,label){
+ if(!btn)return;
+ if(on){btn.dataset.oldText=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> '+x(label||'Memproses…')}
+ else{btn.disabled=false;if(btn.dataset.oldText)btn.innerHTML=btn.dataset.oldText}
+}
+function plain(v){
+ if(v==null)return '';
+ if(typeof v==='string'||typeof v==='number'||typeof v==='boolean')return String(v);
+ try{return JSON.stringify(v)}catch(e){return String(v)}
+}
+function firstText(o,keys){
+ if(!o||typeof o!=='object')return '';
+ for(var i=0;i<keys.length;i++){var v=o[keys[i]];if(v!=null&&String(v).trim())return String(v)}
+ return '';
+}
+function evidenceTitle(e){
+ if(!e||typeof e!=='object')return plain(e);
+ var r=e.record&&typeof e.record==='object'?e.record:e;
+ return firstText(r,['Nama Mesin','namaMesin','Machine','Mesin','Title','Judul','Problem','Deskripsi Masalah','Deskripsi','description','Nama Material','Nama','ID'])||firstText(e,['machine','title','problem','description','sheet'])||'Evidence';
+}
+function resultCards(arr){
+ if(!Array.isArray(arr)||!arr.length)return '<div class="v4-empty">Tidak ada evidence tambahan.</div>';
+ return '<div class="v4-interaction-evidence">'+arr.slice(0,12).map(function(e){
+  var src=firstText(e,['sheet','source','type','label'])||'OMODOS';
+  var score=e&&e.score!=null?' • score '+Math.round(Number(e.score)*100)/100:'';
+  return '<div class="v4-interaction-evidence-card"><strong>'+x(evidenceTitle(e))+'</strong><small>'+x(src+score)+'</small></div>';
+ }).join('')+'</div>';
+}
+function aiResultHtml(data){
+ data=data||{};
+ var summary=firstText(data,['summary','answer'])||'Tidak ada ringkasan.';
+ var assumptions=Array.isArray(data.assumptions)?data.assumptions:[];
+ return '<div class="v4-ai-result">'+
+  '<div class="v4-interaction-result-head"><span class="v4-server-badge">'+x(data.mode||'OMODOS AI')+'</span><span>Confidence: '+x(data.confidence||'not stated')+'</span></div>'+
+  '<div class="v4-ai-answer">'+x(summary).replace(/\n/g,'<br>')+'</div>'+
+  (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi</strong><ul>'+assumptions.slice(0,8).map(function(a){return '<li>'+x(a)+'</li>'}).join('')+'</ul></div>':'')+
+  resultCards(data.evidence)+
+  note('Human review wajib. Output AI adalah decision support; tidak ada perubahan data operasional otomatis.','safe')+
+ '</div>';
+}
+function mountAi(n){
+ var cfg=AI_CONFIG[n],host=bodyHost();if(!cfg||!host||!featureOpen(n))return;
+ var old=host.querySelector('.v4-interaction');if(old)old.remove();
+ var machines=machineNames(),needMachine=n===72;
+ var machineField='<label>Mesin '+(needMachine?'<b>*</b>':'(opsional)')+'<select data-v4-ai-machine>'+options(machines,needMachine?'Pilih mesin':'Semua mesin')+'</select></label>';
+ var sec=document.createElement('section');sec.className='v4-interaction v4-ai-interaction';sec.setAttribute('data-v4-interaction-feature',n);
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">INTERACTIVE • EVIDENCE-FIRST</span><h3>'+x(cfg.title)+'</h3></div><span class="v4-no-write">NO AUTO WRITE</span></div>'+
+  '<div class="v4-form-grid">'+machineField+
+  '<label class="v4-form-wide">Pertanyaan / konteks<textarea data-v4-ai-query rows="4" placeholder="'+x(cfg.placeholder)+'">'+x(cfg.defaultText)+'</textarea></label></div>'+
+  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-ai-run="'+n+'"><i class="ph-bold ph-sparkle"></i> Analisis dengan OMODOS 4.0</button></div>'+
+  '<div data-v4-ai-output>'+note('Analisis hanya dijalankan setelah Anda memilih tombol. Evidence diambil dari source OMODOS existing.','safe')+'</div>';
+ host.prepend(sec);
+}
+async function runAi(btn,n){
+ var sec=btn.closest('.v4-interaction'),q=sec.querySelector('[data-v4-ai-query]').value.trim(),m=sec.querySelector('[data-v4-ai-machine]').value;
+ var cfg=AI_CONFIG[n],out=sec.querySelector('[data-v4-ai-output]');
+ if(!q){out.innerHTML=note('Isi pertanyaan/konteks terlebih dahulu.','warn');return}
+ if(n===72&&!m){out.innerHTML=note('Machine Copilot wajib memakai satu mesin yang dipilih agar konteks tidak bercampur.','warn');return}
+ busy(btn,true,'Menganalisis');
+ out.innerHTML=note('Menghubungkan pertanyaan dengan evidence internal…','safe');
+ try{
+  var data=await v4Action('v4.aiAsk',{query:q,purpose:cfg.purpose,machine:m||''});
+  out.innerHTML=aiResultHtml(data);
+ }catch(e){out.innerHTML=note(e.message||String(e),'error')}
+ finally{busy(btn,false)}
+}
+function mountKnowledgeHarvest(n){
+ var host=bodyHost();if(!host||!featureOpen(n))return;
+ var old=host.querySelector('.v4-interaction');if(old)old.remove();
+ var sec=document.createElement('section');sec.className='v4-interaction';sec.setAttribute('data-v4-interaction-feature',n);
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">KNOWLEDGE HARVEST</span><h3>Review Kandidat Knowledge</h3></div><span class="v4-no-write">REVIEW ONLY</span></div>'+
+ note('OMODOS mencari solusi berulang dan RCA existing. Tidak ada artikel Knowledge Base yang dibuat otomatis.','safe')+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-harvest-refresh><i class="ph-bold ph-arrows-clockwise"></i> Muat Kandidat</button></div><div data-v4-harvest-output></div>';
+ host.prepend(sec);
+}
+async function runHarvest(btn){
+ var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-harvest-output]');busy(btn,true,'Memuat');
+ try{
+  var d=await v4Action('v4.getKnowledgeCandidates',{});
+  out.innerHTML='<div class="v4-interaction-result-head"><span>'+(Array.isArray(d.candidates)?d.candidates.length:0)+' kandidat</span><span>Existing KB: '+x(d.existingKnowledgeRecords==null?'—':d.existingKnowledgeRecords)+'</span></div>'+resultCards(d.candidates)+note(d.note||'Review kandidat sebelum menggunakan modul Knowledge Base existing.','safe');
+ }catch(e){out.innerHTML=note(e.message||String(e),'error')}
+ finally{busy(btn,false)}
+}
+function mountExpert(){
+ var host=bodyHost();if(!host||!featureOpen(63))return;
+ var old=host.querySelector('.v4-interaction');if(old)old.remove();
+ var sec=document.createElement('section');sec.className='v4-interaction';sec.setAttribute('data-v4-interaction-feature','63');
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">EXPERT FINDER</span><h3>Cari berdasarkan evidence keterlibatan</h3></div></div>'+
+ '<div class="v4-form-grid"><label>Mesin<select data-v4-expert-machine>'+options(machineNames(),'Semua mesin')+'</select></label><label class="v4-form-wide">Problem / symptom<input data-v4-expert-query placeholder="Opsional: deskripsikan problem yang relevan"></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-expert-run><i class="ph-bold ph-magnifying-glass"></i> Cari Expert</button></div><div data-v4-expert-output>'+note('Ranking mencerminkan evidence keterlibatan OMODOS, bukan penilaian kinerja karyawan.','safe')+'</div>';
+ host.prepend(sec);
+}
+async function runExpert(btn){
+ var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-expert-output]'),machine=sec.querySelector('[data-v4-expert-machine]').value,query=sec.querySelector('[data-v4-expert-query]').value.trim();
+ busy(btn,true,'Mencari');
+ try{var d=await v4Action('v4.getExpertFinder',{machine:machine,query:query});out.innerHTML=resultCards(d.experts)+note(d.note||'Human validation required.','safe')}
+ catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
+}
+function mountExperience(){
+ var host=bodyHost();if(!host||!featureOpen(64))return;
+ var old=host.querySelector('.v4-interaction');if(old)old.remove();
+ var sec=document.createElement('section');sec.className='v4-interaction';sec.setAttribute('data-v4-interaction-feature','64');
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">EXPERIENCE PASSPORT</span><h3>Pilih personil</h3></div></div>'+
+ '<div class="v4-form-grid"><label>Personil<select data-v4-exp-person>'+options(peopleNames(),'Pilih personil')+'</select></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-exp-run><i class="ph-bold ph-identification-card"></i> Buka Experience Passport</button></div><div data-v4-exp-output></div>';
+ host.prepend(sec);
+}
+function objectList(obj){
+ if(!obj||typeof obj!=='object')return '<div class="v4-empty">NOT AVAILABLE</div>';
+ var rows=[];
+ Object.keys(obj).forEach(function(k){var v=obj[k];if(v==null)return;if(typeof v==='string'||typeof v==='number'||typeof v==='boolean')rows.push([k,String(v)])});
+ return '<div class="v4-kv-stack">'+rows.slice(0,30).map(function(r){return '<div><span>'+x(r[0].replace(/([a-z])([A-Z])/g,'$1 $2'))+'</span><b>'+x(r[1])+'</b></div>'}).join('')+'</div>';
+}
+async function runExperience(btn){
+ var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-exp-output]'),name=sec.querySelector('[data-v4-exp-person]').value;
+ if(!name){out.innerHTML=note('Pilih personil terlebih dahulu.','warn');return}
+ busy(btn,true,'Memuat');
+ try{var d=await v4Action('v4.getExperiencePassport',{name:name});out.innerHTML=objectList(d)+note('Passport ini DERIVED dari People dan histori kerja existing; bukan penilaian performa.','safe')}
+ catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
+}
+function scenarioParams(sec){
+ function n(sel){var v=Number(sec.querySelector(sel).value);return Number.isFinite(v)?Math.max(0,Math.min(100,v)):0}
+ return {downtimeReductionPct:n('[data-v4-s-downtime]'),recurringReductionPct:n('[data-v4-s-recurring]'),stockRiskReductionPct:n('[data-v4-s-stock]'),actionClosurePct:n('[data-v4-s-action]')};
+}
+function mountScenario(){
+ var host=bodyHost();if(!host||!featureOpen(97))return;
+ var old=host.querySelector('.v4-interaction');if(old)old.remove();
+ LAST_SCENARIO=null;
+ var sec=document.createElement('section');sec.className='v4-interaction v4-scenario';sec.setAttribute('data-v4-interaction-feature','97');
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">SCENARIO SIMULATOR</span><h3>What-if simulation</h3></div><span class="v4-no-write">NOT A PREDICTION</span></div>'+
+ note('Masukkan asumsi perubahan. Simulasi tidak mengubah KPI, Logbook, stok, atau data operasional existing.','safe')+
+ '<div class="v4-slider-grid">'+
+  '<label>Downtime reduction %<input type="number" min="0" max="100" value="0" data-v4-s-downtime></label>'+
+  '<label>Recurring reduction %<input type="number" min="0" max="100" value="0" data-v4-s-recurring></label>'+
+  '<label>Stock-risk reduction %<input type="number" min="0" max="100" value="0" data-v4-s-stock></label>'+
+  '<label>Action closure %<input type="number" min="0" max="100" value="0" data-v4-s-action></label>'+
+ '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-s-run><i class="ph-bold ph-play"></i> Jalankan Simulasi</button></div>'+
+ '<div data-v4-s-output></div>'+
+ '<div class="v4-save-box"><label>Nama skenario<input data-v4-s-name maxlength="200" placeholder="Contoh: Skenario PM Q4"></label><button class="btn btn-sm" data-v4-s-save disabled><i class="ph-bold ph-floppy-disk"></i> Simpan ke V4 Scenario</button><small>Save hanya menulis state simulasi terisolasi V4.</small></div><div data-v4-s-save-output></div>';
+ host.prepend(sec);
+}
+function scenarioHtml(d){
+ var base=d&&d.baseline||{},proj=d&&d.projected||{};
+ var keys=['downtimeMinutes','recurringPatterns','sparepartRisks','openHighPriorityActions'];
+ return '<div class="v4-scenario-result"><div class="v4-compare-head"><span>Metric</span><span>Baseline</span><span>Scenario</span></div>'+
+ keys.map(function(k){return '<div class="v4-compare-row"><strong>'+x(k.replace(/([a-z])([A-Z])/g,'$1 $2'))+'</strong><span>'+x(base[k]==null?'—':base[k])+'</span><b>'+x(proj[k]==null?'—':proj[k])+'</b></div>'}).join('')+
+ '</div>'+note((d.assumptions||[]).join(' • ')||'Scenario uses user assumptions.','safe');
+}
+async function runScenario(btn){
+ var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-s-output]'),save=sec.querySelector('[data-v4-s-save]'),params=scenarioParams(sec);
+ busy(btn,true,'Mensimulasikan');save.disabled=true;
+ try{
+  var d=await v4Action('v4.runScenario',params);LAST_SCENARIO={params:params,result:d};out.innerHTML=scenarioHtml(d);save.disabled=false;
+ }catch(e){LAST_SCENARIO=null;out.innerHTML=note(e.message||String(e),'error')}
+ finally{busy(btn,false)}
+}
+async function saveScenario(btn){
+ var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-s-save-output]'),name=sec.querySelector('[data-v4-s-name]').value.trim();
+ if(!LAST_SCENARIO){out.innerHTML=note('Jalankan simulasi terlebih dahulu.','warn');return}
+ if(!name){out.innerHTML=note('Isi nama skenario terlebih dahulu.','warn');return}
+ busy(btn,true,'Menyimpan');
+ try{
+  var d=await v4Action('v4.saveScenario',Object.assign({name:name,transactionId:tx()},LAST_SCENARIO.params));
+  out.innerHTML=note('Skenario tersimpan di storage V4 terisolasi. ID: '+(d.id||'recorded')+'. Data operasional existing tidak berubah.','safe');
+ }catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
+}
+function mountWarRoom(){
+ var host=bodyHost();if(!host||!featureOpen(98))return;
+ var old=host.querySelector('.v4-interaction');if(old)old.remove();
+ var sec=document.createElement('section');sec.className='v4-interaction v4-war-interaction';sec.setAttribute('data-v4-interaction-feature','98');
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">MAINTENANCE WAR ROOM</span><h3>User-triggered coordination</h3></div><span class="v4-no-write">ISOLATED V4 STATE</span></div>'+
+ note('Membuat War Room tidak mengubah Logbook lama. Hanya state koordinasi V4_War_Room / Event yang ditulis.','safe')+
+ '<details class="v4-war-create"><summary><i class="ph-bold ph-plus-circle"></i> Buat War Room Baru</summary><div class="v4-form-grid">'+
+  '<label>Mesin *<select data-v4-war-machine>'+options(machineNames(),'Pilih mesin')+'</select></label>'+
+  '<label>Severity<select data-v4-war-severity><option>P0</option><option selected>P1</option><option>P2</option><option>P3</option></select></label>'+
+  '<label>Judul *<input data-v4-war-title maxlength="200" placeholder="Incident / masalah utama"></label>'+
+  '<label>Owner<input data-v4-war-owner maxlength="160" placeholder="PIC / owner koordinasi"></label>'+
+  '<label>Next checkpoint<input type="datetime-local" data-v4-war-checkpoint></label>'+
+  '<label class="v4-form-wide">Summary<textarea rows="3" data-v4-war-summary maxlength="4000"></textarea></label>'+
+ '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-war-create><i class="ph-bold ph-siren"></i> Buat War Room</button></div><div data-v4-war-create-output></div></details>'+
+ '<div class="v4-war-columns"><div><div class="v4-interaction-subhead"><strong>War Room Existing</strong><button class="btn btn-sm" data-v4-war-refresh><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button></div><div data-v4-war-list></div></div><div><div class="v4-interaction-subhead"><strong>Context & Update</strong></div><div data-v4-war-detail>'+note('Pilih War Room untuk membuka context intelligence.','safe')+'</div></div></div>';
+ host.prepend(sec);
+ if(actionReady())refreshWarList(sec);
+ else sec.querySelector('[data-v4-war-list]').innerHTML=note('Backend V4 belum tersedia pada koneksi/sesi ini.','warn');
+}
+function warId(r){return firstText(r,['ID','id','WarRoomID','warRoomId'])}
+function warTitle(r){return firstText(r,['Title','title'])||'War Room'}
+async function refreshWarList(sec,selectId){
+ var out=sec.querySelector('[data-v4-war-list]');out.innerHTML=note('Memuat War Room…','safe');
+ try{
+  var d=await v4Action('v4.getWarRoom',{}),wars=Array.isArray(d.wars)?d.wars:[];
+  out.innerHTML=wars.length?'<div class="v4-war-list">'+wars.map(function(w){
+   var id=warId(w),status=firstText(w,['Status','status'])||'';
+   return '<button type="button" class="v4-war-item" data-v4-war-open="'+x(id)+'"><strong>'+x(warTitle(w))+'</strong><span>'+x(firstText(w,['Machine','machine'])||'')+'</span><small>'+x(status)+'</small></button>';
+  }).join('')+'</div>':'<div class="v4-empty">Belum ada War Room.</div>';
+  if(selectId)loadWar(sec,selectId);
+ }catch(e){out.innerHTML=note(e.message||String(e),'error')}
+}
+async function createWar(btn){
+ var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-war-create-output]');
+ var machine=sec.querySelector('[data-v4-war-machine]').value,title=sec.querySelector('[data-v4-war-title]').value.trim();
+ if(!machine||!title){out.innerHTML=note('Mesin dan judul wajib diisi.','warn');return}
+ var payload={machine:machine,title:title,severity:sec.querySelector('[data-v4-war-severity]').value,owner:sec.querySelector('[data-v4-war-owner]').value.trim(),nextCheckpoint:sec.querySelector('[data-v4-war-checkpoint]').value||'',summary:sec.querySelector('[data-v4-war-summary]').value.trim(),transactionId:tx()};
+ busy(btn,true,'Membuat');
+ try{
+  var d=await v4Action('v4.createWarRoom',payload);out.innerHTML=note('War Room dibuat. Source-of-truth operasional tidak diubah.','safe');refreshWarList(sec,d.id);
+ }catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
+}
+function contextBlock(ctx){
+ if(!ctx||typeof ctx!=='object')return '';
+ var sections=[];
+ ['openIssues','experts','similarCases','candidateRootCauseEvidence','rca','knowledge','manuals','decisions','actions'].forEach(function(k){
+  if(Array.isArray(ctx[k])&&ctx[k].length)sections.push('<div class="v4-war-context-section"><strong>'+x(k.replace(/([a-z])([A-Z])/g,'$1 $2'))+'</strong>'+resultCards(ctx[k])+'</div>');
+ });
+ return sections.join('');
+}
+async function loadWar(sec,id){
+ var out=sec.querySelector('[data-v4-war-detail]');out.innerHTML=note('Memuat context War Room…','safe');
+ try{
+  var d=await v4Action('v4.getWarRoom',{id:id});
+  if(!d.war){out.innerHTML=note('War Room tidak ditemukan.','warn');return}
+  var w=d.war,status=firstText(w,['Status','status'])||'OPEN',owner=firstText(w,['Owner','owner']),checkpoint=firstText(w,['NextCheckpoint','nextCheckpoint']),summary=firstText(w,['Summary','summary']);
+  out.innerHTML='<div class="v4-war-detail-card"><h4>'+x(warTitle(w))+'</h4><div class="v4-kv-stack"><div><span>Machine</span><b>'+x(firstText(w,['Machine','machine']))+'</b></div><div><span>Severity</span><b>'+x(firstText(w,['Severity','severity']))+'</b></div><div><span>Status</span><b>'+x(status)+'</b></div></div>'+
+   contextBlock(d.context)+
+   '<div class="v4-war-update"><h4>Update War Room</h4><div class="v4-form-grid">'+
+    '<label>Status<select data-v4-war-u-status><option'+(status==='OPEN'?' selected':'')+'>OPEN</option><option'+(status==='MONITORING'?' selected':'')+'>MONITORING</option><option'+(status==='CLOSED'?' selected':'')+'>CLOSED</option></select></label>'+
+    '<label>Type<select data-v4-war-u-type><option>update</option><option>decision</option><option>action</option><option>checkpoint</option><option>state-change</option></select></label>'+
+    '<label>Owner<input data-v4-war-u-owner maxlength="160" value="'+x(owner)+'"></label>'+
+    '<label>Next checkpoint<input data-v4-war-u-checkpoint maxlength="200" value="'+x(checkpoint)+'"></label>'+
+    '<label class="v4-form-wide">Summary<textarea rows="3" data-v4-war-u-summary maxlength="4000">'+x(summary)+'</textarea></label>'+
+    '<label class="v4-form-wide">Message / keputusan / action<textarea rows="3" data-v4-war-u-message maxlength="4000"></textarea></label>'+
+   '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-war-update="'+x(id)+'"><i class="ph-bold ph-check"></i> Simpan Update War Room</button></div><div data-v4-war-update-output></div></div></div>'+
+   note(d.disclaimer||'Candidate causes require human review.','safe');
+ }catch(e){out.innerHTML=note(e.message||String(e),'error')}
+}
+async function updateWar(btn,id){
+ var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-war-update-output]');
+ var payload={id:id,status:sec.querySelector('[data-v4-war-u-status]').value,type:sec.querySelector('[data-v4-war-u-type]').value,owner:sec.querySelector('[data-v4-war-u-owner]').value.trim(),nextCheckpoint:sec.querySelector('[data-v4-war-u-checkpoint]').value.trim(),summary:sec.querySelector('[data-v4-war-u-summary]').value.trim(),message:sec.querySelector('[data-v4-war-u-message]').value.trim(),transactionId:tx()};
+ busy(btn,true,'Menyimpan');
+ try{await v4Action('v4.updateWarRoom',payload);out.innerHTML=note('Update tersimpan di event log War Room V4.','safe');await loadWar(sec,id)}
+ catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
+}
+function mountFor(n){
+ n=Number(n);
+ if(AI_CONFIG[n])mountAi(n);
+ else if(n===78)mountKnowledgeHarvest(n);
+ else if(n===63)mountExpert();
+ else if(n===64)mountExperience();
+ else if(n===97)mountScenario();
+ else if(n===98)mountWarRoom();
+}
+document.addEventListener('click',function(e){
+ var tile=e.target.closest&&e.target.closest('[data-v4-feature]');
+ if(tile){var n=Number(tile.getAttribute('data-v4-feature'));setTimeout(function(){if(featureOpen(n))mountFor(n)},0);return}
+ var ai=e.target.closest&&e.target.closest('[data-v4-ai-run]');if(ai){e.preventDefault();runAi(ai,Number(ai.getAttribute('data-v4-ai-run')));return}
+ var hr=e.target.closest&&e.target.closest('[data-v4-harvest-refresh]');if(hr){e.preventDefault();runHarvest(hr);return}
+ var er=e.target.closest&&e.target.closest('[data-v4-expert-run]');if(er){e.preventDefault();runExpert(er);return}
+ var xp=e.target.closest&&e.target.closest('[data-v4-exp-run]');if(xp){e.preventDefault();runExperience(xp);return}
+ var sr=e.target.closest&&e.target.closest('[data-v4-s-run]');if(sr){e.preventDefault();runScenario(sr);return}
+ var ss=e.target.closest&&e.target.closest('[data-v4-s-save]');if(ss){e.preventDefault();saveScenario(ss);return}
+ var wc=e.target.closest&&e.target.closest('[data-v4-war-create]');if(wc){e.preventDefault();createWar(wc);return}
+ var wr=e.target.closest&&e.target.closest('[data-v4-war-refresh]');if(wr){e.preventDefault();refreshWarList(wr.closest('.v4-interaction'));return}
+ var wo=e.target.closest&&e.target.closest('[data-v4-war-open]');if(wo){e.preventDefault();loadWar(wo.closest('.v4-interaction'),wo.getAttribute('data-v4-war-open'));return}
+ var wu=e.target.closest&&e.target.closest('[data-v4-war-update]');if(wu){e.preventDefault();updateWar(wu,wu.getAttribute('data-v4-war-update'));return}
+},false);
+
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ interactionsVersion:'1',
+ interactionFeatures:Object.keys(AI_CONFIG).map(Number).concat([63,64,78,97,98]),
+ actionReady:actionReady
+});
+})();
