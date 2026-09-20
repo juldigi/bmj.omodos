@@ -1,0 +1,196 @@
+name: Audit Cloudflare Version History
+
+on:
+  push:
+    branches:
+      - recovery/cloudflare-version-safe
+    paths:
+      - ".github/workflows/audit-cloudflare-version-history.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect version history and deployed version
+        shell: python
+        run: |
+          import os, json, base64, hashlib, urllib.request, urllib.parse
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          token=os.environ.get("CLOUDFLARE_DEPLOY_TOKEN","").strip()
+          if not token:
+            raise SystemExit("CLOUDFLARE_DEPLOY_TOKEN missing")
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={
+              "Authorization":"Bearer "+token,
+              "Accept":"application/json"
+            })
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          accounts=get_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []
+          account_id=None
+          history=[]
+          for a in accounts:
+            aid=a.get("id")
+            if not aid:
+              continue
+            try:
+              resp=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions?per_page=20")
+              rows=resp.get("result") or []
+              if rows:
+                account_id=aid
+                history=rows
+                break
+            except Exception:
+              continue
+
+          if not account_id:
+            raise SystemExit("Worker version history unavailable")
+
+          # Current deployment points to the version(s) actually serving traffic.
+          deployments=[]
+          try:
+            dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/deployments")
+            deployments=dep.get("result") or []
+          except Exception:
+            deployments=[]
+
+          active_ids=set()
+          deployment_rows=[]
+          for d in deployments:
+            if not isinstance(d,dict):
+              continue
+            versions=d.get("versions") or []
+            vv=[]
+            for v in versions:
+              if isinstance(v,dict):
+                vid=str(v.get("version_id") or v.get("id") or "")
+                if vid:
+                  active_ids.add(vid)
+                vv.append({
+                  "version_id":vid,
+                  "percentage":v.get("percentage")
+                })
+            deployment_rows.append({
+              "id":str(d.get("id") or ""),
+              "created_on":str(d.get("created_on") or ""),
+              "source":str(d.get("source") or ""),
+              "versions":vv
+            })
+
+          rows=[]
+          for item in history[:15]:
+            if not isinstance(item,dict):
+              continue
+            vid=str(item.get("id") or "")
+            number=item.get("number")
+            meta=item.get("metadata") or {}
+            row={
+              "id":vid,
+              "number":number,
+              "created_on":str(meta.get("created_on") or item.get("created_on") or ""),
+              "source":str(meta.get("source") or item.get("source") or ""),
+              "active":vid in active_ids,
+              "module_count":None,
+              "module_bytes":0,
+              "largest_sha256":"",
+              "largest_name":"",
+              "keys":[],
+              "error":""
+            }
+            if vid:
+              try:
+                detail=get_json(
+                  f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/omodos/versions/{vid}?include=modules"
+                ).get("result") or {}
+                row["keys"]=sorted(detail.keys())
+                mods=detail.get("modules") or []
+                row["module_count"]=len(mods)
+                largest=None
+                for m in mods:
+                  if not isinstance(m,dict):
+                    continue
+                  raw=b""
+                  b64=m.get("content_base64")
+                  if isinstance(b64,str) and b64:
+                    try:
+                      raw=base64.b64decode(b64,validate=False)
+                    except Exception:
+                      raw=b""
+                  row["module_bytes"] += len(raw)
+                  if largest is None or len(raw)>largest[0]:
+                    largest=(len(raw),str(m.get("name") or ""),hashlib.sha256(raw).hexdigest() if raw else "")
+                if largest:
+                  row["largest_name"]=largest[1]
+                  row["largest_sha256"]=largest[2]
+              except Exception as e:
+                row["error"]=type(e).__name__
+            rows.append(row)
+
+          report=[
+            "# Cloudflare OMODOS Version History Audit",
+            "",
+            f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Versions inspected: {len(rows)}",
+            f"- Deployment records returned: {len(deployment_rows)}",
+            "",
+            "## Current deployments",
+            ""
+          ]
+          if deployment_rows:
+            for d in deployment_rows[:10]:
+              parts=", ".join(
+                f"{v['version_id']} @ {v['percentage']}%" for v in d["versions"]
+              ) or "no version refs"
+              report.append(f"- deployment {d['id']} — {d['created_on']} — source={d['source']} — {parts}")
+          else:
+            report.append("- No deployment rows returned by API.")
+
+          report += ["","## Recent versions",""]
+          for r in rows:
+            report.append(
+              f"- v{r['number']} — {r['id']} — {r['created_on']} — source={r['source']} "
+              f"— active={'YES' if r['active'] else 'NO'} — modules={r['module_count']} "
+              f"— decoded_bytes={r['module_bytes']} — largest={r['largest_name']} "
+              f"— sha256={r['largest_sha256']} — keys={','.join(r['keys'])} "
+              f"— error={r['error'] or 'none'}"
+            )
+
+          candidates=[r for r in rows if r["module_count"] and r["module_bytes"]>100000]
+          report += ["","## Recovery candidate",""]
+          if candidates:
+            best=next((r for r in candidates if r["active"]), candidates[0])
+            report.append(
+              f"- PASS: recoverable version found: v{best['number']} / {best['id']} "
+              f"with {best['module_count']} module(s), {best['module_bytes']} decoded bytes."
+            )
+          else:
+            report.append("- No recent version returned code modules through this API path.")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/CLOUDFLARE_VERSION_HISTORY.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[VERSION_HISTORY] sanitized history generated.")
+
+      - name: Commit sanitized history
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/CLOUDFLARE_VERSION_HISTORY.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: inspect Cloudflare Worker version history"
+          git push
