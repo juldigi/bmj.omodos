@@ -1,0 +1,188 @@
+name: Audit Worker Frontend Embedding
+
+on:
+  push:
+    branches:
+      - recovery/cloudflare-version-safe
+    paths:
+      - ".github/workflows/audit-worker-frontend-embedding.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect recovered v68 in memory
+        shell: python
+        run: |
+          import os, json, base64, hashlib, urllib.request, re
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          VERSION_ID="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          token=os.environ.get("CLOUDFLARE_DEPLOY_TOKEN","").strip()
+          if not token:
+            raise SystemExit("CLOUDFLARE_DEPLOY_TOKEN missing")
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          accounts=get_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []
+          account_id=None
+          for a in accounts:
+            aid=a.get("id")
+            if not aid: continue
+            try:
+              get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{VERSION_ID}")
+              account_id=aid
+              break
+            except Exception:
+              continue
+          if not account_id:
+            raise SystemExit("v68 not accessible")
+
+          detail=get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/omodos/versions/{VERSION_ID}?include=modules"
+          ).get("result") or {}
+          modules=detail.get("modules") or []
+          if not modules:
+            raise SystemExit("v68 modules unavailable")
+
+          worker_mod=max(modules,key=lambda m:len(m.get("content_base64") or ""))
+          worker=base64.b64decode(worker_mod.get("content_base64") or "")
+          worker_text=worker.decode("utf-8",errors="replace")
+          worker_low=worker_text.lower()
+
+          repo_html=Path("public/index.html").read_bytes()
+          repo_text=repo_html.decode("utf-8",errors="replace")
+
+          req=urllib.request.Request("https://omodos.offsetbmj.workers.dev/",headers={"User-Agent":"OMODOS-Recovery-Audit/1.0"})
+          with urllib.request.urlopen(req,timeout=35) as r:
+            live_html=r.read()
+          live_text=live_html.decode("utf-8",errors="replace")
+
+          markers=[
+            "<!doctype html",
+            "<html",
+            "</html>",
+            "view-sparepart",
+            "attachSparepartPaginationHandlers",
+            "OMODOS_COPILOT_BANTUAN_HOTFIX",
+            "OMODOS4_PHASE1_SAFE",
+            "omodos4.view",
+            "MaintenanceStore",
+            "const $ = (sel",
+            "window.switchToView",
+          ]
+
+          def first_pos(hay,needle):
+            p=hay.lower().find(needle.lower())
+            return p
+
+          chunk_sizes=[128,256,512,1024,2048]
+          chunk_checks=[]
+          for n in chunk_sizes:
+            for label,data in (("live",live_html),("repo",repo_html)):
+              if len(data)>=n:
+                prefix=data[:n]
+                suffix=data[-n:]
+                chunk_checks.append({
+                  "source":label,
+                  "n":n,
+                  "prefix_present":worker.find(prefix)>=0,
+                  "suffix_present":worker.find(suffix)>=0,
+                })
+
+          # Detect HTML starts and nearby JS quoting characters without leaking source text.
+          doctype_positions=[m.start() for m in re.finditer(r"<!doctype\s+html",worker_text,re.I)]
+          html_positions=[m.start() for m in re.finditer(r"<html\b",worker_text,re.I)]
+          closing_positions=[m.start() for m in re.finditer(r"</html>",worker_text,re.I)]
+
+          report=[
+            "# OMODOS Worker Frontend Embedding Audit",
+            "",
+            f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Recovery version: v68 / {VERSION_ID}",
+            f"- Worker module: {worker_mod.get('name') or 'unknown'}",
+            f"- Worker bytes: {len(worker)}",
+            f"- Worker SHA-256: {hashlib.sha256(worker).hexdigest()}",
+            f"- Live HTML bytes: {len(live_html)}",
+            f"- Live HTML SHA-256: {hashlib.sha256(live_html).hexdigest()}",
+            f"- Repo HTML bytes: {len(repo_html)}",
+            f"- Repo HTML SHA-256: {hashlib.sha256(repo_html).hexdigest()}",
+            f"- Repo HTML equals live HTML: {'YES' if repo_html==live_html else 'NO'}",
+            f"- Exact live HTML embedded in worker: {'YES' if worker.find(live_html)>=0 else 'NO'}",
+            f"- Exact repo HTML embedded in worker: {'YES' if worker.find(repo_html)>=0 else 'NO'}",
+            "",
+            "## Marker map",
+            ""
+          ]
+          for marker in markers:
+            report.append(
+              f"- {marker}: count={worker_low.count(marker.lower())}, first_position={first_pos(worker_text,marker)}"
+            )
+
+          report += ["","## HTML boundary positions",""]
+          report.append(f"- doctype positions: {doctype_positions[:20]}")
+          report.append(f"- html positions: {html_positions[:20]}")
+          report.append(f"- closing html positions: {closing_positions[-20:]}")
+
+          report += ["","## Exact chunk presence",""]
+          for x in chunk_checks:
+            report.append(
+              f"- {x['source']} {x['n']} bytes: prefix={'YES' if x['prefix_present'] else 'NO'}, "
+              f"suffix={'YES' if x['suffix_present'] else 'NO'}"
+            )
+
+          # Check common encoding strategies for the live/repo HTML.
+          import gzip, zlib
+          encodings=[]
+          for label,data in (("live",live_html),("repo",repo_html)):
+            gz=gzip.compress(data,compresslevel=9)
+            zl=zlib.compress(data,level=9)
+            b64=base64.b64encode(data)
+            encodings.append((label,"gzip9",len(gz),worker.find(gz)>=0))
+            encodings.append((label,"zlib9",len(zl),worker.find(zl)>=0))
+            encodings.append((label,"base64",len(b64),worker.find(b64)>=0))
+
+          report += ["","## Common encoding presence",""]
+          for label,kind,size,present in encodings:
+            report.append(f"- {label} {kind}: encoded_bytes={size}, present={'YES' if present else 'NO'}")
+
+          report += ["","## Patch readiness",""]
+          if doctype_positions and closing_positions:
+            report.append("- HTML-like document boundaries exist inside worker source; safe structural patching can be developed and validated against v68.")
+          elif worker_low.count("view-sparepart") and worker_low.count("switchtoview"):
+            report.append("- Frontend code markers exist in worker source, but HTML document boundaries are transformed; patching requires targeted extraction.")
+          else:
+            report.append("- Frontend embedding method is not yet identifiable from static markers.")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/WORKER_FRONTEND_EMBEDDING.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          worker=b""
+          worker_text=""
+          live_html=b""
+          repo_html=b""
+          print("[EMBED_AUDIT] sanitized embedding map generated.")
+
+      - name: Commit sanitized embedding report
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/WORKER_FRONTEND_EMBEDDING.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: map frontend embedding inside recovered Worker"
+          git push
