@@ -5,8 +5,46 @@ path = Path("public/index.html")
 src = path.read_text(encoding="utf-8", errors="strict")
 
 MARKER = "OMODOS4_PHASE1_SAFE"
+SCRIPT_OPEN = '<script id="omodos4-phase1-script">'
+SCRIPT_CLOSE = '</script>'
+
+def move_v4_script_to_real_body_end(source):
+    start = source.find(SCRIPT_OPEN)
+    if start < 0:
+        raise SystemExit("OMODOS 4 marker exists but V4 script block is missing.")
+    end = source.find(SCRIPT_CLOSE, start)
+    if end < 0:
+        raise SystemExit("OMODOS 4 V4 script block is not closed.")
+    end += len(SCRIPT_CLOSE)
+
+    final_body = source.lower().rfind("</body>")
+    if final_body < 0:
+        raise SystemExit("Missing final </body> anchor.")
+
+    # If the V4 script is already the final executable block before the real
+    # closing body tag, leave the file byte-stable.
+    if start < final_body and source[end:final_body].strip() == "":
+        return source, False
+
+    block = source[start:end]
+    source = source[:start] + source[end:]
+    final_body = source.lower().rfind("</body>")
+    if final_body < 0:
+        raise SystemExit("Missing final </body> anchor after relocation.")
+
+    source = source[:final_body] + "\n" + block + "\n" + source[final_body:]
+    return source, True
+
 if MARKER in src:
-    print("OMODOS 4 Phase 1 already applied; no changes.")
+    src, moved = move_v4_script_to_real_body_end(src)
+    if src.count(SCRIPT_OPEN) != 1:
+        raise SystemExit("V4 script count is not exactly one after repair.")
+    script_pos = src.find(SCRIPT_OPEN)
+    body_pos = src.lower().rfind("</body>")
+    if script_pos < 0 or body_pos < 0 or script_pos > body_pos:
+        raise SystemExit("V4 script is not before the real final </body>.")
+    path.write_text(src, encoding="utf-8")
+    print("Repaired OMODOS 4 Phase 1 script placement." if moved else "OMODOS 4 Phase 1 already correctly placed.")
     sys.exit(0)
 
 css = r'''
@@ -299,10 +337,13 @@ if render_anchor not in src:
     raise SystemExit("switchToView renderer anchor not found")
 src = src.replace(render_anchor, render_insert, 1)
 
-# 7) Append isolated implementation before body close.
-if "</body>" not in src:
-    raise SystemExit("Missing </body> anchor")
-src = src.replace("</body>", script + "\n</body>", 1)
+# 7) Append isolated implementation before the REAL final body close.
+# The OMODOS monolith contains literal </body> strings inside export/templates,
+# so using replace(..., 1) can inject the script into non-executable content.
+body_idx = src.lower().rfind("</body>")
+if body_idx < 0:
+    raise SystemExit("Missing final </body> anchor")
+src = src[:body_idx] + script + "\n" + src[body_idx:]
 
 # Safety checks
 required = [
