@@ -125,10 +125,7 @@ jobs:
             "migrations":[
               {"tag":"v1","new_sqlite_classes":["MaintenanceStore"]}
             ],
-            "observability":{"enabled":True},
-            "secrets":{
-              "required":["GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"]
-            }
+            "observability":{"enabled":True}
           }
           Path("wrangler.recovery.json").write_text(json.dumps(config,indent=2)+"\n")
           print("[PREPARE] stable backend recovered and ephemeral Wrangler config created")
@@ -187,6 +184,31 @@ jobs:
           if not new_id:
             raise SystemExit("Unable to identify uploaded version")
 
+          detail=get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{new_id}?include=modules"
+          ).get("result") or {}
+          bindings=detail.get("bindings") or []
+          names=set()
+          typed={}
+          if isinstance(bindings,list):
+            for b in bindings:
+              if isinstance(b,dict):
+                n=str(b.get("name") or "")
+                if n:
+                  names.add(n)
+                  typed[n]=str(b.get("type") or "")
+          elif isinstance(bindings,dict):
+            for n,b in bindings.items():
+              names.add(str(n))
+              typed[str(n)]=str((b or {}).get("type") or "") if isinstance(b,dict) else ""
+
+          required_bindings={"ASSETS","MAINTENANCE","GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"}
+          missing_bindings=sorted(required_bindings-names)
+          if missing_bindings:
+            raise SystemExit("Uploaded version lost required bindings: "+", ".join(missing_bindings))
+          if "durable" not in typed.get("MAINTENANCE","").lower():
+            raise SystemExit("Uploaded version MAINTENANCE binding is not Durable Object")
+
           dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments")
           result=dep.get("result")
           if isinstance(result,dict):
@@ -219,6 +241,7 @@ jobs:
             "- Frontend assets: repository public/ from this branch",
             "- API/files routing: worker-first preserved",
             "- Durable Object binding: MAINTENANCE -> MaintenanceStore preserved",
+            f"- Required bindings verified: {sorted(required_bindings)}",
           ]
           if not production_unchanged:
             raise SystemExit("Safety failure: version upload changed production deployment")
