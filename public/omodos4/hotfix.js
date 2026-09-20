@@ -3139,3 +3139,252 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
 });
 })();
 
+
+/* OMODOS4_FACTORY_BRAIN_V1
+   Progressive-enhancement views for master-prompt features 91–100.
+   91–96 and 99–100 are read-only intelligence views.
+   Existing 97 Scenario Simulator and 98 Maintenance War Room interactions are intentionally preserved. */
+(function(){
+'use strict';
+
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openN(n){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!el&&parseInt(el.textContent,10)===Number(n);
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function note(t,kind){return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+esc(t)+'</span></div>'}
+function empty(t){return '<div class="v4-empty">'+esc(t||'Belum ada evidence yang cukup.')+'</div>'}
+function fmt(v,d){
+ if(v==null||v==='')return '—';
+ var n=Number(v);if(!Number.isFinite(n))return String(v);
+ try{return new Intl.NumberFormat('id-ID',{maximumFractionDigits:d==null?1:d}).format(n)}catch(e){return String(n)}
+}
+function chip(t){return '<span class="v4-risk-chip">'+esc(t||'EVIDENCE')+'</span>'}
+function item(title,sub,right){
+ return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
+}
+function list(arr,fn,limit,msg){
+ if(!Array.isArray(arr)||!arr.length)return empty(msg);
+ return '<div class="v4-sf-list">'+arr.slice(0,limit||60).map(fn).join('')+'</div>';
+}
+function metrics(rows){
+ return '<div class="v4-statline">'+rows.map(function(x){return '<div><b>'+esc(x[1])+'</b><span>'+esc(x[0])+'</span></div>'}).join('')+'</div>';
+}
+function first(o,keys){
+ if(!o||typeof o!=='object')return '';
+ for(var i=0;i<keys.length;i++){var k=keys[i];if(o[k]!=null&&String(o[k]).trim())return String(o[k])}
+ return '';
+}
+function val(sec,sel){var e=sec&&sec.querySelector(sel);return e?String(e.value||'').trim():''}
+function busy(btn,on,label){
+ if(!btn)return;
+ if(on){btn.dataset.old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> '+esc(label||'Memuat…')}
+ else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
+}
+function machineNames(){
+ var set=new Set();
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function machineOptions(blank){return '<option value="">'+esc(blank||'Semua mesin')+'</option>'+machineNames().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('')}
+function read(action,payload){
+ if(!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function'))return Promise.resolve(null);
+ return window.OMODOS4.serverRead(action,payload||{});
+}
+function removeOld(n,h){
+ Array.from(h.querySelectorAll('.v4-factory-brain-intel[data-v4-fb-feature="'+n+'"]')).forEach(function(x){x.remove()});
+}
+function titles(n){
+ return {
+  91:'Factory Maintenance Digital Twin',92:'Maintenance Command Center',93:'What Changed? Mode',94:'Time Machine',95:'Maintenance Black Box',
+  96:'Factory Knowledge Graph',99:'Autonomous Maintenance Intelligence',100:'OMODOS FACTORY BRAIN'
+ }[n]||'Factory Brain';
+}
+function intro(n){
+ var t={
+  91:'Digital Twin ini adalah model hubungan data maintenance, bukan simulasi fisika mesin dan bukan telemetry real-time yang tidak tercatat.',
+  92:'Command Center merangkum evidence existing menjadi prioritas review; tidak menjalankan tindakan operasional otomatis.',
+  93:'What Changed membandingkan record yang benar-benar masuk pada window waktu terpilih dan tetap mempertahankan source lineage.',
+  94:'Time Machine merekonstruksi best-known state dari record bertimestamp. Nilai current-only tidak diproyeksikan mundur.',
+  95:'Black Box menyusun event chronology dari Logbook/Breakdown/Predictive/RCA/Corrective yang bertimestamp; event yang tidak pernah dicatat tidak diasumsikan.',
+  96:'Knowledge Graph menghubungkan node/edge derived dari source OMODOS existing; graph bukan source-of-truth baru.',
+  99:'Autonomous Maintenance Intelligence di sini berarti rekomendasi terstruktur untuk manusia. Tidak ada autonomous write, autonomous control, atau keputusan otomatis.',
+  100:'Factory Brain menggabungkan graph, risk overview, dan deterministic brief sebagai decision-support layer di atas source OMODOS existing.'
+ };
+ return note(t[n]||'Read-only intelligence.','safe');
+}
+function controls(n){
+ if(n===93)return '<div class="v4-form-grid"><label>Window<select data-v4-fb-change><option value="24h">24 jam terakhir</option><option value="7d">7 hari terakhir</option><option value="yesterday">Kemarin</option><option value="previousShift">Shift sebelumnya</option><option value="previousLogin">Sejak login sebelumnya</option></select></label><label>Mesin (opsional)<select data-v4-fb-machine>'+machineOptions('Semua mesin')+'</select></label></div>';
+ if(n===94){
+  var now=new Date(),local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  return '<div class="v4-form-grid"><label>Tanggal & waktu<input type="datetime-local" min="2026-09-01T00:00" value="'+esc(local)+'" data-v4-fb-time></label><label>Mesin (opsional)<select data-v4-fb-machine>'+machineOptions('Semua mesin')+'</select></label><label>Shift (opsional)<select data-v4-fb-shift><option value="">Semua shift</option><option value="1">Shift 1</option><option value="2">Shift 2</option><option value="3">Shift 3</option></select></label></div>';
+ }
+ if(n===95||n===99)return '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-fb-machine>'+machineOptions('Semua mesin')+'</select></label><label>Periode<select data-v4-fb-days><option value="30">30 hari</option><option value="90" selected>90 hari</option><option value="180">180 hari</option><option value="365">365 hari</option></select></label></div>';
+ return '';
+}
+function mount(n){
+ n=Number(n);
+ if(n===97||n===98)return;
+ if(![91,92,93,94,95,96,99,100].includes(n))return;
+ var h=host();if(!h||!openN(n))return;
+ removeOld(n,h);
+ var sec=document.createElement('section');sec.className='v4-interaction v4-factory-brain-intel';sec.setAttribute('data-v4-fb-feature',String(n));
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">FACTORY BRAIN • SOURCE-OF-TRUTH CONNECTED</span><h3>'+esc(titles(n))+'</h3></div><span class="v4-no-write">READ ONLY</span></div>'+
+ intro(n)+controls(n)+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-fb-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat '+esc(titles(n))+'</button>'+
+ (n===92||n===100?'<button class="btn btn-sm" data-v4-open-copilot><i class="ph-bold ph-brain"></i> Buka Copilot Existing</button>':'')+
+ '</div><div data-v4-fb-out></div>';
+ h.prepend(sec);
+}
+function graphSummary(g,labelText){
+ if(!g)return empty('Factory Brain graph belum tersedia.');
+ var nodes=Array.isArray(g.nodes)?g.nodes:[],edges=Array.isArray(g.edges)?g.edges:[],d=g.domains||{};
+ var by={};nodes.forEach(function(n){by[n.type]=(by[n.type]||0)+1});
+ return metrics([
+  ['Graph nodes',fmt(nodes.length,0)],['Graph edges',fmt(edges.length,0)],['Machines',fmt(d.machines,0)],['Logbook',fmt(d.logbook,0)],
+  ['RCA',fmt(d.rca,0)],['Knowledge',fmt(d.knowledge,0)],['Projects',fmt((d.projects||0)+(d.kaizen||0)+(d.sga||0),0)]
+ ])+
+ list(edges,function(e){
+  var from=nodes.find(function(n){return n.id===e.from}),to=nodes.find(function(n){return n.id===e.to});
+  return item((from&&from.label||e.from)+' → '+(to&&to.label||e.to),e.relation||'related',chip('DERIVED EDGE'));
+ },50)+note(labelText||'Graph hanya menghubungkan evidence yang tersedia.','safe');
+}
+function render91(g){
+ return graphSummary(g,'Factory Maintenance Digital Twin memakai graph maintenance existing sebagai model hubungan data. Tidak mengklaim telemetry/physics simulation yang tidak tersedia.');
+}
+function render92(o){
+ if(!o)return empty('Overview belum tersedia.');
+ var s=o.summary||{};
+ return metrics([
+  ['Critical machines',fmt(s.criticalMachines,0)],['Active breakdown',fmt(s.activeBreakdown,0)],['Predictive risks',fmt(s.predictiveRisks,0)],
+  ['Sparepart risks',fmt(s.sparepartRisks,0)],['KPI at risk',fmt(s.kpiAtRisk,0)],['Open high-priority actions',fmt(s.openHighPriorityActions,0)]
+ ])+
+ list(o.thingsToLookAt,function(x){return item(x.title||x.type,x.reason||'',chip(x.priority||'REVIEW'))},20)+
+ note('Command Center menyajikan prioritas review berdasarkan rule/evidence; bukan dispatch pekerjaan otomatis.','warn');
+}
+function changePayload(sec){
+ var preset=val(sec,'[data-v4-fb-change]'),machine=val(sec,'[data-v4-fb-machine]');
+ var p={};if(machine)p.machine=machine;
+ if(preset==='yesterday'||preset==='previousShift'||preset==='previousLogin')p.preset=preset;
+ else{
+  var days=preset==='7d'?7:1,until=new Date(),since=new Date(until.getTime()-days*86400000);
+  p.since=since.toISOString();p.until=until.toISOString();p.preset='selected';
+ }
+ return p;
+}
+function render93(d){
+ if(!d)return empty('Change intelligence belum tersedia.');
+ var cats=d.categories||[];
+ return metrics([['Categories changed',fmt(cats.length,0)],['Preset',first(d.range||{},['preset'])||'CUSTOM'],['Shift',first(d.range||{},['shift'])||'—']])+
+ list(cats,function(x){
+  var latest=Array.isArray(x.latest)?x.latest.length:0;
+  return item(x.category||x.sheet,(x.sheet||'')+' • Scope '+(x.scope||'')+' • Latest preview '+latest,chip(fmt(x.count,0)+' record'));
+ },30)+note('Count berasal dari record pada window terpilih; kategori tanpa record tidak ditampilkan.','safe');
+}
+function timePayload(sec){
+ var raw=val(sec,'[data-v4-fb-time]'),machine=val(sec,'[data-v4-fb-machine]'),shift=val(sec,'[data-v4-fb-shift]');
+ if(!raw)return null;
+ var dt=new Date(raw);if(!Number.isFinite(dt.getTime()))return null;
+ var p={at:dt.toISOString()};if(machine)p.machine=machine;if(shift)p.shift=shift;return p;
+}
+function snapshotCount(x){
+ if(!x||typeof x!=='object')return 0;
+ if(Number.isFinite(Number(x.recordsUntilTime)))return Number(x.recordsUntilTime);
+ if(Array.isArray(x.latest))return x.latest.length;
+ return 0;
+}
+function render94(d){
+ if(!d)return empty('Time Machine belum tersedia.');
+ var s=d.snapshots||{},m=d.machineStatus||{},a=d.activeProblems||{},down=d.downtime||{};
+ return metrics([
+  ['At',String(d.at||'—').replace('T',' ').slice(0,16)],['Logbook',fmt(snapshotCount(s.logbook),0)],['Breakdown',fmt(snapshotCount(s.breakdown),0)],
+  ['Predictive',fmt(snapshotCount(s.predictive),0)],['Project',fmt(snapshotCount(s.project),0)],['Active problems',fmt((a.records||[]).length,0)],
+  ['Derived machine states',fmt((m.records||[]).length,0)],['Downtime',down.label==='NOT AVAILABLE'?'—':fmt(down.totalMinutes,0)+' min']
+ ])+
+ list(m.records,function(x){
+  return item(x.machine||'Mesin',(x.lastAt||'').replace('T',' ').slice(0,16),chip(x.derivedStatus||'DERIVED'));
+ },50)+note(d.note||'Best-known historical state only.','warn');
+}
+function rangePayload(sec){
+ var days=Number(val(sec,'[data-v4-fb-days]')||90),until=new Date(),since=new Date(until.getTime()-days*86400000),machine=val(sec,'[data-v4-fb-machine]');
+ var p={since:since.toISOString(),until:until.toISOString()};if(machine)p.machine=machine;return p;
+}
+function render95(d){
+ if(!d)return empty('Black Box belum tersedia.');
+ var s=d.summary||{};
+ return metrics([['Events',fmt(s.events,0)],['Affected machines',fmt(s.affectedMachines,0)],['Downtime',fmt(s.downtimeMinutes,0)+' min'],['Sources',fmt(Object.keys(s.sources||{}).length,0)]])+
+ list(d.events,function(x){
+  return item((x.machine||'Mesin tidak tercatat')+' • '+(x.event||'Recorded event'),(x.timestamp||'').replace('T',' ').slice(0,19)+' • '+(x.source||'')+' • Downtime '+fmt(x.downtimeMinutes,0)+' min',chip(x.status||x.priority||'RECORDED'));
+ },100)+note(d.note||'Chronology dari timestamped maintenance records only.','safe');
+}
+function render96(g){
+ return graphSummary(g,'Factory Knowledge Graph menghubungkan machine, failure, symptom, RCA, corrective action, technician, manual, knowledge, sparepart, project, KPI, energy, IPAL, vendor/PO/cost bila evidence tersedia.');
+}
+function render99(o){
+ if(!o)return empty('Overview belum tersedia.');
+ var risks=o.topRisks||[],ops=o.topOpportunities||[],latest=o.latestIntelligence||[];
+ return metrics([['Risk signals',fmt(risks.length,0)],['Opportunity signals',fmt(ops.length,0)],['Latest intelligence',fmt(latest.length,0)]])+
+ '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Human review queue</strong><span>AUTONOMOUS WRITE: NONE</span></div>'+
+ list(risks,function(x){return item(x.title||x.type,x.reason||'',chip(x.priority||'REVIEW'))},20)+
+ list(ops,function(x){return item(x.title||x.type,x.reason||'',chip('OPPORTUNITY'))},20)+
+ '</section>'+note('Tidak ada tindakan maintenance, perubahan status, purchase request, atau input Logbook yang dijalankan otomatis oleh fitur ini.','warn');
+}
+function briefBlock(b){
+ if(!b)return '';
+ var sum=Array.isArray(b.summary)?b.summary:[];
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Deterministic Executive Brief</strong><span>Confidence: '+esc(b.confidence||'')+'</span></div>'+
+ (sum.length?'<div class="v4-sf-list">'+sum.map(function(x){return item(x,'',chip('BRIEF'))}).join('')+'</div>':empty('Brief belum tersedia.'))+'</section>';
+}
+function render100(g,o,b){
+ var brain=graphSummary(g,'OMODOS FACTORY BRAIN adalah decision-support layer; seluruh graph tetap derived dari source existing.');
+ var s=o&&o.summary||{};
+ var overview=metrics([
+  ['Critical machines',fmt(s.criticalMachines,0)],['Active breakdown',fmt(s.activeBreakdown,0)],['Sparepart risks',fmt(s.sparepartRisks,0)],
+  ['KPI at risk',fmt(s.kpiAtRisk,0)],['High-priority actions',fmt(s.openHighPriorityActions,0)]
+ ]);
+ return overview+briefBlock(b)+brain+note('Factory Brain tidak menjadi duplicate source-of-truth dan tidak mempunyai hak autonomous write ke modul operasional.','warn');
+}
+async function load(btn,n){
+ var sec=btn.closest('.v4-factory-brain-intel'),out=sec&&sec.querySelector('[data-v4-fb-out]');
+ if(!sec||!out)return;
+ busy(btn,true,'Memuat');
+ try{
+  if(n===91){out.innerHTML=render91(await read('v4.getFactoryBrain',{maxMachines:60}));return}
+  if(n===92){out.innerHTML=render92(await read('v4.getOverview',{}));return}
+  if(n===93){out.innerHTML=render93(await read('v4.getWhatChanged',changePayload(sec)));return}
+  if(n===94){
+   var tp=timePayload(sec);if(!tp){out.innerHTML=note('Pilih tanggal & waktu yang valid.','warn');return}
+   out.innerHTML=render94(await read('v4.getTimeMachine',tp));return
+  }
+  if(n===95){out.innerHTML=render95(await read('v4.getBlackBox',rangePayload(sec)));return}
+  if(n===96){out.innerHTML=render96(await read('v4.getFactoryBrain',{maxMachines:80}));return}
+  if(n===99){out.innerHTML=render99(await read('v4.getOverview',rangePayload(sec)));return}
+  if(n===100){
+   var all=await Promise.all([read('v4.getFactoryBrain',{maxMachines:80}),read('v4.getOverview',{}),read('v4.getBrief',{})]);
+   out.innerHTML=render100(all[0],all[1],all[2]);return
+  }
+ }catch(e){out.innerHTML=note(e&&e.message||String(e),'error')}
+ finally{busy(btn,false)}
+}
+document.addEventListener('click',function(ev){
+ var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
+ if(tile){
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=91&&n<=100&&n!==97&&n!==98)setTimeout(function(){if(openN(n))mount(n)},0);
+  return;
+ }
+ var b=ev.target.closest&&ev.target.closest('[data-v4-fb-load]');
+ if(b){ev.preventDefault();load(b,Number(b.getAttribute('data-v4-fb-load')));return}
+},false);
+
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ factoryBrainVersion:'1',
+ factoryBrainFeatures:[91,92,93,94,95,96,97,98,99,100],
+ factoryBrainReadOnlyEnhanced:[91,92,93,94,95,96,99,100],
+ factoryBrainPreservedInteractions:[97,98],
+ autonomousOperationalWrites:'NONE'
+});
+})();
+
