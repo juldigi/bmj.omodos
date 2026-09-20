@@ -1,0 +1,137 @@
+name: Browser QA Copilot Bantuan
+
+on:
+  push:
+    branches:
+      - fix/bantuan-copilot-final
+    paths:
+      - "public/index.html"
+      - ".github/workflows/browser-qa-bantuan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start local server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/omodos-bantuan-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Run Bantuan UX regression
+        shell: bash
+        run: |
+          cat > bantuan-qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser=await chromium.launch({headless:true});
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            page.setDefaultTimeout(10000);
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            page.on('dialog',async d=>{ try{await d.dismiss();}catch{} });
+
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:15000});
+
+            const structural=await page.evaluate(()=>{
+              const help=document.getElementById('copilot-help');
+              const panel=document.getElementById('copilot-panel');
+              return {
+                helpButton:!!help,
+                helpInsideCopilot:!!(help&&panel&&panel.contains(help)),
+                helpData:!!(window.OMODOS_HELP_DATA&&window.OMODOS_HELP_DATA.guides),
+                helpFn:typeof window.copilotOpenHelp_==='function',
+                oldVisibleGuides:[...document.querySelectorAll('.legacy-simple-guide')].filter(el=>getComputedStyle(el).display!=='none').length,
+                oldGuideNodes:document.querySelectorAll('.view > .legacy-simple-guide').length,
+                bantuanButtons:[...document.querySelectorAll('button')].filter(b=>/\bBantuan\b/i.test((b.textContent||'').trim())).map(b=>b.id)
+              };
+            });
+
+            if(!structural.helpButton || !structural.helpInsideCopilot || !structural.helpData || !structural.helpFn){
+              throw new Error('Structural Bantuan check failed: '+JSON.stringify(structural));
+            }
+            if(structural.oldVisibleGuides!==0 || structural.oldGuideNodes!==0){
+              throw new Error('Legacy page Bantuan still present: '+JSON.stringify(structural));
+            }
+            if(JSON.stringify(structural.bantuanButtons)!==JSON.stringify(['copilot-help'])){
+              throw new Error('Bantuan button is not exclusive to Copilot: '+JSON.stringify(structural.bantuanButtons));
+            }
+
+            const logbook=await page.evaluate(()=>{
+              document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+              document.getElementById('view-utama')?.classList.add('active');
+              openCopilot();
+              document.getElementById('copilot-help')?.click();
+              const card=document.querySelector('#copilot-body .copilot-help-card');
+              return {
+                bg:document.getElementById('copilot-bg')?.classList.contains('active'),
+                card:!!card,
+                view:card?.dataset.helpView||'',
+                title:card?.querySelector('.copilot-help-title')?.textContent?.trim()||'',
+                steps:card?.querySelectorAll('.copilot-help-step').length||0,
+                expanded:document.getElementById('copilot-help')?.getAttribute('aria-expanded')
+              };
+            });
+            if(!logbook.bg || !logbook.card || logbook.view!=='utama' || logbook.title!=='Lihat Logbook' || logbook.steps!==2 || logbook.expanded!=='true'){
+              throw new Error('Logbook Bantuan failed: '+JSON.stringify(logbook));
+            }
+
+            const patrol=await page.evaluate(()=>{
+              copilotCloseHelp_();
+              document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+              document.getElementById('view-patrol')?.classList.add('active');
+              document.getElementById('copilot-help')?.click();
+              const card=document.querySelector('#copilot-body .copilot-help-card');
+              return {
+                card:!!card,
+                view:card?.dataset.helpView||'',
+                title:card?.querySelector('.copilot-help-title')?.textContent?.trim()||'',
+                glossary:!!card?.querySelector('.copilot-help-glossary')
+              };
+            });
+            if(!patrol.card || patrol.view!=='patrol' || patrol.title!=='Pemeriksaan harian' || !patrol.glossary){
+              throw new Error('Patrol contextual Bantuan failed: '+JSON.stringify(patrol));
+            }
+
+            const closeCheck=await page.evaluate(()=>{
+              document.getElementById('copilot-help-close')?.click();
+              return {
+                card:!!document.querySelector('#copilot-body .copilot-help-card'),
+                expanded:document.getElementById('copilot-help')?.getAttribute('aria-expanded')
+              };
+            });
+            if(closeCheck.card || closeCheck.expanded!=='false'){
+              throw new Error('Bantuan close failed: '+JSON.stringify(closeCheck));
+            }
+
+            const relevant=errors.filter(x=>/TypeError|ReferenceError|SyntaxError/i.test(x));
+            if(relevant.length) throw new Error('Relevant browser errors: '+JSON.stringify(relevant));
+
+            console.log('[BANTUAN_QA] '+JSON.stringify({structural,logbook,patrol,closeCheck,relevant}));
+          } finally {
+            await browser.close();
+          }
+          JS
+          node --check bantuan-qa.mjs
+          timeout -k 5s 30s node bantuan-qa.mjs
+
+      - name: Cleanup
+        if: always()
+        run: rm -f package.json package-lock.json bantuan-qa.mjs
