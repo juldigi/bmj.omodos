@@ -2649,3 +2649,252 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
 });
 })();
 
+
+/* OMODOS4_AI_INTELLIGENCE_V2
+   Progressive-enhancement UI for master-prompt features 71–80.
+   Reuses existing v4.aiAsk / V4 read endpoints, never auto-writes operational source data,
+   and always keeps evidence, confidence, source visibility, and human review in the UI. */
+(function(){
+'use strict';
+
+var AI2_CFG={
+ 71:{purpose:'ask',title:'Ask OMODOS 4.0',machine:'optional',placeholder:'Tanyakan kondisi maintenance, risiko, histori, sparepart, KPI, atau evidence lain.',defaultText:''},
+ 72:{purpose:'machine',title:'Machine Copilot',machine:'required',placeholder:'Tanyakan kondisi, histori, pola masalah, atau risiko mesin terpilih.',defaultText:'Jelaskan kondisi terkini, pola masalah, risiko yang perlu diperiksa, dan evidence pendukung mesin ini.'},
+ 73:{purpose:'shift',title:'Shift Copilot',machine:'optional',placeholder:'Tambahkan konteks handover shift bila diperlukan.',defaultText:'Buat brief handover shift: perubahan penting, open issue, risiko, dan tindakan yang harus diteruskan.'},
+ 74:{purpose:'morning-brief',title:'Morning Maintenance Brief',machine:'optional',placeholder:'Tambahkan fokus brief pagi bila diperlukan.',defaultText:'Buat Morning Maintenance Brief yang ringkas, evidence-first, dan prioritaskan hal yang perlu ditindaklanjuti.'},
+ 75:{purpose:'rca-draft',title:'Auto RCA Draft',machine:'optional',placeholder:'Tuliskan problem / symptom. Root cause final tetap harus diverifikasi manusia.',defaultText:''},
+ 76:{purpose:'troubleshooting',title:'Troubleshooting Similarity Search',machine:'optional',placeholder:'Tuliskan symptom / problem untuk mencari historical case yang mirip.',defaultText:''},
+ 77:{purpose:'manual',title:'Manual Whisperer',machine:'required',placeholder:'Tanyakan hal yang ingin dipahami dari manual / knowledge yang tersedia untuk mesin ini.',defaultText:''},
+ 78:{purpose:'harvest',title:'Knowledge Auto-Harvest',machine:'none',placeholder:'',defaultText:''},
+ 79:{purpose:'translate',title:'Maintenance Translator',machine:'none',placeholder:'Masukkan istilah / kalimat maintenance yang ingin diterjemahkan atau dinormalisasi.',defaultText:''},
+ 80:{purpose:'skeptic',title:'AI Skeptic Mode',machine:'optional',placeholder:'Tuliskan diagnosis, asumsi, atau keputusan yang ingin diuji secara kritis.',defaultText:''}
+};
+
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openN(n){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!el&&parseInt(el.textContent,10)===Number(n);
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function note(t,kind){return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+esc(t)+'</span></div>'}
+function empty(t){return '<div class="v4-empty">'+esc(t||'Belum ada evidence yang cukup.')+'</div>'}
+function chip(t){return '<span class="v4-risk-chip">'+esc(t||'EVIDENCE')+'</span>'}
+function busy(btn,on,label){
+ if(!btn)return;
+ if(on){btn.dataset.old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> '+esc(label||'Memproses…')}
+ else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
+}
+function val(sec,sel){var e=sec&&sec.querySelector(sel);return e?String(e.value||'').trim():''}
+function fmt(v,d){
+ if(v==null||v==='')return '—';
+ var n=Number(v);if(!Number.isFinite(n))return String(v);
+ try{return new Intl.NumberFormat('id-ID',{maximumFractionDigits:d==null?2:d}).format(n)}catch(e){return String(n)}
+}
+function first(o,keys){
+ if(!o||typeof o!=='object')return '';
+ for(var i=0;i<keys.length;i++){var k=keys[i];if(o[k]!=null&&String(o[k]).trim())return String(o[k])}
+ return '';
+}
+function names(){
+ var set=new Set();
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function machineOptions(blank){
+ return '<option value="">'+esc(blank||'Semua mesin')+'</option>'+names().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('');
+}
+function actionReady(){return !!(window.OMODOS4&&typeof window.OMODOS4.interactiveAction==='function')}
+function readReady(){return !!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function')}
+function action(action,payload){
+ if(!actionReady())return Promise.reject(new Error('Backend V4 interaction belum tersedia pada sesi ini.'));
+ return window.OMODOS4.interactiveAction(action,payload||{});
+}
+function read(actionName,payload){
+ if(!readReady())return Promise.resolve(null);
+ return window.OMODOS4.serverRead(actionName,payload||{});
+}
+function evidenceTitle(e){
+ if(!e||typeof e!=='object')return String(e||'Evidence');
+ var r=e.record&&typeof e.record==='object'?e.record:e;
+ return first(r,['Nama Mesin','namaMesin','Machine','Mesin','Title','Judul','Problem','Deskripsi Masalah','Deskripsi','description','Nama Material','Nama','ID'])||
+        first(e,['machine','title','problem','description','sheet','source'])||'Evidence';
+}
+function evidenceHtml(arr,limit){
+ if(!Array.isArray(arr)||!arr.length)return empty('Tidak ada evidence source tambahan yang ditemukan.');
+ return '<div class="v4-sf-list">'+arr.slice(0,limit||16).map(function(e){
+  var src=first(e,['sheet','source','type','label'])||'OMODOS';
+  var machine=first(e,['machine']);
+  var score=e&&e.score!=null?' • score '+fmt(e.score,2):'';
+  return '<div class="v4-sf-item"><div><strong>'+esc(evidenceTitle(e))+'</strong><small>'+esc(src+(machine?' • '+machine:'')+score)+'</small></div>'+chip('SOURCE')+'</div>';
+ }).join('')+'</div>';
+}
+function aiHtml(d){
+ d=d||{};
+ var summary=first(d,['summary','answer'])||'Belum ada ringkasan.';
+ var assumptions=Array.isArray(d.assumptions)?d.assumptions:[];
+ var evidence=Array.isArray(d.evidence)?d.evidence:[];
+ var recommendation=first(d,['recommendation']);
+ var provider=d.providerStatus==='unavailable'?'Provider unavailable • deterministic fallback':(d.modelUsed?'Model: '+d.modelUsed:'Evidence-first');
+ return '<div class="v4-ai-result">'+
+  '<div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(d.mode||'OMODOS AI')+'</span><span>Confidence: '+esc(d.confidence||'not stated')+'</span></div>'+
+  '<div class="v4-ai-answer">'+esc(summary).replace(/\n/g,'<br>')+'</div>'+
+  '<div class="v4-statline"><div><b>'+esc(evidence.length)+'</b><span>Evidence source</span></div><div><b>'+esc(d.humanReviewRequired===false?'No':'Yes')+'</b><span>Human review</span></div><div><b>'+esc(provider)+'</b><span>Mode</span></div></div>'+
+  (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi / batasan</strong><ul>'+assumptions.slice(0,8).map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>':'')+
+  (recommendation?note(recommendation,'safe'):'')+
+  evidenceHtml(evidence,16)+
+  note('AI action tercatat pada audit V4. Output adalah decision support dan tidak mengubah source data secara otomatis.','warn')+
+ '</div>';
+}
+function removeOlder(n,h){
+ Array.from(h.querySelectorAll('.v4-interaction[data-v4-interaction-feature="'+n+'"],.v4-ai2-interaction')).forEach(function(x){x.remove()});
+}
+function controls(n,cfg){
+ if(n===78)return '';
+ var machine='';
+ if(cfg.machine!=='none'){
+  var blank=cfg.machine==='required'?'Pilih mesin':'Semua mesin / tidak dibatasi';
+  machine='<label>Mesin '+(cfg.machine==='required'?'<b>*</b>':'(opsional)')+'<select data-v4-ai2-machine>'+machineOptions(blank)+'</select></label>';
+ }
+ return '<div class="v4-form-grid">'+machine+
+  '<label class="v4-form-wide">'+(n===79?'Istilah / kalimat':'Pertanyaan / konteks')+
+  '<textarea data-v4-ai2-query rows="4" maxlength="4000" placeholder="'+esc(cfg.placeholder)+'">'+esc(cfg.defaultText)+'</textarea></label></div>';
+}
+function buttons(n){
+ var extra='';
+ if(n===71||n===72||n===73||n===74||n===79||n===80)extra='<button class="btn btn-sm" data-v4-open-copilot><i class="ph-bold ph-brain"></i> Buka Copilot Existing</button>';
+ if(n===75)extra='<button class="btn btn-sm" data-v4-open-existing="diagnostic"><i class="ph-bold ph-file-magnifying-glass"></i> Buka RCA Existing</button>';
+ if(n===77||n===78)extra='<button class="btn btn-sm" data-v4-open-existing="knowledge"><i class="ph-bold ph-books"></i> Buka Knowledge Existing</button>';
+ return '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-ai2-run="'+n+'"><i class="ph-bold ph-sparkle"></i> '+(n===78?'Muat Kandidat':'Jalankan')+'</button>'+extra+'</div>';
+}
+function intro(n){
+ var text='Evidence diambil dari source OMODOS existing. AI tidak boleh mengubah data operasional otomatis.';
+ if(n===72)text='Machine Copilot memakai server-side machine scope. Evidence dari mesin lain tidak ikut dicari ketika satu mesin dipilih.';
+ if(n===75)text='Auto RCA hanya membuat DRAFT. Root cause final, corrective action, dan commit RCA wajib diverifikasi manusia.';
+ if(n===76)text='Similarity Search mengutamakan historical case retrieval. Kemiripan teks bukan bukti root cause identik.';
+ if(n===77)text='Manual Whisperer tidak boleh mengarang isi manual. Jika manual hanya berupa link/metadata, sistem akan menyatakan batasannya.';
+ if(n===78)text='Knowledge Auto-Harvest hanya menghasilkan kandidat. Penyimpanan artikel tetap melalui Knowledge Base existing setelah review.';
+ if(n===79)text='Translator menjaga makna teknis; hasil terjemahan perlu diperiksa bila menyangkut prosedur keselamatan atau spesifikasi.';
+ if(n===80)text='Skeptic Mode sengaja mencari alternative explanation, missing evidence, dan asumsi yang perlu diuji.';
+ return note(text,'safe');
+}
+function mount(n){
+ n=Number(n);var cfg=AI2_CFG[n],h=host();if(!cfg||!h||!openN(n))return;
+ removeOlder(n,h);
+ var sec=document.createElement('section');
+ sec.className='v4-interaction v4-ai2-interaction';
+ sec.setAttribute('data-v4-ai2-feature',String(n));
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">AI INTELLIGENCE • EVIDENCE-FIRST</span><h3>'+esc(cfg.title)+'</h3></div><span class="v4-no-write">NO AUTO WRITE</span></div>'+
+  intro(n)+controls(n,cfg)+buttons(n)+'<div data-v4-ai2-out></div>';
+ h.prepend(sec);
+}
+async function getBriefContext(machine){
+ var d=await read('v4.getBrief',machine?{machine:machine}:{});
+ return d||null;
+}
+function briefHtml(d){
+ if(!d)return '';
+ var s=Array.isArray(d.summary)?d.summary:[];
+ var look=Array.isArray(d.thingsToLookAt)?d.thingsToLookAt:[];
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Deterministic brief baseline</strong><span>'+esc(d.confidence||'')+'</span></div>'+
+ (s.length?'<div class="v4-sf-list">'+s.slice(0,8).map(function(x){return '<div class="v4-sf-item"><div><strong>'+esc(x)+'</strong></div>'+chip('RECORDED/DERIVED')+'</div>'}).join('')+'</div>':'')+
+ (look.length?evidenceHtml(look,8):'')+'</section>';
+}
+function passportHtml(d){
+ if(!d)return '';
+ var c=d.currentCondition||{},r=d.reliability||{},k=d.knowledge||{},manual=k.manual||{};
+ var hasManual=!!(manual.manualPdf||manual.reference);
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Machine-scoped context</strong><span>'+esc(d.logicVersion||'')+'</span></div>'+
+ '<div class="v4-statline"><div><b>'+esc(c.healthIndex==null?'—':c.healthIndex)+'</b><span>Health index</span></div><div><b>'+esc(c.currentRisk||'—')+'</b><span>Current risk</span></div><div><b>'+esc(r.failureCount==null?'—':r.failureCount)+'</b><span>Failure evidence</span></div><div><b>'+esc(r.downtimeMinutes==null?'—':r.downtimeMinutes)+'</b><span>Downtime min</span></div></div>'+
+ note(hasManual?'Manual/reference metadata tercatat untuk mesin ini.':'Manual/reference belum tercatat pada Machine Master.','safe')+
+ '</section>';
+}
+function similarityHtml(d){
+ if(!d)return '';
+ var hits=Array.isArray(d.hits)?d.hits:[];
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Historical similarity</strong><span>Confidence: '+esc(d.confidence||'')+'</span></div>'+
+ evidenceHtml(hits,18)+note(d.note||'Similarity adalah retrieval evidence, bukan bukti root cause identik.','warn')+'</section>';
+}
+function candidateHtml(d){
+ var rows=d&&Array.isArray(d.candidates)?d.candidates:[];
+ var head='<div class="v4-interaction-result-head"><span>'+rows.length+' kandidat</span><span>Existing KB: '+esc(d&&d.existingKnowledgeRecords==null?'—':d.existingKnowledgeRecords)+'</span></div>';
+ var body=rows.length?'<div class="v4-sf-list">'+rows.slice(0,60).map(function(x){
+  var sourceIds=Array.isArray(x.sourceIds)&&x.sourceIds.length?' • Source IDs '+x.sourceIds.slice(0,5).join(', '):'';
+  var sub=(x.machine||'Mesin belum tercatat')+' • Recurrence '+fmt(x.recurrence,0)+' • '+(x.problem||'Problem belum tercatat')+
+   (x.mostRecordedAction?' • Action: '+x.mostRecordedAction:'')+sourceIds;
+  return '<div class="v4-sf-item"><div><strong>'+esc(x.label||'KNOWLEDGE_DRAFT_CANDIDATE')+'</strong><small>'+esc(sub)+'</small></div>'+chip(x.existingKnowledgePossibleMatch?'CHECK EXISTING KB':'DRAFT CANDIDATE')+'</div>';
+ }).join('')+'</div>':empty('Belum ada knowledge candidate dari recurring solved case / RCA.');
+ return head+body+note(d&&d.note||'Review existing Knowledge Base lebih dulu untuk mencegah duplikasi.','warn');
+}
+async function run78(sec,out){
+ var d=await read('v4.getKnowledgeCandidates',{});
+ if(!d)throw new Error('Knowledge candidate endpoint belum tersedia.');
+ out.innerHTML=candidateHtml(d);
+}
+async function run72(sec,out,q,m){
+ var passport=await read('v4.getMachinePassport',{machine:m});
+ var ai=await action('v4.aiAsk',{query:q,purpose:'machine',machine:m});
+ out.innerHTML=passportHtml(passport)+aiHtml(ai);
+}
+async function run73or74(n,sec,out,q,m){
+ var brief=await getBriefContext(m);
+ var briefText=brief&&Array.isArray(brief.summary)?brief.summary.join(' | '):'';
+ var enriched=q+(briefText?'\nInternal brief context: '+briefText:'');
+ var ai=await action('v4.aiAsk',{query:enriched.slice(0,4000),purpose:AI2_CFG[n].purpose,machine:m||''});
+ out.innerHTML=briefHtml(brief)+aiHtml(ai);
+}
+async function run75(sec,out,q,m){
+ var sim=await read('v4.getFailureMemory',{query:q,machine:m||''});
+ var ai=await action('v4.aiAsk',{query:q,purpose:'rca-draft',machine:m||''});
+ out.innerHTML=similarityHtml(sim)+aiHtml(ai)+note('DRAFT RCA belum menjadi RCA record. Simpan/commit hanya melalui workflow RCA existing setelah verifikasi fakta dan root cause.','warn');
+}
+async function run76(sec,out,q,m){
+ var sim=await read('v4.getFailureMemory',{query:q,machine:m||''});
+ var ai=await action('v4.aiAsk',{query:q,purpose:'troubleshooting',machine:m||''});
+ out.innerHTML=similarityHtml(sim)+aiHtml(ai);
+}
+async function run77(sec,out,q,m){
+ var passport=await read('v4.getMachinePassport',{machine:m});
+ var ai=await action('v4.aiAsk',{query:q,purpose:'manual',machine:m});
+ out.innerHTML=passportHtml(passport)+aiHtml(ai)+note('AI tidak membaca PDF manual hanya karena URL tercatat. Jawaban harus tetap dibatasi pada evidence/manual knowledge yang benar-benar tersedia.','warn');
+}
+async function runGeneric(n,sec,out,q,m){
+ var ai=await action('v4.aiAsk',{query:q,purpose:AI2_CFG[n].purpose,machine:m||''});
+ out.innerHTML=aiHtml(ai);
+}
+async function run(btn,n){
+ var cfg=AI2_CFG[n],sec=btn.closest('.v4-ai2-interaction'),out=sec&&sec.querySelector('[data-v4-ai2-out]');
+ if(!cfg||!sec||!out)return;
+ if(n===78){busy(btn,true,'Memuat');try{await run78(sec,out)}catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}return}
+ var q=val(sec,'[data-v4-ai2-query]'),m=val(sec,'[data-v4-ai2-machine]');
+ if(!q){out.innerHTML=note('Isi pertanyaan / konteks terlebih dahulu.','warn');return}
+ if(cfg.machine==='required'&&!m){out.innerHTML=note('Pilih satu mesin agar evidence tidak bercampur.','warn');return}
+ busy(btn,true,'Menganalisis');out.innerHTML=note('Menghubungkan pertanyaan dengan evidence internal dan audit trail V4…','safe');
+ try{
+  if(n===72)await run72(sec,out,q,m);
+  else if(n===73||n===74)await run73or74(n,sec,out,q,m);
+  else if(n===75)await run75(sec,out,q,m);
+  else if(n===76)await run76(sec,out,q,m);
+  else if(n===77)await run77(sec,out,q,m);
+  else await runGeneric(n,sec,out,q,m);
+ }catch(e){out.innerHTML=note(e.message||String(e),'error')}
+ finally{busy(btn,false)}
+}
+document.addEventListener('click',function(ev){
+ var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
+ if(tile){
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=71&&n<=80)setTimeout(function(){if(openN(n))mount(n)},0);
+  return;
+ }
+ var b=ev.target.closest&&ev.target.closest('[data-v4-ai2-run]');
+ if(b){ev.preventDefault();run(b,Number(b.getAttribute('data-v4-ai2-run')));return}
+},false);
+
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ aiIntelligenceVersion:'2',
+ aiIntelligenceFeatures:[71,72,73,74,75,76,77,78,79,80],
+ aiMachineEvidenceScope:'SERVER_FILTERED'
+});
+})();
+
