@@ -190,6 +190,10 @@ jobs:
               SESSION_TOKEN = 'qa';
               FEATURE_REGISTRY = mergeFeatureRegistry([]);
               PERMISSIONS = {};
+              const app=document.getElementById('app-root');
+              const gate=document.getElementById('login-gate');
+              if(app) app.classList.add('unlocked');
+              if(gate) gate.style.display='none';
               applyRbacToUi();
               window.dispatchEvent(new Event('storage'));
             });
