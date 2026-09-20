@@ -159,7 +159,8 @@ jobs:
               };
             });
             result.uiSafety = uiSafety;
-            if (!uiSafety.authorizedClass || uiSafety.recoveredModules < 11 || !uiSafety.helpInside || uiSafety.helpOutside || !uiSafety.filterMachine || uiSafety.toastZ <= uiSafety.copilotZ || uiSafety.toastBottom !== 'auto') {
+            const toastTopPx = Number.parseFloat(uiSafety.toastTop);
+            if (!uiSafety.authorizedClass || uiSafety.recoveredModules < 11 || !uiSafety.helpInside || uiSafety.helpOutside || !uiSafety.filterMachine || uiSafety.toastZ <= uiSafety.copilotZ || !Number.isFinite(toastTopPx) || toastTopPx < 0 || toastTopPx > 40) {
               throw new Error('Frontend recovery/UI safety failed: ' + JSON.stringify(uiSafety));
             }
             result.phases.push('ui-safety');
