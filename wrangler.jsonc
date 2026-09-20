@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "omodos",
-  "main": "src/worker.js",
+  "main": "src/entry.js",
   "compatibility_date": "2026-09-01",
   "no_bundle": true,
   "assets": {
