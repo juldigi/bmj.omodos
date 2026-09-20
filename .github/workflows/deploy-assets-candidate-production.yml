@@ -80,8 +80,7 @@ jobs:
               {"version_id":candidate,"percentage":0.01}
             ],
             "annotations":{
-              "workers/message":"OMODOS assets v81 controlled smoke",
-              "workers/triggered_by":"github-actions"
+              "workers/message":"OMODOS assets v81 controlled smoke"
             }
           }
           status,created=api("POST",endpoint,payload)
@@ -164,8 +163,7 @@ jobs:
             "strategy":"percentage",
             "versions":[{"version_id":candidate,"percentage":100}],
             "annotations":{
-              "workers/message":"OMODOS assets v81 promoted after preview + override QA PASS",
-              "workers/triggered_by":"github-actions"
+              "workers/message":"OMODOS assets v81 promoted after preview + override QA PASS"
             }
           }
           req=urllib.request.Request(
@@ -276,8 +274,7 @@ jobs:
             "strategy":"percentage",
             "versions":[{"version_id":old,"percentage":100}],
             "annotations":{
-              "workers/message":"OMODOS automatic rollback after assets v81 QA failure",
-              "workers/triggered_by":"github-actions"
+              "workers/message":"OMODOS automatic rollback after assets v81 QA failure"
             }
           }
           req=urllib.request.Request(
