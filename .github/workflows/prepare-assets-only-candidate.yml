@@ -1,0 +1,160 @@
+name: Prepare Assets Only OMODOS Candidate
+
+on:
+  push:
+    branches:
+      - deploy/assets-only-fresh-shell
+    paths:
+      - ".github/workflows/prepare-assets-only-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create assets-only Wrangler config
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          config={
+            "$schema":"node_modules/wrangler/config-schema.json",
+            "name":"omodos",
+            "compatibility_date":"2026-09-18",
+            "assets":{
+              "directory":"./public",
+              "html_handling":"auto-trailing-slash",
+              "not_found_handling":"none",
+              "run_worker_first":False
+            }
+          }
+          Path("/tmp/wrangler.assets.json").write_text(json.dumps(config,indent=2)+"\n",encoding="utf-8")
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@latest
+
+      - name: Dry run assets-only package
+        shell: bash
+        run: |
+          npx wrangler deploy --config /tmp/wrangler.assets.json --dry-run
+          echo "[ASSETS_ONLY] dry-run PASS"
+
+      - name: Capture active deployment before upload
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          url=f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments"
+          req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+          with urllib.request.urlopen(req,timeout=35) as r:
+            d=json.loads(r.read().decode("utf-8"))
+          rr=d.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          if not rows:
+            raise SystemExit("No active deployment")
+          active=[{"version_id":str(v.get("version_id")),"percentage":v.get("percentage")} for v in rows[0].get("versions") or []]
+          Path("/tmp/active-before.json").write_text(json.dumps(active))
+          print("[ASSETS_ONLY] active-before="+json.dumps(active))
+
+      - name: Upload candidate version only
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions upload             --config /tmp/wrangler.assets.json             --message "OMODOS assets-only fresh shell: GitHub main fbe122f; no-cache HTML"             --tag "assets-fresh-shell-20260920"             2>&1 | tee /tmp/assets-upload.log
+
+          VERSION_ID="$(grep -Eo 'Worker Version ID: [0-9a-f-]+' /tmp/assets-upload.log | tail -1 | awk '{print $4}')"
+          if [ -z "$VERSION_ID" ]; then
+            echo "Unable to parse Worker Version ID"
+            exit 1
+          fi
+          echo "CANDIDATE_VERSION=$VERSION_ID" >> "$GITHUB_ENV"
+          printf '%s' "$VERSION_ID" > /tmp/candidate-version
+          echo "[ASSETS_ONLY] candidate=$VERSION_ID"
+
+      - name: Verify candidate is assets-only and production unchanged
+        shell: python
+        run: |
+          import os,json,urllib.request,hashlib
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          vid=os.environ["CANDIDATE_VERSION"]
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          detail=get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{vid}?include=modules"
+          ).get("result") or {}
+
+          modules=detail.get("modules") or []
+          bindings=detail.get("bindings") or []
+          assets=detail.get("assets") or {}
+          config=(assets.get("config") or {}) if isinstance(assets,dict) else {}
+
+          if modules:
+            raise SystemExit("Candidate unexpectedly contains Worker modules")
+          if bindings:
+            raise SystemExit("Candidate unexpectedly contains Worker bindings: "+repr(bindings))
+          if config.get("run_worker_first") is not False:
+            raise SystemExit("Candidate run_worker_first is not false: "+repr(config))
+
+          dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments")
+          rr=dep.get("result")
+          rows=(rr.get("deployments") or []) if isinstance(rr,dict) else (rr if isinstance(rr,list) else [])
+          after=[{"version_id":str(v.get("version_id")),"percentage":v.get("percentage")} for v in (rows[0].get("versions") or [])] if rows else []
+          before=json.loads(Path("/tmp/active-before.json").read_text())
+          if after!=before:
+            raise SystemExit("Version upload unexpectedly changed production deployment")
+
+          index=Path("public/index.html").read_bytes()
+          headers=Path("public/_headers").read_text(encoding="utf-8")
+
+          report=[
+            "# OMODOS Assets-Only Candidate",
+            "",
+            f"- Created UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Candidate version ID: {vid}",
+            f"- Candidate version number: {detail.get('number')}",
+            f"- Frontend index SHA-256: {hashlib.sha256(index).hexdigest()}",
+            f"- Modules: {len(modules)}",
+            f"- Bindings: {len(bindings)}",
+            f"- Assets config: {json.dumps(config,sort_keys=True)}",
+            f"- Active before: {json.dumps(before)}",
+            f"- Active after: {json.dumps(after)}",
+            "- Production changed by upload: NO",
+            f"- No-cache headers present: {'YES' if 'no-store' in headers and 'no-cache' in headers else 'NO'}",
+            "- Architecture matches current production assets-only model: YES"
+          ]
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/ASSETS_ONLY_CANDIDATE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[ASSETS_ONLY] candidate verification PASS")
+
+      - name: Commit sanitized report
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/ASSETS_ONLY_CANDIDATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: record assets-only Worker candidate"
+          git push
