@@ -22,58 +22,40 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch Worker source to ephemeral runner
-        shell: python
+        shell: bash
         run: |
-          import os, json, urllib.request
+          set -euo pipefail
+
+          ACCOUNT_ID="$(curl -fsSL --retry 3 --retry-delay 1             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Accept: application/json"             "https://api.cloudflare.com/client/v4/accounts?per_page=50"             | python -c "import sys,json; d=json.load(sys.stdin); r=d.get('result') or []; print(r[0].get('id','') if r else '')")"
+
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "Cloudflare account not found."
+            exit 1
+          fi
+
+          URL="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/omodos/content/v2"
+          rm -f /tmp/worker-content-v2 /tmp/worker-headers
+
+          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors             --http1.1             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Accept: */*"             -D /tmp/worker-headers             -o /tmp/worker-content-v2             "$URL"
+
+          RAW_BYTES="$(wc -c < /tmp/worker-content-v2 | tr -d ' ')"
+          echo "[PRIVATE_RECOVERY] content/v2 bytes=$RAW_BYTES"
+          if [ "$RAW_BYTES" -lt 1000 ]; then
+            echo "Worker content/v2 returned an unexpectedly small payload."
+            sed -n '1,20p' /tmp/worker-headers | sed -E 's/(authorization|cookie|set-cookie):.*/\\1: [redacted]/Ig'
+            exit 1
+          fi
+
+          python - <<'PY'
           from email.parser import BytesParser
           from email.policy import default
           from pathlib import Path
+          import re
 
-          token=os.environ.get("CLOUDFLARE_API_TOKEN","").strip()
-          if not token:
-            raise SystemExit("CLOUDFLARE_API_TOKEN missing")
-
-          def req_json(url):
-            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
-            with urllib.request.urlopen(req,timeout=25) as r:
-              return json.loads(r.read().decode("utf-8"))
-
-          def req_raw(url):
-            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"*/*"})
-            with urllib.request.urlopen(req,timeout=35) as r:
-              return r.read(), r.headers.get("Content-Type","")
-
-          account_id=None
-          for a in req_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []:
-            aid=a.get("id")
-            if not aid: continue
-            try:
-              scripts=req_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts").get("result") or []
-            except Exception:
-              continue
-            if any(str(x.get("id") or "")=="omodos" for x in scripts):
-              account_id=aid
-              break
-
-          if not account_id:
-            raise SystemExit("Worker omodos not found")
-
-          import time
-
-          raw=b""
-          ctype=""
-          endpoints=[
-            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content/v2",
-            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/content",
-          ]
-          for endpoint in endpoints:
-            for attempt in range(1,4):
-              raw,ctype=req_raw(endpoint)
-              if len(raw) > 1000:
-                break
-              time.sleep(attempt)
-            if len(raw) > 1000:
-              break
+          raw=Path("/tmp/worker-content-v2").read_bytes()
+          headers=Path("/tmp/worker-headers").read_text(encoding="utf-8",errors="replace")
+          m=re.findall(r"(?im)^content-type:\s*(.+?)\s*$",headers)
+          ctype=m[-1].strip() if m else ""
 
           source=None
           source_name="worker.js"
@@ -88,20 +70,22 @@ jobs:
               pct=p.get_content_type()
               if payload:
                 parsed.append((str(name),pct,payload))
-            js_parts=[x for x in parsed if x[0].lower().endswith((".js",".mjs",".ts")) or x[1].startswith("application/javascript")]
-            pool=js_parts or parsed
+            js=[x for x in parsed if x[0].lower().endswith((".js",".mjs",".ts")) or x[1].startswith("application/javascript")]
+            pool=js or parsed
             if pool:
               source_name,pct,source=max(pool,key=lambda x:len(x[2]))
           else:
             source=raw
-            source_name="worker.js"
 
-          if not source or len(source) < 1000:
-            raise SystemExit(f"Worker source payload unavailable after retries; raw_bytes={len(raw)} content_type={ctype!r}")
+          if not source or len(source)<1000:
+            raise SystemExit(f"Unable to extract Worker source; raw={len(raw)} bytes, content_type={ctype!r}")
 
           Path("/tmp/omodos-worker.js").write_bytes(source)
           Path("/tmp/source-name.txt").write_text(source_name,encoding="utf-8")
           print(f"[PRIVATE_RECOVERY] source captured in ephemeral runner: {len(source)} bytes")
+          PY
+
+          rm -f /tmp/worker-content-v2 /tmp/worker-headers
 
       - name: Encrypt source before repository write
         shell: bash
