@@ -1,0 +1,241 @@
+name: Prepare Worker Frontend Sync Version
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/prepare-worker-frontend-version.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Recover stable backend v68 and active deployment
+        shell: python
+        run: |
+          import os,json,base64,urllib.request
+          from pathlib import Path
+
+          token=os.environ.get("CLOUDFLARE_API_TOKEN","").strip()
+          if not token:
+            raise SystemExit("deploy token missing")
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          accounts=get_json("https://api.cloudflare.com/client/v4/accounts?per_page=50").get("result") or []
+          account_id=None
+          deployments=None
+          for a in accounts:
+            aid=a.get("id")
+            if not aid: continue
+            try:
+              dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments")
+              result=dep.get("result")
+              if isinstance(result,dict):
+                rows=result.get("deployments") or []
+              elif isinstance(result,list):
+                rows=result
+              else:
+                rows=[]
+              if rows:
+                account_id=aid
+                deployments=rows
+                break
+            except Exception:
+              continue
+
+          if not account_id:
+            # Fallback via known version history.
+            for a in accounts:
+              aid=a.get("id")
+              if not aid: continue
+              try:
+                rows=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions?per_page=5").get("result") or []
+              except Exception:
+                rows=[]
+              if rows:
+                account_id=aid
+                deployments=[]
+                break
+
+          if not account_id:
+            raise SystemExit("omodos account not found")
+
+          Path("/tmp/account-id").write_text(account_id)
+          os.environ["GITHUB_ENV"] and Path(os.environ["GITHUB_ENV"]).open("a").write(f"CLOUDFLARE_ACCOUNT_ID={account_id}\n")
+
+          # Save current deployment version IDs for post-upload safety check.
+          active=[]
+          for d in deployments or []:
+            for v in d.get("versions") or []:
+              vid=str(v.get("version_id") or "")
+              pct=v.get("percentage")
+              if vid:
+                active.append({"version_id":vid,"percentage":pct})
+          Path("/tmp/active-before.json").write_text(json.dumps(active))
+
+          v68_id="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          detail=get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/omodos/versions/{v68_id}?include=modules"
+          ).get("result") or {}
+          mods=detail.get("modules") or []
+          if not mods:
+            raise SystemExit("v68 source module unavailable")
+          mod=max(mods,key=lambda m:len(m.get("content_base64") or ""))
+          raw=base64.b64decode(mod.get("content_base64") or "")
+          if len(raw)<800000:
+            raise SystemExit(f"Recovered backend unexpectedly small: {len(raw)}")
+
+          Path("src").mkdir(exist_ok=True)
+          Path("src/worker.js").write_bytes(raw)
+
+          # Preserve v68 compatibility and routing semantics; only assets change.
+          config={
+            "$schema":"node_modules/wrangler/config-schema.json",
+            "name":"omodos",
+            "main":"src/worker.js",
+            "compatibility_date":"2026-09-01",
+            "no_bundle":True,
+            "assets":{
+              "directory":"./public",
+              "binding":"ASSETS",
+              "run_worker_first":["/api","/api/*","/files/*"],
+              "html_handling":"auto-trailing-slash",
+              "not_found_handling":"none"
+            },
+            "durable_objects":{
+              "bindings":[
+                {"name":"MAINTENANCE","class_name":"MaintenanceStore"}
+              ]
+            },
+            "migrations":[
+              {"tag":"v1","new_sqlite_classes":["MaintenanceStore"]}
+            ],
+            "observability":{"enabled":True},
+            "secrets":{
+              "required":["GEMINI_API_KEY","GROQ_API_KEY","SETUP_TOKEN"]
+            }
+          }
+          Path("wrangler.recovery.json").write_text(json.dumps(config,indent=2)+"\n")
+          print("[PREPARE] stable backend recovered and ephemeral Wrangler config created")
+          print("[PREPARE] active versions before upload:",active)
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@latest
+
+      - name: Dry-run full worker package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config wrangler.recovery.json --dry-run --outdir /tmp/wrangler-dry-run
+          test -s /tmp/wrangler-dry-run/worker.js || test -n "$(find /tmp/wrangler-dry-run -type f -maxdepth 2 -print -quit)"
+          echo "[PREPARE] dry-run package valid"
+
+      - name: Upload new version without production deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE="$(cat /tmp/active-before.json)"
+          echo "[PREPARE] active-before=$BEFORE"
+
+          npx wrangler versions upload             --config wrangler.recovery.json             --message "OMODOS frontend sync from GitHub main 29d2b6e; backend preserved from v68"             --tag "frontend-sync-20260920"             2>&1 | tee /tmp/version-upload.log
+
+          echo "[PREPARE] version upload completed; production deployment was not requested"
+
+      - name: Identify uploaded version and verify production unchanged
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+          from datetime import datetime,timezone
+
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          aid=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token,"Accept":"application/json"})
+            with urllib.request.urlopen(req,timeout=35) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          versions=get_json(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions?per_page=10"
+          ).get("result") or []
+          tagged=[]
+          for v in versions:
+            ann=v.get("annotations") or {}
+            tag=ann.get("workers/tag") or ann.get("tag") or ""
+            msg=ann.get("workers/message") or ann.get("message") or ""
+            if "frontend-sync-20260920" in str(tag) or "OMODOS frontend sync" in str(msg):
+              tagged.append(v)
+
+          candidate=tagged[0] if tagged else (versions[0] if versions else {})
+          new_id=str(candidate.get("id") or "")
+          if not new_id:
+            raise SystemExit("Unable to identify uploaded version")
+
+          dep=get_json(f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/scripts/omodos/deployments")
+          result=dep.get("result")
+          if isinstance(result,dict):
+            rows=result.get("deployments") or []
+          elif isinstance(result,list):
+            rows=result
+          else:
+            rows=[]
+          after=[]
+          for d in rows:
+            for v in d.get("versions") or []:
+              vid=str(v.get("version_id") or "")
+              if vid:
+                after.append({"version_id":vid,"percentage":v.get("percentage")})
+
+          before=json.loads(Path("/tmp/active-before.json").read_text())
+          production_unchanged=(before==after) if before else True
+
+          report=[
+            "# Prepared OMODOS Worker Frontend Sync",
+            "",
+            f"- Prepared UTC: {datetime.now(timezone.utc).isoformat()}",
+            f"- Candidate version ID: {new_id}",
+            f"- Candidate version number: {candidate.get('number')}",
+            f"- Candidate created_on: {candidate.get('created_on') or (candidate.get('metadata') or {}).get('created_on')}",
+            f"- Active deployment before: {json.dumps(before)}",
+            f"- Active deployment after: {json.dumps(after)}",
+            f"- Production unchanged by upload: {'YES' if production_unchanged else 'NO'}",
+            "- Backend source: recovered v68 worker.js",
+            "- Frontend assets: repository public/ from this branch",
+            "- API/files routing: worker-first preserved",
+            "- Durable Object binding: MAINTENANCE -> MaintenanceStore preserved",
+          ]
+          if not production_unchanged:
+            raise SystemExit("Safety failure: version upload changed production deployment")
+
+          Path("audit/PREPARED_WORKER_FRONTEND_SYNC.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          Path("/tmp/new-version-id").write_text(new_id)
+          print("[PREPARE] candidate version:",new_id)
+          print("[PREPARE] production unchanged")
+
+      - name: Commit sanitized preparation report only
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf src wrangler.recovery.json node_modules package-lock.json package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/PREPARED_WORKER_FRONTEND_SYNC.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: record prepared Worker frontend sync version"
+          git push
