@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "packages": [
+    {
+      "file": "html2canvas.min.js",
+      "package": "html2canvas",
+      "version": "1.4.1",
+      "license": "MIT",
+      "source": "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+      "bytes": 198689,
+      "sha256": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb"
+    },
+    {
+      "file": "jspdf.min.js",
+      "package": "jspdf",
+      "version": "2.5.2",
+      "license": "MIT",
+      "source": "https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js",
+      "bytes": 365730,
+      "sha256": "85ba2cc3ff858a20fa49fe6e457bec863ea40b55a9f3725e58a940e62f6f61a4"
+    },
+    {
+      "file": "docx.min.js",
+      "package": "docx",
+      "version": "8.5.0",
+      "license": "MIT",
+      "source": "https://unpkg.com/docx@8.5.0/build/index.umd.js",
+      "bytes": 742858,
+      "sha256": "02d568d203c0180af37609bcf5ff6c0919d220f933a88ca896eba0556a08faad"
+    },
+    {
+      "file": "xlsx.min.js",
+      "package": "xlsx",
+      "version": "0.18.5",
+      "license": "Apache-2.0",
+      "source": "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
+      "bytes": 881727,
+      "sha256": "c9506197caf809a075b6dee1da0d36fb19da7158ffe8a88e7b0c96c5d8623c99"
+    },
+    {
+      "file": "exceljs.min.js",
+      "package": "exceljs",
+      "version": "4.4.0",
+      "license": "MIT",
+      "source": "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js",
+      "bytes": 947702,
+      "sha256": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9"
+    },
+    {
+      "file": "chart.min.js",
+      "package": "Chart.js",
+      "version": "4.5.1",
+      "license": "MIT",
+      "source": "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js",
+      "bytes": 208522,
+      "sha256": "48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a"
+    },
+    {
+      "file": "vis-network.min.js",
+      "package": "vis-network",
+      "version": "9.1.9",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js",
+      "bytes": 688911,
+      "sha256": "f53f833ddb9bf97efe856bb0637d4fe88f39e39999c7e94a4b8afc8de8a1a2e5"
+    }
+  ]
+}
