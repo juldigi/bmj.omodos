@@ -2,6 +2,17 @@
 #v4-nav-group{display:none!important}
 #v4-nav-group.v4-authorized{display:block!important}
 #v4-nav-group .v4-module-btn{padding-left:34px}
+#v4-nav-group.v4-authorized [data-submenu="omodos4"].open{
+  max-height:none!important;
+  overflow:visible!important;
+}
+#v4-nav-group.v4-authorized .v4-module-btn{
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  flex:0 0 auto!important;
+  min-height:38px;
+}
 #v4-safe-stage{margin-top:16px;scroll-margin-top:16px}
 #view-omodos4.v4-safe-module-open>.v4-hero,
 #view-omodos4.v4-safe-module-open>.v4-summary,
