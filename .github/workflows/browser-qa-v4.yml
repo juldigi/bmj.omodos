@@ -435,6 +435,147 @@ jobs:
             }
             result.phases.push('report-flows');
 
+            console.log('[QA] Logbook submit payload without/with photo');
+            const logbookSubmitQA = await page.evaluate(async () => {
+              const oldApiPost = apiPost;
+              const oldLoadAll = loadAll;
+              const oldGroqAutoFix = groqAutoFixEntryFields;
+              const oldUrl = WEB_APP_URL;
+              const oldMachines = Array.isArray(MACHINES) ? MACHINES.slice() : MACHINES;
+              const oldPending = Array.isArray(PENDING_FILES) ? PENDING_FILES.slice() : PENDING_FILES;
+              const calls = [];
+
+              const waitForCalls = async n => {
+                const start = Date.now();
+                while (calls.length < n && Date.now() - start < 2000) {
+                  await new Promise(r => setTimeout(r, 20));
+                }
+              };
+
+              const ensureOption = (sel, value, label) => {
+                if (!sel) return;
+                let opt = [...sel.options].find(o => o.value === value);
+                if (!opt) {
+                  opt = document.createElement('option');
+                  opt.value = value;
+                  opt.textContent = label || value;
+                  sel.appendChild(opt);
+                }
+                sel.value = value;
+              };
+
+              const fillRequired = () => {
+                const form = document.getElementById('form-entry');
+                form.classList.remove('wizard-mode');
+                form.querySelectorAll('[required]').forEach(el => {
+                  if (el.tagName === 'SELECT') {
+                    if (el.id === 'select-namaPelapor') ensureOption(el, 'QA Teknisi', 'QA Teknisi');
+                    else if (el.id === 'select-kodeMesin') ensureOption(el, 'QA-MCH-1', 'QA-MCH-1');
+                    else if (el.id === 'select-namaMesin') ensureOption(el, 'QA Machine', 'QA Machine');
+                    else {
+                      const usable = [...el.options].find(o => String(o.value || o.textContent || '').trim());
+                      if (usable) el.value = usable.value;
+                    }
+                  } else if (el.type === 'date') el.value = '2026-09-20';
+                  else if (el.type === 'time') el.value = el.name === 'jamSelesai' ? '11:00' : '10:00';
+                  else if (el.type === 'number') el.value = '1';
+                  else if (el.type !== 'file') el.value = 'QA ' + (el.name || el.id || 'field');
+                });
+                const desc = document.getElementById('ta-deskripsiMasalah');
+                const action = document.getElementById('ta-tindakanPerbaikan');
+                const note = document.getElementById('ta-catatan');
+                const unit = document.getElementById('input-namaUnit');
+                if (desc) desc.value = 'QA masalah pengujian';
+                if (action) action.value = 'QA tindakan pengujian';
+                if (note) note.value = 'QA catatan pengujian';
+                if (unit) unit.value = 'QA Unit';
+                const notif = form.querySelector('[name="nomorNotifikasi"]');
+                if (notif) notif.value = 'QA-NOTIF-001';
+                const date = form.querySelector('[name="tanggal"]');
+                if (date) date.value = '2026-09-20';
+                const start = form.querySelector('[name="jamMulai"]');
+                const finish = form.querySelector('[name="jamSelesai"]');
+                if (start) start.value = '10:00';
+                if (finish) finish.value = '11:00';
+                if (typeof computeEstimasi === 'function') computeEstimasi();
+                return form;
+              };
+
+              try {
+                WEB_APP_URL = 'https://qa.invalid';
+                MACHINES = [{ 'Kode Mesin':'QA-MCH-1', 'Nama Mesin':'QA Machine', 'Lokasi/Area':'QA Area' }];
+                apiPost = async payload => { calls.push(JSON.parse(JSON.stringify(payload))); return {ok:true}; };
+                loadAll = async () => ({ok:true});
+                groqAutoFixEntryFields = async () => 0;
+
+                PENDING_FILES = [];
+                let form = fillRequired();
+                form.dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+                await waitForCalls(1);
+
+                PENDING_FILES = [{
+                  name:'qa-photo.jpg',
+                  mimeType:'image/jpeg',
+                  base64:'AAECAwQ=',
+                  _localUrl:'blob:qa-photo',
+                  _isVideo:false
+                }];
+                form = fillRequired();
+                form.dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+                await waitForCalls(2);
+
+                const noPhoto = calls[0] || null;
+                const withPhoto = calls[1] || null;
+                return {
+                  callCount: calls.length,
+                  noPhoto: noPhoto ? {
+                    action:noPhoto.action,
+                    filesLength:Array.isArray(noPhoto.files) ? noPhoto.files.length : -1,
+                    kodeMesin:noPhoto.entry?.kodeMesin,
+                    namaMesin:noPhoto.entry?.namaMesin,
+                    lokasi:noPhoto.entry?.lokasi,
+                    namaPelapor:noPhoto.entry?.namaPelapor,
+                    lokasiSparepart:noPhoto.entry?.lokasiSparepart,
+                    description:noPhoto.entry?.deskripsiMasalah
+                  } : null,
+                  withPhoto: withPhoto ? {
+                    action:withPhoto.action,
+                    filesLength:Array.isArray(withPhoto.files) ? withPhoto.files.length : -1,
+                    firstFile:withPhoto.files?.[0] || null,
+                    hasLocalUrl:Object.prototype.hasOwnProperty.call(withPhoto.files?.[0] || {}, '_localUrl'),
+                    hasVideoFlag:Object.prototype.hasOwnProperty.call(withPhoto.files?.[0] || {}, '_isVideo')
+                  } : null
+                };
+              } finally {
+                apiPost = oldApiPost;
+                loadAll = oldLoadAll;
+                groqAutoFixEntryFields = oldGroqAutoFix;
+                WEB_APP_URL = oldUrl;
+                MACHINES = oldMachines;
+                PENDING_FILES = oldPending;
+                try { renderFilePreviews(); } catch {}
+              }
+            });
+            result.logbookSubmitQA = logbookSubmitQA;
+            if (logbookSubmitQA.callCount !== 2 ||
+                logbookSubmitQA.noPhoto?.action !== 'addEntry' ||
+                logbookSubmitQA.noPhoto?.filesLength !== 0 ||
+                logbookSubmitQA.noPhoto?.kodeMesin !== 'QA-MCH-1' ||
+                logbookSubmitQA.noPhoto?.namaMesin !== 'QA Machine' ||
+                logbookSubmitQA.noPhoto?.lokasi !== 'QA Area' ||
+                logbookSubmitQA.noPhoto?.namaPelapor !== 'QA Teknisi' ||
+                logbookSubmitQA.noPhoto?.lokasiSparepart !== 'Tidak menggunakan sparepart' ||
+                logbookSubmitQA.withPhoto?.action !== 'addEntry' ||
+                logbookSubmitQA.withPhoto?.filesLength !== 1 ||
+                logbookSubmitQA.withPhoto?.firstFile?.name !== 'qa-photo.jpg' ||
+                logbookSubmitQA.withPhoto?.firstFile?.mimeType !== 'image/jpeg' ||
+                logbookSubmitQA.withPhoto?.firstFile?.base64 !== 'AAECAwQ=' ||
+                logbookSubmitQA.withPhoto?.hasLocalUrl !== false ||
+                logbookSubmitQA.withPhoto?.hasVideoFlag !== false) {
+              throw new Error('Logbook submit contract failed: ' + JSON.stringify(logbookSubmitQA));
+            }
+            result.phases.push('logbook-submit-contract');
+
             console.log('[QA] sparepart pagination');
             const selectorQA = await page.evaluate(() => {
               const p = document.createElement('div');
