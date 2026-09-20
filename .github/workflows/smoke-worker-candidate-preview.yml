@@ -1,0 +1,162 @@
+name: Smoke Test Worker Candidate Preview
+
+on:
+  push:
+    branches:
+      - deploy/worker-frontend-sync
+    paths:
+      - ".github/workflows/smoke-worker-candidate-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve candidate preview URL
+        shell: python
+        run: |
+          import os,json,urllib.request
+          from pathlib import Path
+
+          aid="3c0bf44ff86c9587390f09b6d0bc42dd"
+          vid="f460d7b3-b3ce-4088-b002-c4a726da95f6"
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+
+          req=urllib.request.Request(
+            f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{vid}?include=modules",
+            headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+          )
+          with urllib.request.urlopen(req,timeout=35) as r:
+            d=json.loads(r.read().decode("utf-8")).get("result") or {}
+
+          urls=d.get("urls") or []
+          candidates=[]
+          if isinstance(urls,list):
+            candidates=[str(x) for x in urls if x]
+          elif isinstance(urls,dict):
+            for v in urls.values():
+              if isinstance(v,str) and v:
+                candidates.append(v)
+              elif isinstance(v,list):
+                candidates.extend(str(x) for x in v if x)
+
+          candidates=[x if x.startswith("http") else "https://"+x for x in candidates]
+          preview=next((x for x in candidates if "workers.dev" in x), candidates[0] if candidates else "")
+          if not preview:
+            raise SystemExit("Candidate version did not expose a preview URL")
+          Path("/tmp/preview-url").write_text(preview)
+          with Path(os.environ["GITHUB_ENV"]).open("a") as f:
+            f.write("PREVIEW_URL="+preview+"\n")
+          print("[SMOKE] preview URL resolved")
+
+      - name: HTTP smoke test preview
+        shell: python
+        run: |
+          import os,json,urllib.request,urllib.error,re
+          from pathlib import Path
+
+          base=os.environ["PREVIEW_URL"].rstrip("/")
+
+          def fetch(path,headers=None):
+            h={"User-Agent":"OMODOS-Candidate-Smoke/1.0","Cache-Control":"no-cache"}
+            if headers:h.update(headers)
+            req=urllib.request.Request(base+path,headers=h)
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                return r.status,r.headers, r.read()
+            except urllib.error.HTTPError as e:
+              return e.code,e.headers,e.read()
+
+          status,h,body=fetch("/?candidate_smoke=1")
+          text=body.decode("utf-8",errors="replace")
+          checks={
+            "root_http_200": status==200,
+            "copilot_help_button": 'id="copilot-help"' in text,
+            "logbook_machine_dropdown": 'id="filter-machine"' in text,
+            "bantuan_cleanup_marker": "BANTUAN_PAGE_CARD_REMOVAL_V1" in text,
+            "old_page_injector_absent": "top.insertAdjacentElement('afterend',guide)" not in text,
+            "omodos4_present": "OMODOS 4.0" in text,
+          }
+          bad=[k for k,v in checks.items() if not v]
+          if bad:
+            raise SystemExit("Candidate frontend smoke failed: "+", ".join(bad))
+
+          api_status,api_h,api_body=fetch("/api/backup/config")
+          api_ct=(api_h.get("Content-Type") or "").lower()
+          api_text=api_body.decode("utf-8",errors="replace").lstrip()
+          json_like=("json" in api_ct) or api_text.startswith("{") or api_text.startswith("[")
+          api_ok=(api_status!=404 and json_like)
+          if not api_ok:
+            raise SystemExit(f"Candidate API routing failed: status={api_status} content_type={api_ct!r} prefix={api_text[:80]!r}")
+
+          report=[
+            "# OMODOS Worker Candidate Preview Smoke Test",
+            "",
+            "- Candidate: v80 / f460d7b3-b3ce-4088-b002-c4a726da95f6",
+            f"- Root HTTP status: {status}",
+            f"- Frontend checks: {json.dumps(checks,sort_keys=True)}",
+            f"- API /api/backup/config status: {api_status}",
+            f"- API response JSON-like: {'YES' if json_like else 'NO'}",
+            "- API route returned 404: NO",
+            "- Production traffic changed by this preview test: NO",
+            "- Preview smoke verdict: PASS",
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/WORKER_CANDIDATE_PREVIEW_SMOKE.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+          print("[SMOKE] candidate preview PASS")
+
+      - name: Browser smoke test preview
+        shell: bash
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+          cat > candidate-preview.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            page.on('dialog',async d=>{try{await d.dismiss();}catch{}});
+            await page.goto(process.env.PREVIEW_URL+'/?pw_smoke=1',{waitUntil:'domcontentloaded',timeout:30000});
+            const r=await page.evaluate(()=>({
+              help:!!document.getElementById('copilot-help'),
+              helpInside:!!document.getElementById('copilot-help')?.closest('#copilot-panel'),
+              pageGuides:[...document.querySelectorAll('.legacy-simple-guide')].filter(x=>getComputedStyle(x).display!=='none').length,
+              machineFilter:!!document.getElementById('filter-machine'),
+              omodos4:!!document.getElementById('view-omodos4')
+            }));
+            if(!r.help||!r.helpInside||r.pageGuides!==0||!r.machineFilter||!r.omodos4){
+              throw new Error('Candidate browser structure failed: '+JSON.stringify(r));
+            }
+            const relevant=errors.filter(x=>/TypeError|ReferenceError|SyntaxError/i.test(x));
+            if(relevant.length) throw new Error('Candidate browser errors: '+JSON.stringify(relevant));
+            console.log('[CANDIDATE_BROWSER_SMOKE] '+JSON.stringify({r,relevant}));
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          timeout -k 5s 60s node candidate-preview.mjs
+          rm -f candidate-preview.mjs package.json package-lock.json
+
+      - name: Commit sanitized smoke report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/WORKER_CANDIDATE_PREVIEW_SMOKE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "test: record Worker candidate preview smoke"
+          git push
