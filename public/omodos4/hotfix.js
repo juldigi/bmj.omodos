@@ -635,14 +635,15 @@ Object.assign(FEATURE_ACTIONS,{
  1:'v4.getMachinePassport',
  2:'v4.getMachineHealth',
  3:'v4.getMachineGraph',
- 4:'v4.getMachineGraph',
+ 4:'v4.getMachinePassport',
  5:'v4.getMachinePassport',
  6:'v4.getFailureMemory',
  7:'v4.getMachinePassport',
- 8:'v4.getMachineHealth',
+ 8:'v4.getMachinePassport',
  9:'v4.getMachinePassport',
  10:'v4.getMachineGraph',
  47:'v4.getFailureMemory',
+ 60:'v4.getBrief',
  63:'v4.getExpertFinder',
  64:'v4.getPeopleSkillGraph',
  73:'v4.getBrief',
@@ -660,6 +661,118 @@ Object.assign(FEATURE_ACTIONS,{
  99:'v4.getOverview',
  100:'v4.getFactoryBrain'
 });
+
+var FEATURE_PATHS={
+ 2:['machines'],
+ 4:['intelligence.anatomy'],
+ 5:['intelligence.componentLifeClock'],
+ 6:['patterns','hits'],
+ 7:['intelligence.machinePersonality'],
+ 8:['intelligence.agingCurve'],
+ 9:['intelligence.eventReplay'],
+ 11:['risks'],
+ 12:['attentionQueue'],
+ 13:['anomalyBeforeFailure'],
+ 14:['failureSignatures'],
+ 15:['crossMachineClusters'],
+ 16:['silentDeterioration'],
+ 17:['failureSignatures'],
+ 18:['risks'],
+ 19:['remainingUsefulLife'],
+ 20:['attentionQueue'],
+ 21:['journey'],
+ 22:['missions'],
+ 23:['missions'],
+ 24:['missions'],
+ 25:['missions'],
+ 26:['missions'],
+ 27:['journey'],
+ 28:['journey'],
+ 29:['journey'],
+ 30:['missions'],
+ 31:['criticalityMatrix'],
+ 32:['criticalityMatrix','procurementUrgency'],
+ 33:['deadStockCandidates'],
+ 34:['consumptionTop'],
+ 35:['machinePartGraph'],
+ 36:['equivalentParts'],
+ 37:['photoRecognition','partPhotoAssets'],
+ 38:['shelfDigitalTwin'],
+ 39:['reservationForecast'],
+ 40:['procurementUrgency'],
+ 41:['totals','badActors'],
+ 42:['badActors'],
+ 43:['pareto','paretoNarrative'],
+ 44:['chronic','acute'],
+ 45:['hiddenFactory'],
+ 46:['reliabilityGrowth'],
+ 47:['rcaMemory'],
+ 48:['countermeasureEffectiveness'],
+ 49:['costIntelligence'],
+ 50:['costIntelligence'],
+ 51:['kpiStories'],
+ 52:['kpiAtRisk','kpiStories'],
+ 53:['kpiStories'],
+ 54:['targetRecovery'],
+ 55:['maintenanceProductionCorrelation'],
+ 56:['energyAnomalies'],
+ 57:['energyPerGoodOutput'],
+ 58:['utilityDigitalTwin'],
+ 59:['ipalIntelligence'],
+ 60:['headline','summary','thingsToLookAt'],
+ 61:['personnel'],
+ 62:['skillToMachine'],
+ 63:['experts'],
+ 64:['personnel'],
+ 65:['knowledgeRisk'],
+ 66:['skillGapRadar'],
+ 67:['adaptiveLearning'],
+ 68:['mentorMatches'],
+ 69:['troubleshootingChallenges'],
+ 70:['personnel','skillToMachine'],
+ 73:['headline','summary','thingsToLookAt'],
+ 74:['headline','summary','thingsToLookAt'],
+ 75:['candidates'],
+ 78:['candidates'],
+ 80:['headline','summary','thingsToLookAt'],
+ 81:['opportunityRadar'],
+ 82:['autoKaizenDraft','opportunityRadar'],
+ 83:['benefitEvidence'],
+ 84:['beforeAfterTimeline'],
+ 85:['ideaMarketplace'],
+ 86:['opportunityRadar','openImprovements'],
+ 87:['overdueProjects','openImprovements'],
+ 88:['sgaStories'],
+ 89:['knowledgeGraph'],
+ 90:['improvementLegacy'],
+ 91:['nodes','edges','domains'],
+ 92:['summary','thingsToLookAt','topRisks'],
+ 93:['categories'],
+ 95:['summary','topMachines','events'],
+ 96:['nodes','edges','domains'],
+ 97:['scenarios'],
+ 98:['wars'],
+ 99:['summary','topRisks','topOpportunities'],
+ 100:['nodes','edges','domains']
+};
+function pathValue(obj,path){
+ var cur=obj;
+ String(path||'').split('.').forEach(function(k){cur=cur&&typeof cur==='object'?cur[k]:undefined});
+ return cur;
+}
+function projectForFeature(n,data){
+ var paths=FEATURE_PATHS[Number(n)];
+ if(!paths||!paths.length||!data||typeof data!=='object')return data;
+ var out={};
+ paths.forEach(function(p){
+  var v=pathValue(data,p);
+  if(v!==undefined)out[p.split('.').pop()]=v;
+ });
+ ['generatedAt','logicVersion','range','appliedScope','confidence','caveat','note','safety','lineage','sourceTruth'].forEach(function(k){
+  if(data[k]!==undefined)out[k]=data[k];
+ });
+ return Object.keys(out).length?out:data;
+}
 
 var HYDRATE_SEQ=0;
 
@@ -808,6 +921,14 @@ function serverHtml(action,data){
   }).join('')+'</div>';
  }else html+=objectMetrics(data);
  preferredCollections(data).forEach(function(x){html+=collectionHtml(x[0],x[1])});
+ Object.keys(data).filter(function(k){
+  var v=data[k];
+  return v&&typeof v==='object'&&!Array.isArray(v)&&!['summary','lineage','sourceTruth','range','appliedScope'].includes(k);
+ }).slice(0,4).forEach(function(k){
+  var v=data[k], nested=objectMetrics(v);
+  if(nested)html+='<section class="v4-server-section"><div class="v4-server-section-head"><strong>'+h(label(k))+'</strong><span>DETAIL</span></div>'+nested+'</section>';
+  preferredCollections(v).slice(0,2).forEach(function(x){html+=collectionHtml(label(k)+' — '+x[0],x[1])});
+ });
  if(data.lineage||data.sourceTruth){
   var l=data.lineage||data.sourceTruth;
   html+='<div class="v4-server-lineage"><i class="ph-bold ph-shield-check"></i> '+h(typeof l==='string'?l:JSON.stringify(l).slice(0,600))+'</div>';
@@ -851,7 +972,7 @@ async function hydrateFeature(n){
   var data=await serverRead(action,payloadFor(action,n));
   if(seq!==HYDRATE_SEQ||!document.querySelector('[data-v4-feature-context="'+n+'"], #v4-server-intel'))return;
   panel=serverPanel();if(!panel)return;
-  panel.innerHTML=machinePicker(panel,action,n)+serverHtml(action,data);
+  panel.innerHTML=machinePicker(panel,action,n)+serverHtml(action,projectForFeature(n,data));
  }catch(err){
   panel=serverPanel();if(!panel)return;
   panel.innerHTML=machinePicker(panel,action,n)+'<div class="v4-server-state v4-server-error"><i class="ph-bold ph-warning-circle"></i><span>Backend V4 tidak dapat dimuat saat ini. Fallback lokal tetap aktif. '+h(err&&err.message||err)+'</span></div>';
@@ -925,6 +1046,7 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
  serverRead:serverRead,
  serverReady:ready,
  serverActionForFeature:function(n){return FEATURE_ACTIONS[Number(n)]||''},
+ serverProjectionForFeature:function(n){return (FEATURE_PATHS[Number(n)]||[]).slice()},
  serverReadActions:Array.from(READ_ACTIONS)
 });
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(hydrateOverview,900)});
