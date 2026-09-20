@@ -34,22 +34,15 @@ jobs:
           ROOT_URL="https://omodos.offsetbmj.workers.dev/"
           API_URL="https://omodos.offsetbmj.workers.dev/api"
           JS_URL="https://omodos.offsetbmj.workers.dev/omodos4/hotfix.js"
-
           passed=0
+
           for i in $(seq 1 24); do
             HTML="$(curl -fsS "$ROOT_URL" || true)"
             JS="$(curl -fsS "$JS_URL" || true)"
-            STATUS="$(curl -sS -o /tmp/login.json -w '%{http_code}'               -X POST -H 'content-type: application/json'               --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}'               "$API_URL" || true)"
+            STATUS="$(curl -sS -o /tmp/login.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}' "$API_URL" || true)"
 
-            if printf '%s' "$HTML" | grep -q 'id="form-login"'               && printf '%s' "$HTML" | grep -q 'OMODOS4_FRONTEND_SAFE_V3'               && printf '%s' "$HTML" | grep -q '/omodos4/hotfix.css'               && printf '%s' "$HTML" | grep -q '/omodos4/hotfix.js'               && printf '%s' "$JS" | grep -q 'frontend-only recovery'               && [ "$STATUS" = "200" ]; then
-              if node - <<'NODE'
-const fs=require('fs');
-try {
-  const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));
-  if (!x || typeof x!=='object' || x.ok !== false) process.exit(1);
-} catch (_) { process.exit(1); }
-NODE
-              then
+            if printf '%s' "$HTML" | grep -q 'id="form-login"' && printf '%s' "$HTML" | grep -q 'OMODOS4_FRONTEND_SAFE_V3' && printf '%s' "$HTML" | grep -q '/omodos4/hotfix.css' && printf '%s' "$HTML" | grep -q '/omodos4/hotfix.js' && printf '%s' "$JS" | grep -q 'frontend-only recovery' && [ "$STATUS" = "200" ]; then
+              if node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));if(!x||typeof x!=='object'||x.ok!==false)process.exit(1)"; then
                 passed=1
                 break
               fi
@@ -61,4 +54,5 @@ NODE
           printf '%s' "$HTML" | grep -q 'id="v4-nav-group"'
           test "$(printf '%s' "$HTML" | grep -o 'OMODOS4_FRONTEND_SAFE_V3' | wc -l | tr -d ' ')" = "1"
           test "$(printf '%s' "$HTML" | grep -o '/omodos4/hotfix.css' | wc -l | tr -d ' ')" = "1"
-          printf '%s' "$JS" | node --check
+          printf '%s' "$JS" > /tmp/omodos-hotfix.js
+          node --check /tmp/omodos-hotfix.js
