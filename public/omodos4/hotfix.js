@@ -2436,3 +2436,216 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
 });
 })();
 
+
+/* OMODOS4_PEOPLE_INTEL_V1
+   Progressive-enhancement views for master-prompt features 61–70.
+   Read-only evidence views. Recorded activity/assessment evidence must not be treated as employee performance ratings. */
+(function(){
+'use strict';
+
+var PEOPLE_CACHE=null,PEOPLE_AT=0,PEOPLE_TTL=30000;
+
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openN(n){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return !!el&&parseInt(el.textContent,10)===Number(n);
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function note(t,kind){return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+esc(t)+'</span></div>'}
+function empty(t){return '<div class="v4-empty">'+esc(t||'Belum ada evidence yang cukup.')+'</div>'}
+function fmt(v,d){
+ if(v==null||v==='')return '—';
+ var n=Number(v);if(!Number.isFinite(n))return String(v);
+ try{return new Intl.NumberFormat('id-ID',{maximumFractionDigits:d==null?1:d}).format(n)}catch(e){return String(n)}
+}
+function val(sec,sel){var e=sec&&sec.querySelector(sel);return e?String(e.value||'').trim():''}
+function busy(btn,on,label){
+ if(!btn)return;
+ if(on){btn.dataset.old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> '+esc(label||'Memuat…')}
+ else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
+}
+function chip(t){return '<span class="v4-risk-chip">'+esc(t||'EVIDENCE')+'</span>'}
+function item(title,sub,right){
+ return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
+}
+function list(arr,fn,limit,msg){
+ if(!Array.isArray(arr)||!arr.length)return empty(msg);
+ return '<div class="v4-sf-list">'+arr.slice(0,limit||60).map(fn).join('')+'</div>';
+}
+function metrics(rows){
+ return '<div class="v4-statline">'+rows.map(function(x){return '<div><b>'+esc(x[1])+'</b><span>'+esc(x[0])+'</span></div>'}).join('')+'</div>';
+}
+function pick(o,keys){
+ if(!o||typeof o!=='object')return '';
+ for(var i=0;i<keys.length;i++){var k=keys[i];if(o[k]!=null&&String(o[k]).trim())return String(o[k])}
+ return '';
+}
+function machineNamesFromData(d){
+ var set=new Set();
+ (d&&Array.isArray(d.skillToMachine)?d.skillToMachine:[]).forEach(function(x){if(x.machine)set.add(String(x.machine))});
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function peopleNames(d){
+ return (d&&Array.isArray(d.personnel)?d.personnel:[]).map(function(x){return x.name}).filter(Boolean).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function options(list,first){
+ return '<option value="">'+esc(first||'Pilih')+'</option>'+list.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>'}).join('');
+}
+async function getPeople(force){
+ if(!force&&PEOPLE_CACHE&&Date.now()-PEOPLE_AT<PEOPLE_TTL)return PEOPLE_CACHE;
+ if(!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function'))return null;
+ var d=await window.OMODOS4.serverRead('v4.getPeopleSkillGraph',{});
+ if(d){PEOPLE_CACHE=d;PEOPLE_AT=Date.now()}
+ return d;
+}
+function mount(n){
+ var h=host();if(!h||!openN(n))return;
+ var old=h.querySelector('.v4-people-intel');if(old)old.remove();
+ var titles={
+  61:'Technician Skill Galaxy',62:'Skill-to-Machine Matrix',63:'Expert Finder',64:'Experience Passport',65:'Knowledge Risk',
+  66:'Skill Gap Radar',67:'Adaptive Learning',68:'Mentor Matching',69:'Troubleshooting Challenge',70:'Competency Evidence Engine'
+ };
+ var controls='';
+ if(n===63)controls='<div class="v4-form-grid"><label>Mesin<select data-v4-pi-machine><option value="">Muat evidence untuk melihat mesin</option></select></label><label class="v4-form-wide">Problem / gejala<input data-v4-pi-query placeholder="Contoh: sensor register error"></label></div>';
+ if(n===64||n===70)controls='<div class="v4-form-grid"><label>Personel<select data-v4-pi-person><option value="">Muat evidence untuk melihat personel</option></select></label></div>';
+ var sec=document.createElement('section');sec.className='v4-interaction v4-people-intel';sec.dataset.v4PiFeature=String(n);
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PEOPLE INTELLIGENCE 4.0</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">READ ONLY</span></div>'+
+ controls+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-pi-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Evidence</button>'+
+ '<button class="btn btn-sm" data-v4-open-existing="pi-dashboard"><i class="ph-bold ph-users-three"></i> Buka People Intelligence Existing</button></div>'+
+ '<div data-v4-pi-out>'+note('Menghubungkan assessment, work history, RCA, project, knowledge, dan machine evidence existing. Evidence footprint bukan rating performa karyawan.','safe')+'</div>';
+ h.prepend(sec);
+}
+function hydrateControls(sec,d){
+ var ms=sec.querySelector('[data-v4-pi-machine]');
+ if(ms&&ms.options.length<=1)ms.innerHTML=options(machineNamesFromData(d),'Semua mesin');
+ var ps=sec.querySelector('[data-v4-pi-person]');
+ if(ps&&ps.options.length<=1)ps.innerHTML=options(peopleNames(d),'Pilih personel');
+}
+function render61(d){
+ var rows=d.personnel||[];
+ return metrics([
+  ['Personnel master',fmt(d.counts&&d.counts.personnel,0)],['Linked people',fmt(d.counts&&d.counts.linkedPeople,0)],
+  ['Hard assessment',fmt(d.counts&&d.counts.hard,0)],['Soft assessment',fmt(d.counts&&d.counts.soft,0)]
+ ])+
+ list(rows,function(x){
+  var machines=Array.isArray(x.machines)&&x.machines.length?x.machines.slice(0,4).join(', '):'belum ada machine evidence';
+  return item(x.name||'Personel',(x.position||'Posisi belum tercatat')+' • '+machines+' • RCA '+fmt(x.rcaCount,0)+' • Knowledge '+fmt(x.knowledgeCount,0),chip('Evidence '+fmt(x.evidenceScore,0)));
+ },80)+note('Evidence score adalah jumlah jejak evidence recorded untuk navigasi, bukan nilai kompetensi atau performa.','warn');
+}
+function render62(d){
+ return list(d.skillToMachine,function(x){
+  return item(x.person||'Personel',(x.machine||'Mesin')+' • Logbook '+fmt(x.logbook,0)+' • RCA '+fmt(x.rca,0)+' • Last seen '+String(x.lastSeen||'—').slice(0,10),chip(fmt(x.evidenceEvents,0)+' event'));
+ },100)+note('Matrix menunjukkan keterhubungan berdasarkan evidence pekerjaan yang tercatat, bukan otorisasi otomatis untuk mengerjakan mesin.','safe');
+}
+function render65(d){
+ return list(d.knowledgeRisk,function(x){
+  return item(x.machine||'Mesin','Experienced people '+fmt(x.experiencedPeople,0)+' • Evidence '+fmt(x.evidenceEvents,0)+' • Knowledge '+fmt(x.knowledgeArticles,0)+' • RCA '+fmt(x.rca,0),chip((x.risk||'')+' '+fmt(x.riskScore,0)));
+ },100)+note('Knowledge Risk menilai risiko coverage dokumentasi/pengalaman recorded. Skor tinggi berarti perlu review transfer knowledge, bukan kritik terhadap individu.','warn');
+}
+function gapText(x){
+ var g=x&&x.gap;
+ if(g&&typeof g==='object')return pick(g,['Unit Kompetensi','Kriteria Unjuk Kerja','Elemen Unit','Penjelasan Belum Kompeten','Status','Keterangan'])||'Recorded competency gap';
+ return String(g||'Recorded competency gap');
+}
+function render66(d){
+ return list(d.skillGapRadar,function(x){
+  return item(x.person||'Personel',(x.position||'Posisi belum tercatat')+' • '+gapText(x),chip('RECORDED GAP'));
+ },100)+note('Radar menampilkan gap yang tercatat pada assessment detail; tidak menyimpulkan kemampuan di luar evidence tersebut.','safe');
+}
+function render67(d){
+ return list(d.adaptiveLearning,function(x){
+  return item(x.person||'Personel',gapText(x)+' • '+(x.recommendation||'Review standard/evidence dan rencanakan learning bersama atasan/mentor.'),chip('HUMAN PLAN'));
+ },100)+note('Rekomendasi learning adalah draft berbasis recorded gap. Rencana pelatihan tetap membutuhkan keputusan manusia.','warn');
+}
+function render68(d){
+ return list(d.mentorMatches,function(x){
+  var mentors=(x.mentors||[]).map(function(m){return m.name+' ['+(m.sharedMachines||[]).slice(0,3).join(', ')+']'}).join(' • ');
+  return item(x.mentee||'Mentee candidate',mentors||'Belum ada mentor candidate',chip('CANDIDATE'));
+ },100)+note('Mentor Matching hanya kandidat dari shared machine evidence + competency evidence. Assignment mentor wajib persetujuan manusia.','warn');
+}
+function render69(d){
+ return list(d.troubleshootingChallenges,function(x){
+  var e=x.evidence||{};
+  return item(x.title||'Troubleshooting Challenge',(x.machine||'Mesin')+' • Recurring '+fmt(e.recurring,0)+' • Downtime '+fmt(e.downtimeMinutes,0)+' min • Open '+fmt(e.openIssues,0),chip('READ-ONLY TRAINING'));
+ },50)+note('Challenge menggunakan failure history nyata sebagai latihan. Jawaban latihan tidak ditulis ke Logbook/RCA atau data operasional.','safe');
+}
+function render70Person(p){
+ if(!p)return empty('Pilih personel lalu muat evidence.');
+ var ev=p.competencyEvidence||{};
+ return metrics([
+  ['Hard assessment',fmt(p.hardAssessments,0)],['Soft assessment',fmt(p.softAssessments,0)],
+  ['Competent field',fmt(p.competent,0)],['Not competent field',fmt(p.notCompetent,0)],
+  ['RCA evidence',fmt(p.rcaCount,0)],['Knowledge',fmt(p.knowledgeCount,0)]
+ ])+
+ list(p.machineEvidence,function(x){
+  return item(x.machine||'Mesin','Event '+fmt(x.events,0)+' • Logbook '+fmt(x.logbook,0)+' • RCA '+fmt(x.rca,0)+' • Last '+(x.lastSeen?new Date(x.lastSeen).toISOString().slice(0,10):'—'),chip('MACHINE EVIDENCE'));
+ },30)+
+ note('Competency Evidence Engine hanya menyatukan recorded evidence: assessment, machine history, RCA, project, dan knowledge. Tidak menghitung performance score otomatis.','warn');
+}
+function passportView(p){
+ if(!p||p.label==='NOT AVAILABLE')return empty('Experience Passport belum tersedia untuk personel ini.');
+ var machines=Array.isArray(p.machines)&&p.machines.length?p.machines.join(', '):'belum ada machine evidence';
+ return metrics([
+  ['Hard assessment',fmt(p.hardAssessments,0)],['Soft assessment',fmt(p.softAssessments,0)],
+  ['RCA',fmt(p.rcaCount,0)],['Knowledge',fmt(p.knowledgeCount,0)]
+ ])+
+ '<div class="v4-sf-list">'+item(p.name||'Personel',(p.position||'Posisi belum tercatat')+' • Machines: '+machines,chip('DERIVED PASSPORT'))+'</div>'+
+ note('Passport dirakit dari People Intelligence + work history existing. Ini bukan CV formal dan bukan penilaian performa.','safe');
+}
+async function render63(sec,out){
+ var machine=val(sec,'[data-v4-pi-machine]'),query=val(sec,'[data-v4-pi-query]');
+ if(!machine&&!query){out.innerHTML=note('Pilih mesin atau isi problem/gejala agar Expert Finder tidak terlalu luas.','warn');return}
+ var d=await window.OMODOS4.serverRead('v4.getExpertFinder',{machine:machine,query:query});
+ out.innerHTML=list(d&&d.experts,function(x){
+  return item(x.name||'Personel','Recorded events '+fmt(x.events,0)+' • Machine events '+fmt(x.machineEvents,0)+' • Similar evidence '+fmt(x.similarityEvidence,0)+' • Hard assessments '+fmt(x.hardSkillAssessments,0),chip('Evidence match '+fmt(x.score,0)));
+ },30)+note('Urutan Expert Finder hanya berdasarkan recorded involvement/similarity evidence, bukan employee performance rating.','warn');
+}
+async function render64(sec,out){
+ var name=val(sec,'[data-v4-pi-person]');
+ if(!name){out.innerHTML=empty('Pilih personel untuk membuka Experience Passport.');return}
+ var p=await window.OMODOS4.serverRead('v4.getExperiencePassport',{name:name});
+ out.innerHTML=passportView(p);
+}
+async function load(btn,n,force){
+ var sec=btn.closest('.v4-people-intel'),out=sec&&sec.querySelector('[data-v4-pi-out]');
+ if(!sec||!out)return;
+ busy(btn,true,'Memuat');
+ try{
+  var d=await getPeople(!!force);
+  if(!d){out.innerHTML=empty('Backend People Intelligence belum tersedia pada sesi ini.');return}
+  hydrateControls(sec,d);
+  if(n===61)out.innerHTML=render61(d);
+  else if(n===62)out.innerHTML=render62(d);
+  else if(n===63)await render63(sec,out);
+  else if(n===64)await render64(sec,out);
+  else if(n===65)out.innerHTML=render65(d);
+  else if(n===66)out.innerHTML=render66(d);
+  else if(n===67)out.innerHTML=render67(d);
+  else if(n===68)out.innerHTML=render68(d);
+  else if(n===69)out.innerHTML=render69(d);
+  else if(n===70){
+   var name=val(sec,'[data-v4-pi-person]');
+   var p=(d.personnel||[]).find(function(x){return String(x.name||'')===name});
+   out.innerHTML=render70Person(p);
+  }
+ }catch(err){out.innerHTML=note(err&&err.message||String(err),'error')}
+ finally{busy(btn,false)}
+}
+document.addEventListener('click',function(ev){
+ var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
+ if(tile){
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=61&&n<=70)setTimeout(function(){if(openN(n))mount(n)},0);
+  return;
+ }
+ var b=ev.target.closest&&ev.target.closest('[data-v4-pi-load]');
+ if(b){ev.preventDefault();load(b,Number(b.getAttribute('data-v4-pi-load')),true);return}
+},false);
+
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ peopleIntelVersion:'1',
+ peopleIntelFeatures:[61,62,63,64,65,66,67,68,69,70]
+});
+})();
+
