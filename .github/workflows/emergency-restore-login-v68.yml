@@ -113,8 +113,7 @@ jobs:
               "strategy":"percentage",
               "versions":[{"version_id":VERSION_ID,"percentage":100}],
               "annotations":{
-                  "workers/message":"Emergency restore OMODOS backend /api routing and login from verified v68",
-                  "workers/triggered_by":"github-actions-login-recovery"
+                  "workers/message":"Emergency restore OMODOS backend /api routing and login from verified v68"
               }
           }
           _,dep=request_json(
