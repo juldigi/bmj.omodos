@@ -1091,7 +1091,16 @@ function serverPanel(){
   panel=document.createElement('section');
   panel.id='v4-server-intel';panel.className='v4-server-intel';
   var actions=card.querySelector('.v4-actions');
-  if(actions)card.insertBefore(panel,actions);else card.appendChild(panel);
+  var anchor=null;
+  if(actions){
+   if(actions.parentNode===card)anchor=actions;
+   else{
+    var details=actions.closest&&actions.closest('.v4-simple-details');
+    if(details&&details.parentNode===card)anchor=details;
+   }
+  }
+  if(anchor&&anchor.parentNode===card)card.insertBefore(panel,anchor);
+  else card.appendChild(panel);
  }
  return panel;
 }
