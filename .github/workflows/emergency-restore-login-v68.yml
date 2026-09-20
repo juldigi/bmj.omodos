@@ -1,0 +1,218 @@
+name: Emergency Restore OMODOS Login Backend v68
+
+on:
+  push:
+    branches:
+      - fix/login-backend-json-404
+    paths:
+      - ".github/workflows/emergency-restore-login-v68.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify v68 and deploy 100 percent
+        shell: python
+        run: |
+          import os, json, base64, urllib.request, urllib.error, hashlib, time
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          VERSION_ID="0ff07d98-66e4-423c-80a5-2a2009b7be5e"
+          token=os.environ.get("CLOUDFLARE_DEPLOY_TOKEN","").strip()
+          if not token:
+              raise SystemExit("CLOUDFLARE_DEPLOY_TOKEN missing")
+
+          def request_json(url, method="GET", body=None):
+              data=None
+              headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+              if body is not None:
+                  data=json.dumps(body).encode("utf-8")
+                  headers["Content-Type"]="application/json"
+              req=urllib.request.Request(url,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=40) as r:
+                      raw=r.read()
+                      return r.status, json.loads(raw.decode("utf-8")) if raw else {}
+              except urllib.error.HTTPError as e:
+                  raw=e.read()
+                  msg=raw.decode("utf-8",errors="replace")
+                  raise SystemExit(f"Cloudflare API HTTP {e.code}: {msg[:1200]}")
+
+          status,accounts=request_json("https://api.cloudflare.com/client/v4/accounts?per_page=50")
+          account_id=None
+          version_detail=None
+          for a in accounts.get("result") or []:
+              aid=a.get("id")
+              if not aid: continue
+              try:
+                  _,detail=request_json(
+                      f"https://api.cloudflare.com/client/v4/accounts/{aid}/workers/workers/omodos/versions/{VERSION_ID}?include=modules"
+                  )
+                  if detail.get("result"):
+                      account_id=aid
+                      version_detail=detail.get("result") or {}
+                      break
+              except SystemExit:
+                  continue
+
+          if not account_id or not version_detail:
+              raise SystemExit("Verified v68 not accessible with deploy token")
+
+          mods=version_detail.get("modules") or []
+          decoded=[]
+          for m in mods:
+              if not isinstance(m,dict): continue
+              b64=m.get("content_base64")
+              if isinstance(b64,str) and b64:
+                  try: raw=base64.b64decode(b64)
+                  except Exception: raw=b""
+                  if raw: decoded.append((len(raw),m,raw))
+
+          if not decoded:
+              raise SystemExit("v68 source module unavailable")
+
+          size,mod,raw=max(decoded,key=lambda x:x[0])
+          sha=hashlib.sha256(raw).hexdigest()
+          text=raw.decode("utf-8",errors="replace")
+
+          expected_sha="fd8ae6b16ad8d60218d99f8590694647bab90edd7422c391450a0bdeb38b640b"
+          checks={
+              "source_bytes":size,
+              "sha_matches":sha==expected_sha,
+              "api_route": 'url.pathname === "/api"' in text or 'pathname === "/api"' in text,
+              "maintenance_store":"MaintenanceStore" in text,
+              "durable_binding":"MAINTENANCE" in text,
+              "json_response":"application/json" in text,
+              "login_action":"login" in text.lower(),
+          }
+          print("[RESTORE_PRECHECK]",json.dumps(checks))
+          if not all(v if isinstance(v,bool) else True for k,v in checks.items() if k!="source_bytes"):
+              raise SystemExit("v68 precheck failed: "+json.dumps(checks))
+
+          # Capture current latest version metadata for rollback traceability.
+          _,versions=request_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/workers/omodos/versions?per_page=10"
+          )
+          recent=versions.get("result") or []
+          newest=recent[0] if recent else {}
+          newest_id=str(newest.get("id") or "")
+          newest_num=newest.get("number")
+
+          deploy_body={
+              "strategy":"percentage",
+              "versions":[{"version_id":VERSION_ID,"percentage":100}],
+              "annotations":{
+                  "workers/message":"Emergency restore OMODOS backend /api routing and login from verified v68",
+                  "workers/triggered_by":"github-actions-login-recovery"
+              }
+          }
+          _,dep=request_json(
+              f"https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/omodos/deployments",
+              method="POST",
+              body=deploy_body
+          )
+          deployment=dep.get("result") or {}
+          deployment_id=str(deployment.get("id") or "")
+          print("[RESTORE_DEPLOYMENT]",deployment_id)
+
+          def live_probe(method,path,payload=None):
+              url="https://omodos.offsetbmj.workers.dev"+path
+              data=None
+              headers={"User-Agent":"OMODOS-PostRestore-QA/1.0","Accept":"application/json,text/html,*/*"}
+              if payload is not None:
+                  data=json.dumps(payload).encode("utf-8")
+                  headers["Content-Type"]="application/json"
+              req=urllib.request.Request(url,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      body=r.read()
+                      return {
+                          "status":r.status,
+                          "content_type":r.headers.get("Content-Type",""),
+                          "bytes":len(body),
+                          "body":body.decode("utf-8",errors="replace")[:500]
+                      }
+              except urllib.error.HTTPError as e:
+                  body=e.read()
+                  return {
+                      "status":e.code,
+                      "content_type":e.headers.get("Content-Type",""),
+                      "bytes":len(body),
+                      "body":body.decode("utf-8",errors="replace")[:500]
+                  }
+
+          result=None
+          root=None
+          for attempt in range(1,7):
+              time.sleep(2 if attempt==1 else 3)
+              root=live_probe("GET","/")
+              result=live_probe("POST","/api",{"action":"__omodos_readonly_probe__"})
+              print("[RESTORE_PROBE]",attempt,root,result)
+              ctype=(result.get("content_type") or "").lower()
+              body=result.get("body") or ""
+              json_ok="application/json" in ctype
+              if not json_ok:
+                  try:
+                      json.loads(body)
+                      json_ok=True
+                  except Exception:
+                      pass
+              if root.get("status")==200 and root.get("bytes",0)>100000 and result.get("status")!=404 and json_ok:
+                  break
+
+          if not root or root.get("status")!=200 or root.get("bytes",0)<100000:
+              raise SystemExit("Root frontend failed after restore: "+json.dumps(root))
+
+          ctype=(result.get("content_type") or "").lower()
+          json_ok="application/json" in ctype
+          if not json_ok:
+              try:
+                  json.loads(result.get("body") or "")
+                  json_ok=True
+              except Exception:
+                  json_ok=False
+
+          if result.get("status")==404 or not json_ok:
+              raise SystemExit("POST /api still invalid after restore: "+json.dumps(result))
+
+          report=[
+              "# OMODOS Emergency Login Backend Restore",
+              "",
+              f"- UTC: {datetime.now(timezone.utc).isoformat()}",
+              f"- Deployment ID: {deployment_id}",
+              f"- Restored Worker version: v68 / {VERSION_ID}",
+              f"- Restored source SHA-256: {sha}",
+              f"- Previously newest version: v{newest_num} / {newest_id}",
+              f"- GET / status: {root.get('status')}",
+              f"- GET / bytes: {root.get('bytes')}",
+              f"- POST /api status: {result.get('status')}",
+              f"- POST /api content-type: {result.get('content_type')}",
+              f"- POST /api JSON-valid: {'YES' if json_ok else 'NO'}",
+              "",
+              "## Result",
+              "- PASS: production /api routing is active again and returns JSON instead of 404.",
+              "- No Durable Object, SQLite, or stored application data was reset by this deployment.",
+          ]
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/LOGIN_BACKEND_RESTORE_RESULT.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+      - name: Commit restore report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/LOGIN_BACKEND_RESTORE_RESULT.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: restore production login backend routing"
+          git push
