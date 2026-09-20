@@ -1,0 +1,355 @@
+name: Deep Production Regression Audit
+
+on:
+  push:
+    branches:
+      - audit/deep-production-regression
+    paths:
+      - ".github/workflows/deep-production-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deep-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Audit source structure
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, json, collections
+
+          s=Path("public/index.html").read_text(encoding="utf-8",errors="replace")
+          lines=s.splitlines()
+
+          ids=re.findall(r'\bid=["\']([^"\']+)["\']',s,re.I)
+          counts=collections.Counter(ids)
+          duplicates=sorted((k,v) for k,v in counts.items() if v>1)
+
+          view_ids=sorted(set(re.findall(r'id=["\']view-([^"\']+)["\']',s,re.I)))
+          nav_views=sorted(set(re.findall(r'data-view=["\']([^"\']+)["\']',s,re.I)))
+          missing_targets=sorted(v for v in nav_views if v not in view_ids)
+
+          needles={
+            "switchToView":"function switchToView(",
+            "sparepartPagination":"function attachSparepartPaginationHandlers(",
+            "machineLatestLogbook":"function latestLogbookForMachine_",
+            "machineLatestPatrol":"function latestPatrolForMachine_",
+            "machineCurrentSnapshot":"function currentMachineStatusSnapshot_",
+            "mediaModal":["media-modal","previewMedia","openMedia","showMedia"],
+            "copilot":["copilot","Copilot"],
+            "help":["Bantuan","bantuan"],
+            "userManagement":["User Management","user-management","user management"],
+            "roleAccess":["Role Access","role-access","role access"],
+            "omodos4Permission":"omodos4.view",
+          }
+
+          def hits(term):
+            terms=term if isinstance(term,list) else [term]
+            out=[]
+            for i,l in enumerate(lines,1):
+              if any(t.lower() in l.lower() for t in terms):
+                out.append((i,l.strip()))
+            return out
+
+          findings={}
+          for name,term in needles.items():
+            h=hits(term)
+            findings[name]={
+              "count":len(h),
+              "samples":[{"line":i,"text":x[:600]} for i,x in h[:30]]
+            }
+
+          report={
+            "total_ids":len(ids),
+            "unique_ids":len(counts),
+            "duplicates":[{"id":k,"count":v} for k,v in duplicates],
+            "view_ids":view_ids,
+            "nav_views":nav_views,
+            "missing_targets":missing_targets,
+            "findings":findings,
+          }
+          Path("/tmp/static-audit.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+
+      - name: Browser audit every navigation view on production
+        shell: bash
+        run: |
+          cat > deep-audit.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser=await chromium.launch({headless:true});
+          const result={
+            pageErrors:[],
+            consoleErrors:[],
+            failedRequests:[],
+            views:[],
+            dom:{},
+            targeted:{}
+          };
+
+          try{
+            const page=await browser.newPage({viewport:{width:1440,height:1000}});
+            page.setDefaultTimeout(8000);
+
+            page.on('pageerror',e=>result.pageErrors.push(String(e)));
+            page.on('console',m=>{
+              if(m.type()==='error') result.consoleErrors.push(m.text());
+            });
+            page.on('requestfailed',req=>{
+              if(req.url().startsWith('https://omodos.offsetbmj.workers.dev')){
+                result.failedRequests.push({url:req.url(),error:req.failure()?.errorText||''});
+              }
+            });
+            page.on('dialog',async d=>{ try{await d.dismiss();}catch{} });
+
+            await page.goto('https://omodos.offsetbmj.workers.dev/',{
+              waitUntil:'domcontentloaded',timeout:25000
+            });
+
+            await page.evaluate(()=>{
+              CURRENT_USER={username:'qa-super',displayName:'QA Superadmin',role:'Superadmin'};
+              SESSION_TOKEN='qa-readonly-navigation';
+              try{
+                FEATURE_REGISTRY=mergeFeatureRegistry([]);
+                PERMISSIONS={};
+                applyRbacToUi();
+              }catch{}
+            });
+
+            const inventory=await page.evaluate(()=>{
+              const views=[...document.querySelectorAll('[data-view]')]
+                .map(el=>String(el.getAttribute('data-view')||'').trim())
+                .filter(Boolean);
+              return [...new Set(views)];
+            });
+
+            for(const view of inventory){
+              const beforePE=result.pageErrors.length;
+              const beforeCE=result.consoleErrors.length;
+              const row={view,container:false,allowed:null,go:null,active:false,newPageErrors:[],newConsoleErrors:[]};
+
+              try{
+                row.container=await page.evaluate(v=>!!document.getElementById('view-'+v),view);
+                row.allowed=await page.evaluate(v=>{
+                  try{return typeof canAccessView_==='function'?canAccessView_(v):null}catch(e){return 'ERR:'+String(e)}
+                },view);
+
+                row.go=await page.evaluate(v=>{
+                  try{
+                    if(typeof goToView!=='function') return 'NO_FUNCTION';
+                    return goToView(v);
+                  }catch(e){
+                    return 'ERR:'+String(e && e.stack || e);
+                  }
+                },view);
+
+                await page.waitForTimeout(80);
+                row.active=await page.evaluate(v=>!!document.getElementById('view-'+v)?.classList.contains('active'),view);
+              }catch(e){
+                row.go='PLAYWRIGHT_ERR:'+String(e);
+              }
+
+              row.newPageErrors=result.pageErrors.slice(beforePE);
+              row.newConsoleErrors=result.consoleErrors.slice(beforeCE).filter(x=>
+                !/Failed to load resource.*(?:401|403|404)|ERR_ABORTED|Failed to fetch|NetworkError/i.test(x)
+              );
+              result.views.push(row);
+            }
+
+            result.dom=await page.evaluate(()=>{
+              const ids=[...document.querySelectorAll('[id]')].map(x=>x.id);
+              const count={};
+              for(const id of ids) count[id]=(count[id]||0)+1;
+              const duplicates=Object.entries(count).filter(([,n])=>n>1).map(([id,n])=>({id,count:n}));
+
+              const helpNodes=[...document.querySelectorAll('button,a,[role="button"],.card,.panel,.help-card')]
+                .filter(el=>/\bbantuan\b/i.test(el.textContent||''))
+                .map(el=>({
+                  tag:el.tagName,
+                  id:el.id||'',
+                  cls:String(el.className||'').slice(0,200),
+                  text:String(el.textContent||'').trim().replace(/\s+/g,' ').slice(0,220),
+                  insideCopilot:!!el.closest('[id*="copilot" i],[class*="copilot" i]')
+                }))
+                .slice(0,50);
+
+              const selects=(root)=>[...root.querySelectorAll('select')].map(x=>({
+                id:x.id||'',name:x.name||'',options:x.options?.length||0,
+                aria:x.getAttribute('aria-label')||''
+              }));
+
+              const logbook=document.getElementById('view-utama') || document.getElementById('view-logbook') || document.getElementById('view-input');
+              const patrol=document.getElementById('view-patrol');
+
+              const userAccess=[...document.querySelectorAll('[data-view],button,a')]
+                .filter(el=>/(user management|role access|user.*akses|akses.*role)/i.test(el.textContent||''))
+                .map(el=>({
+                  text:String(el.textContent||'').trim().replace(/\s+/g,' ').slice(0,200),
+                  view:el.getAttribute('data-view')||'',
+                  id:el.id||''
+                })).slice(0,40);
+
+              return {
+                duplicateIds:duplicates,
+                helpNodes,
+                logbookSelects:logbook?selects(logbook):[],
+                patrolSelects:patrol?selects(patrol):[],
+                userAccess,
+                copilotRoots:[...document.querySelectorAll('[id*="copilot" i],[class*="copilot" i]')]
+                  .slice(0,30).map(x=>({tag:x.tagName,id:x.id||'',cls:String(x.className||'').slice(0,160)})),
+                mediaElements:[...document.querySelectorAll('[id*="media" i],[class*="media" i],[id*="preview" i],[class*="preview" i]')]
+                  .slice(0,50).map(x=>({tag:x.tagName,id:x.id||'',cls:String(x.className||'').slice(0,180)}))
+              };
+            });
+
+            result.targeted=await page.evaluate(()=>{
+              const fnNames=[
+                'latestLogbookForMachine_',
+                'latestPatrolForMachine_',
+                'currentMachineStatusSnapshot_',
+                'attachSparepartPaginationHandlers',
+                'switchToView',
+                'renderOmodos4'
+              ];
+              const functions={};
+              for(const n of fnNames) functions[n]=typeof window[n];
+
+              const helpTexts=[...document.querySelectorAll('body *')]
+                .filter(el=>el.children.length===0 && /\bbantuan\b/i.test(el.textContent||''))
+                .slice(0,50)
+                .map(el=>({
+                  tag:el.tagName,id:el.id||'',cls:String(el.className||'').slice(0,160),
+                  text:String(el.textContent||'').trim().slice(0,180),
+                  insideCopilot:!!el.closest('[id*="copilot" i],[class*="copilot" i]')
+                }));
+
+              return {functions,helpTexts};
+            });
+
+            console.log('[DEEP_AUDIT_RESULT] '+JSON.stringify(result));
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          node --check deep-audit.mjs
+          timeout -k 5s 90s node deep-audit.mjs | tee /tmp/deep-browser.txt
+
+      - name: Generate sanitized audit report
+        shell: python
+        run: |
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import json,re
+
+          static=json.loads(Path("/tmp/static-audit.json").read_text())
+          txt=Path("/tmp/deep-browser.txt").read_text(encoding="utf-8",errors="replace")
+          m=re.search(r"\[DEEP_AUDIT_RESULT\]\s*(\{.*\})",txt)
+          browser=json.loads(m.group(1)) if m else {}
+
+          bad_views=[]
+          for v in browser.get("views") or []:
+            if not v.get("container") or str(v.get("go","")).startswith(("ERR:","PLAYWRIGHT_ERR:","NO_FUNCTION")) or v.get("newPageErrors"):
+              bad_views.append(v)
+
+          report=[
+            "# OMODOS Deep Production Regression Audit",
+            "",
+            f"- Audited UTC: {datetime.now(timezone.utc).isoformat()}",
+            "- Mode: read-only navigation/render audit using synthetic Superadmin session in browser memory",
+            f"- Navigation views tested: {len(browser.get('views') or [])}",
+            f"- Views with structural/runtime findings: {len(bad_views)}",
+            f"- Page errors observed: {len(browser.get('pageErrors') or [])}",
+            f"- Same-origin failed requests observed: {len(browser.get('failedRequests') or [])}",
+            "",
+            "## View routing findings",
+            ""
+          ]
+
+          if bad_views:
+            for v in bad_views[:100]:
+              report.append(
+                f"- {v.get('view')}: container={v.get('container')}, allowed={v.get('allowed')}, "
+                f"go={v.get('go')}, active={v.get('active')}, "
+                f"page_errors={json.dumps(v.get('newPageErrors') or [],ensure_ascii=False)}, "
+                f"console_errors={json.dumps(v.get('newConsoleErrors') or [],ensure_ascii=False)}"
+              )
+          else:
+            report.append("- No structural/runtime view-routing failure detected.")
+
+          report += ["","## Static view target audit",""]
+          report.append(f"- Unique HTML IDs: {static.get('unique_ids')}")
+          report.append(f"- Duplicate ID definitions: {len(static.get('duplicates') or [])}")
+          report.append(f"- data-view targets: {len(static.get('nav_views') or [])}")
+          report.append(f"- view containers: {len(static.get('view_ids') or [])}")
+          report.append(f"- data-view values without view-* container: {json.dumps(static.get('missing_targets') or [],ensure_ascii=False)}")
+
+          report += ["","## Duplicate IDs",""]
+          dup=browser.get("dom",{}).get("duplicateIds") or []
+          if dup:
+            for x in dup[:100]: report.append(f"- {x['id']}: {x['count']}")
+          else:
+            report.append("- None in rendered DOM.")
+
+          report += ["","## Bantuan / Copilot",""]
+          helps=browser.get("dom",{}).get("helpNodes") or []
+          outside=[x for x in helps if not x.get("insideCopilot")]
+          report.append(f"- Help-related interactive/card nodes found: {len(helps)}")
+          report.append(f"- Help-related nodes outside Copilot: {len(outside)}")
+          for x in outside[:30]:
+            report.append(f"- OUTSIDE: {json.dumps(x,ensure_ascii=False)}")
+
+          report += ["","## Machine selectors",""]
+          report.append("- Logbook selects: "+json.dumps(browser.get("dom",{}).get("logbookSelects") or [],ensure_ascii=False))
+          report.append("- Patrol selects: "+json.dumps(browser.get("dom",{}).get("patrolSelects") or [],ensure_ascii=False))
+
+          report += ["","## User Management / Role Access",""]
+          ua=browser.get("dom",{}).get("userAccess") or []
+          for x in ua[:40]: report.append(f"- {json.dumps(x,ensure_ascii=False)}")
+          if not ua: report.append("- No matching navigation/control text found.")
+
+          report += ["","## Required core functions",""]
+          funcs=browser.get("targeted",{}).get("functions") or {}
+          for k,v in funcs.items(): report.append(f"- {k}: {v}")
+
+          report += ["","## Static feature fingerprints",""]
+          for name,data in (static.get("findings") or {}).items():
+            report.append(f"- {name}: {data.get('count',0)} hit(s)")
+
+          report += ["","## Network failures during view traversal",""]
+          failed=browser.get("failedRequests") or []
+          if failed:
+            seen=set()
+            for x in failed:
+              key=(x.get("url"),x.get("error"))
+              if key in seen: continue
+              seen.add(key)
+              report.append(f"- {x.get('url')} — {x.get('error')}")
+          else:
+            report.append("- None.")
+
+          Path("audit").mkdir(exist_ok=True)
+          Path("audit/DEEP_PRODUCTION_REGRESSION.md").write_text("\n".join(report)+"\n",encoding="utf-8")
+
+      - name: Commit sanitized report
+        shell: bash
+        run: |
+          rm -f package.json package-lock.json deep-audit.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/DEEP_PRODUCTION_REGRESSION.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "audit: deep production navigation and feature regression"
+          git push
