@@ -1,0 +1,81 @@
+name: Recover OMODOS Production Frontend
+
+on:
+  push:
+    paths:
+      - ".github/workflows/recover-production.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    name: Capture production baseline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Capture public production assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE="https://omodos.offsetbmj.workers.dev"
+          OUT="recovery/production"
+
+          mkdir -p "$OUT/public"
+
+          echo "Capturing OMODOS production root..."
+          curl -fsSL             --retry 3             --retry-delay 2             --retry-all-errors             -D "$OUT/root.headers.txt"             "$BASE/"             -o "$OUT/public/index.html"
+
+          ROOT_STATUS="$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/")"
+
+          SETUP_STATUS="$(curl -sS -o "$OUT/public/setup.html.tmp" -w "%{http_code}" "$BASE/setup.html" || true)"
+          if [ "$SETUP_STATUS" = "200" ]; then
+            mv "$OUT/public/setup.html.tmp" "$OUT/public/setup.html"
+          else
+            rm -f "$OUT/public/setup.html.tmp"
+          fi
+
+          {
+            echo "captured_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "source=$BASE"
+            echo "root_status=$ROOT_STATUS"
+            echo "setup_status=$SETUP_STATUS"
+            echo "recovery_mode=public-read-only"
+          } > "$OUT/metadata.txt"
+
+          (
+            cd "$OUT"
+            sha256sum public/index.html > SHA256SUMS.txt
+            if [ -f public/setup.html ]; then
+              sha256sum public/setup.html >> SHA256SUMS.txt
+            fi
+          )
+
+          test -s "$OUT/public/index.html"
+          echo "Production snapshot captured."
+
+      - name: Upload recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omodos-production-recovery
+          path: recovery/production
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Commit recovery baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add recovery/production
+          if git diff --cached --quiet; then
+            echo "No production snapshot changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: capture OMODOS production frontend baseline"
+          git push
