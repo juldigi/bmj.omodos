@@ -1,4 +1,4 @@
-/* OMODOS 4.0 master-prompt recovery layer.
+/* OMODOS 4.0 master-prompt frontend-only recovery layer.
    Additive frontend intelligence only: no login/auth/API/database mutation. */
 (function(){
 'use strict';
