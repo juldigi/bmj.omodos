@@ -656,6 +656,11 @@ jobs:
                 prepare(false);
                 document.getElementById('btn-patrol-save').click();
                 await waitForCalls(1);
+                {
+                  const start=Date.now();
+                  const btn=document.getElementById('btn-patrol-save');
+                  while(btn.disabled && Date.now()-start<2000) await new Promise(r=>setTimeout(r,20));
+                }
 
                 prepare(true);
                 document.getElementById('btn-patrol-save').click();
