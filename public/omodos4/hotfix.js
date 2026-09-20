@@ -130,13 +130,45 @@ function sync(){
 }
 function stage(){
  var view=document.getElementById('view-omodos4');if(!view)return null;
- var s=document.getElementById('v4-safe-stage');if(!s){s=document.createElement('div');s.id='v4-safe-stage';view.appendChild(s)}return s
+ var s=document.getElementById('v4-safe-stage');
+ if(!s){
+  s=document.createElement('div');s.id='v4-safe-stage';
+  var top=view.querySelector('.topbar');
+  if(top&&top.parentNode===view)top.insertAdjacentElement('afterend',s);else view.insertBefore(s,view.firstChild)
+ }
+ return s
+}
+function setSidebarActive(n){
+ var g=group();if(!g)return;
+ var root=g.querySelector('[data-v4-root]');
+ var mods=g.querySelectorAll('[data-v4-safe-module]');
+ if(root)root.classList.toggle('active',n===0);
+ for(var i=0;i<mods.length;i++)mods[i].classList.toggle('active',Number(mods[i].getAttribute('data-v4-safe-module'))===n);
+ var parent=g.querySelector('.nav-parent-btn[data-group="omodos4"]');
+ var sub=g.querySelector('[data-submenu="omodos4"]');
+ if(parent)parent.classList.add('active','open');
+ if(sub)sub.classList.add('open')
+}
+function showCommandCenter(){
+ var view=document.getElementById('view-omodos4'),s=document.getElementById('v4-safe-stage');
+ if(view)view.classList.remove('v4-safe-module-open');
+ if(s){s.innerHTML='';s.style.display='none'}
+ setSidebarActive(0)
 }
 function render(n){
- if(!permitted())return;var data=GROUPS[n]||GROUPS[0],s=stage();if(!s)return;
+ if(!permitted())return false;
+ n=Number(n)||0;
+ if(n===0){showCommandCenter();return true}
+ var data=GROUPS[n]||GROUPS[0],s=stage(),view=document.getElementById('view-omodos4');if(!s||!view)return false;
  var cards='';for(var i=0;i<data[2].length;i++){var name=data[2][i],route=ROUTES[name]||'';
  cards+='<button type="button" class="v4-feature-tile" data-v4-route="'+esc(route)+'"><span class="n">'+String(i+1).padStart(2,'0')+'</span><strong>'+esc(name)+'</strong><small>'+(route?'Buka data/fungsi existing.':'Ringkasan intelligence dari data existing.')+'</small></button>'}
- s.innerHTML='<div class="v4-card"><div class="v4-module-head"><div><div class="v4-eyebrow">OMODOS 4.0</div><h2><i class="ph-bold '+data[1]+'"></i> '+esc(data[0])+'</h2><p>Menggunakan sumber data existing tanpa input ganda.</p></div></div><div class="v4-feature-grid">'+cards+'</div></div>'
+ s.innerHTML='<div class="v4-card"><div class="v4-module-head"><div><div class="v4-eyebrow">OMODOS 4.0</div><h2><i class="ph-bold '+data[1]+'"></i> '+esc(data[0])+'</h2><p>Menggunakan sumber data existing tanpa input ganda.</p></div></div><div class="v4-feature-grid">'+cards+'</div></div>';
+ s.style.display='';
+ view.classList.add('v4-safe-module-open');
+ view.setAttribute('data-v4-active-module',String(n));
+ setSidebarActive(n);
+ try{s.scrollIntoView({block:'start',behavior:'auto'})}catch(e){}
+ return true
 }
 function openCopilot(showHelp){
  var bg=document.querySelector('.copilot-bg'),fab=document.getElementById('copilot-fab');
@@ -155,8 +187,24 @@ function openRoute(route){
  return false
 }
 document.addEventListener('click',function(e){
- var m=e.target.closest&&e.target.closest('[data-v4-safe-module]');if(m){if(!permitted()){e.preventDefault();e.stopImmediatePropagation();return}var root=document.querySelector('#v4-nav-group [data-view="omodos4"]');if(root)root.click();setTimeout(function(){render(Number(m.getAttribute('data-v4-safe-module')))},0);return}
- var tile=e.target.closest&&e.target.closest('[data-v4-route]');if(tile){var route=tile.getAttribute('data-v4-route');if(!openRoute(route)&&typeof window.toast==='function')window.toast('Fitur belum dapat dibuka dari OMODOS 4.0.');return}
+ var root=e.target.closest&&e.target.closest('#v4-nav-group [data-v4-root]');
+ if(root){if(!permitted()){e.preventDefault();e.stopImmediatePropagation();return}setTimeout(function(){showCommandCenter()},0);return}
+ var m=e.target.closest&&e.target.closest('[data-v4-safe-module]');
+ if(m){
+  if(!permitted()){e.preventDefault();e.stopImmediatePropagation();return}
+  e.preventDefault();
+  var n=Number(m.getAttribute('data-v4-safe-module'));
+  var opened=false;
+  try{if(typeof window.goToView==='function')opened=window.goToView('omodos4')!==false;else if(typeof goToView==='function')opened=goToView('omodos4')!==false}catch(err){}
+  if(!opened){
+   var view=document.getElementById('view-omodos4');
+   if(view){var views=document.querySelectorAll('.view');for(var i=0;i<views.length;i++)views[i].classList.remove('active');view.classList.add('active');opened=true}
+  }
+  if(opened)render(n);
+  return
+ }
+ var tile=e.target.closest&&e.target.closest('[data-v4-route]');
+ if(tile){e.preventDefault();var route=tile.getAttribute('data-v4-route');if(!openRoute(route)&&typeof window.toast==='function')window.toast('Fitur belum dapat dibuka dari OMODOS 4.0.');return}
 },true);
 window.addEventListener('storage',sync);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)sync()});
