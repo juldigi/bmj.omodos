@@ -342,9 +342,10 @@ jobs:
                   kodeMesin:'QA-STATUS-1',
                   namaMesin:'QA Status Machine',
                   tanggal:'2026-09-20',
-                  waktu:'11:00',
+                  waktuPatrol:'11:00',
+                  ts:new Date('2026-09-20T11:00:00+07:00').getTime(),
+                  patrolMode:'daily',
                   createdAt:'2026-09-20T11:00:00+07:00',
-                  timestamp:'2026-09-20T11:00:00+07:00',
                   severity:'Kritikal',
                   deskripsiTemuan:'Patrol lebih baru'
                 }];
