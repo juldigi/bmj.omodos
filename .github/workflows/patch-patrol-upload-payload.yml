@@ -1,0 +1,104 @@
+name: Patch Patrol upload payload
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/patch-patrol-upload-payload.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove duplicate Patrol base64 from report metadata
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("public/index.html")
+          s=p.read_text(encoding="utf-8")
+          old="""  try{
+    const res = await apiPost({ action:'savePredictiveReport', report: { ...report, files: undefined }, files: files || [] });
+    const stableFiles = parseAttachments((res && res.attachments) || []);"""
+          new="""  try{
+    // File biner/base64 dikirim HANYA lewat top-level `files`. Sebelumnya
+    // report.findings[].files ikut membawa base64 yang sama sehingga payload
+    // foto/video Patrol terduplikasi dan bisa membengkak hampir 2x.
+    // Metadata URL permanen non-blob tetap dipertahankan untuk kompatibilitas
+    // report lama / file eksternal; preview blob lokal tidak pernah dikirim.
+    const reportForBackend = {
+      ...report,
+      files: undefined,
+      findings: (report.findings||[]).map(finding=>({
+        ...finding,
+        files: (finding.files||[]).map(file=>{
+          const safe = {
+            name: file && file.name || 'lampiran',
+            mimeType: file && file.mimeType || '',
+            type: file && file.type || ''
+          };
+          const viewUrl = String(file && file.viewUrl || '');
+          if(viewUrl && !viewUrl.startsWith('blob:') && !(file && file.base64)){
+            safe.viewUrl = viewUrl;
+            if(file.previewUrl) safe.previewUrl = file.previewUrl;
+            if(file.thumbUrl) safe.thumbUrl = file.thumbUrl;
+          }
+          return safe;
+        })
+      }))
+    };
+    const res = await apiPost({ action:'savePredictiveReport', report: reportForBackend, files: files || [] });
+    const stableFiles = parseAttachments((res && res.attachments) || []);"""
+          if old not in s:
+              raise SystemExit("persistPmReport anchor not found or already changed")
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding="utf-8")
+          print("[PATCH] Patrol upload payload de-duplicated")
+
+      - name: Validate frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "const reportForBackend" public/index.html
+          grep -q "report: reportForBackend" public/index.html
+          grep -q "files: files || \[\]" public/index.html
+          grep -q 'id="form-login"' public/index.html
+          grep -q "action: 'login'" public/index.html
+          node --check public/omodos4/hotfix.js
+          node - <<'NODE'
+          const fs=require('fs');
+          const h=fs.readFileSync('public/index.html','utf8');
+          const rx=/<script([^>]*)>([\s\S]*?)<\/script>/gi;
+          let m,n=0,fail=[];
+          while((m=rx.exec(h))){
+            n++;
+            if(/\bsrc=/.test(m[1])) continue;
+            try{ new Function(m[2]); }catch(e){ fail.push({script:n,error:e.message}); }
+          }
+          if(fail.length){ console.error(fail); process.exit(1); }
+          console.log('[PATCH] inline scripts valid:',n);
+          NODE
+
+      - name: Commit safe frontend patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No frontend changes."
+            exit 0
+          fi
+          git commit -m "fix: avoid duplicate base64 in Patrol upload payload"
+          git push origin HEAD:main
