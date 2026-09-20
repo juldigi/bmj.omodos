@@ -1,0 +1,47 @@
+name: Deploy OMODOS V4 RBAC Toast Recovery
+on:
+  push:
+    branches:
+      - deploy/v4-rbac-toast-recovery
+    paths:
+      - ".github/workflows/deploy-v4-rbac-toast-recovery.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate frontend recovery files
+        run: |
+          node --check public/omodos4/hotfix.js
+          test -s public/omodos4/hotfix.css
+          grep -q '"main": "src/entry.js"' wrangler.jsonc
+          grep -q 'OMODOS4_RECOVERY_V2' src/entry.js
+      - name: Install pinned Wrangler
+        run: npm install
+      - name: Dry run
+        run: npx wrangler deploy --dry-run --outdir /tmp/omodos-dry-run
+      - name: Deploy production Worker
+        run: npx wrangler deploy
+      - name: Smoke test production
+        run: |
+          for i in $(seq 1 20); do
+            HTML="$(curl -fsS https://omodos.offsetbmj.workers.dev/ || true)"
+            if printf '%s' "$HTML" | grep -q 'OMODOS4_RECOVERY_V2'; then break; fi
+            sleep 3
+          done
+          printf '%s' "$HTML" | grep -q 'OMODOS4_RECOVERY_V2'
+          printf '%s' "$HTML" | grep -q '/omodos4/hotfix.js'
+          curl -fsS https://omodos.offsetbmj.workers.dev/omodos4/hotfix.js | node --check
+          STATUS="$(curl -sS -o /tmp/api.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"bootstrap"}' https://omodos.offsetbmj.workers.dev/api)"
+          test "$STATUS" = "200"
+          node -e "const x=require('/tmp/api.json'); if(typeof x!=='object')process.exit(1)"
