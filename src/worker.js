@@ -1388,13 +1388,23 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const recentCount = /* @__PURE__ */ new Map();
     partRefsFromLogbook(forecastRows).forEach((p, k) => recentCount.set(k, p.consumptionCount));
+    function stockQtyValue(r) {
+      const raw = first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"], null);
+      if (raw === null || raw === void 0 || text(raw) === "") return null;
+      return num(raw);
+    }
+    __name(stockQtyValue, "stockQtyValue");
     const criticality = [...materialInfo.values()].map((x) => {
       const stockRisk = x.stock.some((r) => {
-        const qty = num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"]));
-        const min = num(first(r, ["Min Stock", "Minimum Stock", "Safety Stock", "ROP", "Reorder Point"]));
-        return min > 0 && qty <= min;
+        const qty = stockQtyValue(r);
+        const minRaw = first(r, ["Min Stock", "Minimum Stock", "Safety Stock", "ROP", "Reorder Point"], null);
+        const min = minRaw === null || minRaw === void 0 || text(minRaw) === "" ? null : num(minRaw);
+        return qty !== null && min !== null && min > 0 && qty <= min;
       });
-      const stockout = x.stock.some((r) => num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"])) <= 0);
+      const stockout = x.stock.some((r) => {
+        const qty = stockQtyValue(r);
+        return qty !== null && qty <= 0;
+      });
       const etaOverdue = x.eta.some((r) => {
         const d = timeMs(first(r, ["Estimasi ETA", "ETA", "Tanggal ETA", "Expected Date"]), NaN);
         return Number.isFinite(d) && d < now && !isClosed(r);
@@ -1431,7 +1441,10 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       risks.push({ severity: x.priority, type: x.factors.stockout ? "stockout" : x.factors.stockRisk ? "stock-risk" : "eta-overdue", material: x.material, materialNumber: x.materialNumber, score: x.criticalityScore, factors: x.factors });
     });
     const deadStockCandidates = criticality.filter((x) => {
-      const hasPositive = x.records.stock.some((r) => num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"])) > 0);
+      const hasPositive = x.records.stock.some((r) => {
+        const qty = stockQtyValue(r);
+        return qty !== null && qty > 0;
+      });
       return hasPositive && x.factors.consumptionCount === 0;
     }).slice(0, 100).map((x) => ({ material: x.material, materialNumber: x.materialNumber, label: "CANDIDATE_ONLY", reason: "Positive stock with no exact linked Logbook consumption in available history", records: x.records.stock }));
     const shelfMap = /* @__PURE__ */ new Map();
@@ -1457,14 +1470,14 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     criticality.forEach((x) => x.machines.forEach((m) => machinePartGraph.push({ from: "machine:" + m, to: "part:" + (x.materialNumber || x.material), relation: "uses/consumed", material: x.material, materialNumber: x.materialNumber })));
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-sparepart-3",
+      logicVersion: "v4-sparepart-4",
       risks,
       criticalityMatrix: criticality.slice(0, 150),
       consumptionTop: criticality.filter((x) => x.factors.consumptionCount > 0).sort((x, y) => y.factors.consumptionCount - x.factors.consumptionCount).slice(0, 50).map((x) => ({ material: x.material, materialNumber: x.materialNumber, count: x.factors.consumptionCount, machines: x.machines, latest: x.latestConsumption })),
       deadStockCandidates,
       shelfDigitalTwin: shelfDigitalTwin.slice(0, 100),
       reservationForecast: criticality.filter((x) => x.reservationForecast.observedConsumptions > 0).slice(0, 100).map((x) => ({ material: x.material, materialNumber: x.materialNumber, ...x.reservationForecast })),
-      procurementUrgency: criticality.filter((x) => x.priority === "P0" || x.priority === "P1").slice(0, 50).map((x) => ({ material: x.material, materialNumber: x.materialNumber, priority: x.priority, score: x.criticalityScore, factors: x.factors, eta: x.records.eta.slice(0, 5), stock: x.records.stock.slice(0, 5) })),
+      procurementUrgency: criticality.filter((x) => (x.priority === "P0" || x.priority === "P1") && (x.factors.stockRisk || x.factors.stockout || x.factors.etaOverdue)).slice(0, 50).map((x) => ({ material: x.material, materialNumber: x.materialNumber, priority: x.priority, score: x.criticalityScore, factors: x.factors, eta: x.records.eta.slice(0, 5), stock: x.records.stock.slice(0, 5) })),
       machinePartGraph: machinePartGraph.slice(0, 1e3),
       equivalentParts: explicitEquivalents,
       partPhotoAssets: partPhotos,
