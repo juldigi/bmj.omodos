@@ -212,47 +212,60 @@ function permitted(){
   return typeof CURRENT_USER!=='undefined' && !!CURRENT_USER && CURRENT_USER.role==='Superadmin';
  }catch(e){return false}
 }
+function monthNumber(v){
+ var n=Number(v);if(Number.isFinite(n)&&n>=1&&n<=12)return Math.trunc(n);
+ var x=String(v||'').toLowerCase().replace(/\./g,'');
+ var names=[['jan','januari','january'],['feb','februari','february'],['mar','maret','march'],['apr','april'],['mei','may'],['jun','juni','june'],['jul','juli','july'],['agu','agust','agustus','aug','august'],['sep','sept','september'],['okt','oct','oktober','october'],['nop','nov','november'],['des','dec','desember','december']];
+ var idx=names.findIndex(function(a){return a.some(function(k){return x.indexOf(k)===0})});
+ return idx>=0?idx+1:0;
+}
+function periodValue(o){
+ if(!o||typeof o!=='object')return 0;
+ var year=Number(val(o,['Tahun','Year'])),month=monthNumber(val(o,['Bulan','Month']));
+ if(!year||!month)return 0;
+ return Date.UTC(year,month-1,1)-7*3600000;
+}
+function sourceTimestamp(o){return dateValue(o)||periodValue(o)||0}
+function temporalRows(list){return arr(list).filter(function(r){return sourceTimestamp(r)>=V4_CUTOFF})}
 function getEntries(){
  try{
   var rows=arr(typeof ENTRIES!=='undefined'?ENTRIES:[]);
   if(typeof sotEntries==='function') rows=arr(sotEntries(rows));
-  return rows.filter(function(r){var t=dateValue(r);return !t || t>=V4_CUTOFF});
+  return temporalRows(rows);
  }catch(e){return []}
 }
-function getPatrol(){
- try{return arr(typeof PM_REPORTS!=='undefined'?PM_REPORTS:[]).filter(function(r){var t=dateValue(r);return !t || t>=V4_CUTOFF})}catch(e){return []}
-}
+function getPatrol(){try{return temporalRows(typeof PM_REPORTS!=='undefined'?PM_REPORTS:[])}catch(e){return []}}
 function getMachines(){try{return arr(typeof MACHINES!=='undefined'?MACHINES:[])}catch(e){return []}}
-function getBreakdown(){try{return arr(typeof MACHINE_BREAKDOWN!=='undefined'?MACHINE_BREAKDOWN:[])}catch(e){return []}}
+function getBreakdown(){try{return temporalRows(typeof MACHINE_BREAKDOWN!=='undefined'?MACHINE_BREAKDOWN:[])}catch(e){return []}}
 function getPeople(){
  try{
   var p=arr(typeof PI_PERSONNEL_MASTER!=='undefined'?PI_PERSONNEL_MASTER:[]);
   return p.length?p:arr(typeof PERSONIL!=='undefined'?PERSONIL:[]);
  }catch(e){return []}
 }
-function getSoftAssess(){try{return arr(typeof PI_SS_SCORES!=='undefined'?PI_SS_SCORES:[])}catch(e){return []}}
-function getHardAssess(){try{return arr(typeof PI_HS_ASSESSMENTS!=='undefined'?PI_HS_ASSESSMENTS:[])}catch(e){return []}}
-function getKnowledge(){try{return arr(typeof KB_ENTRIES!=='undefined'?KB_ENTRIES:[])}catch(e){return []}}
+function getSoftAssess(){try{return temporalRows(typeof PI_SS_SCORES!=='undefined'?PI_SS_SCORES:[])}catch(e){return []}}
+function getHardAssess(){try{return temporalRows(typeof PI_HS_ASSESSMENTS!=='undefined'?PI_HS_ASSESSMENTS:[])}catch(e){return []}}
+function getKnowledge(){try{return temporalRows(typeof KB_ENTRIES!=='undefined'?KB_ENTRIES:[])}catch(e){return []}}
 function getKpi(){
  var out=[];
  try{out=out.concat(arr(typeof KPI_DEPARTMENT_YTD!=='undefined'?KPI_DEPARTMENT_YTD:[]))}catch(e){}
- try{out=out.concat(arr(typeof KPI_KERJA!=='undefined'?KPI_KERJA:[]))}catch(e){}
+ try{out=out.concat(temporalRows(typeof KPI_KERJA!=='undefined'?KPI_KERJA:[]))}catch(e){}
  return out;
 }
 function getEnergy(){
  var out=[];
- try{out=out.concat(arr(typeof ENERGY_UTILITY!=='undefined'?ENERGY_UTILITY:[]))}catch(e){}
- try{out=out.concat(arr(typeof ENERGY_COST_TOE!=='undefined'?ENERGY_COST_TOE:[]))}catch(e){}
+ try{out=out.concat(temporalRows(typeof ENERGY_UTILITY!=='undefined'?ENERGY_UTILITY:[]))}catch(e){}
+ try{out=out.concat(temporalRows(typeof ENERGY_COST_TOE!=='undefined'?ENERGY_COST_TOE:[]))}catch(e){}
  return out;
 }
 function getIpal(){
  try{
   var x=typeof IPAL_CURRENT!=='undefined'?IPAL_CURRENT:null;
-  if(Array.isArray(x)) return x;
-  return x&&typeof x==='object'?[x]:[];
+  if(Array.isArray(x)) return temporalRows(x);
+  return x&&typeof x==='object'?temporalRows([x]):[];
  }catch(e){return []}
 }
-function getRunHour(){try{return arr(typeof RUN_HOUR_COMPARISON!=='undefined'?RUN_HOUR_COMPARISON:[])}catch(e){return []}}
+function getRunHour(){try{return temporalRows(typeof RUN_HOUR_COMPARISON!=='undefined'?RUN_HOUR_COMPARISON:[])}catch(e){return []}}
 function getProjects(){
  var out=[];
  try{
@@ -264,7 +277,7 @@ function getProjects(){
   var d=typeof PMC_DETAIL!=='undefined'?PMC_DETAIL:null;
   if(Array.isArray(d)) out=out.concat(d);
  }catch(e){}
- return out;
+ return temporalRows(out);
 }
 function getSpare(){
  try{if(typeof sparepartRows==='function')return arr(sparepartRows())}catch(e){}
@@ -286,7 +299,7 @@ function sourceCount(name){
   case 'IPAL':return getIpal().length;
   case 'Project':return getProjects().length;
   case 'RCA':
-   try{return arr(typeof GENERAL_REPORTS!=='undefined'?GENERAL_REPORTS:[]).filter(function(x){return /rca/i.test(text(x))}).length}catch(e){return 0}
+   try{return temporalRows(typeof GENERAL_REPORTS!=='undefined'?GENERAL_REPORTS:[]).filter(function(x){return /rca/i.test(text(x))}).length}catch(e){return 0}
   default:return 0;
  }
 }
@@ -317,7 +330,7 @@ function isCritical(o){
 }
 function dateValue(o){
  if(!o||typeof o!=='object')return 0;
- var raw=val(o,['ts','Timestamp','timestamp','UpdatedAt','updatedAt','CreatedAt','createdAt','Tanggal Laporan','tanggal','Tanggal','date']);
+ var raw=val(o,['ts','Timestamp','Timestamp Input','timestamp','Updated At','UpdatedAt','updatedAt','Created At','CreatedAt','createdAt','Tanggal Laporan','Tanggal Kejadian','Tanggal Input','Tanggal Mulai','StartedAt','tanggal','Tanggal','Date','date']);
  if(!raw)return 0;
  var d=new Date(raw);
  if(!Number.isFinite(d.getTime()) && val(o,['waktuPatrol','Waktu','waktu'])) d=new Date(String(raw)+'T'+String(val(o,['waktuPatrol','Waktu','waktu'])));
@@ -358,17 +371,10 @@ function sparePending(){
  return null;
 }
 function kpiAtRisk(){
- var rows=getKpi(), found=0, measured=0;
- rows.forEach(function(r){
-  if(!r||typeof r!=='object')return;
-  Object.keys(r).forEach(function(k){
-   if(/achievement|capaian|pencapaian/i.test(k)){
-    var n=parseFloat(String(r[k]).replace(',','.').replace('%',''));
-    if(Number.isFinite(n)){measured++;if(n<100)found++}
-   }
-  });
- });
- return measured?found:null;
+ // KPI YTD stores several months in one row. Reading a generic achievement field here
+ // could expose Jan-Aug values. The server overview applies the Sep-2026 cutoff correctly,
+ // so the local fallback intentionally stays unavailable instead of guessing.
+ return null;
 }
 function activateView(route){
  if(!route)return false;
@@ -510,7 +516,7 @@ function sourcePanel(f){
   var c=sourceCount(name),state=c>0?'Ada data':'Belum ada data';
   return '<div class="v4-evidence"><span>'+esc(sourceDisplay(name))+'</span><strong>'+esc(c)+'</strong><small>'+state+'</small></div>';
  }).join('')+'</div>';
- return '<details class="v4-simple-details v4-source-details"><summary><i class="ph-bold ph-database"></i> Lihat sumber data</summary>'+grid+'</details>';
+ return '<details class="v4-simple-details v4-source-details"><summary><i class="ph-bold ph-database"></i> Lihat sumber data</summary><p class="v4-muted">Catatan historis OMODOS 4.0 dihitung mulai 1 September 2026. Master mesin, personel, stok, lokasi, dan template dapat dipakai sebagai referensi kondisi saat ini.</p>'+grid+'</details>';
 }
 function openButtons(f){
  var used=new Set(),html='';
