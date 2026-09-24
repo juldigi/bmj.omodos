@@ -1939,14 +1939,27 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const legacy = [...legacyMap.values()].sort((x, y) => String(y.year).localeCompare(String(x.year)));
     const reliability = getReliability(body || {}).data;
-    const existingText = open.map((x) => lower([first(x.record, ["Judul", "Tema"]), first(x.record, ["Permasalahan", "Background"]), machineCode(x.record), machineName(x.record)].join(" "))).join(" || ");
+    function improvementMentionsMachine(record, machine) {
+      if (!record || !machine) return false;
+      if (matchesMachine(record, machine)) return true;
+      const key = lower(machine).replace(/\s+/g, " ").trim();
+      if (!key) return false;
+      const corpus = lower([
+        first(record, ["Judul", "Tema", "Nama Project"]),
+        first(record, ["Permasalahan", "Background"]),
+        first(record, ["Ide Perbaikan", "Objective", "Target"])
+      ].join(" ")).replace(/\s+/g, " ").trim();
+      return (" " + corpus + " ").includes(" " + key + " ");
+    }
+    __name(improvementMentionsMachine, "improvementMentionsMachine");
     const opportunityRadar = (reliability.badActors || []).filter((m) => m.recurring > 0 || m.healthIndex < 60).map((m) => {
-      const key = lower(m.code || m.name || m.key), covered = key && existingText.includes(key);
-      return { machine: m.code || m.name || m.key, healthIndex: m.healthIndex, recurring: m.recurring, downtimeMinutes: Math.round(m.downtimeMinutes), openIssues: m.openIssues, existingImprovementCoverage: covered ? "POSSIBLE_MATCH" : "NO_MACHINE_NAME_MATCH", priority: !covered && (m.healthIndex < 40 || m.recurring >= 3) ? "P1" : "P2", reason: covered ? "Existing open improvement mentions this machine; review before creating duplicate." : "Recurring/loss evidence exists and no open improvement directly names the machine." };
+      const machine = m.code || m.name || m.key;
+      const covered = open.some((x) => improvementMentionsMachine(x.record, machine));
+      return { machine, healthIndex: m.healthIndex, recurring: m.recurring, downtimeMinutes: Math.round(m.downtimeMinutes), openIssues: m.openIssues, existingImprovementCoverage: covered ? "POSSIBLE_MATCH" : "NO_MACHINE_NAME_MATCH", priority: !covered && (m.healthIndex < 40 || m.recurring >= 3) ? "P1" : "P2", reason: covered ? "Existing open improvement mentions this machine; review before creating duplicate." : "Recurring/loss evidence exists and no open improvement directly names the machine." };
     }).sort((x, y) => ({ P1: 0, P2: 1 })[x.priority] - { P1: 0, P2: 1 }[y.priority] || x.healthIndex - y.healthIndex).slice(0, 40);
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-improvement-2",
+      logicVersion: "v4-improvement-3",
       counts: { project: project.length, kaizen: kaizen.length, sga: sga.length, overdue: overdue.length, open: open.length },
       overdueProjects: overdue.slice(0, 40).map((r) => cleanRecord(r, 12)),
       openImprovements: opportunity,
