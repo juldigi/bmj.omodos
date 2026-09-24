@@ -3262,6 +3262,11 @@ function chip(t){return '<span class="v4-risk-chip">'+esc(t||'Bukti data')+'</sp
 function item(title,sub,right){
  return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
 }
+function statusLabel(v){var s=String(v||'').trim(),u=s.toUpperCase();var m={OPEN:'Terbuka',CLOSED:'Selesai',COMPLETED:'Selesai',DONE:'Selesai','IN PROGRESS':'Berjalan',PROGRESS:'Berjalan',MONITORING:'Dipantau',DRAFT:'Draf'};return m[u]||s||'—'}
+function typeLabel(v){var s=String(v||'').trim();return s==='Factory Project'?'Proyek':s==='Improvement'?'Perbaikan':s||'Perbaikan'}
+function priorityLabel(v){var u=String(v||'').toUpperCase();return u==='P1'?'Perlu ditinjau dulu':u==='P2'?'Dapat ditinjau':u==='P0'?'Sangat mendesak':u==='P3'?'Rendah':String(v||'Periksa')}
+function coverageLabel(v){var u=String(v||'').toUpperCase();return u==='POSSIBLE_MATCH'?'Ada perbaikan terkait':u==='NO_MACHINE_NAME_MATCH'?'Belum ditemukan perbaikan terkait':String(v||'')}
+function relationLabel(v){var s=String(v||'terkait'),u=s.toLowerCase();var m={uses:'memakai',experienced:'mengalami',investigated_by:'ditangani oleh',resolved_by:'diselesaikan oleh',explained_by:'dijelaskan oleh',created:'menghasilkan',targets:'menargetkan',impacts:'memengaruhi',supplied_by:'dipasok oleh',linked_to:'terkait dengan',has:'memiliki',relates_to:'terkait dengan'};return m[u]||s.replace(/_/g,' ')}
 function list(arr,fn,limit,msg){
  if(!Array.isArray(arr)||!arr.length)return empty(msg);
  return '<div class="v4-sf-list">'+arr.slice(0,limit||60).map(fn).join('')+'</div>';
@@ -3334,9 +3339,9 @@ function mount(n){
   86:'Cari Kaizen yang Mirip',87:'Project yang Perlu Perhatian',88:'Cerita SGA',89:'Hubungan Pengetahuan Perbaikan',90:'Riwayat Perbaikan'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-improvement-intel';sec.setAttribute('data-v4-imp-feature',String(n));
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PERBAIKAN & KAIZEN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===82?'DRAF SAJA':'HANYA LIHAT')+'</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PERBAIKAN & KAIZEN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===82?'Belum disimpan':'Tidak mengubah data')+'</span></div>'+
  intro(n)+controls(n)+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-imp-load="'+n+'"><i class="ph-bold '+(n===82?'ph-sparkle':'ph-arrows-clockwise')+'"></i> '+(n===82?'Buat Draf':'Muat Analisis')+'</button>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-imp-load="'+n+'"><i class="ph-bold '+(n===82?'ph-sparkle':'ph-arrows-clockwise')+'"></i> '+(n===82?'Buat draf Kaizen':'Tampilkan data')+'</button>'+
  '<button class="btn btn-sm" data-v4-open-existing="project-center"><i class="ph-bold ph-kanban"></i> Buka Project</button>'+
  (n===84||n===85||n===88?'<button class="btn btn-sm" data-v4-open-existing="knowledge"><i class="ph-bold ph-books"></i> Buka Pengetahuan</button>':'')+
  '</div><div data-v4-imp-out></div>';
@@ -3346,14 +3351,15 @@ function render81(d){
  var c=d.counts||{};
  return metrics([['Project',fmt(c.project,0)],['Kaizen',fmt(c.kaizen,0)],['SGA',fmt(c.sga,0)],['Masih terbuka',fmt(c.open,0)]])+
  list(d.opportunityRadar,function(x){
-  return item(x.machine||'Mesin','Kesehatan '+fmt(x.healthIndex,0)+' • Berulang '+fmt(x.recurring,0)+' • Waktu berhenti '+fmt(x.downtimeMinutes,0)+' menit • Belum selesai '+fmt(x.openIssues,0)+' • '+(x.reason||''),chip((x.priority||'P2')+' • '+(x.existingImprovementCoverage||'')));
+  return item(x.machine||'Mesin','Nilai kesehatan '+fmt(x.healthIndex,0)+' • Masalah berulang '+fmt(x.recurring,0)+' • Waktu berhenti '+fmt(x.downtimeMinutes,0)+' menit • Belum selesai '+fmt(x.openIssues,0)+' • '+(x.reason||''),chip(priorityLabel(x.priority)+' • '+coverageLabel(x.existingImprovementCoverage)));
  },50)+note('Nama mesin tidak ditemukan pada catatan perbaikan yang masih terbuka. Periksa ide serupa sebelum membuat catatan baru.','warn');
 }
 function aiHtml(d){
  d=d||{};
  var ev=Array.isArray(d.evidence)?d.evidence:[];
  var assumptions=Array.isArray(d.assumptions)?d.assumptions:[];
- return '<div class="v4-ai-result"><div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(d.mode||'OMODOS AI')+'</span><span>Tingkat keyakinan: '+esc(d.confidence||'belum tersedia')+'</span></div>'+
+ var mode={GENERATIVE_WITH_INTERNAL_EVIDENCE:'Draf dari Asisten OMODOS',DETERMINISTIC_FALLBACK:'Draf dari data tercatat'}[d.mode]||'Draf Asisten OMODOS';
+ return '<div class="v4-ai-result"><div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(mode)+'</span><span>Tingkat keyakinan: '+esc(d.confidence||'belum tersedia')+'</span></div>'+
  '<div class="v4-ai-answer">'+esc(first(d,['summary','answer'])||'Belum ada draft.').replace(/\n/g,'<br>')+'</div>'+
  (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi / batasan</strong><ul>'+assumptions.slice(0,8).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>':'')+
  metrics([['Bukti data',fmt(ev.length,0)],['Persetujuan manusia','Wajib'],['Perubahan data operasional','Tidak ada']])+
@@ -3369,7 +3375,7 @@ function render83(d){
  return list(d.benefitEvidence,function(x){
   var cost=(x.budget!=null&&String(x.budget)!=='')?'Budget '+x.budget:'Budget —';
   if(x.actualCost!=null&&String(x.actualCost)!=='')cost+=' • Actual '+x.actualCost;
-  return item(x.title||x.id||'Project','Status '+(x.status||'—')+' • '+cost+' • Bukti terisi '+fmt(x.evidenceFields,0)+'/'+fmt(x.totalEvidenceFields,0),chip(fmt(x.evidenceCoverage,0)+'% terisi'));
+  return item(x.title||x.id||'Proyek','Status '+statusLabel(x.status)+' • '+cost+' • Bukti terisi '+fmt(x.evidenceFields,0)+'/'+fmt(x.totalEvidenceFields,0),chip(fmt(x.evidenceCoverage,0)+'% bukti terisi'));
  },80)+note('Pemeriksaan ini hanya melihat apakah bagian laporan sudah diisi. Besarnya manfaat tetap perlu diperiksa.','warn');
 }
 function render84(d){
@@ -3379,14 +3385,14 @@ function render84(d){
   if(x.beforePhoto)evidence.push('Foto sebelum');
   if(x.afterPhoto)evidence.push('Foto sesudah');
   if(x.benefit)evidence.push('Manfaat');
-  return item(x.theme||x.id||'Kaizen',(x.date||'Tanggal —')+' • '+(x.machine||x.area||'')+' • '+evidence.join(', ')+' • Status '+(x.status||'—'),chip('Tercatat'));
+  return item(x.theme||x.id||'Kaizen',(x.date||'Tanggal —')+' • '+(x.machine||x.area||'')+' • '+evidence.join(', ')+' • Status '+statusLabel(x.status),chip('Bukti tercatat'));
  },80)+note('Foto ditampilkan sebagai bukti yang tercatat. Foto asli tidak diubah.','safe');
 }
 function render85(d){
  return list(d.ideaMarketplace,function(x){
-  var detail=(x.type||'Improvement')+' • '+(x.area||x.machine||'')+' • PIC '+(x.pic||'—')+' • Status '+(x.status||'—')+(x.progress!==''&&x.progress!=null?' • Progress '+x.progress:'');
+  var detail=typeLabel(x.type)+' • '+(x.area||x.machine||'')+' • PIC '+(x.pic||'—')+' • Status '+statusLabel(x.status)+(x.progress!==''&&x.progress!=null?' • Progres '+x.progress:'');
   var content=[x.problem?('Problem: '+x.problem):'',x.idea?('Idea: '+x.idea):''].filter(Boolean).join(' • ');
-  return item(x.title||x.id||x.type,detail+(content?' • '+content:''),chip('SUDAH ADA'));
+  return item(x.title||x.id||typeLabel(x.type),detail+(content?' • '+content:''),chip('Catatan sudah ada'));
  },100)+note('Ini adalah daftar ide perbaikan yang masih terbuka.','safe');
 }
 async function render86(sec){
@@ -3395,7 +3401,7 @@ async function render86(sec){
  var query=(m?m+' ':'')+q,d=await read('v4.findSimilarImprovement',{query:query});
  if(!d)return empty('Pencarian kemiripan belum tersedia.');
  return list(d.hits,function(x){
-  return item(x.title||x.type,(x.type||'')+' • '+(x.machine||x.area||'')+' • Status '+(x.status||'—'),chip('Kemiripan '+fmt(x.score,2)));
+  return item(x.title||typeLabel(x.type),typeLabel(x.type)+' • '+(x.machine||x.area||'')+' • Status '+statusLabel(x.status),chip(Math.round(Number(x.score||0)*100)+'% mirip'));
  },40,'Tidak ada kemiripan yang berarti dari teks saat ini.')+note(d.note||'Kemungkinan kemiripan tetap perlu diperiksa manusia.','warn');
 }
 function render87(d){
@@ -3406,16 +3412,16 @@ function render87(d){
   var due=first(r,['Target Finish','Due Date','Deadline'])||'Due date tercatat';
   var status=first(r,['Status'])||'OPEN';
   var pic=first(r,['PIC','Project Leader'])||'PIC —';
-  return item(title,'Target '+due+' • '+pic,chip(status+' • TERLAMBAT'));
+  return item(title,'Target '+due+' • '+pic,chip(statusLabel(status)+' • Terlambat'));
  },60,'Tidak ada project terlambat berdasarkan tanggal target yang tercatat.')+
  note('Proyek ditandai terlambat jika tanggal target lewat dan statusnya belum selesai. Dampaknya perlu dinilai petugas.','safe');
 }
 function render88(d){
  return list(d.sgaStories,function(x){
   var team=x.team||'SGA';
-  var members=x.members?' • Members '+x.members:'';
-  var result=x.result||x.achievement||'Hasil/Achievement belum tercatat';
-  return item((x.theme||'Tema belum tercatat')+' — '+team,'Ketua '+(x.leader||'—')+members+' • Target '+(x.target||'—')+' • Progres '+(x.progress||'—')+' • '+result,chip(x.status||'Tercatat'));
+  var members=x.members?' • Anggota '+x.members:'';
+  var result=x.result||x.achievement||'Hasil belum tercatat';
+  return item((x.theme||'Tema belum tercatat')+' — '+team,'Ketua '+(x.leader||'—')+members+' • Target '+(x.target||'—')+' • Progres '+(x.progress||'—')+' • Hasil: '+result,chip(statusLabel(x.status||'Tercatat')));
  },80)+note('Ringkasan hanya memakai hasil yang benar-benar dicatat; bagian kosong tidak dianggap berhasil.','safe');
 }
 async function render89(){
@@ -3433,12 +3439,12 @@ async function render89(){
  ])+
  list(top,function(e){
   var from=nodes.find(function(n){return n.id===e.from}),to=nodes.find(function(n){return n.id===e.to});
-  return item((from&&from.label||e.from)+' → '+(to&&to.label||e.to),e.relation||'terkait',chip('HUBUNGAN DATA'));
+  return item((from&&from.label||e.from)+' → '+(to&&to.label||e.to),relationLabel(e.relation),chip('Data terkait'));
  },80)+note('Peta ini menghubungkan catatan yang sudah ada sejak 1 September 2026.','safe');
 }
 function render90(d){
  return list(d.improvementLegacy,function(x){
-  return item(String(x.year||'Tidak diketahui'),'Project '+fmt(x.projects,0)+' • Kaizen '+fmt(x.kaizen,0)+' • SGA '+fmt(x.sga,0)+' • Selesai '+fmt(x.completed,0),chip(fmt((x.records||[]).length,0)+' contoh catatan'));
+  return item(String(x.year||'Tidak diketahui'),'Proyek '+fmt(x.projects,0)+' • Kaizen '+fmt(x.kaizen,0)+' • SGA '+fmt(x.sga,0)+' • Selesai '+fmt(x.completed,0),chip(fmt((x.records||[]).length,0)+' contoh catatan'));
  },40)+note('Riwayat dikelompokkan per tahun dari tanggal yang tersedia. Ini bukan peringkat orang atau tim.','safe');
 }
 async function load(btn,n){
