@@ -9219,8 +9219,53 @@ function createBackend(services, env = {}) {
       if (q.length > 4e3) throw { code: "VALIDATION_ERROR", message: "query terlalu panjang" };
       var allowedPurpose = ["ask", "machine", "shift", "morning-brief", "rca-draft", "kaizen-draft", "troubleshooting", "manual", "translate", "skeptic"];
       body.purpose = allowedPurpose.indexOf(String(body.purpose || "ask")) >= 0 ? String(body.purpose || "ask") : "ask";
-      var ev = JSON.parse(OMODOS4.dispatch({ action: "v4.ask", query: q, machine: body.machine || "", since: body.since, until: body.until }).getContent());
-      body._v4Evidence = ev && ev.ok ? ev.data : { query: q, evidence: [], confidence: "low", answer: "Belum ditemukan evidence internal." };
+      if (body.purpose === "translate") {
+        body._v4Evidence = {
+          query: q,
+          evidence: [],
+          confidence: "not-applicable",
+          answer: "Layanan terjemahan membutuhkan model bahasa. Data internal OMODOS sengaja tidak digunakan untuk fitur ini.",
+          assumptions: ["Terjemahan hanya memakai teks yang dimasukkan pengguna; tidak mencari Logbook, mesin, sparepart, KPI, atau data internal lain."],
+          recommendation: "Periksa kembali istilah yang menyangkut keselamatan, spesifikasi, atau nama komponen."
+        };
+      } else if (body.purpose === "manual") {
+        var manualMachine = String(body.machine || "").trim();
+        if (!manualMachine) throw { code: "VALIDATION_ERROR", message: "machine wajib untuk Tanya Manual" };
+        var passportRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getMachinePassport", machine: manualMachine }).getContent());
+        var passport = passportRes && passportRes.ok && passportRes.data ? passportRes.data : null;
+        var manualEvidence = [];
+        if (passport && passport.knowledge) {
+          var manual = passport.knowledge.manual || {};
+          if (manual.manualPdf || manual.reference || manual.sourceNote) {
+            manualEvidence.push({
+              sheet: "Master_Mesin",
+              score: 10,
+              machine: manualMachine,
+              record: {
+                "Nama Mesin": passport.identity && (passport.identity["Nama Mesin"] || passport.identity.name) || manualMachine,
+                "Manual PDF URL": manual.manualPdf || "",
+                "Link Manual/Referensi": manual.reference || "",
+                "Keterangan Sumber": manual.sourceNote || ""
+              }
+            });
+          }
+          (Array.isArray(passport.knowledge.kb) ? passport.knowledge.kb : []).slice(0, 12).forEach(function(record) {
+            manualEvidence.push({ sheet: "Knowledge_Base", score: 8, machine: manualMachine, record: record });
+          });
+        }
+        body._v4Evidence = {
+          query: q,
+          machine: manualMachine,
+          evidence: manualEvidence.slice(0, 12),
+          confidence: manualEvidence.length ? "medium" : "low",
+          answer: manualEvidence.length ? "Ditemukan referensi manual/pengetahuan untuk mesin " + manualMachine + ". Isi dokumen yang hanya berupa tautan belum dianggap telah dibaca." : "Belum ditemukan referensi manual atau pengetahuan untuk mesin " + manualMachine + ".",
+          assumptions: ["Bukti dibatasi ke manual metadata dan Knowledge Base mesin terpilih.", "Tautan PDF/referensi bukan bukti bahwa isi dokumen sudah dibaca oleh model."],
+          recommendation: "Bandingkan jawaban dengan manual atau artikel pengetahuan sumber sebelum mengikuti prosedur."
+        };
+      } else {
+        var ev = JSON.parse(OMODOS4.dispatch({ action: "v4.ask", query: q, machine: body.machine || "", since: body.since, until: body.until }).getContent());
+        body._v4Evidence = ev && ev.ok ? ev.data : { query: q, evidence: [], confidence: "low", answer: "Belum ditemukan evidence internal." };
+      }
     }
     checkRateLimit_(body.action, body.actor);
     return body;
