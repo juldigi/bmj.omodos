@@ -100,16 +100,16 @@ var SIMPLE_FEATURE = {
  29:{name:'Urutan Kunjungan Mesin',help:'Lihat mesin mana yang sebaiknya didatangi lebih dulu berdasarkan prioritas data.'},
  30:{name:'Status Antrean Offline',help:'Lihat kiriman Logbook yang masih tersimpan di perangkat dan menunggu sinkronisasi saat koneksi kembali.'},
 
- 31:{name:'Tingkat Penting Sparepart',help:'Lihat sparepart mana yang paling penting untuk diperhatikan.'},
- 32:{name:'Risiko Stok Habis',help:'Lihat sparepart yang berisiko habis.'},
- 33:{name:'Sparepart Tidak Terpakai',help:'Cari sparepart yang lama tidak terlihat dipakai.'},
+ 31:{name:'Prioritas Perhatian Sparepart',help:'Lihat sparepart yang perlu diperiksa lebih dulu berdasarkan pemakaian, stok, ETA, dan mesin terkait.'},
+ 32:{name:'Stok Habis atau Menipis',help:'Lihat sparepart yang benar-benar tercatat habis atau sudah mencapai batas stok minimum.'},
+ 33:{name:'Belum Tercatat Dipakai',help:'Lihat sparepart yang masih punya stok tetapi belum ditemukan pemakaiannya pada Logbook yang tersedia.'},
  34:{name:'Pemakaian Sparepart',help:'Lihat sparepart yang paling sering digunakan.'},
  35:{name:'Mesin & Sparepart Terkait',help:'Lihat sparepart yang tercatat terkait dengan mesin.'},
- 36:{name:'Cari Sparepart Pengganti',help:'Cari kandidat sparepart pengganti untuk ditinjau manusia.'},
+ 36:{name:'Pengganti Sparepart yang Tercatat',help:'Lihat alternatif atau pengganti yang memang sudah tercatat di data sparepart untuk diperiksa Engineering.'},
  37:{name:'Foto Referensi Sparepart',help:'Lihat foto referensi sparepart yang sudah tercatat tanpa menebak isi foto.'},
  38:{name:'Lokasi Sparepart',help:'Lihat lokasi atau rak sparepart yang sudah tercatat.'},
  39:{name:'Perkiraan Frekuensi Kebutuhan Sparepart',help:'Lihat perkiraan seberapa sering sparepart mungkin dibutuhkan berdasarkan catatan pemakaian yang valid.'},
- 40:{name:'Urutan Pembelian Sparepart',help:'Lihat sparepart mana yang perlu dibeli lebih dulu.'},
+ 40:{name:'Prioritas Pembelian Sparepart',help:'Lihat sparepart yang lebih mendesak untuk proses pembelian berdasarkan stok, ETA, dan tingkat perhatian datanya.'},
 
  41:{name:'Ringkasan Keandalan',help:'Lihat gambaran umum keandalan mesin.'},
  42:{name:'Mesin yang Sering Bermasalah',help:'Lihat mesin dengan masalah terbanyak atau berulang.'},
@@ -2013,9 +2013,9 @@ function factors(f){
  f=f||{};var p=[];
  if(f.consumptionCount!=null)p.push('Konsumsi '+f.consumptionCount);
  if(f.machines!=null)p.push('Mesin '+f.machines);
- if(f.criticalMachineCount)p.push('Mesin kritis '+f.criticalMachineCount);
- if(f.stockout)p.push('STOCKOUT');
- else if(f.stockRisk)p.push('Stock ≤ minimum');
+ if(f.criticalMachineCount)p.push('Mesin perlu perhatian '+f.criticalMachineCount);
+ if(f.stockout)p.push('Stok habis');
+ else if(f.stockRisk)p.push('Stok mencapai batas minimum');
  if(f.etaOverdue)p.push('ETA terlambat');
  return p.join(' • ')||'Bukti sparepart yang tersedia';
 }
@@ -2032,9 +2032,13 @@ function rows(list,renderer,limit){
 function item(title,sub,right){
  return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
 }
+function priorityText(v){
+ var p=String(v||'P3').toUpperCase();
+ return {P0:'Sangat mendesak',P1:'Perlu segera',P2:'Perlu dipantau',P3:'Belum mendesak'}[p]||p;
+}
 function priorityBadge(x){
  var p=x&&x.priority||'P3';
- return '<span class="v4-risk-chip">'+esc(p)+(x&&x.criticalityScore!=null?' • '+esc(x.criticalityScore):'')+'</span>';
+ return '<span class="v4-risk-chip">'+esc(priorityText(p))+(x&&x.criticalityScore!=null?' • nilai perhatian '+esc(x.criticalityScore):'')+'</span>';
 }
 function machineOptions(data){
  var set=new Set();
@@ -2047,8 +2051,8 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-sparepart-intel');if(old)old.remove();
  var titles={
- 31:'Tingkat Penting Sparepart',32:'Risiko Stok Habis',33:'Sparepart Tidak Terpakai',34:'Pemakaian Sparepart',35:'Mesin & Sparepart Terkait',
- 36:'Cari Sparepart Pengganti',37:'Foto Referensi Sparepart',38:'Lokasi Sparepart',39:'Perkiraan Frekuensi Kebutuhan Sparepart',40:'Urutan Pembelian Sparepart'
+ 31:'Prioritas Perhatian Sparepart',32:'Stok Habis atau Menipis',33:'Belum Tercatat Dipakai',34:'Pemakaian Sparepart',35:'Mesin & Sparepart Terkait',
+ 36:'Pengganti Sparepart yang Tercatat',37:'Foto Referensi Sparepart',38:'Lokasi Sparepart',39:'Perkiraan Frekuensi Kebutuhan Sparepart',40:'Prioritas Pembelian Sparepart'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-sparepart-intel';sec.dataset.v4SpFeature=String(n);
  var controls='';
@@ -2070,19 +2074,19 @@ async function getData(force){
 function renderCritical(data){
  return rows(data.criticalityMatrix,function(x){
   return item(partName(x),partNo(x)+' • '+factors(x.factors),priorityBadge(x));
- },60)+note('Nilai tingkat penting dihitung dari aturan dan bukti data yang tersedia. Nilai ini membantu menentukan urutan pemeriksaan, bukan keputusan pembelian otomatis.','safe');
+ },60)+note('Nilai perhatian menggabungkan catatan pemakaian, jumlah mesin terkait, kondisi stok, ETA, dan mesin yang perlu perhatian. Ini bukan klasifikasi criticality Engineering dan bukan keputusan pembelian otomatis.','safe');
 }
 function renderStockout(data){
- var list=(data.risks||[]).filter(function(x){return ['stockout','stock-risk','eta-overdue'].includes(String(x.type||''))});
+ var list=(data.risks||[]).filter(function(x){return ['stockout','stock-risk'].includes(String(x.type||''))});
  return rows(list,function(x){
-  var label=x.type==='stockout'?'STOK HABIS':x.type==='stock-risk'?'STOK MENIPIS':'ETA TERLAMBAT';
-  return item(partName(x),partNo(x)+' • '+factors(x.factors),'<span class="v4-risk-chip">'+esc(label)+' • '+esc(x.score==null?'—':x.score)+'</span>');
- },60)+note('Daftar hanya menandai stok minimum, stok habis, atau ETA terlambat yang benar-benar tercatat.','safe');
+  var label=x.type==='stockout'?'STOK HABIS':'STOK MENIPIS';
+  return item(partName(x),partNo(x)+' • '+factors(x.factors),'<span class="v4-risk-chip">'+esc(label)+'</span>');
+ },60)+note('Fitur ini hanya menampilkan kondisi stok: habis atau sudah mencapai batas minimum yang tercatat. ETA terlambat dipisahkan ke Prioritas Pembelian Sparepart.','safe');
 }
 function renderDead(data){
  return rows(data.deadStockCandidates,function(x){
   return item(partName(x),partNo(x)+' • '+(x.reason||'Kandidat untuk diperiksa'),'<span class="v4-risk-chip">KANDIDAT</span>');
- },60)+note('Daftar ini hanya menunjukkan kandidat sparepart yang tampak tidak terpakai. Periksa riwayat, kebutuhan engineering, dan reservasi sebelum mengambil keputusan.','warn');
+ },60)+note('Artinya hanya: masih ada stok positif tetapi belum ditemukan pemakaian yang terhubung secara tepat pada Logbook yang tersedia. Ini bukan bukti bahwa sparepart benar-benar tidak diperlukan.','warn');
 }
 function renderConsumption(data){
  return rows(data.consumptionTop,function(x){
@@ -2106,8 +2110,8 @@ function renderEquivalent(data,sec){
   return !q||[x.material,x.materialNumber,x.recordedEquivalent].some(function(v){return String(v||'').toLowerCase().includes(q)});
  });
  return rows(list,function(x){
-  return item(partName(x)+' → '+(x.recordedEquivalent||'—'),partNo(x)+' • '+(x.validation||'perlu konfirmasi engineering'),'<span class="v4-risk-chip">PERIKSA</span>');
- },60)+note('Hanya kandidat pengganti yang memiliki sumber tercatat yang ditampilkan. Engineering tetap wajib memeriksa sebelum substitusi.','warn');
+  return item(partName(x)+' → '+(x.recordedEquivalent||'—'),partNo(x)+' • Alternatif tercatat • perlu konfirmasi Engineering','<span class="v4-risk-chip">PERLU KONFIRMASI</span>');
+ },60)+note('OMODOS tidak mencari pengganti baru dan tidak menebak kecocokan part. Hanya field alternatif/pengganti yang sudah tercatat yang ditampilkan. Engineering tetap wajib memeriksa sebelum substitusi.','warn');
 }
 function renderPhoto(data){
  var list=Array.isArray(data.partPhotoAssets)?data.partPhotoAssets:[];
@@ -2136,8 +2140,8 @@ function renderReservation(data){
 }
 function renderUrgency(data){
  return rows(data.procurementUrgency,function(x){
-  return item(partName(x),partNo(x)+' • '+factors(x.factors),'<span class="v4-risk-chip">'+esc(x.priority)+' • '+esc(x.score)+'</span>');
- },60)+note('Urutan pembelian disusun dari tingkat penting, stok, dan ETA yang tercatat. Persetujuan pembelian tetap mengikuti proses yang berlaku.','warn');
+  return item(partName(x),partNo(x)+' • '+factors(x.factors),'<span class="v4-risk-chip">'+esc(priorityText(x.priority))+' • nilai perhatian '+esc(x.score==null?'—':x.score)+'</span>');
+ },60)+note('Prioritas ini membantu melihat sparepart yang lebih mendesak karena stok, ETA, dan bukti pemakaian. Ini bukan purchase order dan tidak menggantikan persetujuan pembelian yang berlaku.','warn');
 }
 function render(n,data,sec){
  if(!data)return empty('Daftar belum dapat dimuat. Coba lagi setelah masuk kembali.');
