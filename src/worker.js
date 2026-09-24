@@ -416,7 +416,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       startAt: SOURCE_TRUTH_START_ISO,
       timezone: SOURCE_TRUTH_TIMEZONE,
       historicalRule: "Analisis historis OMODOS 4.0 hanya memakai record bertanggal/periode mulai 1 September 2026. Knowledge Base tanpa tanggal atau sebelum cutoff tidak dipakai sebagai bukti V4.",
-      referenceRule: "Master/current-state seperti mesin, stok, lokasi sparepart, template Patrol, personel master, Knowledge Base dan standar kompetensi tetap dipakai sebagai referensi kondisi saat ini."
+      referenceRule: "Master/current-state yang tidak bersifat historis seperti mesin, stok, lokasi sparepart, template Patrol, personel master, dan standar kompetensi tetap dipakai sebagai referensi kondisi saat ini. Knowledge Base dan data historis lain tetap mengikuti batas tanggal bila dipakai sebagai bukti OMODOS 4.0."
     };
   }
   __name(sourceTruthInfo, "sourceTruthInfo");
