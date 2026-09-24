@@ -2618,16 +2618,17 @@ function render53(d){
 }
 function render55(d){
  var c=d.maintenanceProductionCorrelation||{};
- if(typeof c.pearson!=='number')return empty('Data maintenance–production belum cukup untuk korelasi.')+note('Minimal perlu periode berpasangan breakdown dan good output.','safe');
+ if(typeof c.pearson!=='number')return empty('Data gangguan dan hasil produksi belum cukup untuk dibandingkan.')+note('Minimal perlu beberapa periode yang memiliki angka jam gangguan dan hasil baik.','safe');
  return metrics([
-  ['Periode yang bisa dibandingkan',fmt(c.pairs,0)],['Kekuatan hubungan (Pearson r)',fmt(c.pearson,3)],['Data 1','Jam breakdown'],['Data 2','Good output']
- ])+note('Nilai mendekati +1 berarti keduanya cenderung bergerak searah; mendekati -1 berlawanan; mendekati 0 berarti hubungan linear lemah. Ini tetap bukan bukti sebab-akibat dan hasil dengan sedikit periode perlu dibaca hati-hati.','warn');
+  ['Periode yang bisa dibandingkan',fmt(c.pairs,0)],['Nilai hubungan (-1 sampai +1)',fmt(c.pearson,3)],['Data 1','Jam gangguan'],['Data 2','Hasil baik']
+ ])+note('Mendekati +1: keduanya cenderung naik/turun bersama. Mendekati -1: arahnya cenderung berlawanan. Mendekati 0: hubungannya lemah. Angka ini tidak membuktikan sebab-akibat.','warn');
 }
 function render56(d){
  return list(d.energyAnomalies,function(x){
-  return item((x.area||'Area')+' • '+(x.type||'Energi'), 'Nilai '+fmt(x.value)+' • rata-rata kelompok '+fmt(x.baselineMean),chip('Jarak pola '+fmt(x.zScore,2)+'σ'));
- },60,'Tidak ditemukan nilai energi yang berjarak sekurangnya 2 standar deviasi dari rata-rata kelompoknya.')+
- note('Fitur ini hanya menandai nilai yang jauh dari pola statistik area dan jenis yang sama. Nilai yang jauh belum tentu salah atau boros; petugas tetap perlu memeriksa penyebabnya.','safe');
+  var distance=Math.abs(Number(x.zScore));
+  return item((x.area||'Area')+' • '+(x.type||'Energi'), 'Nilai '+fmt(x.value)+' • rata-rata kelompok '+fmt(x.baselineMean),chip('Tingkat perbedaan '+fmt(distance,2)));
+ },60,'Tidak ditemukan pemakaian energi yang sangat jauh dari pola kelompoknya.')+
+ note('Sistem membandingkan angka dengan pola area dan jenis energi yang sama. Tanda ini hanya membantu memilih data yang perlu diperiksa; bukan bukti bahwa pemakaian salah atau boros.','safe');
 }
 function render57(d){
  return list(d.energyPerGoodOutput,function(x){
@@ -3536,7 +3537,11 @@ function item(title,sub,right){
  return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
 }
 function priorityLabel(v){var u=String(v||'').toUpperCase();return u==='P0'?'Sangat mendesak':u==='P1'?'Perlu ditinjau':u==='P2'?'Terjadwal':u==='P3'?'Rendah':String(v||'Periksa')}
-function statusLabel(v){var s=String(v||'').trim(),u=s.toUpperCase();var m={OPEN:'Terbuka',CLOSED:'Selesai',COMPLETED:'Selesai',DONE:'Selesai',MONITORING:'Dipantau',NORMAL:'Normal',OK:'Normal',DERIVED:'Dihitung dari data'};return m[u]||s||'Tercatat'}
+function statusLabel(v){var s=String(v||'').trim(),u=s.toUpperCase();var m={OPEN:'Terbuka',CLOSED:'Selesai',COMPLETED:'Selesai',DONE:'Selesai',MONITORING:'Dipantau',NORMAL:'Normal',OK:'Normal',DERIVED:'Dihitung dari data',RECORDED:'Tercatat','NOT AVAILABLE':'Belum tersedia','LAST_RECORDED_EVENT_CLOSED':'Catatan terakhir selesai','LAST_RECORDED_EVENT_OPEN':'Catatan terakhir masih terbuka'};return m[u]||s.replace(/_/g,' ')||'Tercatat'}
+function confidenceLabel(v){var u=String(v||'').trim().toUpperCase();return {HIGH:'Kuat',MEDIUM:'Sedang','LOW-MEDIUM':'Terbatas',LOW:'Rendah'}[u]||String(v||'—')}
+function periodLabel(v){var u=String(v||'').trim().toUpperCase();return {TODAY:'Hari ini',YESTERDAY:'Kemarin',PREVIOUS_SHIFT:'Shift sebelumnya',PREVIOUS_LOGIN:'Sejak login sebelumnya',CUSTOM:'Periode dipilih',SELECTED:'Periode dipilih',PILIHAN:'Periode dipilih'}[u]||String(v||'Periode dipilih').replace(/_/g,' ')}
+function categoryLabel(v){var u=String(v||'').trim().toLowerCase();return {machine:'Mesin',logbook:'Logbook',breakdown:'Gangguan mesin',predictive:'Temuan prediktif',sparepart:'Sparepart',kpi:'KPI',project:'Proyek',people:'Teknisi',energy:'Energi',ipal:'IPAL'}[u]||String(v||'Data').replace(/_/g,' ')}
+function plainBriefText(v){return String(v||'').replace(/P0\/P1/g,'prioritas sangat mendesak / perlu ditinjau')}
 function relationLabel(v){var s=String(v||'terkait'),u=s.toLowerCase();var m={uses:'memakai',experienced:'mengalami',investigated_by:'ditangani oleh',resolved_by:'diselesaikan oleh',explained_by:'dijelaskan oleh',created:'menghasilkan',targets:'menargetkan',impacts:'memengaruhi',supplied_by:'dipasok oleh',linked_to:'terkait dengan',has:'memiliki',relates_to:'terkait dengan'};return m[u]||s.replace(/_/g,' ')}
 function sourceLabel(v){var s=String(v||'Sumber OMODOS');var m={Logbook:'Logbook',Breakdown:'Gangguan mesin',Predictive:'Temuan prediktif',RCA:'RCA',Corrective:'Tindakan perbaikan',Project:'Proyek',Kaizen:'Kaizen',SGA:'SGA',Knowledge:'Pengetahuan',Sparepart:'Sparepart',KPI:'KPI'};return m[s]||s.replace(/_/g,' ')}
 function list(arr,fn,limit,msg){
@@ -3676,10 +3681,10 @@ function changePayload(sec){
 function render93(d){
  if(!d)return empty('Data perubahan belum tersedia.');
  var cats=d.categories||[];
- return metrics([['Kategori berubah',fmt(cats.length,0)],['Periode',first(d.range||{},['preset'])||'PILIHAN'],['Shift',first(d.range||{},['shift'])||'—']])+
+ return metrics([['Kategori berubah',fmt(cats.length,0)],['Periode',periodLabel(first(d.range||{},['preset'])||'PILIHAN')],['Shift',first(d.range||{},['shift'])||'—']])+
  list(cats,function(x){
   var latest=Array.isArray(x.latest)?x.latest.length:0;
-  return item(x.category||sourceLabel(x.sheet),sourceLabel(x.sheet)+' • Contoh terbaru '+latest,chip(fmt(x.count,0)+' catatan'));
+  return item(categoryLabel(x.category||sourceLabel(x.sheet)),sourceLabel(x.sheet)+' • Contoh terbaru '+latest,chip(fmt(x.count,0)+' catatan'));
  },30)+note('Jumlah berasal dari catatan pada periode yang dipilih. Kategori kosong tidak ditampilkan.','safe');
 }
 function timePayload(sec){
@@ -3699,7 +3704,7 @@ function render94(d){
  var s=d.snapshots||{},m=d.machineStatus||{},a=d.activeProblems||{},down=d.downtime||{};
  return metrics([
   ['Waktu',String(d.at||'—').replace('T',' ').slice(0,16)],['Logbook',fmt(snapshotCount(s.logbook),0)],['Gangguan',fmt(snapshotCount(s.breakdown),0)],
-  ['Prediktif',fmt(snapshotCount(s.predictive),0)],['Project',fmt(snapshotCount(s.project),0)],['Masalah aktif',fmt((a.records||[]).length,0)],
+  ['Prediktif',fmt(snapshotCount(s.predictive),0)],['Proyek',fmt(snapshotCount(s.project),0)],['Masalah aktif',fmt((a.records||[]).length,0)],
   ['Kondisi mesin dari catatan',fmt((m.records||[]).length,0)],['Waktu berhenti',down.label==='NOT AVAILABLE'?'—':fmt(down.totalMinutes,0)+' menit']
  ])+
  list(m.records,function(x){
@@ -3750,8 +3755,8 @@ function render99(d){
 function briefBlock(b){
  if(!b)return '';
  var sum=Array.isArray(b.summary)?b.summary:[];
- return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Ringkasan Singkat</strong><span>Tingkat keyakinan: '+esc(b.confidence||'')+'</span></div>'+
- (sum.length?'<div class="v4-sf-list">'+sum.map(function(x){return item(x,'',chip('Ringkasan'))}).join('')+'</div>':empty('Ringkasan belum tersedia.'))+'</section>';
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Ringkasan Singkat</strong><span>Tingkat keyakinan: '+esc(confidenceLabel(b.confidence))+'</span></div>'+
+ (sum.length?'<div class="v4-sf-list">'+sum.map(function(x){return item(plainBriefText(x),'',chip('Ringkasan'))}).join('')+'</div>':empty('Ringkasan belum tersedia.'))+'</section>';
 }
 function render100(g,o,b){
  var brain=graphSummary(g,'Ringkasan besar OMODOS membantu membaca data; seluruh hubungan tetap dihitung dari data yang sudah ada.');
