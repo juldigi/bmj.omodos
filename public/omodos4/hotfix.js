@@ -76,7 +76,7 @@ var SIMPLE_FEATURE = {
   7:{name:'Kebiasaan Mesin',help:'Lihat pola masalah yang sering muncul pada mesin.'},
   8:{name:'Perubahan Kondisi Mesin',help:'Lihat perubahan kondisi mesin dari waktu ke waktu.'},
   9:{name:'Putar Ulang Kejadian Mesin',help:'Lihat kembali urutan kejadian yang pernah tercatat.'},
- 10:{name:'Ruang Mesin Virtual',help:'Lihat hubungan informasi penting tiap mesin.'},
+ 10:{name:'Pusat Informasi Mesin',help:'Lihat kondisi penting dan hubungan data untuk satu mesin dalam satu tempat.'},
 
  11:{name:'Risiko Kerusakan',help:'Lihat mesin yang punya tanda risiko dan perlu dicek.'},
  12:{name:'Peringatan Dini',help:'Lihat tanda masalah sebelum menjadi gangguan lebih besar.'},
@@ -675,20 +675,9 @@ function renderFeature(n){
  ACTIVE_WORKSPACE=f.wi;ACTIVE_FEATURE=f.n;setActiveNav(f.wi);
  var s=stage(),view=document.getElementById('view-omodos4');if(!s||!view)return false;
  view.classList.add('v4-master-active','v4-safe-module-open','v4-feature-open','v4-low-cognitive');view.classList.remove('v4-show-technical');
+ // Shell only. Dedicated feature modules 1–100 populate .v4-detail-body after the card opens.
+ // This avoids showing the old generic preview underneath the specific feature UI.
  var body='';
- if(f.n===1)body=renderMachinePassport(f);
- else if(f.n===6)body=renderFailureMemory();
- else if(f.n===11||f.n===12||f.n===20)body=renderRiskRadar();
- else if(f.n===31||f.n===32||f.n===34||f.n===40)body=renderSpareCritical();
- else if(f.n===41||f.n===42||f.n===43||f.n===44||f.n===46)body=renderReliability();
- else if(f.n>=61&&f.n<=70)body=renderPeople();
- else if(f.n>=71&&f.n<=80)body=renderAiBrief()+genericEvidence(f);
- else if(f.n>=81&&f.n<=90)body=renderImprovement();
- else if(f.n===93)body=renderWhatChanged();
- else if(f.n===94)body=renderTimeMachine();
- else if(f.n===96||f.n===100)body=renderBrain();
- else if(f.n===98)body=renderWarRoom();
- else body=genericEvidence(f);
  s.innerHTML='<div class="v4-card v4-detail-card">'+
   '<div class="v4-module-head"><div><div class="v4-simple-kicker">'+esc(simpleWs.name)+' • Fitur '+String(f.n).padStart(3,'0')+'</div>'+
   '<h2>'+esc(info.name)+'</h2><p>'+esc(info.help)+'</p><div class="v4-tech-name">Nama teknis: '+esc(f.name)+'</div></div>'+
@@ -1539,11 +1528,9 @@ async function updateWar(btn,id){
 }
 function mountFor(n){
  n=Number(n);
- if(AI_CONFIG[n])mountAi(n);
- else if(n===78)mountKnowledgeHarvest(n);
- else if(n===63)mountExpert();
- else if(n===64)mountExperience();
- else if(n===97)mountScenario();
+ // 63/64 are owned by People Intelligence V1; 71–80 by AI Intelligence V2.
+ // Keep only the interaction flows that do not have a newer dedicated renderer.
+ if(n===97)mountScenario();
  else if(n===98)mountWarRoom();
 }
 document.addEventListener('click',function(e){
@@ -2663,7 +2650,7 @@ async function getPeople(force){
 }
 function mount(n){
  var h=host();if(!h||!openN(n))return;
- var old=h.querySelector('.v4-people-intel');if(old)old.remove();
+ Array.from(h.querySelectorAll('.v4-interaction[data-v4-interaction-feature="'+n+'"],.v4-people-intel')).forEach(function(x){x.remove()});
  var titles={
   61:'Peta Keahlian Teknisi',62:'Teknisi & Mesin yang Dikuasai',63:'Cari Orang Berpengalaman',64:'Riwayat Pengalaman Teknisi',65:'Risiko Hilangnya Pengetahuan',
   66:'Keahlian yang Perlu Dipelajari',67:'Saran Belajar',68:'Cari Mentor',69:'Latihan Cari Masalah',70:'Bukti Kompetensi'
@@ -3577,6 +3564,16 @@ function dateText(v){
  if(!v)return '—';
  var d=new Date(v);return Number.isNaN(d.getTime())?esc(v):d.toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
 }
+function riskText(v){
+ var s=String(v==null?'':v).trim(),u=s.toUpperCase();
+ var m={CRITICAL:'Kritis',HIGH:'Tinggi',MEDIUM:'Sedang',LOW:'Rendah',NORMAL:'Normal',OK:'Normal'};
+ return m[u]||s||'—';
+}
+function confidenceText(v){
+ var s=String(v==null?'':v).trim(),u=s.toUpperCase();
+ var m={HIGH:'Kuat',MEDIUM:'Sedang',LOW:'Terbatas',VERY_LOW:'Sangat terbatas'};
+ return m[u]||s||'—';
+}
 function first(o,keys){
  if(!o||typeof o!=='object')return '';
  for(var i=0;i<keys.length;i++){var v=o[keys[i]];if(v!=null&&String(v).trim())return v}
@@ -3610,7 +3607,7 @@ function read(action,payload){
 function machineRequired(n){return [1,3,4,5,6,7,8,9,10].indexOf(n)>=0}
 function actionFor(n){
  if(n===2)return 'v4.getMachineHealth';
- if(n===3||n===10)return 'v4.getMachineGraph';
+ if(n===3)return 'v4.getMachineGraph';
  if(n===6)return 'v4.getFailureMemory';
  if(n>=11&&n<=20)return 'v4.getPredictiveRisk';
  return 'v4.getMachinePassport';
@@ -3626,7 +3623,7 @@ function intro(n){
  7:'Merangkum pola masalah yang paling sering tercatat pada mesin.',
  8:'Membandingkan tekanan historis mesin per bulan: kejadian, gangguan, waktu berhenti, masalah terbuka, dan temuan prediktif.',
  9:'Menyusun ulang urutan kejadian mesin dari catatan Logbook, Breakdown, Predictive, RCA, dan Corrective.',
- 10:'Menampilkan peta hubungan data di sekitar satu mesin agar sumber informasi yang saling terkait mudah ditemukan.',
+ 10:'Menggabungkan kondisi terkini, masalah terbuka, dan hubungan data untuk satu mesin dalam satu tempat.',
  11:'Mengurutkan mesin berdasarkan sinyal risiko berbasis data yang tersedia. Ini bukan probabilitas kerusakan.',
  12:'Menampilkan mesin yang perlu diperiksa lebih dulu berdasarkan sinyal risiko dan bukti masalah.',
  13:'Mencari temuan predictive yang pernah muncul sebelum gangguan pada mesin yang sama.',
@@ -3672,7 +3669,7 @@ function machineHtml(n,d){
  if(n===1){
   var c=d.currentCondition||{},r=d.reliability||{},id=d.identity||{},open=Array.isArray(c.openIssues)?c.openIssues:[];
   return metrics([
-   metric('Nilai kesehatan',c.healthIndex==null?'Belum tersedia':fmt(c.healthIndex,0)+'/100',c.currentRisk||''),
+   metric('Nilai kesehatan',c.healthIndex==null?'Belum tersedia':fmt(c.healthIndex,0)+'/100',riskText(c.currentRisk)),
    metric('Gangguan tercatat',fmt(r.failureCount,0),'Riwayat gangguan'),
    metric('Waktu berhenti',fmt(r.downtimeMinutes,0)+' menit','Dari catatan yang tersedia'),
    metric('Masalah belum selesai',open.length,'Perlu diperiksa')
@@ -3684,7 +3681,7 @@ function machineHtml(n,d){
   var ms=Array.isArray(d.machines)?d.machines:[];
   return list(ms,function(x){return item(x.code||x.name||x.key||'Mesin','Gangguan '+fmt(x.breakdowns,0)+' • waktu berhenti '+fmt(x.downtimeMinutes,0)+' menit • belum selesai '+fmt(x.openIssues,0),fmt(x.healthIndex,0)+'/100')},'Belum ada mesin yang dapat dihitung nilai kesehatannya.',40);
  }
- if(n===3||n===10){
+ if(n===3){
   var nodes=Array.isArray(d.nodes)?d.nodes:[],edges=Array.isArray(d.edges)?d.edges:[];
   var counts={};nodes.forEach(function(x){var t=x.type||'lainnya';counts[t]=(counts[t]||0)+1});
   return metrics([metric('Titik data',nodes.length,'Data yang terhubung'),metric('Hubungan',edges.length,'Koneksi antar data'),metric('Jenis data',Object.keys(counts).length,'Kelompok informasi')])+
@@ -3698,6 +3695,25 @@ function machineHtml(n,d){
  if(n===8)return list(intel.agingCurve,function(x){return item(x.month,fmt(x.failures,0)+' gangguan • '+fmt(x.openIssues,0)+' terbuka',fmt(x.downtimeMinutes,0)+' menit')},'Belum ada riwayat bulanan yang cukup.',24)+note('Grafik ini menunjukkan tekanan historis, bukan umur fisik mesin.');
  if(n===9)return list(intel.eventReplay,function(x){return item(x.description||x.source||'Kejadian',x.source||'',dateText(x.timestamp))},'Belum ada kejadian yang dapat diputar ulang.',40);
  return empty();
+}
+function machineCenterHtml(passport,graph){
+ passport=passport||{};graph=graph||{};
+ var cond=passport.currentCondition||{},rel=passport.reliability||{},
+     open=Array.isArray(cond.openIssues)?cond.openIssues:[],
+     nodes=Array.isArray(graph.nodes)?graph.nodes:[],edges=Array.isArray(graph.edges)?graph.edges:[],
+     counts={};
+ nodes.forEach(function(x){var t=x.type||'lainnya';counts[t]=(counts[t]||0)+1});
+ var out=metrics([
+  metric('Nilai kesehatan',cond.healthIndex==null?'Belum tersedia':fmt(cond.healthIndex,0)+'/100',riskText(cond.currentRisk)),
+  metric('Masalah belum selesai',open.length,'Perlu diperiksa'),
+  metric('Data terhubung',nodes.length,'Catatan terkait mesin'),
+  metric('Hubungan data',edges.length,'Koneksi antar catatan')
+ ]);
+ out+='<h3 class="v4-detail-heading">Yang Perlu Dilihat</h3>'+
+  list(open,function(x){return item(first(x,['Deskripsi Masalah','Problem','Deskripsi','description'])||'Catatan masalah',String(first(x,['Status','Severity','Prioritas'])||''),dateText(first(x,['Tanggal','Timestamp','Created At'])))},'Tidak ada masalah terbuka pada mesin ini.',12);
+ out+='<h3 class="v4-detail-heading">Data yang Terhubung</h3>'+
+  (Object.keys(counts).length?'<div class="v4-kv-stack">'+Object.keys(counts).sort(function(a,b){return counts[b]-counts[a]}).map(function(k){return '<div><span>'+esc(k)+'</span><b>'+counts[k]+'</b></div>'}).join('')+'</div>':empty('Belum ada hubungan data lain yang tercatat untuk mesin ini.'));
+ return out+note('Pusat informasi ini merangkum data yang sudah ada. Buka data asal bila perlu melihat rincian lengkap.');
 }
 function machineProblemHtml(d){
  d=d||{};
@@ -3723,7 +3739,7 @@ function predictiveHtml(n,d){
      sig=Array.isArray(d.failureSignatures)?d.failureSignatures:[],
      rul=Array.isArray(d.remainingUsefulLife)?d.remainingUsefulLife:[];
  if(n===11)return list(risks,function(x){return item(x.machine,evidenceText(x.evidence),fmt(x.riskScore,0)+'/100')},'Tidak ada sinyal risiko pada periode ini.',40)+note('Skor adalah indikator berbasis aturan, bukan peluang kerusakan.');
- if(n===12)return list(q,function(x){return item(x.machine,(x.factors||[]).join(' • ')||evidenceText(x.evidence),String(x.risk||'').toUpperCase())},'Tidak ada peringatan yang perlu diprioritaskan.',30);
+ if(n===12)return list(q,function(x){return item(x.machine,(x.factors||[]).join(' • ')||evidenceText(x.evidence),riskText(x.risk))},'Tidak ada peringatan yang perlu diprioritaskan.',30);
  if(n===13)return list(pre,function(x){return item(x.pattern,fmt(x.count,0)+' kejadian pendahulu','Mesin: '+(x.machines||[]).slice(0,4).join(', '))},'Belum ada pola yang konsisten muncul sebelum gangguan.',30)+note('Hubungan waktu tidak membuktikan bahwa temuan tersebut menyebabkan gangguan.');
  if(n===14){
   var rec=risks.filter(function(x){return x.evidence&&Number(x.evidence.recurringPatterns)>0}).sort(function(a,b){return Number(b.evidence.recurringPatterns)-Number(a.evidence.recurringPatterns)});
@@ -3732,7 +3748,7 @@ function predictiveHtml(n,d){
  if(n===15)return list(cross,function(x){return item(x.signature.replace(/\|/g,' • '),fmt(x.count,0)+' kejadian',(x.machines||[]).join(', '))},'Belum ada pola yang cukup mirip pada beberapa mesin.',30);
  if(n===16)return list(silent,function(x){return item(x.machine,'Awal: '+fmt(x.early&&x.early.events,0)+' kejadian • Akhir: '+fmt(x.late&&x.late.events,0)+' kejadian','skor perubahan '+fmt(x.deteriorationScore,0))},'Belum ada penurunan tersembunyi yang terdeteksi.',30)+note('Sinyal ini membandingkan dua bagian periode; tetap perlu pemeriksaan lapangan.');
  if(n===17)return list(sig,function(x){return item(x.machine,x.signature||'Belum ada ciri kata yang dominan',fmt(x.events,0)+' kejadian')},'Belum ada ciri khas gangguan yang cukup.',30);
- if(n===18)return list(risks,function(x){return item(x.machine,'Bukti: '+evidenceText(x.evidence),'Keyakinan '+String(x.confidence||'rendah'))},'Belum ada sinyal risiko untuk dinilai.',40)+note('Tingkat keyakinan menunjukkan kelengkapan bukti yang tersedia, bukan kepastian prediksi.');
+ if(n===18)return list(risks,function(x){return item(x.machine,'Bukti: '+evidenceText(x.evidence),'Kekuatan bukti '+confidenceText(x.confidence))},'Belum ada sinyal risiko untuk dinilai.',40)+note('Tingkat keyakinan menunjukkan kelengkapan bukti yang tersedia, bukan kepastian prediksi.');
  if(n===19)return list(rul,function(x){return item(x.machine+' • '+x.component,fmt(x.replacementEvents,0)+' penggantian • rata-rata '+fmt(x.averageHistoricalIntervalDays,0)+' hari',fmt(x.remainingIntervalEstimateDays,0)+' hari tersisa')},'Belum ada minimal tiga catatan penggantian untuk komponen yang sama.',40)+note('Perkiraan hanya dari interval historis penggantian; bukan Remaining Useful Life dari pabrikan.');
  if(n===20){
   var parts=rul.slice().sort(function(a,b){return Number(a.remainingIntervalEstimateDays)-Number(b.remainingIntervalEstimateDays)});
@@ -3752,10 +3768,14 @@ async function load(btn,n){
  btn.disabled=true;var old=btn.innerHTML;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> Memuat data';
  out.innerHTML=note('Mengambil data yang sesuai dengan fitur ini…');
  try{
-  var d=await read(n===6&&!qText?'v4.getMachinePassport':actionFor(n),payload);
+  var d;
+  if(n===10){
+   var pair=await Promise.all([read('v4.getMachinePassport',payload),read('v4.getMachineGraph',payload)]);
+   d=pair[0]||pair[1]?{passport:pair[0],graph:pair[1]}:null;
+  }else d=await read(n===6&&!qText?'v4.getMachinePassport':actionFor(n),payload);
   if(seq!==LAST_LOAD||openNo()!==n)return;
   if(!d){out.innerHTML=note('Data server belum dapat dimuat. Coba muat ulang setelah sesi login aktif.','warn');return}
-  out.innerHTML=n===6?(qText?failureHtml(d):machineProblemHtml(d)):(n<=10?machineHtml(n,d):predictiveHtml(n,d));
+  out.innerHTML=n===10?machineCenterHtml(d.passport,d.graph):(n===6?(qText?failureHtml(d):machineProblemHtml(d)):(n<=9?machineHtml(n,d):predictiveHtml(n,d)));
  }catch(e){if(seq===LAST_LOAD)out.innerHTML=note(e&&e.message?e.message:String(e),'error')}
  finally{btn.disabled=false;btn.innerHTML=old}
 }
