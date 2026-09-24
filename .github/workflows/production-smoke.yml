@@ -56,3 +56,8 @@ jobs:
           test "$(printf '%s' "$HTML" | grep -o '/omodos4/hotfix.css' | wc -l | tr -d ' ')" = "1"
           printf '%s' "$JS" > /tmp/omodos-hotfix.js
           node --check /tmp/omodos-hotfix.js
+          grep -Fq "Buka profil mesin" /tmp/omodos-hotfix.js
+          grep -Fq "Tampilkan prioritas pembelian" /tmp/omodos-hotfix.js
+          grep -Fq "Cari teknisi berpengalaman" /tmp/omodos-hotfix.js
+          grep -Fq "if(n<1||n>100)" /tmp/omodos-hotfix.js
+          ! grep -Fq "Muat Analisis" /tmp/omodos-hotfix.js
