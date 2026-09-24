@@ -7,12 +7,14 @@ on:
       - main
     paths:
       - "public/**"
+      - "src/**"
       - ".github/workflows/browser-qa-v4.yml"
   pull_request:
     branches:
       - main
     paths:
       - "public/**"
+      - "src/**"
       - ".github/workflows/browser-qa-v4.yml"
   workflow_dispatch:
 
@@ -31,6 +33,9 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install --save-dev playwright@1.55.0
           npx playwright install --with-deps chromium
+
+      - name: Validate Worker JavaScript
+        run: node --check src/worker.js
 
       - name: Start local server
         run: |
