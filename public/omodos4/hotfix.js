@@ -139,7 +139,7 @@ var SIMPLE_FEATURE = {
  64:{name:'Riwayat Pengalaman Teknisi',help:'Lihat pengalaman teknisi yang tercatat di OMODOS.'},
  65:{name:'Risiko Hilangnya Pengetahuan',help:'Lihat area yang pengetahuannya hanya dimiliki sedikit orang.'},
  66:{name:'Keahlian yang Perlu Dipelajari',help:'Lihat gap keahlian yang memang tercatat.'},
- 67:{name:'Saran Belajar',help:'Lihat saran belajar dari gap keahlian yang tercatat.'},
+ 67:{name:'Rencana Belajar',help:'Lihat langkah belajar yang disusun dari gap, standar, pengalaman mesin, dan kandidat mentor yang tercatat.'},
  68:{name:'Cari Mentor',help:'Cari kandidat mentor berdasarkan pengalaman yang tercatat.'},
  69:{name:'Latihan Cari Masalah',help:'Belajar dari kasus nyata tanpa mengubah data.'},
  70:{name:'Bukti Kompetensi',help:'Lihat bukti kompetensi yang sudah tercatat.'},
@@ -2713,7 +2713,7 @@ function mount(n){
  Array.from(h.querySelectorAll('.v4-interaction[data-v4-interaction-feature="'+n+'"],.v4-people-intel')).forEach(function(x){x.remove()});
  var titles={
   61:'Ringkasan Keahlian Teknisi',62:'Teknisi & Mesin yang Dikuasai',63:'Cari Orang Berpengalaman',64:'Riwayat Pengalaman Teknisi',65:'Risiko Hilangnya Pengetahuan',
-  66:'Keahlian yang Perlu Dipelajari',67:'Saran Belajar',68:'Cari Mentor',69:'Latihan Cari Masalah',70:'Bukti Kompetensi'
+  66:'Keahlian yang Perlu Dipelajari',67:'Rencana Belajar',68:'Cari Mentor',69:'Latihan Cari Masalah',70:'Bukti Kompetensi'
  };
  var controls='';
  if(n===63)controls='<div class="v4-form-grid"><label>Mesin<select data-v4-pi-machine><option value="">Muat data untuk melihat mesin</option></select></label><label class="v4-form-wide">Masalah / gejala<input data-v4-pi-query placeholder="Contoh: sensor register error"></label></div>';
@@ -2767,9 +2767,23 @@ function render66(d){
  },100)+note('Daftar ini hanya menunjukkan kebutuhan belajar yang tercatat dalam penilaian.','safe');
 }
 function render67(d){
- return list(d.adaptiveLearning,function(x){
-  return item(x.person||'Personel',gapText(x)+' • '+(x.recommendation||'Periksa standar dan bukti yang ada, lalu rencanakan belajar bersama atasan atau mentor.'),chip('RENCANA MANUSIA'));
- },100)+note('Saran belajar berasal dari kebutuhan yang tercatat. Atasan dan teknisi menentukan rencana belajarnya.','warn');
+ var rows=Array.isArray(d.adaptiveLearning)?d.adaptiveLearning:[];
+ if(!rows.length)return empty('Belum ada gap kompetensi tercatat yang dapat dibuat menjadi rencana belajar.');
+ return '<div class="v4-sf-list">'+rows.slice(0,80).map(function(x){
+  var gaps=Array.isArray(x.gaps)?x.gaps:[],standards=Array.isArray(x.standards)?x.standards:[],
+      machines=Array.isArray(x.machines)?x.machines:[],mentors=Array.isArray(x.mentorCandidates)?x.mentorCandidates:[],
+      steps=Array.isArray(x.nextSteps)?x.nextSteps:[];
+  return '<details class="v4-simple-details"><summary><strong>'+esc(x.person||'Personel')+'</strong> — '+esc(fmt(x.gapCount,0))+' kebutuhan belajar</summary>'+
+   '<div class="v4-kv-stack">'+
+   '<div><span>Posisi</span><b>'+esc(x.position||'Belum tercatat')+'</b></div>'+
+   '<div><span>Gap utama</span><b>'+esc(gaps.join(' • ')||'Belum dirinci')+'</b></div>'+
+   '<div><span>Standar terkait</span><b>'+esc(standards.join(' • ')||'Belum ada standar yang cocok')+'</b></div>'+
+   '<div><span>Mesin untuk latihan</span><b>'+esc(machines.join(', ')||'Belum ada riwayat mesin')+'</b></div>'+
+   '<div><span>Kandidat mentor</span><b>'+esc(mentors.join(', ')||'Belum ada kandidat dari data')+'</b></div>'+
+   '</div>'+
+   (steps.length?'<ol class="v4-learning-steps">'+steps.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ol>':'')+
+   '</details>';
+ }).join('')+'</div>'+note('Rencana ini disusun dari bukti yang tercatat. Atasan dan teknisi tetap menentukan prioritas, jadwal, mentor, dan penilaian ulang.','warn');
 }
 function render68(d){
  return list(d.mentorMatches,function(x){
