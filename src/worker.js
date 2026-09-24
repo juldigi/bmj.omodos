@@ -220,6 +220,19 @@ function createStorage(sql, env = {}, origin = "http://localhost:8787") {
     commit,
     rollback,
     importSheet,
+    importFile(id, name, mime, data) {
+      const existing = [...sql.exec("SELECT id FROM files WHERE id=?", id)][0];
+      if (existing) {
+        const current = this.file(id);
+        if (current.name === name && current.mime === mime && current.data.equals(data)) return false;
+        throw Error("FILE_IMPORT_CONFLICT");
+      }
+      sql.exec("INSERT INTO files(id,name,mime,size) VALUES(?,?,?,?)", id, name, mime, data.length);
+      for (let offset = 0, n = 0; offset < data.length; offset += 512e3, n++) {
+        sql.exec("INSERT INTO file_chunks(id,n,data) VALUES(?,?,?)", id, n, new Uint8Array(data.subarray(offset, offset + 512e3)));
+      }
+      return true;
+    },
     spreadsheet,
     cache,
     clear() {
@@ -9375,12 +9388,29 @@ var Application = class {
           transact(() => store.commit());
           return json({ ok: true, sheet: body.name, records: Math.max(0, body.rows.length - 1) });
         }
+        if (url.pathname === "/api/setup/file") {
+          if (typeof body.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(body.id) ||
+              typeof body.name !== "string" || body.name.length > 255 ||
+              typeof body.mime !== "string" || body.mime.length > 128 ||
+              typeof body.base64 !== "string" || body.base64.length > 15e6 ||
+              typeof body.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(body.sha256)) {
+            return json({ ok: false, error: "INVALID_FILE_IMPORT" }, 400);
+          }
+          const data = Buffer.from(body.base64, "base64");
+          if (data.length > 10e6 || createHash2("sha256").update(data).digest("hex") !== body.sha256) return json({ ok: false, error: "FILE_HASH_MISMATCH" }, 400);
+          const added = transact(() => store.importFile(body.id, body.name, body.mime, data));
+          return json({ ok: true, file: body.id, bytes: data.length, reused: !added });
+        }
         if (url.pathname === "/api/setup/finish") {
           const sheets = store.spreadsheet.getSheets();
           if (!Array.isArray(body.sheets) || body.sheets.length !== sheets.length) return json({ ok: false, error: "IMPORT_INCOMPLETE" }, 400);
           for (const item of body.sheets) {
             const s = store.spreadsheet.getSheetByName(item.name);
             if (!s || Math.max(0, s.getLastRow() - 1) !== item.rows) return json({ ok: false, error: "IMPORT_COUNT_MISMATCH: " + item.name }, 400);
+          }
+          if (!Array.isArray(body.files) || body.files.length !== store.listFiles().length ||
+              body.files.some((item) => !store.listFiles().some((f) => f.id === item.id && f.size === item.size))) {
+            return json({ ok: false, error: "FILE_IMPORT_INCOMPLETE" }, 400);
           }
           const users = store.spreadsheet.getSheetByName("Users");
           if (!users || users.getLastRow() < 2) return json({ ok: false, error: "USERS_REQUIRED" }, 400);
