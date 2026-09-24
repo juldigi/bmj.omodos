@@ -1681,7 +1681,7 @@ function backendRead(action,payload){
 }
 function backendAction(action,payload){
  if(window.OMODOS4&&typeof window.OMODOS4.interactiveAction==='function')return window.OMODOS4.interactiveAction(action,payload||{});
- return Promise.reject(new Error('Backend interaction belum tersedia.'));
+ return Promise.reject(new Error('Layanan OMODOS 4.0 belum tersedia.'));
 }
 function busy(btn,on,label){
  if(!btn)return;
@@ -1690,7 +1690,7 @@ function busy(btn,on,label){
 }
 function selected(sec,selector){var el=sec&&sec.querySelector(selector);return el?el.value:''}
 function missionList(data,mode){
- if(!data)return '<div class="v4-empty">Backend V4 belum tersedia.</div>';
+ if(!data)return '<div class="v4-empty">Data OMODOS 4.0 belum tersedia.</div>';
  var list=[];
  if(mode==='journey')list=Array.isArray(data.journey)?data.journey:[];
  else list=Array.isArray(data.missions)?data.missions:[];
@@ -1705,14 +1705,14 @@ function missionList(data,mode){
 function checklistHtml(data,machine){
  var missions=Array.isArray(data&&data.missions)?data.missions:[];
  var n=norm(machine),m=missions.find(function(x){return norm(x.machine)===n})||missions[0];
- if(!m)return '<div class="v4-empty">BELUM CUKUP DATA — checklist dinamis tidak tersedia.</div>';
+ if(!m)return '<div class="v4-empty">BELUM CUKUP DATA — daftar pemeriksaan belum tersedia.</div>';
  var items=Array.isArray(m.checklist)?m.checklist:[];
  return '<div class="v4-sf-check-head"><strong>'+e(m.machine||machine)+'</strong><span>'+e(m.priority||'')+' • '+e(m.reason||'')+'</span></div>'+
  (items.length?'<div class="v4-sf-checklist">'+items.slice(0,40).map(function(it,i){
-  var label=it.label||it.item||it.name||it['Item Pemeriksaan']||it['Checklist']||('Check '+(i+1));
+  var label=it.label||it.item||it.name||it['Item Pemeriksaan']||it['Checklist']||('Pemeriksaan '+(i+1));
   var source=it.source||it.labelType||it.status||'Tercatat / dihitung';
   return '<label><input type="checkbox" disabled><span><strong>'+e(label)+'</strong><small>'+e(source)+'</small></span></label>';
- }).join('')+'</div>':'<div class="v4-empty">Tidak ada checklist untuk mesin ini.</div>')+
+ }).join('')+'</div>':'<div class="v4-empty">Tidak ada daftar pemeriksaan untuk mesin ini.</div>')+
  info('Daftar pemeriksaan ini hanya bantuan kerja. Pencatatan resmi tetap dilakukan di Patrol.','safe');
 }
 function proofHtml(data,machine){
@@ -2309,16 +2309,16 @@ function render48(d){
   var delta=Number(x.delta);
   var badge=x.status==='IMPROVED_SIGNAL'?'IMPROVED SIGNAL':x.status==='WORSE_SIGNAL'?'WORSE SIGNAL':x.status==='NO_CHANGE_SIGNAL'?'NO CHANGE':'WINDOW INCOMPLETE';
   return item(x.machine||'Mesin','Perbaikan '+(x.correctiveId||'—')+' • '+String(x.date||'').slice(0,10)+' • 30 hari sebelum '+fmtNum(x.before30d,0)+' → 30 hari sesudah '+fmtNum(x.after30d,0)+' • Δ '+fmtNum(delta,0),statusChip(badge));
- },40,'Belum ada corrective dengan evidence before/after yang dapat dibandingkan.')+
+ },40,'Belum ada catatan perbaikan dengan data sebelum/sesudah yang dapat dibandingkan.')+
  note('Perbandingan sebelum/sesudah menunjukkan hubungan waktu, bukan bukti bahwa tindakan tersebut pasti menyebabkan perubahan.','warn');
 }
 function render49(d){
  var c=d.costIntelligence||{};
  if(c.status!=='RECORDED_COST_ONLY')return empty('Biaya kerusakan belum tersedia karena belum ada angka biaya yang tercatat.')+note(c.note||'Biaya yang belum tercatat tidak diperkirakan.','warn');
  return metrics([
-  ['Record biaya',fmtNum(c.records,0)],
+  ['Catatan biaya',fmtNum(c.records,0)],
   ['Total recorded cost',rupiah(c.totalRecordedCost)],
-  ['Cost / downtime minute',rupiah(c.recordedCostPerDowntimeMinute)]
+  ['Biaya / menit berhenti',rupiah(c.recordedCostPerDowntimeMinute)]
  ])+note('Biaya kerusakan hanya memakai angka biaya yang benar-benar tercatat. Biaya yang kosong tidak diisi dengan asumsi.','safe');
 }
 function render50(d){
@@ -2326,9 +2326,9 @@ function render50(d){
  if(c.status!=='RECORDED_COST_ONLY'||!Number.isFinite(Number(c.millionRupiahMinute)))return empty('Biaya per menit berhenti belum tersedia karena catatan biaya atau waktu berhenti belum cukup.')+note(c.note||'Biaya yang belum tercatat tidak diperkirakan.','warn');
  var rpm=Number(c.recordedCostPerDowntimeMinute)||0,million=Number(c.millionRupiahMinute)||0;
  return metrics([
-  ['Rp per downtime minute',rupiah(rpm)],
-  ['Juta Rp per downtime minute',fmtNum(million,4)],
-  ['Basis record biaya',fmtNum(c.records,0)]
+  ['Rp per menit berhenti',rupiah(rpm)],
+  ['Juta Rp per menit berhenti',fmtNum(million,4)],
+  ['Dasar catatan biaya',fmtNum(c.records,0)]
  ])+note('Nilai ini = biaya kerusakan/waktu berhenti yang tercatat ÷ menit berhenti yang tercatat. Gunakan untuk memahami dampak, bukan sebagai biaya standar tanpa pemeriksaan Finance.','warn');
 }
 function render(n,d){
@@ -2475,7 +2475,7 @@ function render52(d){
   return {name:x.name,status:x.status,evidence:ev};
  });
  return list(rows,function(x){
-  var e=x.evidence.map(function(v){return (v.domain||'domain')+': '+(v.records||0)+' record • '+(v.reason||'')}).join(' | ');
+  var e=x.evidence.map(function(v){return (v.domain||'bagian')+': '+(v.records||0)+' catatan • '+(v.reason||'')}).join(' | ');
   return item(x.name||'KPI perlu perhatian',(x.status||'')+(e?' • '+e:''),chip('MUNGKIN TERKAIT'));
  },50)+note('Bagan ini menunjukkan data yang mungkin berkaitan. Hubungan tersebut belum membuktikan penyebab.','warn');
 }
@@ -2496,7 +2496,7 @@ function render55(d){
 }
 function render56(d){
  return list(d.energyAnomalies,function(x){
-  return item((x.area||'Area')+' • '+(x.type||'Energy'), 'Nilai '+fmt(x.value)+' • rata-rata pembanding '+fmt(x.baselineMean),chip('z '+fmt(x.zScore,2)));
+  return item((x.area||'Area')+' • '+(x.type||'Energi'), 'Nilai '+fmt(x.value)+' • rata-rata pembanding '+fmt(x.baselineMean),chip('z '+fmt(x.zScore,2)));
  },60,'Tidak ada statistical outlier |z| ≥ 2 pada data energi yang cukup.')+
  note('Pemakaian yang jauh berbeda dari kelompok sejenis ditandai untuk diperiksa petugas.','safe');
 }
@@ -2504,14 +2504,14 @@ function render57(d){
  return list(d.energyPerGoodOutput,function(x){
   var label=(x.month||'')+' '+(x.year||'');
   var ratio=x.energyPerGoodSheet!=null?x.energyPerGoodSheet:x.ratio;
-  var sub=(x.area?x.area+' • ':'')+(x.type?x.type+' • ':'')+'Output '+fmt(x.goodOutput!=null?x.goodOutput:x.output)+' • Source '+(x.source||'');
+  var sub=(x.area?x.area+' • ':'')+(x.type?x.type+' • ':'')+'Hasil '+fmt(x.goodOutput!=null?x.goodOutput:x.output)+' • Sumber '+(x.source||'');
   return item(label.trim()||'Periode',sub,chip('Energi/Hasil baik '+fmt(ratio,6)));
  },80,'Belum ada pasangan energy + good output yang valid.')+
  note('Bandingkan angka hanya jika jenis dan satuan datanya sama.','warn');
 }
 function render58(d){
  return list(d.utilityDigitalTwin,function(x){
-  return item((x.area||'Area')+' • '+(x.type||'Utility'),fmt(x.records,0)+' catatan pada data yang tersedia',chip('Rata-rata '+fmt(x.average,3)));
+  return item((x.area||'Area')+' • '+(x.type||'Utilitas'),fmt(x.records,0)+' catatan pada data yang tersedia',chip('Rata-rata '+fmt(x.average,3)));
  },80)+note('Bagian ini merangkum catatan utilitas menurut area dan jenisnya.','safe');
 }
 function render59(d){
@@ -2519,7 +2519,7 @@ function render59(d){
   var nums=Array.isArray(x.numericMetrics)?x.numericMetrics.slice(0,5):[];
   var sub=nums.map(function(m){return m.metric+'='+fmt(m.value,3)}).join(' • ');
   return item((x.outlet||'IPAL')+' • '+(x.month||''),String(x.timestamp||'').slice(0,16)+(sub?' • '+sub:''),chip(nums.length+' ukuran'));
- },80,'Belum ada IPAL report pada source-of-truth window.')+
+ },80,'Belum ada laporan IPAL pada periode data OMODOS 4.0.')+
  note('Angka IPAL berasal dari catatan yang tersedia. Penilaian apakah hasil memenuhi batas resmi tetap perlu merujuk standar yang berlaku.','warn');
 }
 function render60(d){
@@ -2533,7 +2533,7 @@ function render60(d){
  note('Ringkasan prioritas dibuat dari catatan OMODOS yang tersedia.','safe');
 }
 function render(n,d){
- if(!d)return empty('Backend V4 belum tersedia pada sesi/koneksi ini.');
+ if(!d)return empty('Data OMODOS 4.0 belum tersedia pada sesi atau koneksi ini.');
  if(n===51)return render51(d);
  if(n===52)return render52(d);
  if(n===53)return render53(d);
@@ -2751,7 +2751,7 @@ function passportView(p){
  var machines=Array.isArray(p.machines)&&p.machines.length?p.machines.join(', '):'belum ada bukti pengalaman mesin';
  return metrics([
   ['Hard assessment',fmt(p.hardAssessments,0)],['Soft assessment',fmt(p.softAssessments,0)],
-  ['RCA',fmt(p.rcaCount,0)],['Knowledge',fmt(p.knowledgeCount,0)]
+  ['RCA',fmt(p.rcaCount,0)],['Pengetahuan',fmt(p.knowledgeCount,0)]
  ])+
  '<div class="v4-sf-list">'+item(p.name||'Personel',(p.position||'Posisi belum tercatat')+' • Mesin: '+machines,chip('RINGKASAN DATA'))+'</div>'+
  note('Riwayat ini merangkum pekerjaan yang tercatat. Isinya bukan penilaian kinerja resmi.','safe');
@@ -2870,7 +2870,7 @@ function machineOptions(blank){
 function actionReady(){return !!(window.OMODOS4&&typeof window.OMODOS4.interactiveAction==='function')}
 function readReady(){return !!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function')}
 function action(action,payload){
- if(!actionReady())return Promise.reject(new Error('Backend V4 interaction belum tersedia pada sesi ini.'));
+ if(!actionReady())return Promise.reject(new Error('Layanan OMODOS 4.0 belum tersedia pada sesi ini.'));
  return window.OMODOS4.interactiveAction(action,payload||{});
 }
 function read(actionName,payload){
@@ -2982,7 +2982,7 @@ function candidateHtml(d){
  var rows=d&&Array.isArray(d.candidates)?d.candidates:[];
  var head='<div class="v4-interaction-result-head"><span>'+rows.length+' kandidat</span><span>Artikel yang ada: '+esc(d&&d.existingKnowledgeRecords==null?'—':d.existingKnowledgeRecords)+'</span></div>';
  var body=rows.length?'<div class="v4-sf-list">'+rows.slice(0,60).map(function(x){
-  var sourceIds=Array.isArray(x.sourceIds)&&x.sourceIds.length?' • Source IDs '+x.sourceIds.slice(0,5).join(', '):'';
+  var sourceIds=Array.isArray(x.sourceIds)&&x.sourceIds.length?' • ID sumber '+x.sourceIds.slice(0,5).join(', '):'';
   var sub=(x.machine||'Mesin belum tercatat')+' • Recurrence '+fmt(x.recurrence,0)+' • '+(x.problem||'Problem belum tercatat')+
    (x.mostRecordedAction?' • Action: '+x.mostRecordedAction:'')+sourceIds;
   return '<div class="v4-sf-item"><div><strong>'+esc(x.label||'KANDIDAT_PENGETAHUAN')+'</strong><small>'+esc(sub)+'</small></div>'+chip(x.existingKnowledgePossibleMatch?'PERIKSA PENGETAHUAN YANG ADA':'KANDIDAT DRAF')+'</div>';
@@ -3225,12 +3225,12 @@ function render87(d){
  var c=d.counts||{};
  return metrics([['Terlambat',fmt(c.overdue,0)],['Perbaikan terbuka',fmt(c.open,0)]])+
  list(d.overdueProjects,function(r){
-  var title=first(r,['Judul','Nama Project','Title','ID'])||'Project overdue';
+  var title=first(r,['Judul','Nama Project','Title','ID'])||'Project terlambat';
   var due=first(r,['Target Finish','Due Date','Deadline'])||'Due date tercatat';
   var status=first(r,['Status'])||'OPEN';
   var pic=first(r,['PIC','Project Leader'])||'PIC —';
   return item(title,'Target '+due+' • '+pic,chip(status+' • TERLAMBAT'));
- },60,'Tidak ada project overdue yang terdeteksi dari due date existing.')+
+ },60,'Tidak ada project terlambat berdasarkan tanggal target yang tercatat.')+
  note('Proyek ditandai terlambat jika tanggal target lewat dan statusnya belum selesai. Dampaknya perlu dinilai petugas.','safe');
 }
 function render88(d){
@@ -3624,7 +3624,7 @@ function intro(n){
  5:'Menampilkan lama waktu sejak penggantian komponen yang tercatat. Ini bukan umur teknis dari pabrikan.',
  6:'Mencari masalah lama dan pola yang berulang agar petugas tidak mulai dari nol.',
  7:'Merangkum pola masalah yang paling sering tercatat pada mesin.',
- 8:'Membandingkan tekanan historis mesin per bulan: kejadian, gangguan, downtime, masalah terbuka, dan temuan prediktif.',
+ 8:'Membandingkan tekanan historis mesin per bulan: kejadian, gangguan, waktu berhenti, masalah terbuka, dan temuan prediktif.',
  9:'Menyusun ulang urutan kejadian mesin dari catatan Logbook, Breakdown, Predictive, RCA, dan Corrective.',
  10:'Menampilkan peta hubungan data di sekitar satu mesin agar sumber informasi yang saling terkait mudah ditemukan.',
  11:'Mengurutkan mesin berdasarkan sinyal risiko berbasis data yang tersedia. Ini bukan probabilitas kerusakan.',
@@ -3632,7 +3632,7 @@ function intro(n){
  13:'Mencari temuan predictive yang pernah muncul sebelum gangguan pada mesin yang sama.',
  14:'Menunjukkan mesin yang memiliki pola masalah berulang pada periode data yang dipakai.',
  15:'Mencari pola gangguan serupa yang muncul pada lebih dari satu mesin.',
- 16:'Mencari kenaikan kejadian, downtime, atau masalah terbuka antara paruh awal dan paruh akhir periode.',
+ 16:'Mencari kenaikan kejadian, waktu berhenti, atau masalah terbuka antara paruh awal dan paruh akhir periode.',
  17:'Merangkum kata/gejala yang paling sering muncul bersama pada riwayat gangguan tiap mesin.',
  18:'Menjelaskan kuat-lemahnya bukti di balik setiap sinyal risiko.',
  19:'Menghitung perkiraan jarak waktu penggantian berikutnya dari pola penggantian historis yang cukup. Bukan umur teknis resmi.',
@@ -3682,7 +3682,7 @@ function machineHtml(n,d){
  }
  if(n===2){
   var ms=Array.isArray(d.machines)?d.machines:[];
-  return list(ms,function(x){return item(x.code||x.name||x.key||'Mesin','Gangguan '+fmt(x.breakdowns,0)+' • downtime '+fmt(x.downtimeMinutes,0)+' menit • terbuka '+fmt(x.openIssues,0),fmt(x.healthIndex,0)+'/100')},'Belum ada mesin yang dapat dihitung nilai kesehatannya.',40);
+  return list(ms,function(x){return item(x.code||x.name||x.key||'Mesin','Gangguan '+fmt(x.breakdowns,0)+' • waktu berhenti '+fmt(x.downtimeMinutes,0)+' menit • belum selesai '+fmt(x.openIssues,0),fmt(x.healthIndex,0)+'/100')},'Belum ada mesin yang dapat dihitung nilai kesehatannya.',40);
  }
  if(n===3||n===10){
   var nodes=Array.isArray(d.nodes)?d.nodes:[],edges=Array.isArray(d.edges)?d.edges:[];
