@@ -167,7 +167,7 @@ var SIMPLE_FEATURE = {
  90:{name:'Riwayat Perbaikan',help:'Lihat perjalanan project, Kaizen, dan SGA dari tahun ke tahun.'},
 
  91:{name:'Gambaran Pabrik dari Data',help:'Lihat hubungan mesin dan maintenance sebagai gambaran besar.'},
- 92:{name:'Pusat Pantau Maintenance',help:'Lihat hal paling penting yang perlu diperhatikan sekarang.'},
+ 92:{name:'Pantau Risiko Maintenance',help:'Saring periode atau mesin lalu lihat risiko utama beserta sumber datanya.'},
  93:{name:'Apa yang Berubah?',help:'Lihat data apa saja yang berubah dalam waktu tertentu.'},
  94:{name:'Lihat Kondisi Masa Lalu',help:'Lihat kondisi terbaik yang bisa direkonstruksi pada waktu tertentu.'},
  95:{name:'Rekaman Kejadian Maintenance',help:'Lihat urutan kejadian maintenance berdasarkan waktu.'},
@@ -3445,14 +3445,14 @@ function removeOld(n,h){
 }
 function titles(n){
  return {
-  91:'Gambaran Pabrik dari Data',92:'Pusat Pantau Maintenance',93:'Apa yang Berubah?',94:'Lihat Kondisi Masa Lalu',95:'Rekaman Kejadian Maintenance',
+  91:'Gambaran Pabrik dari Data',92:'Pantau Risiko Maintenance',93:'Apa yang Berubah?',94:'Lihat Kondisi Masa Lalu',95:'Rekaman Kejadian Maintenance',
   96:'Peta Hubungan Pengetahuan',99:'Saran Tugas Maintenance',100:'Ringkasan Besar OMODOS'
  }[n]||'Ringkasan Pabrik';
 }
 function intro(n){
  var t={
   91:'Gambaran ini menunjukkan hubungan data maintenance yang tercatat. Ini bukan simulasi fisik mesin dan bukan data sensor real-time yang tidak tersedia.',
-  92:'Pusat pantau merangkum bukti data yang sudah ada menjadi urutan hal yang perlu diperiksa. Tidak ada tindakan operasional otomatis.',
+  92:'Pantau risiko memfilter ringkasan risiko berdasarkan periode dan mesin agar perhatian tidak bercampur dengan area lain. Tidak ada tindakan operasional otomatis.',
   93:'Membandingkan catatan yang benar-benar masuk pada periode terpilih dan tetap menunjukkan asal datanya.',
   94:'Menyusun kembali kondisi terbaik yang dapat diketahui dari catatan bertanggal. Data yang hanya menggambarkan kondisi saat ini tidak dipaksakan ke masa lalu.',
   95:'Menyusun urutan kejadian dari Logbook, Breakdown, Predictive, RCA, dan Corrective yang memiliki waktu. Kejadian yang tidak dicatat tidak akan ditebak.',
@@ -3468,7 +3468,7 @@ function controls(n){
   var now=new Date(),local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
   return '<div class="v4-form-grid"><label>Tanggal & waktu<input type="datetime-local" min="2026-09-01T00:00" value="'+esc(local)+'" data-v4-fb-time></label><label>Mesin (opsional)<select data-v4-fb-machine>'+machineOptions('Semua mesin')+'</select></label><label>Shift (opsional)<select data-v4-fb-shift><option value="">Semua shift</option><option value="1">Shift 1</option><option value="2">Shift 2</option><option value="3">Shift 3</option></select></label></div>';
  }
- if(n===95||n===99)return '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-fb-machine>'+machineOptions('Semua mesin')+'</select></label><label>Periode<select data-v4-fb-days><option value="30">30 hari</option><option value="90" selected>90 hari</option><option value="180">180 hari</option><option value="365">365 hari</option></select></label></div>';
+ if(n===92||n===95||n===99)return '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-fb-machine>'+machineOptions('Semua mesin')+'</select></label><label>Periode<select data-v4-fb-days><option value="30"'+(n===92?' selected':'')+'>30 hari</option><option value="90"'+(n!==92?' selected':'')+'>90 hari</option><option value="180">180 hari</option><option value="365">365 hari</option></select></label></div>';
  return '';
 }
 function mount(n){
@@ -3512,14 +3512,26 @@ function render91(g){
  note('Gambaran pabrik menunjukkan seberapa banyak data maintenance yang saling terhubung. Ini bukan simulasi fisik mesin dan bukan data sensor real-time.','safe');
 }
 function render92(o){
- if(!o)return empty('Ringkasan belum tersedia.');
- var s=o.summary||{};
+ if(!o)return empty('Pantauan risiko belum tersedia.');
+ var s=o.summary||{},look=Array.isArray(o.thingsToLookAt)?o.thingsToLookAt:[],
+     p0=look.filter(function(x){return String(x.priority||'').toUpperCase()==='P0'}),
+     p1=look.filter(function(x){return String(x.priority||'').toUpperCase()==='P1'}),
+     other=look.filter(function(x){var p=String(x.priority||'').toUpperCase();return p!=='P0'&&p!=='P1'}),
+     sources=Array.isArray(o.sourceStatus)?o.sourceStatus:[],
+     r=o.range||{};
  return metrics([
   ['Mesin perlu perhatian',fmt(s.criticalMachines,0)],['Gangguan aktif',fmt(s.activeBreakdown,0)],['Risiko prediktif',fmt(s.predictiveRisks,0)],
   ['Risiko sparepart',fmt(s.sparepartRisks,0)],['KPI perlu perhatian',fmt(s.kpiAtRisk,0)],['Tindakan penting belum selesai',fmt(s.openHighPriorityActions,0)]
  ])+
- list(o.thingsToLookAt,function(x){return item(x.title||x.type,x.reason||'',chip(x.priority||'PERIKSA'))},20)+
- note('Ringkasan membantu menentukan apa yang perlu diperiksa. Tugas tidak dibagikan secara otomatis.','warn');
+ '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Perlu tindakan cepat</strong><span>P0 • '+fmt(p0.length,0)+'</span></div>'+
+ list(p0,function(x){return item(x.title||x.type,x.reason||'',chip('P0'))},20,'Tidak ada risiko P0 pada filter ini.')+'</section>'+
+ '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Perlu ditinjau</strong><span>P1 • '+fmt(p1.length,0)+'</span></div>'+
+ list(p1,function(x){return item(x.title||x.type,x.reason||'',chip('P1'))},30,'Tidak ada risiko P1 pada filter ini.')+'</section>'+
+ (other.length?'<section class="v4-server-section"><div class="v4-server-section-head"><strong>Catatan lain</strong><span>'+fmt(other.length,0)+'</span></div>'+
+ list(other,function(x){return item(x.title||x.type,x.reason||'',chip(x.priority||'PERIKSA'))},20)+'</section>':'')+
+ '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Sumber data yang dipakai</strong><span>'+fmt(sources.length,0)+' sumber</span></div>'+
+ list(sources,function(x){return item(x.sheet||'Sumber OMODOS',fmt(x.records,0)+' catatan',chip(x.records>0?'ADA DATA':'KOSONG'))},20,'Status sumber belum tersedia.')+'</section>'+
+ note('Periode server: '+(r.since?String(r.since).slice(0,10):'—')+' sampai '+(r.until?String(r.until).slice(0,10):'—')+'. Tampilan ini hanya membantu triase risiko; penugasan pekerjaan ada di fitur Saran Tugas Maintenance.','warn');
 }
 function changePayload(sec){
  var preset=val(sec,'[data-v4-fb-change]'),machine=val(sec,'[data-v4-fb-machine]');
@@ -3626,7 +3638,7 @@ async function load(btn,n){
  busy(btn,true,'Memuat');
  try{
   if(n===91){out.innerHTML=render91(await read('v4.getFactoryBrain',{maxMachines:60}));return}
-  if(n===92){out.innerHTML=render92(await read('v4.getOverview',{}));return}
+  if(n===92){out.innerHTML=render92(await read('v4.getOverview',rangePayload(sec)));return}
   if(n===93){out.innerHTML=render93(await read('v4.getWhatChanged',changePayload(sec)));return}
   if(n===94){
    var tp=timePayload(sec);if(!tp){out.innerHTML=note('Pilih tanggal & waktu yang valid.','warn');return}
@@ -3654,7 +3666,7 @@ document.addEventListener('click',function(ev){
 },false);
 
 window.OMODOS4=Object.assign(window.OMODOS4||{},{
- factoryBrainVersion:'1',
+ factoryBrainVersion:'2',
  factoryBrainFeatures:[91,92,93,94,95,96,97,98,99,100],
  factoryBrainReadOnlyEnhanced:[91,92,93,94,95,96,99,100],
  factoryBrainPreservedInteractions:[97,98],
