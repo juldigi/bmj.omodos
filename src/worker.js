@@ -1783,7 +1783,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       if (standardLabels.length) steps.push("Pelajari ulang standar: " + standardLabels.slice(0, 2).join(" • "));
       if (machines.length) steps.push("Latihan/observasi pada mesin yang sudah pernah ditangani: " + machines.slice(0, 3).join(", "));
       if (mentorNames.length) steps.push("Diskusikan gap dengan kandidat mentor: " + mentorNames.join(", "));
-      steps.push("Kumpulkan bukti praktik lalu lakukan penilaian ulang sesuai proses People Intelligence.");
+      steps.push("Kumpulkan bukti praktik lalu lakukan penilaian ulang sesuai proses penilaian teknisi.");
       return {
         person: p.name,
         position: p.position,
