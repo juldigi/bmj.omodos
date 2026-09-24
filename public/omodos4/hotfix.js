@@ -123,7 +123,7 @@ var SIMPLE_FEATURE = {
  50:{name:'Biaya per Menit Berhenti',help:'Lihat dampak biaya dari waktu mesin berhenti jika datanya ada.'},
 
  51:{name:'Cerita KPI',help:'Baca KPI dalam bentuk ringkasan yang mudah dipahami.'},
- 52:{name:'Penyebab KPI',help:'Lihat faktor yang mungkin berkaitan dengan perubahan KPI.'},
+ 52:{name:'Data yang Berkaitan dengan KPI',help:'Lihat data maintenance atau energi yang mungkin berkaitan dengan perubahan KPI.'},
  53:{name:'Arah KPI',help:'Lihat arah perubahan KPI dari data yang tersedia.'},
  54:{name:'Simulasi Capai Target',help:'Coba asumsi untuk melihat kemungkinan pemulihan target.'},
  55:{name:'Hubungan Maintenance & Produksi',help:'Lihat apakah perubahan maintenance bergerak bersama data produksi.'},
@@ -2261,10 +2261,18 @@ function render42(d){
  },30)+note('Urutan mesin memakai gabungan nilai kesehatan dan kerugian yang tercatat. Gunakan sebagai urutan pemeriksaan, bukan penilaian mutlak mesin.','safe');
 }
 function render43(d){
- var narrative=d.paretoNarrative||[];
- return list(narrative,function(x){
-  return item('#'+(x.rank||'')+' '+(x.machine||'Mesin'),(x.why||'')+' • '+(x.inspect||''),statusChip('PARETO'));
- },20)+note('Urutan masalah dijelaskan dari waktu berhenti, jumlah gangguan, pola berulang, dan masalah yang belum selesai.','safe');
+ var rows=Array.isArray(d.problemPareto)?d.problemPareto:[];
+ if(!rows.length){
+  var fallback=d.paretoNarrative||[];
+  return list(fallback,function(x){
+   return item('#'+(x.rank||'')+' '+(x.machine||'Mesin'),x.why||'',statusChip('DATA MESIN'));
+  },20,'Belum ada pengelompokan masalah yang cukup.')+note('Data lama belum menyediakan pengelompokan jenis masalah; urutan mesin ditampilkan sebagai cadangan.','warn');
+ }
+ return list(rows,function(x,i){
+  var machines=Array.isArray(x.machines)&&x.machines.length?x.machines.slice(0,5).join(', '):'mesin belum tercatat';
+  var detail=fmtNum(x.events,0)+' kejadian • '+fmtNum(x.downtimeMinutes,0)+' menit berhenti • '+fmtNum(x.machineCount,0)+' mesin • '+fmtNum(x.openEvents,0)+' belum selesai';
+  return item('#'+(i+1)+' '+(x.problem||'Masalah belum bernama'),detail+' • '+machines,statusChip(fmtNum(x.events,0)+'x'));
+ },30)+note('Urutan dibuat berdasarkan jumlah kejadian masalah yang sama, lalu waktu berhentinya. Gunakan untuk memilih masalah yang perlu dianalisis lebih dulu.','safe');
 }
 function render44(d){
  var chronic='<section class="v4-server-section"><div class="v4-server-section-head"><strong>Sering Berulang</strong><span>Berulang ≥ 2</span></div>'+
@@ -2430,7 +2438,7 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-operation-intel');if(old)old.remove();
  var titles={
-  51:'Cerita KPI',52:'Penyebab KPI',53:'Arah KPI',54:'Simulasi Capai Target',55:'Hubungan Maintenance & Produksi',
+  51:'Cerita KPI',52:'Data yang Berkaitan dengan KPI',53:'Arah KPI',54:'Simulasi Capai Target',55:'Hubungan Maintenance & Produksi',
   56:'Keanehan Energi',57:'Energi per Hasil Baik',58:'Ringkasan Utilitas',59:'Kondisi IPAL',60:'Ringkasan 1 Menit'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-operation-intel';sec.dataset.v4OpFeature=String(n);
@@ -3403,7 +3411,17 @@ function graphSummary(g,labelText){
  },50)+note(labelText||'Peta hanya menghubungkan bukti data yang tersedia.','safe');
 }
 function render91(g){
- return graphSummary(g,'Gambaran pabrik memakai hubungan data maintenance yang sudah ada. Fitur ini tidak mengklaim data sensor atau simulasi fisik yang tidak tersedia.');
+ if(!g)return empty('Gambaran pabrik belum tersedia.');
+ var d=g.domains||{},nodes=Array.isArray(g.nodes)?g.nodes:[],edges=Array.isArray(g.edges)?g.edges:[];
+ var relations={};edges.forEach(function(e){var k=e.relation||'terkait';relations[k]=(relations[k]||0)+1});
+ var relRows=Object.keys(relations).map(function(k){return {name:k,count:relations[k]}}).sort(function(a,b){return b.count-a.count}).slice(0,12);
+ return metrics([
+  ['Mesin',fmt(d.machines,0)],['Logbook',fmt(d.logbook,0)],['Prediktif',fmt(d.predictive,0)],['RCA',fmt(d.rca,0)],
+  ['Perbaikan',fmt(d.corrective,0)],['Pengetahuan',fmt(d.knowledge,0)],['Sparepart',fmt(d.stock,0)],['Project/Kaizen/SGA',fmt((d.projects||0)+(d.kaizen||0)+(d.sga||0),0)]
+ ])+
+ '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Hubungan Data yang Paling Banyak</strong><span>'+fmt(edges.length,0)+' hubungan</span></div>'+
+ list(relRows,function(x){return item(x.name,fmt(x.count,0)+' hubungan',chip('TERHUBUNG'))},12)+'</section>'+
+ note('Gambaran pabrik menunjukkan seberapa banyak data maintenance yang saling terhubung. Ini bukan simulasi fisik mesin dan bukan data sensor real-time.','safe');
 }
 function render92(o){
  if(!o)return empty('Ringkasan belum tersedia.');
@@ -3471,16 +3489,33 @@ function render95(d){
  },100)+note(d.note||'Urutan kejadian hanya dibuat dari catatan maintenance yang memiliki waktu.','safe');
 }
 function render96(g){
- return graphSummary(g,'Peta pengetahuan menghubungkan mesin, masalah, gejala, RCA, tindakan perbaikan, teknisi, manual, pengetahuan, sparepart, project, KPI, energi, IPAL, vendor, PO, dan biaya bila bukti datanya tersedia.');
+ if(!g)return empty('Peta hubungan pengetahuan belum tersedia.');
+ var allNodes=Array.isArray(g.nodes)?g.nodes:[],allEdges=Array.isArray(g.edges)?g.edges:[];
+ var allowed=new Set(['machine','failure','symptom','root_cause','rca','corrective_action','manual','knowledge','sop']);
+ var nodes=allNodes.filter(function(n){return allowed.has(String(n.type||''))});
+ var ids=new Set(nodes.map(function(n){return n.id}));
+ var edges=allEdges.filter(function(e){return ids.has(e.from)&&ids.has(e.to)});
+ var by={};nodes.forEach(function(n){by[n.type]=(by[n.type]||0)+1});
+ return metrics([
+  ['Mesin',fmt(by.machine,0)],['Masalah',fmt((by.failure||0)+(by.symptom||0),0)],['Akar penyebab',fmt(by.root_cause,0)],
+  ['RCA',fmt(by.rca,0)],['Tindakan perbaikan',fmt(by.corrective_action,0)],['Manual & pengetahuan',fmt((by.manual||0)+(by.knowledge||0)+(by.sop||0),0)]
+ ])+
+ list(edges,function(e){
+  var from=nodes.find(function(n){return n.id===e.from}),to=nodes.find(function(n){return n.id===e.to});
+  return item((from&&from.label||e.from)+' → '+(to&&to.label||e.to),e.relation||'terkait',chip('PENGETAHUAN'));
+ },80,'Belum ada hubungan pengetahuan yang cukup.')+
+ note('Fitur ini hanya menampilkan hubungan yang relevan dengan masalah, RCA, tindakan perbaikan, manual, dan pengetahuan. Data energi, KPI, vendor, dan biaya tidak dicampurkan ke sini.','safe');
 }
-function render99(o){
- if(!o)return empty('Ringkasan belum tersedia.');
- var risks=o.topRisks||[],ops=o.topOpportunities||[],latest=o.latestIntelligence||[];
- return metrics([['Sinyal risiko',fmt(risks.length,0)],['Peluang perbaikan',fmt(ops.length,0)],['Informasi terbaru',fmt(latest.length,0)]])+
- '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Antrean Pemeriksaan Petugas</strong><span>Tidak ada perubahan otomatis</span></div>'+
- list(risks,function(x){return item(x.title||x.type,x.reason||'',chip(x.priority||'PERIKSA'))},20)+
- list(ops,function(x){return item(x.title||x.type,x.reason||'',chip('PELUANG'))},20)+
- '</section>'+note('Tidak ada pekerjaan maintenance, perubahan status, permintaan pembelian, atau input Logbook yang dijalankan otomatis oleh fitur ini.','warn');
+function render99(d){
+ if(!d)return empty('Saran tugas maintenance belum tersedia.');
+ var missions=Array.isArray(d.missions)?d.missions:[],p0=missions.filter(function(x){return x.priority==='P0'}).length,
+     p1=missions.filter(function(x){return x.priority==='P1'}).length,p2=missions.filter(function(x){return x.priority==='P2'}).length;
+ return metrics([['Tugas sangat penting',fmt(p0,0)],['Tugas penting',fmt(p1,0)],['Tugas terjadwal',fmt(p2,0)],['Total mesin',fmt(missions.length,0)]])+
+ list(missions,function(x){
+  var checks=Array.isArray(x.checklist)?x.checklist.length:0,open=Array.isArray(x.openIssues)?x.openIssues.length:0;
+  return item(x.machine||'Mesin', (x.reason||'Perlu pemeriksaan')+' • '+fmt(checks,0)+' item pemeriksaan • '+fmt(open,0)+' masalah terbuka', chip(x.priority||'PERIKSA'));
+ },40,'Tidak ada tugas maintenance yang perlu disarankan dari data periode ini.')+
+ note('Saran tugas diambil dari kondisi mesin, masalah terbuka, pola berulang, dan daftar pemeriksaan yang tersedia. Petugas tetap menentukan pekerjaan yang benar-benar dilakukan.','warn');
 }
 function briefBlock(b){
  if(!b)return '';
@@ -3511,7 +3546,7 @@ async function load(btn,n){
   }
   if(n===95){out.innerHTML=render95(await read('v4.getBlackBox',rangePayload(sec)));return}
   if(n===96){out.innerHTML=render96(await read('v4.getFactoryBrain',{maxMachines:80}));return}
-  if(n===99){out.innerHTML=render99(await read('v4.getOverview',rangePayload(sec)));return}
+  if(n===99){out.innerHTML=render99(await read('v4.getFieldMission',rangePayload(sec)));return}
   if(n===100){
    var all=await Promise.all([read('v4.getFactoryBrain',{maxMachines:80}),read('v4.getOverview',{}),read('v4.getBrief',{})]);
    out.innerHTML=render100(all[0],all[1],all[2]);return
