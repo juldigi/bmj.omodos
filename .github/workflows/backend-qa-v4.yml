@@ -1,0 +1,51 @@
+name: OMODOS 4 Backend QA
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - ".github/workflows/backend-qa-v4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Worker syntax
+        run: node --check src/worker.js
+
+      - name: Guard OMODOS 4 backend fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Field Mission recurring-history accumulator must keep {label,count}.
+          ! grep -Fq 'recurring.set(lower(d), (recurring.get(lower(d)) || { label: d, count: 0 }).count + 1)' src/worker.js
+          grep -Fq 'const cur = recurring.get(k) || { label: d, count: 0 };' src/worker.js
+          grep -Fq 'cur.count++;' src/worker.js
+
+          # KPI period parsing must reuse the shared month parser (Nov/November included).
+          grep -Fq 'const y = num(year), m = monthNumber(month);' src/worker.js
+
+          # Knowledge-risk must include machines with zero technician evidence.
+          grep -Fq 'machineMaster.forEach((r) =>' src/worker.js
+          grep -Fq 'if (!machineCoverage.has(key)) machineCoverage.set(key' src/worker.js
+
+          # Mentor matching must include people with recorded gaps / not-competent evidence.
+          grep -Fq 'p.gaps.length > 0 || p.notCompetent > 0' src/worker.js
+
+          # Improvement coverage must be record-scoped, not one giant substring corpus.
+          grep -Fq 'function improvementMentionsMachine(record, machine)' src/worker.js
+          ! grep -Fq 'existingText.includes(key)' src/worker.js
+
+          # OMODOS 4 historical cutoff remains intact.
+          grep -Fq 'const SOURCE_TRUTH_START_MS = Date.parse(SOURCE_TRUTH_START_ISO);' src/worker.js
+          grep -Fq 'return data.filter((r) => sourceTimestamp(r) >= SOURCE_TRUTH_START_MS);' src/worker.js
