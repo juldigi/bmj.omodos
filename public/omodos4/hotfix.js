@@ -93,12 +93,12 @@ var SIMPLE_FEATURE = {
  22:{name:'Panduan Cari Masalah',help:'Ikuti langkah sederhana untuk mencari penyebab masalah.'},
  23:{name:'Daftar Pemeriksaan',help:'Lihat daftar hal yang perlu diperiksa satu per satu.'},
  24:{name:'Isi Logbook dengan Suara',help:'Gunakan suara untuk membantu menulis catatan Logbook.'},
- 25:{name:'Bantuan dari Foto',help:'Gunakan foto sebagai bahan bantu pemeriksaan.'},
+ 25:{name:'Catat Foto Pemeriksaan',help:'Ambil atau lampirkan foto ke Logbook sebagai bukti. Analisis otomatis hanya memakai gejala tertulis, bukan isi foto.'},
  26:{name:'Bukti Sebelum & Sesudah',help:'Bandingkan kondisi sebelum dan sesudah pekerjaan.'},
  27:{name:'Buka Mesin lewat QR',help:'Pindai QR untuk membuka mesin yang tepat.'},
  28:{name:'Buka Mesin lewat NFC',help:'Gunakan NFC untuk membuka data mesin.'},
  29:{name:'Urutan Kunjungan Mesin',help:'Lihat mesin mana yang sebaiknya didatangi lebih dulu berdasarkan prioritas data.'},
- 30:{name:'Mode Tanpa Internet',help:'Bantu pekerjaan lapangan saat koneksi internet terbatas.'},
+ 30:{name:'Status Antrean Offline',help:'Lihat kiriman Logbook yang masih tersimpan di perangkat dan menunggu sinkronisasi saat koneksi kembali.'},
 
  31:{name:'Tingkat Penting Sparepart',help:'Lihat sparepart mana yang paling penting untuk diperhatikan.'},
  32:{name:'Risiko Stok Habis',help:'Lihat sparepart yang berisiko habis.'},
@@ -1615,7 +1615,12 @@ function findMachine(raw){
  var n=norm(value),list=names();
  var exact=list.find(function(x){return norm(x)===n});
  if(exact)return exact;
- return list.find(function(x){var a=norm(x);return a&&n&&(n.includes(a)||a.includes(n))})||'';
+ // Plain QR/NFC payloads may contain extra words, but machine names must match as a whole phrase.
+ // This prevents short names such as "Offset 5" from silently matching "Offset 50".
+ var padded=' '+n+' ',matches=list.filter(function(x){
+  var a=norm(x);return a&&padded.includes(' '+a+' ');
+ });
+ return matches.length===1?matches[0]:'';
 }
 function stopQr(){
  if(SF_QR_RAF){cancelAnimationFrame(SF_QR_RAF);SF_QR_RAF=0}
@@ -1688,12 +1693,18 @@ function busy(btn,on,label){
  else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
 }
 function selected(sec,selector){var el=sec&&sec.querySelector(selector);return el?el.value:''}
-function missionList(data,mode){
+function missionList(data,mode,machine){
  if(!data)return '<div class="v4-empty">Data OMODOS 4.0 belum tersedia.</div>';
  var list=[];
  if(mode==='journey')list=Array.isArray(data.journey)?data.journey:[];
- else list=Array.isArray(data.missions)?data.missions:[];
- if(!list.length)return '<div class="v4-empty">BELUM CUKUP DATA untuk konteks ini.</div>';
+ else{
+  list=Array.isArray(data.missions)?data.missions:[];
+  if(machine){
+   var wanted=norm(machine);
+   list=list.filter(function(x){return norm(x&&x.machine)===wanted});
+  }
+ }
+ if(!list.length)return '<div class="v4-empty">Belum ada tugas yang cocok dengan mesin dan periode ini.</div>';
  return '<div class="v4-sf-list">'+list.slice(0,30).map(function(m){
   var machine=m.machine||m.Machine||'-';
   var title=mode==='journey'?('Urutan '+(m.order||'')+' • '+machine):((m.priority||'')+' '+machine);
@@ -1703,8 +1714,8 @@ function missionList(data,mode){
 }
 function checklistHtml(data,machine){
  var missions=Array.isArray(data&&data.missions)?data.missions:[];
- var n=norm(machine),m=missions.find(function(x){return norm(x.machine)===n})||missions[0];
- if(!m)return '<div class="v4-empty">BELUM CUKUP DATA — daftar pemeriksaan belum tersedia.</div>';
+ var n=norm(machine),m=missions.find(function(x){return norm(x.machine)===n});
+ if(!m)return '<div class="v4-empty">Belum ada daftar pemeriksaan yang cocok dengan mesin terpilih.</div>';
  var items=Array.isArray(m.checklist)?m.checklist:[];
  return '<div class="v4-sf-check-head"><strong>'+e(m.machine||machine)+'</strong><span>'+e(m.priority||'')+' • '+e(m.reason||'')+'</span></div>'+
  (items.length?'<div class="v4-sf-checklist">'+items.slice(0,40).map(function(it,i){
@@ -1714,14 +1725,40 @@ function checklistHtml(data,machine){
  }).join('')+'</div>':'<div class="v4-empty">Tidak ada daftar pemeriksaan untuk mesin ini.</div>')+
  info('Daftar pemeriksaan ini hanya bantuan kerja. Pencatatan resmi tetap dilakukan di Patrol.','safe');
 }
+function mediaRefs(raw){
+ var out=[];
+ function add(v){
+  if(v==null||v==='')return;
+  if(Array.isArray(v)){v.forEach(add);return}
+  if(typeof v==='object'){
+   ['url','src','downloadUrl','download_url','webViewLink','webContentLink','fileUrl','link'].forEach(function(k){if(v[k])add(v[k])});
+   return;
+  }
+  var t=String(v).trim();if(!t)return;
+  if(/^https?:\/\//i.test(t)||t.indexOf('/')===0){out.push(t);return}
+  try{add(JSON.parse(t))}catch(err){}
+ }
+ add(raw);
+ return Array.from(new Set(out)).slice(0,4);
+}
+function mediaButtons(raw,label){
+ var refs=mediaRefs(raw);
+ if(!refs.length)return raw?'<span class="v4-risk-chip">'+e(label)+' tercatat</span>':'';
+ return refs.map(function(url,i){
+  return '<a class="btn btn-sm" href="'+e(url)+'" target="_blank" rel="noopener noreferrer">'+e(label)+(refs.length>1?' '+(i+1):'')+'</a>';
+ }).join('');
+}
 function proofHtml(data,machine){
  var missions=Array.isArray(data&&data.missions)?data.missions:[],n=norm(machine);
- var m=missions.find(function(x){return norm(x.machine)===n})||missions[0];
+ var m=missions.find(function(x){return norm(x.machine)===n});
  var rows=Array.isArray(m&&m.beforeAfterProof)?m.beforeAfterProof:[];
+ if(!m)return '<div class="v4-empty">Tidak ada data tugas yang cocok dengan mesin terpilih.</div>';
  if(!rows.length)return '<div class="v4-empty">Belum ada bukti sebelum dan sesudah yang tercatat untuk mesin ini.</div>';
- return '<div class="v4-sf-proof">'+rows.slice(0,16).map(function(r){
-  return '<div><strong>'+e(r.theme||r.id||'Perbaikan')+'</strong><span>'+e(r.date||'')+'</span><small>Status: '+e(r.status||'Tercatat')+' • Manfaat: '+e(r.benefit||'Belum tersedia')+'</small></div>';
- }).join('')+'</div>';
+ return '<div class="v4-sf-list">'+rows.slice(0,16).map(function(r){
+  var media=mediaButtons(r.beforePhoto,'Foto sebelum')+mediaButtons(r.afterPhoto,'Foto sesudah');
+  var detail=['Tanggal '+(r.date||'belum tercatat'),'Status '+(r.status||'Tercatat'),r.benefit?('Manfaat '+r.benefit):'',r.beforeAfter?('Catatan '+r.beforeAfter):''].filter(Boolean).join(' • ');
+  return '<div class="v4-sf-item"><div><strong>'+e(r.theme||r.id||'Perbaikan')+'</strong><small>'+e(detail)+'</small></div><div class="v4-interaction-actions">'+(media||'<span class="v4-risk-chip">Bukti teks</span>')+'</div></div>';
+ }).join('')+'</div>'+info('Bukti berasal dari data Kaizen yang sudah tercatat untuk mesin terpilih. OMODOS 4.0 tidak membuat foto atau hasil baru.','safe');
 }
 function mountMissionFeature(n){
  var h=host();if(!h||!openN(n))return;
@@ -1743,7 +1780,7 @@ async function loadMission(btn,n){
   var d=await backendRead('v4.getFieldMission',machine?{machine:machine}:{});
   if(n===23)out.innerHTML=checklistHtml(d,machine);
   else if(n===26)out.innerHTML=proofHtml(d,machine);
-  else out.innerHTML=missionList(d,n===29?'journey':'missions');
+  else out.innerHTML=missionList(d,n===29?'journey':'missions',machine);
  }catch(err){out.innerHTML=info(err.message||String(err),'error')}
  finally{busy(btn,false)}
 }
@@ -1802,10 +1839,10 @@ function mountPhoto(){
  var h=host();if(!h||!openN(25))return;
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='25';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BANTUAN DARI FOTO</span><h3>Catat Foto sebagai Bukti</h3></div><span class="v4-no-write">FOTO TIDAK DIANALISIS OTOMATIS</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">FOTO PEMERIKSAAN</span><h3>Catat Foto ke Logbook</h3></div><span class="v4-no-write">FOTO TIDAK DIANALISIS OTOMATIS</span></div>'+
  info('OMODOS 4.0 belum memiliki pembaca foto yang terverifikasi. Foto akan dilampirkan ke Logbook, sedangkan pemeriksaan masalah tetap berdasarkan gejala tertulis dan penilaian petugas.','warn')+
  '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label><label class="v4-form-wide">Gejala singkat<textarea rows="3" data-v4-photo-note placeholder="Contoh: suara abnormal di feeder, bekas gesekan terlihat di sisi operator."></textarea></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-photo-logbook><i class="ph-bold ph-camera"></i> Buka Logbook + Kamera</button><button class="btn btn-sm" data-v4-photo-text-ai><i class="ph-bold ph-brain"></i> Analisis Gejala Teks</button></div><div data-v4-sf-output></div>';
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-photo-logbook><i class="ph-bold ph-camera"></i> Buka Logbook + Kamera</button><button class="btn btn-sm" data-v4-photo-text-ai><i class="ph-bold ph-brain"></i> Analisis Catatan Teks</button></div><div data-v4-sf-output></div>';
  h.prepend(sec);
 }
 function photoToLogbook(btn){
@@ -1899,7 +1936,7 @@ function mountOffline(){
  try{q=JSON.parse(localStorage.getItem('logbook_pending_sync_queue')||'[]')}catch(err){}
  var online=navigator.onLine;
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='30';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">MODE TANPA INTERNET</span><h3>Status Antrean Saat Offline</h3></div><span class="v4-no-write">'+(online?'TERHUBUNG':'TANPA INTERNET')+'</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ANTREAN OFFLINE</span><h3>Status Kiriman yang Menunggu Sinkronisasi</h3></div><span class="v4-no-write">'+(online?'TERHUBUNG':'TANPA INTERNET')+'</span></div>'+
  '<div class="v4-statline"><div><b>'+(online?'Terhubung':'Tanpa Internet')+'</b><span>Koneksi browser</span></div><div><b>'+q.length+'</b><span>Menunggu sinkronisasi</span></div><div><b>OMODOS</b><span>Memakai antrean yang sama</span></div></div>'+
  info('OMODOS menyimpan kiriman yang gagal ke antrean lokal dan mencoba menyinkronkannya saat koneksi kembali. OMODOS 4.0 tidak membuat antrean kedua.','safe')+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-offline-logbook><i class="ph-bold ph-notebook"></i> Buka Input Logbook</button><button class="btn btn-sm" data-v4-offline-refresh>Muat Ulang Status</button></div>';
