@@ -2675,8 +2675,8 @@ function hydrateControls(sec,d){
 function render61(d){
  var rows=d.personnel||[];
  return metrics([
-  ['Personnel master',fmt(d.counts&&d.counts.personnel,0)],['Linked people',fmt(d.counts&&d.counts.linkedPeople,0)],
-  ['Hard assessment',fmt(d.counts&&d.counts.hard,0)],['Soft assessment',fmt(d.counts&&d.counts.soft,0)]
+  ['Personel terdaftar',fmt(d.counts&&d.counts.personnel,0)],['Personel dengan riwayat',fmt(d.counts&&d.counts.linkedPeople,0)],
+  ['Penilaian teknis',fmt(d.counts&&d.counts.hard,0)],['Penilaian perilaku',fmt(d.counts&&d.counts.soft,0)]
  ])+
  list(rows,function(x){
   var machines=Array.isArray(x.machines)&&x.machines.length?x.machines.slice(0,4).join(', '):'belum ada bukti pengalaman mesin';
@@ -2695,8 +2695,8 @@ function render65(d){
 }
 function gapText(x){
  var g=x&&x.gap;
- if(g&&typeof g==='object')return pick(g,['Unit Kompetensi','Kriteria Unjuk Kerja','Elemen Unit','Penjelasan Belum Kompeten','Status','Keterangan'])||'Recorded competency gap';
- return String(g||'Recorded competency gap');
+ if(g&&typeof g==='object')return pick(g,['Unit Kompetensi','Kriteria Unjuk Kerja','Elemen Unit','Penjelasan Belum Kompeten','Status','Keterangan'])||'Kebutuhan kompetensi tercatat';
+ return String(g||'Kebutuhan kompetensi tercatat');
 }
 function render66(d){
  return list(d.skillGapRadar,function(x){
@@ -2724,8 +2724,8 @@ function render70Person(p){
  if(!p)return empty('Pilih personel lalu tampilkan bukti.');
  var ev=p.competencyEvidence||{};
  return metrics([
-  ['Hard assessment',fmt(p.hardAssessments,0)],['Soft assessment',fmt(p.softAssessments,0)],
-  ['Competent field',fmt(p.competent,0)],['Not competent field',fmt(p.notCompetent,0)],
+  ['Penilaian teknis',fmt(p.hardAssessments,0)],['Penilaian perilaku',fmt(p.softAssessments,0)],
+  ['Kompeten',fmt(p.competent,0)],['Perlu dikembangkan',fmt(p.notCompetent,0)],
   ['Bukti RCA',fmt(p.rcaCount,0)],['Pengetahuan',fmt(p.knowledgeCount,0)]
  ])+
  list(p.machineEvidence,function(x){
@@ -2737,7 +2737,7 @@ function passportView(p){
  if(!p||p.label==='NOT AVAILABLE')return empty('Riwayat pengalaman belum tersedia untuk teknisi ini.');
  var machines=Array.isArray(p.machines)&&p.machines.length?p.machines.join(', '):'belum ada bukti pengalaman mesin';
  return metrics([
-  ['Hard assessment',fmt(p.hardAssessments,0)],['Soft assessment',fmt(p.softAssessments,0)],
+  ['Penilaian teknis',fmt(p.hardAssessments,0)],['Penilaian perilaku',fmt(p.softAssessments,0)],
   ['RCA',fmt(p.rcaCount,0)],['Pengetahuan',fmt(p.knowledgeCount,0)]
  ])+
  '<div class="v4-sf-list">'+item(p.name||'Personel',(p.position||'Posisi belum tercatat')+' • Mesin: '+machines,chip('RINGKASAN DATA'))+'</div>'+
@@ -2875,7 +2875,7 @@ function evidenceHtml(arr,limit){
  return '<div class="v4-sf-list">'+arr.slice(0,limit||16).map(function(e){
   var src=first(e,['sheet','source','type','label'])||'OMODOS';
   var machine=first(e,['machine']);
-  var score=e&&e.score!=null?' • score '+fmt(e.score,2):'';
+  var score=e&&e.score!=null?' • kecocokan '+fmt(e.score,2):'';
   return '<div class="v4-sf-item"><div><strong>'+esc(evidenceTitle(e))+'</strong><small>'+esc(src+(machine?' • '+machine:'')+score)+'</small></div>'+chip('SUMBER')+'</div>';
  }).join('')+'</div>';
 }
@@ -2885,7 +2885,7 @@ function aiHtml(d){
  var assumptions=Array.isArray(d.assumptions)?d.assumptions:[];
  var evidence=Array.isArray(d.evidence)?d.evidence:[];
  var recommendation=first(d,['recommendation']);
- var provider=d.providerStatus==='unavailable'?'Layanan bantuan belum tersedia • ringkasan diambil dari catatan':(d.modelUsed?'Model: '+d.modelUsed:'Berdasarkan catatan');
+ var provider=d.providerStatus==='unavailable'?'Layanan bantuan belum tersedia • ringkasan memakai catatan OMODOS':(d.modelUsed?'Asisten aktif':'Berdasarkan catatan');
  return '<div class="v4-ai-result">'+
   '<div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(d.mode||'OMODOS AI')+'</span><span>Tingkat keyakinan: '+esc(d.confidence||'belum tersedia')+'</span></div>'+
   '<div class="v4-ai-answer">'+esc(summary).replace(/\n/g,'<br>')+'</div>'+
@@ -2922,9 +2922,9 @@ function intro(n){
  if(n===72)text='Data dibatasi ke mesin yang dipilih di server. Bukti dari mesin lain tidak ikut dicari.';
  if(n===75)text='Fitur ini hanya membuat draf RCA. Akar penyebab akhir dan tindakan perbaikan wajib diperiksa manusia sebelum disimpan.';
  if(n===76)text='Pencarian kasus mirip memakai riwayat lama. Kemiripan teks bukan bukti bahwa akar penyebabnya sama.';
- if(n===77)text='Manual Whisperer tidak boleh mengarang isi manual. Jika manual hanya berupa link/metadata, sistem akan menyatakan batasannya.';
+ if(n===77)text='Asisten tidak boleh mengarang isi manual. Jika yang tersedia hanya tautan atau informasi dokumen, sistem akan menjelaskan batasannya.';
  if(n===78)text='Fitur ini hanya menghasilkan kandidat pengetahuan. Artikel tetap disimpan melalui halaman Pengetahuan setelah diperiksa.';
- if(n===79)text='Translator menjaga makna teknis; hasil terjemahan perlu diperiksa bila menyangkut prosedur keselamatan atau spesifikasi.';
+ if(n===79)text='Terjemahan menjaga makna teknis. Periksa kembali bila isinya menyangkut prosedur keselamatan atau spesifikasi.';
  if(n===80)text='Fitur ini sengaja mencari penjelasan lain, bukti yang belum ada, dan asumsi yang masih perlu diuji.';
  return note(text,'safe');
 }
