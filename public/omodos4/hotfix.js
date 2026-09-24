@@ -1220,16 +1220,16 @@ else setTimeout(hydrateOverview,900);
 'use strict';
 
 var AI_CONFIG={
- 71:{purpose:'ask',title:'Ask OMODOS 4.0',placeholder:'Contoh: Apa yang paling perlu diperhatikan hari ini?',defaultText:''},
- 72:{purpose:'machine',title:'Machine Copilot',placeholder:'Tanyakan kondisi, pola, risiko, atau histori mesin.',defaultText:'Jelaskan kondisi mesin ini, pola masalah, risiko yang perlu diperiksa, dan evidence yang mendukung.'},
- 73:{purpose:'shift',title:'Shift Copilot',placeholder:'Buat handover shift berdasarkan data OMODOS.',defaultText:'Buat brief handover shift: perubahan penting, open issue, risiko, dan tindakan yang perlu diteruskan.'},
- 74:{purpose:'morning-brief',title:'Morning Maintenance Brief',placeholder:'Buat brief maintenance pagi.',defaultText:'Buat Morning Maintenance Brief yang ringkas, evidence-first, dan prioritaskan hal yang perlu ditindaklanjuti.'},
- 75:{purpose:'rca-draft',title:'Auto RCA Draft',placeholder:'Tuliskan problem/symptom untuk membuat draft RCA.',defaultText:''},
- 76:{purpose:'troubleshooting',title:'Troubleshooting Similarity Search',placeholder:'Tuliskan symptom atau problem yang sedang dihadapi.',defaultText:''},
- 77:{purpose:'manual',title:'Manual Whisperer',placeholder:'Tanyakan hal yang ingin dipahami dari manual/knowledge yang tersedia.',defaultText:''},
- 79:{purpose:'translate',title:'Maintenance Translator',placeholder:'Masukkan istilah/kalimat maintenance yang perlu dinormalisasi atau diterjemahkan.',defaultText:''},
- 80:{purpose:'skeptic',title:'AI Skeptic Mode',placeholder:'Tuliskan asumsi/diagnosis yang ingin diuji secara kritis.',defaultText:''},
- 82:{purpose:'kaizen-draft',title:'Auto Kaizen Draft',placeholder:'Tuliskan masalah atau opportunity yang ingin dibuatkan draft Kaizen.',defaultText:''}
+ 71:{purpose:'ask',title:'Tanya OMODOS',placeholder:'Contoh: Apa yang paling perlu diperhatikan hari ini?',defaultText:''},
+ 72:{purpose:'machine',title:'Tanya Tentang Mesin',placeholder:'Tanyakan kondisi, pola, risiko, atau riwayat mesin.',defaultText:'Jelaskan kondisi mesin ini, pola masalah, risiko yang perlu diperiksa, dan bukti data yang mendukung.'},
+ 73:{purpose:'shift',title:'Ringkasan Pergantian Shift',placeholder:'Buat ringkasan pergantian shift berdasarkan data OMODOS.',defaultText:'Buat ringkasan pergantian shift: perubahan penting, masalah yang belum selesai, risiko, dan tindakan yang perlu diteruskan.'},
+ 74:{purpose:'morning-brief',title:'Ringkasan Pagi',placeholder:'Buat ringkasan maintenance pagi.',defaultText:'Buat ringkasan maintenance pagi yang singkat, berdasarkan bukti data, dan utamakan hal yang perlu ditindaklanjuti.'},
+ 75:{purpose:'rca-draft',title:'Buat Draf RCA',placeholder:'Tuliskan masalah atau gejala untuk membuat draf RCA.',defaultText:''},
+ 76:{purpose:'troubleshooting',title:'Cari Kasus Mirip',placeholder:'Tuliskan gejala atau masalah yang sedang dihadapi.',defaultText:''},
+ 77:{purpose:'manual',title:'Tanya Manual',placeholder:'Tanyakan hal yang ingin dipahami dari manual atau pengetahuan yang tersedia.',defaultText:''},
+ 79:{purpose:'translate',title:'Terjemahkan Istilah Maintenance',placeholder:'Masukkan istilah atau kalimat maintenance yang ingin dibuat lebih mudah dipahami.',defaultText:''},
+ 80:{purpose:'skeptic',title:'Periksa Ulang Asumsi',placeholder:'Tuliskan asumsi atau dugaan yang ingin diperiksa ulang.',defaultText:''},
+ 82:{purpose:'kaizen-draft',title:'Buat Draf Kaizen',placeholder:'Tuliskan masalah atau peluang yang ingin dibuatkan draf Kaizen.',defaultText:''}
 };
 var LAST_SCENARIO=null;
 
@@ -1251,7 +1251,7 @@ function actionReady(){
 }
 function errText(json){
  var e=json&&json.error;
- return typeof e==='string'?e:(e&&e.message)||'Request OMODOS 4.0 gagal';
+ return typeof e==='string'?e:(e&&e.message)||'Permintaan OMODOS 4.0 gagal';
 }
 async function v4Action(action,payload){
  if(!actionReady())throw new Error('Daftar belum dapat dimuat. Coba lagi setelah masuk kembali.');
@@ -1310,13 +1310,13 @@ function firstText(o,keys){
 function evidenceTitle(e){
  if(!e||typeof e!=='object')return plain(e);
  var r=e.record&&typeof e.record==='object'?e.record:e;
- return firstText(r,['Nama Mesin','namaMesin','Machine','Mesin','Title','Judul','Problem','Deskripsi Masalah','Deskripsi','description','Nama Material','Nama','ID'])||firstText(e,['machine','title','problem','description','sheet'])||'Evidence';
+ return firstText(r,['Nama Mesin','namaMesin','Machine','Mesin','Title','Judul','Problem','Deskripsi Masalah','Deskripsi','description','Nama Material','Nama','ID'])||firstText(e,['machine','title','problem','description','sheet'])||'Bukti data';
 }
 function resultCards(arr){
- if(!Array.isArray(arr)||!arr.length)return '<div class="v4-empty">Tidak ada evidence tambahan.</div>';
+ if(!Array.isArray(arr)||!arr.length)return '<div class="v4-empty">Tidak ada bukti data tambahan.</div>';
  return '<div class="v4-interaction-evidence">'+arr.slice(0,12).map(function(e){
   var src=firstText(e,['sheet','source','type','label'])||'OMODOS';
-  var score=e&&e.score!=null?' • score '+Math.round(Number(e.score)*100)/100:'';
+  var score=e&&e.score!=null?' • nilai '+Math.round(Number(e.score)*100)/100:'';
   return '<div class="v4-interaction-evidence-card"><strong>'+x(evidenceTitle(e))+'</strong><small>'+x(src+score)+'</small></div>';
  }).join('')+'</div>';
 }
@@ -1329,7 +1329,7 @@ function aiResultHtml(data){
   '<div class="v4-ai-answer">'+x(summary).replace(/\n/g,'<br>')+'</div>'+
   (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi</strong><ul>'+assumptions.slice(0,8).map(function(a){return '<li>'+x(a)+'</li>'}).join('')+'</ul></div>':'')+
   resultCards(data.evidence)+
-  note('Periksa oleh petugas wajib. Output AI adalah decision support; tidak ada perubahan data operasional otomatis.','safe')+
+  note('Hasil perlu diperiksa oleh petugas. Asisten hanya membantu membaca data dan tidak mengubah data operasional secara otomatis.','safe')+
  '</div>';
 }
 function mountAi(n){
@@ -1338,20 +1338,20 @@ function mountAi(n){
  var machines=machineNames(),needMachine=n===72;
  var machineField='<label>Mesin '+(needMachine?'<b>*</b>':'(opsional)')+'<select data-v4-ai-machine>'+options(machines,needMachine?'Pilih mesin':'Semua mesin')+'</select></label>';
  var sec=document.createElement('section');sec.className='v4-interaction v4-ai-interaction';sec.setAttribute('data-v4-interaction-feature',n);
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">INTERACTIVE • Bukti data-FIRST</span><h3>'+x(cfg.title)+'</h3></div><span class="v4-no-write">Tidak menyimpan otomatis</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">INTERAKTIF • BERDASARKAN BUKTI DATA</span><h3>'+x(cfg.title)+'</h3></div><span class="v4-no-write">Tidak menyimpan otomatis</span></div>'+
   '<div class="v4-form-grid">'+machineField+
   '<label class="v4-form-wide">Pertanyaan / konteks<textarea data-v4-ai-query rows="4" placeholder="'+x(cfg.placeholder)+'">'+x(cfg.defaultText)+'</textarea></label></div>'+
   '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-ai-run="'+n+'"><i class="ph-bold ph-sparkle"></i> Analisis dengan OMODOS 4.0</button></div>'+
-  '<div data-v4-ai-output>'+note('Analisis hanya dijalankan setelah Anda memilih tombol. Evidence diambil dari source OMODOS existing.','safe')+'</div>';
+  '<div data-v4-ai-output>'+note('Analisis hanya berjalan setelah Anda memilih tombol. Bukti diambil dari data OMODOS yang sudah tersedia.','safe')+'</div>';
  host.prepend(sec);
 }
 async function runAi(btn,n){
  var sec=btn.closest('.v4-interaction'),q=sec.querySelector('[data-v4-ai-query]').value.trim(),m=sec.querySelector('[data-v4-ai-machine]').value;
  var cfg=AI_CONFIG[n],out=sec.querySelector('[data-v4-ai-output]');
  if(!q){out.innerHTML=note('Isi pertanyaan/konteks terlebih dahulu.','warn');return}
- if(n===72&&!m){out.innerHTML=note('Machine Copilot wajib memakai satu mesin yang dipilih agar konteks tidak bercampur.','warn');return}
+ if(n===72&&!m){out.innerHTML=note('Pilih satu mesin agar data dari mesin lain tidak tercampur.','warn');return}
  busy(btn,true,'Menganalisis');
- out.innerHTML=note('Menghubungkan pertanyaan dengan evidence internal…','safe');
+ out.innerHTML=note('Mencocokkan pertanyaan dengan bukti data OMODOS…','safe');
  try{
   var data=await v4Action('v4.aiAsk',{query:q,purpose:cfg.purpose,machine:m||''});
   out.innerHTML=aiResultHtml(data);
@@ -1362,8 +1362,8 @@ function mountKnowledgeHarvest(n){
  var host=bodyHost();if(!host||!featureOpen(n))return;
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction';sec.setAttribute('data-v4-interaction-feature',n);
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">KNOWLEDGE HARVEST</span><h3>Review Kandidat Knowledge</h3></div><span class="v4-no-write">REVIEW ONLY</span></div>'+
- note('OMODOS mencari solusi berulang dan RCA existing. Tidak ada artikel Knowledge Base yang dibuat otomatis.','safe')+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">CARI PENGETAHUAN BARU</span><h3>Periksa Kandidat Pengetahuan</h3></div><span class="v4-no-write">HANYA CEK</span></div>'+
+ note('OMODOS mencari solusi berulang dan RCA yang sudah ada. Tidak ada artikel pengetahuan yang dibuat otomatis.','safe')+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-harvest-refresh><i class="ph-bold ph-arrows-clockwise"></i> Muat Kandidat</button></div><div data-v4-harvest-output></div>';
  host.prepend(sec);
 }
@@ -1371,7 +1371,7 @@ async function runHarvest(btn){
  var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-harvest-output]');busy(btn,true,'Memuat');
  try{
   var d=await v4Action('v4.getKnowledgeCandidates',{});
-  out.innerHTML='<div class="v4-interaction-result-head"><span>'+(Array.isArray(d.candidates)?d.candidates.length:0)+' kandidat</span><span>Artikel yang ada: '+x(d.existingKnowledgeRecords==null?'—':d.existingKnowledgeRecords)+'</span></div>'+resultCards(d.candidates)+note(d.note||'Review kandidat sebelum menggunakan modul Knowledge Base existing.','safe');
+  out.innerHTML='<div class="v4-interaction-result-head"><span>'+(Array.isArray(d.candidates)?d.candidates.length:0)+' kandidat</span><span>Artikel yang ada: '+x(d.existingKnowledgeRecords==null?'—':d.existingKnowledgeRecords)+'</span></div>'+resultCards(d.candidates)+note(d.note||'Periksa kandidat sebelum memasukkannya ke Pengetahuan.','safe');
  }catch(e){out.innerHTML=note(e.message||String(e),'error')}
  finally{busy(btn,false)}
 }
@@ -1379,24 +1379,24 @@ function mountExpert(){
  var host=bodyHost();if(!host||!featureOpen(63))return;
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction';sec.setAttribute('data-v4-interaction-feature','63');
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">EXPERT FINDER</span><h3>Cari berdasarkan evidence keterlibatan</h3></div></div>'+
- '<div class="v4-form-grid"><label>Mesin<select data-v4-expert-machine>'+options(machineNames(),'Semua mesin')+'</select></label><label class="v4-form-wide">Problem / symptom<input data-v4-expert-query placeholder="Opsional: deskripsikan problem yang relevan"></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-expert-run><i class="ph-bold ph-magnifying-glass"></i> Cari Expert</button></div><div data-v4-expert-output>'+note('Ranking mencerminkan evidence keterlibatan OMODOS, bukan penilaian kinerja karyawan.','safe')+'</div>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">CARI ORANG BERPENGALAMAN</span><h3>Cari berdasarkan riwayat keterlibatan</h3></div></div>'+
+ '<div class="v4-form-grid"><label>Mesin<select data-v4-expert-machine>'+options(machineNames(),'Semua mesin')+'</select></label><label class="v4-form-wide">Masalah / gejala<input data-v4-expert-query placeholder="Opsional: jelaskan masalah yang relevan"></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-expert-run><i class="ph-bold ph-magnifying-glass"></i> Cari Orang Berpengalaman</button></div><div data-v4-expert-output>'+note('Urutan hasil dibuat dari bukti keterlibatan di OMODOS, bukan penilaian kinerja karyawan.','safe')+'</div>';
  host.prepend(sec);
 }
 async function runExpert(btn){
  var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-expert-output]'),machine=sec.querySelector('[data-v4-expert-machine]').value,query=sec.querySelector('[data-v4-expert-query]').value.trim();
  busy(btn,true,'Mencari');
- try{var d=await v4Action('v4.getExpertFinder',{machine:machine,query:query});out.innerHTML=resultCards(d.experts)+note(d.note||'Human validation required.','safe')}
+ try{var d=await v4Action('v4.getExpertFinder',{machine:machine,query:query});out.innerHTML=resultCards(d.experts)+note(d.note||'Hasil perlu diperiksa oleh petugas.','safe')}
  catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
 }
 function mountExperience(){
  var host=bodyHost();if(!host||!featureOpen(64))return;
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction';sec.setAttribute('data-v4-interaction-feature','64');
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">EXPERIENCE PASSPORT</span><h3>Pilih personil</h3></div></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">RIWAYAT PENGALAMAN</span><h3>Pilih personil</h3></div></div>'+
  '<div class="v4-form-grid"><label>Personil<select data-v4-exp-person>'+options(peopleNames(),'Pilih personil')+'</select></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-exp-run><i class="ph-bold ph-identification-card"></i> Buka Experience Passport</button></div><div data-v4-exp-output></div>';
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-exp-run><i class="ph-bold ph-identification-card"></i> Buka Riwayat Pengalaman</button></div><div data-v4-exp-output></div>';
  host.prepend(sec);
 }
 function objectList(obj){
@@ -1409,7 +1409,7 @@ async function runExperience(btn){
  var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-exp-output]'),name=sec.querySelector('[data-v4-exp-person]').value;
  if(!name){out.innerHTML=note('Pilih personil terlebih dahulu.','warn');return}
  busy(btn,true,'Memuat');
- try{var d=await v4Action('v4.getExperiencePassport',{name:name});out.innerHTML=objectList(d)+note('Passport ini DERIVED dari People dan histori kerja existing; bukan penilaian performa.','safe')}
+ try{var d=await v4Action('v4.getExperiencePassport',{name:name});out.innerHTML=objectList(d)+note('Riwayat ini disusun dari data personil dan riwayat kerja yang sudah ada; bukan penilaian kinerja.','safe')}
  catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
 }
 function scenarioParams(sec){
@@ -1421,24 +1421,25 @@ function mountScenario(){
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  LAST_SCENARIO=null;
  var sec=document.createElement('section');sec.className='v4-interaction v4-scenario';sec.setAttribute('data-v4-interaction-feature','97');
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">SCENARIO SIMULATOR</span><h3>What-if simulation</h3></div><span class="v4-no-write">NOT A PREDICTION</span></div>'+
- note('Masukkan asumsi perubahan. Simulasi tidak mengubah KPI, Logbook, stok, atau data operasional existing.','safe')+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">COBA SKENARIO</span><h3>Simulasi Berdasarkan Asumsi</h3></div><span class="v4-no-write">BUKAN RAMALAN</span></div>'+
+ note('Masukkan asumsi perubahan. Simulasi tidak mengubah KPI, Logbook, stok, atau data operasional yang ada.','safe')+
  '<div class="v4-slider-grid">'+
   '<label>Pengurangan waktu mesin berhenti (%)<input type="number" min="0" max="100" value="0" data-v4-s-downtime></label>'+
   '<label>Pengurangan masalah berulang (%)<input type="number" min="0" max="100" value="0" data-v4-s-recurring></label>'+
   '<label>Pengurangan risiko stok habis (%)<input type="number" min="0" max="100" value="0" data-v4-s-stock></label>'+
-  '<label>Action closure %<input type="number" min="0" max="100" value="0" data-v4-s-action></label>'+
+  '<label>Penyelesaian tindakan (%)<input type="number" min="0" max="100" value="0" data-v4-s-action></label>'+
  '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-s-run><i class="ph-bold ph-play"></i> Jalankan Simulasi</button></div>'+
  '<div data-v4-s-output></div>'+
- '<div class="v4-save-box"><label>Nama skenario<input data-v4-s-name maxlength="200" placeholder="Contoh: Skenario PM Q4"></label><button class="btn btn-sm" data-v4-s-save disabled><i class="ph-bold ph-floppy-disk"></i> Simpan ke V4 Scenario</button><small>Save hanya menulis state simulasi terisolasi V4.</small></div><div data-v4-s-save-output></div>';
+ '<div class="v4-save-box"><label>Nama skenario<input data-v4-s-name maxlength="200" placeholder="Contoh: Skenario PM Q4"></label><button class="btn btn-sm" data-v4-s-save disabled><i class="ph-bold ph-floppy-disk"></i> Simpan Skenario</button><small>Penyimpanan hanya mencatat skenario di area V4 dan tidak mengubah data operasional.</small></div><div data-v4-s-save-output></div>';
  host.prepend(sec);
 }
 function scenarioHtml(d){
  var base=d&&d.baseline||{},proj=d&&d.projected||{};
  var keys=['downtimeMinutes','recurringPatterns','sparepartRisks','openHighPriorityActions'];
- return '<div class="v4-scenario-result"><div class="v4-compare-head"><span>Metric</span><span>Baseline</span><span>Scenario</span></div>'+
- keys.map(function(k){return '<div class="v4-compare-row"><strong>'+x(k.replace(/([a-z])([A-Z])/g,'$1 $2'))+'</strong><span>'+x(base[k]==null?'—':base[k])+'</span><b>'+x(proj[k]==null?'—':proj[k])+'</b></div>'}).join('')+
- '</div>'+note((d.assumptions||[]).join(' • ')||'Scenario uses user assumptions.','safe');
+ var names={downtimeMinutes:'Waktu mesin berhenti (menit)',recurringPatterns:'Masalah berulang',sparepartRisks:'Risiko sparepart',openHighPriorityActions:'Tindakan penting belum selesai'};
+ return '<div class="v4-scenario-result"><div class="v4-compare-head"><span>Ukuran</span><span>Kondisi Awal</span><span>Hasil Skenario</span></div>'+
+ keys.map(function(k){return '<div class="v4-compare-row"><strong>'+x(names[k]||k)+'</strong><span>'+x(base[k]==null?'—':base[k])+'</span><b>'+x(proj[k]==null?'—':proj[k])+'</b></div>'}).join('')+
+ '</div>'+note((d.assumptions||[]).join(' • ')||'Simulasi memakai asumsi yang Anda masukkan.','safe');
 }
 async function runScenario(btn){
  var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-s-output]'),save=sec.querySelector('[data-v4-s-save]'),params=scenarioParams(sec);
@@ -1455,16 +1456,16 @@ async function saveScenario(btn){
  busy(btn,true,'Menyimpan');
  try{
   var d=await v4Action('v4.saveScenario',Object.assign({name:name,transactionId:tx()},LAST_SCENARIO.params));
-  out.innerHTML=note('Skenario tersimpan di storage V4 terisolasi. ID: '+(d.id||'recorded')+'. Data operasional existing tidak berubah.','safe');
+  out.innerHTML=note('Skenario tersimpan di area V4. ID: '+(d.id||'tercatat')+'. Data operasional tidak berubah.','safe');
  }catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
 }
 function mountWarRoom(){
  var host=bodyHost();if(!host||!featureOpen(98))return;
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction v4-war-interaction';sec.setAttribute('data-v4-interaction-feature','98');
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">MAINTENANCE WAR ROOM</span><h3>User-triggered coordination</h3></div><span class="v4-no-write">ISOLATED V4 STATE</span></div>'+
- note('Membuat War Room tidak mengubah Logbook lama. Hanya state koordinasi V4_War_Room / Event yang ditulis.','safe')+
- '<details class="v4-war-create"><summary><i class="ph-bold ph-plus-circle"></i> Buat War Room Baru</summary><div class="v4-form-grid">'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">RUANG KOORDINASI MASALAH</span><h3>Koordinasi Masalah Besar</h3></div><span class="v4-no-write">AREA KHUSUS V4</span></div>'+
+ note('Membuat ruang koordinasi tidak mengubah Logbook lama. Yang disimpan hanya catatan koordinasi di area V4.','safe')+
+ '<details class="v4-war-create"><summary><i class="ph-bold ph-plus-circle"></i> Buat Ruang Koordinasi Baru</summary><div class="v4-form-grid">'+
   '<label>Mesin *<select data-v4-war-machine>'+options(machineNames(),'Pilih mesin')+'</select></label>'+
   '<label>Tingkat masalah<select data-v4-war-severity><option value="P0">P0 – paling mendesak</option><option value="P1" selected>P1 – mendesak</option><option value="P2">P2 – sedang</option><option value="P3">P3 – rendah</option></select></label>'+
   '<label>Judul *<input data-v4-war-title maxlength="200" placeholder="Masalah utama"></label>'+
@@ -1478,15 +1479,16 @@ function mountWarRoom(){
  else sec.querySelector('[data-v4-war-list]').innerHTML=note('Daftar belum dapat dimuat. Coba lagi setelah masuk kembali.','warn');
 }
 function warId(r){return firstText(r,['ID','id','WarRoomID','warRoomId'])}
-function warTitle(r){return firstText(r,['Title','title'])||'War Room'}
+function warTitle(r){return firstText(r,['Title','title'])||'Ruang Koordinasi'}
+function warStatusLabel(s){var v=String(s||'').toUpperCase();return v==='OPEN'?'Terbuka':v==='MONITORING'?'Dipantau':v==='CLOSED'?'Selesai':s||'—'}
 async function refreshWarList(sec,selectId){
- var out=sec.querySelector('[data-v4-war-list]');out.innerHTML=note('Memuat War Room…','safe');
+ var out=sec.querySelector('[data-v4-war-list]');out.innerHTML=note('Memuat ruang koordinasi…','safe');
  try{
   var d=await v4Action('v4.getWarRoom',{}),wars=Array.isArray(d.wars)?d.wars:[];
   out.innerHTML=wars.length?'<div class="v4-war-list">'+wars.map(function(w){
    var id=warId(w),status=firstText(w,['Status','status'])||'';
-   return '<button type="button" class="v4-war-item" data-v4-war-open="'+x(id)+'"><strong>'+x(warTitle(w))+'</strong><span>'+x(firstText(w,['Machine','machine'])||'')+'</span><small>'+x(status)+'</small></button>';
-  }).join('')+'</div>':'<div class="v4-empty">Belum ada War Room.</div>';
+   return '<button type="button" class="v4-war-item" data-v4-war-open="'+x(id)+'"><strong>'+x(warTitle(w))+'</strong><span>'+x(firstText(w,['Machine','machine'])||'')+'</span><small>'+x(warStatusLabel(status))+'</small></button>';
+  }).join('')+'</div>':'<div class="v4-empty">Belum ada ruang koordinasi.</div>';
   if(selectId)loadWar(sec,selectId);
  }catch(e){out.innerHTML=note(e.message||String(e),'error')}
 }
@@ -1503,18 +1505,19 @@ async function createWar(btn){
 function contextBlock(ctx){
  if(!ctx||typeof ctx!=='object')return '';
  var sections=[];
+ var names={openIssues:'Masalah belum selesai',experts:'Orang berpengalaman',similarCases:'Kasus mirip',candidateRootCauseEvidence:'Bukti calon penyebab',rca:'RCA',knowledge:'Pengetahuan',manuals:'Manual',decisions:'Keputusan',actions:'Tindakan'};
  ['openIssues','experts','similarCases','candidateRootCauseEvidence','rca','knowledge','manuals','decisions','actions'].forEach(function(k){
-  if(Array.isArray(ctx[k])&&ctx[k].length)sections.push('<div class="v4-war-context-section"><strong>'+x(k.replace(/([a-z])([A-Z])/g,'$1 $2'))+'</strong>'+resultCards(ctx[k])+'</div>');
+  if(Array.isArray(ctx[k])&&ctx[k].length)sections.push('<div class="v4-war-context-section"><strong>'+x(names[k]||k)+'</strong>'+resultCards(ctx[k])+'</div>');
  });
  return sections.join('');
 }
 async function loadWar(sec,id){
- var out=sec.querySelector('[data-v4-war-detail]');out.innerHTML=note('Memuat context War Room…','safe');
+ var out=sec.querySelector('[data-v4-war-detail]');out.innerHTML=note('Memuat rincian ruang koordinasi…','safe');
  try{
   var d=await v4Action('v4.getWarRoom',{id:id});
-  if(!d.war){out.innerHTML=note('War Room tidak ditemukan.','warn');return}
+  if(!d.war){out.innerHTML=note('Ruang koordinasi tidak ditemukan.','warn');return}
   var w=d.war,status=firstText(w,['Status','status'])||'OPEN',owner=firstText(w,['Owner','owner']),checkpoint=firstText(w,['NextCheckpoint','nextCheckpoint']),summary=firstText(w,['Summary','summary']);
-  out.innerHTML='<div class="v4-war-detail-card"><h4>'+x(warTitle(w))+'</h4><div class="v4-kv-stack"><div><span>Mesin</span><b>'+x(firstText(w,['Machine','machine']))+'</b></div><div><span>Tingkat masalah</span><b>'+x(firstText(w,['Severity','severity']))+'</b></div><div><span>Status</span><b>'+x(status)+'</b></div></div>'+
+  out.innerHTML='<div class="v4-war-detail-card"><h4>'+x(warTitle(w))+'</h4><div class="v4-kv-stack"><div><span>Mesin</span><b>'+x(firstText(w,['Machine','machine']))+'</b></div><div><span>Tingkat masalah</span><b>'+x(firstText(w,['Severity','severity']))+'</b></div><div><span>Status</span><b>'+x(warStatusLabel(status))+'</b></div></div>'+
    contextBlock(d.context)+
    '<div class="v4-war-update"><h4>Catat Perkembangan</h4><div class="v4-form-grid">'+
     '<label>Status<select data-v4-war-u-status><option value="OPEN"'+(status==='OPEN'?' selected':'')+'>Terbuka</option><option value="MONITORING"'+(status==='MONITORING'?' selected':'')+'>Dipantau</option><option value="CLOSED"'+(status==='CLOSED'?' selected':'')+'>Selesai</option></select></label>'+
@@ -1523,7 +1526,7 @@ async function loadWar(sec,id){
     '<label>Periksa lagi pada<input data-v4-war-u-checkpoint maxlength="200" value="'+x(checkpoint)+'"></label>'+
     '<label class="v4-form-wide">Ringkasan<textarea rows="3" data-v4-war-u-summary maxlength="4000">'+x(summary)+'</textarea></label>'+
     '<label class="v4-form-wide">Catatan / keputusan / tindakan<textarea rows="3" data-v4-war-u-message maxlength="4000"></textarea></label>'+
-   '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-war-update="'+x(id)+'"><i class="ph-bold ph-check"></i> Simpan Update War Room</button></div><div data-v4-war-update-output></div></div></div>'+
+   '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-war-update="'+x(id)+'"><i class="ph-bold ph-check"></i> Simpan Perkembangan</button></div><div data-v4-war-update-output></div></div></div>'+
    note(d.disclaimer||'Dugaan penyebab perlu diperiksa oleh petugas.','safe');
  }catch(e){out.innerHTML=note(e.message||String(e),'error')}
 }
@@ -1531,7 +1534,7 @@ async function updateWar(btn,id){
  var sec=btn.closest('.v4-interaction'),out=sec.querySelector('[data-v4-war-update-output]');
  var payload={id:id,status:sec.querySelector('[data-v4-war-u-status]').value,type:sec.querySelector('[data-v4-war-u-type]').value,owner:sec.querySelector('[data-v4-war-u-owner]').value.trim(),nextCheckpoint:sec.querySelector('[data-v4-war-u-checkpoint]').value.trim(),summary:sec.querySelector('[data-v4-war-u-summary]').value.trim(),message:sec.querySelector('[data-v4-war-u-message]').value.trim(),transactionId:tx()};
  busy(btn,true,'Menyimpan');
- try{await v4Action('v4.updateWarRoom',payload);out.innerHTML=note('Update tersimpan di event log War Room V4.','safe');await loadWar(sec,id)}
+ try{await v4Action('v4.updateWarRoom',payload);out.innerHTML=note('Perkembangan tersimpan di riwayat ruang koordinasi.','safe');await loadWar(sec,id)}
  catch(e){out.innerHTML=note(e.message||String(e),'error')}finally{busy(btn,false)}
 }
 function mountFor(n){
@@ -1694,8 +1697,8 @@ function missionList(data,mode){
  if(!list.length)return '<div class="v4-empty">BELUM CUKUP DATA untuk konteks ini.</div>';
  return '<div class="v4-sf-list">'+list.slice(0,30).map(function(m){
   var machine=m.machine||m.Machine||'-';
-  var title=mode==='journey'?('Mission '+(m.order||'')):((m.priority||'')+' '+machine);
-  var detail=m.reason||((m.checklist||[]).length+' checklist')||'Evidence mission';
+  var title=mode==='journey'?('Tugas '+(m.order||'')):((m.priority||'')+' '+machine);
+  var detail=m.reason||((m.checklist||[]).length+' item pemeriksaan')||'Dasar tugas';
   return '<div class="v4-sf-item"><div><strong>'+e(title)+'</strong><small>'+e(detail)+'</small></div><button class="btn btn-sm" data-v4-sf-open-patrol="'+e(machine)+'">Buka Patrol</button></div>';
  }).join('')+'</div>';
 }
@@ -1710,27 +1713,27 @@ function checklistHtml(data,machine){
   var source=it.source||it.labelType||it.status||'Tercatat / dihitung';
   return '<label><input type="checkbox" disabled><span><strong>'+e(label)+'</strong><small>'+e(source)+'</small></span></label>';
  }).join('')+'</div>':'<div class="v4-empty">Tidak ada checklist untuk mesin ini.</div>')+
- info('Checklist V4 adalah decision support. Pencatatan resmi tetap dilakukan di Patrol existing.','safe');
+ info('Daftar pemeriksaan ini hanya bantuan kerja. Pencatatan resmi tetap dilakukan di Patrol.','safe');
 }
 function proofHtml(data,machine){
  var missions=Array.isArray(data&&data.missions)?data.missions:[],n=norm(machine);
  var m=missions.find(function(x){return norm(x.machine)===n})||missions[0];
  var rows=Array.isArray(m&&m.beforeAfterProof)?m.beforeAfterProof:[];
- if(!rows.length)return '<div class="v4-empty">Belum tersedia — belum ada Before–After Proof tercatat untuk mesin ini.</div>';
+ if(!rows.length)return '<div class="v4-empty">Belum ada bukti sebelum dan sesudah yang tercatat untuk mesin ini.</div>';
  return '<div class="v4-sf-proof">'+rows.slice(0,16).map(function(r){
-  return '<div><strong>'+e(r.theme||r.id||'Improvement')+'</strong><span>'+e(r.date||'')+'</span><small>Status: '+e(r.status||'Tercatat')+' • Benefit: '+e(r.benefit||'Belum tersedia')+'</small></div>';
+  return '<div><strong>'+e(r.theme||r.id||'Perbaikan')+'</strong><span>'+e(r.date||'')+'</span><small>Status: '+e(r.status||'Tercatat')+' • Manfaat: '+e(r.benefit||'Belum tersedia')+'</small></div>';
  }).join('')+'</div>';
 }
 function mountMissionFeature(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
- var titles={21:'Technician Mission Mode',23:'Dynamic Checklist',26:'Before–After Proof',29:'Maintenance Journey'};
+ var titles={21:'Tugas Teknisi',23:'Daftar Pemeriksaan',26:'Bukti Sebelum & Sesudah',29:'Urutan Pekerjaan Maintenance'};
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature=String(n);
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">SMART FIELD</span><h3>'+e(titles[n])+'</h3></div><span class="v4-no-write">USES EXISTING DATA</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BANTUAN KERJA LAPANGAN</span><h3>'+e(titles[n])+'</h3></div><span class="v4-no-write">PAKAI DATA YANG ADA</span></div>'+
  '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts(n===29?'Semua mesin':'Pilih mesin')+'</select></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sf-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat '+e(titles[n])+'</button>'+
- (n===21||n===23?'<button class="btn btn-sm" data-v4-sf-patrol-current>Buka Patrol Existing</button>':'')+
- '</div><div data-v4-sf-output>'+info('Data berasal dari Logbook/Patrol/Project existing; tidak membuat input ganda.','safe')+'</div>';
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sf-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Tampilkan '+e(titles[n])+'</button>'+
+ (n===21||n===23?'<button class="btn btn-sm" data-v4-sf-patrol-current>Buka Patrol</button>':'')+
+ '</div><div data-v4-sf-output>'+info('Data berasal dari Logbook, Patrol, dan Project yang sudah ada; tidak membuat input ganda.','safe')+'</div>';
  h.prepend(sec);
 }
 async function loadMission(btn,n){
@@ -1749,19 +1752,19 @@ function mountTroubleshoot(){
  var h=host();if(!h||!openN(22))return;
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='22';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">SMART TROUBLESHOOTING</span><h3>Symptom → Inspection → Evidence → Next Step</h3></div><span class="v4-no-write">HUMAN REVIEW</span></div>'+
- '<div class="v4-form-grid"><label>Mesin *<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label><label class="v4-form-wide">Symptom / masalah *<textarea rows="4" data-v4-sf-symptom placeholder="Jelaskan gejala yang terlihat, terdengar, atau terukur."></textarea></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sf-troubleshoot><i class="ph-bold ph-stethoscope"></i> Susun Troubleshooting</button></div><div data-v4-sf-output>'+info('OMODOS mencari evidence internal; hasil bukan root cause final.','safe')+'</div>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PANDUAN CARI MASALAH</span><h3>Gejala → Pemeriksaan → Bukti → Langkah Berikutnya</h3></div><span class="v4-no-write">PERLU CEK PETUGAS</span></div>'+
+ '<div class="v4-form-grid"><label>Mesin *<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label><label class="v4-form-wide">Gejala / masalah *<textarea rows="4" data-v4-sf-symptom placeholder="Jelaskan gejala yang terlihat, terdengar, atau terukur."></textarea></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sf-troubleshoot><i class="ph-bold ph-stethoscope"></i> Susun Panduan Pemeriksaan</button></div><div data-v4-sf-output>'+info('OMODOS mencari bukti data yang relevan; hasil bukan penentuan akar penyebab final.','safe')+'</div>';
  h.prepend(sec);
 }
 async function troubleshoot(btn){
  var sec=btn.closest('.v4-sf-interaction'),machine=selected(sec,'[data-v4-sf-machine]'),q=selected(sec,'[data-v4-sf-symptom]'),out=sec.querySelector('[data-v4-sf-output]');
- if(!machine||!q.trim()){out.innerHTML=info('Pilih mesin dan isi symptom terlebih dahulu.','warn');return}
+ if(!machine||!q.trim()){out.innerHTML=info('Pilih mesin dan isi gejala terlebih dahulu.','warn');return}
  busy(btn,true,'Menganalisis');
  try{
   var d=await backendAction('v4.aiAsk',{machine:machine,query:q.trim(),purpose:'troubleshooting'});
-  var sum=d&&d.summary?d.summary:(d&&d.answer)||'Evidence tersedia.';
-  out.innerHTML='<div class="v4-ai-answer">'+e(sum).replace(/\n/g,'<br>')+'</div>'+info('Tingkat keyakinan: '+(d&&d.confidence||'belum tersedia')+'. Human inspection tetap wajib.','safe');
+  var sum=d&&d.summary?d.summary:(d&&d.answer)||'Bukti data tersedia.';
+  out.innerHTML='<div class="v4-ai-answer">'+e(sum).replace(/\n/g,'<br>')+'</div>'+info('Tingkat keyakinan: '+(d&&d.confidence||'belum tersedia')+'. Pemeriksaan petugas tetap wajib.','safe');
  }catch(err){out.innerHTML=info(err.message||String(err),'error')}
  finally{busy(btn,false)}
 }
@@ -1770,16 +1773,16 @@ function mountVoice(){
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='24';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">VOICE LOGBOOK</span><h3>Dictation Draft</h3></div><span class="v4-no-write">DRAFT ONLY</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ISI LOGBOOK DENGAN SUARA</span><h3>Draf dari Suara</h3></div><span class="v4-no-write">DRAF SAJA</span></div>'+
  '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-sf-machine>'+opts('Pilih jika relevan')+'</select></label><label class="v4-form-wide">Hasil dikte<textarea rows="5" data-v4-voice-text placeholder="Hasil suara muncul di sini. Bisa diedit sebelum dikirim ke form Logbook."></textarea></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-voice-start '+(SR?'':'disabled')+'><i class="ph-bold ph-microphone"></i> Mulai Dikte</button><button class="btn btn-sm" data-v4-voice-to-logbook><i class="ph-bold ph-arrow-square-out"></i> Kirim Draft ke Form Logbook</button></div>'+
- '<div data-v4-sf-output>'+info(SR?'Speech Recognition tersedia. Tidak ada data yang disimpan sebelum form Logbook disubmit.':'Speech Recognition tidak didukung browser ini. Ketik manual pada draft lalu kirim ke form Logbook.','safe')+'</div>';
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-voice-start '+(SR?'':'disabled')+'><i class="ph-bold ph-microphone"></i> Mulai Dikte</button><button class="btn btn-sm" data-v4-voice-to-logbook><i class="ph-bold ph-arrow-square-out"></i> Kirim Draf ke Form Logbook</button></div>'+
+ '<div data-v4-sf-output>'+info(SR?'Fitur pengenal suara tersedia. Tidak ada data yang disimpan sebelum formulir Logbook disimpan.':'Browser ini belum mendukung pengenal suara. Ketik manual pada draf lalu kirim ke formulir Logbook.','safe')+'</div>';
  h.prepend(sec);
 }
 function startVoice(btn){
  var sec=btn.closest('.v4-sf-interaction'),ta=sec.querySelector('[data-v4-voice-text]'),out=sec.querySelector('[data-v4-sf-output]');
  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR){out.innerHTML=info('Speech Recognition tidak tersedia di browser ini.','warn');return}
+ if(!SR){out.innerHTML=info('Pengenal suara tidak tersedia di browser ini.','warn');return}
  stopSpeech();
  try{
   var rec=new SR();SF_SPEECH=rec;rec.lang='id-ID';rec.interimResults=true;rec.continuous=true;
@@ -1790,20 +1793,20 @@ function startVoice(btn){
    if(finalText){base=(base?base+' ':'')+finalText.trim()}
    ta.value=(base+(interim?' '+interim:'')).trim();
   };
-  rec.onerror=function(ev){out.innerHTML=info('Dikte berhenti: '+(ev.error||'speech error')+'. Draft yang sudah ada tetap dipertahankan.','warn');stopSpeech()};
+  rec.onerror=function(ev){out.innerHTML=info('Dikte berhenti: '+(ev.error||'kesalahan suara')+'. Draft yang sudah ada tetap dipertahankan.','warn');stopSpeech()};
   rec.onend=function(){if(SF_SPEECH===rec){SF_SPEECH=null;btn.disabled=false;btn.innerHTML='<i class="ph-bold ph-microphone"></i> Mulai Dikte'}};
   btn.disabled=true;btn.innerHTML='<i class="ph-bold ph-stop-circle"></i> Mendengarkan…';rec.start();
-  out.innerHTML=info('Mendengarkan. Ucapkan deskripsi masalah; hasil masih berupa draft.','safe');
+  out.innerHTML=info('Mendengarkan. Ucapkan deskripsi masalah; hasil masih berupa draf.','safe');
  }catch(err){out.innerHTML=info(err.message||String(err),'error');stopSpeech()}
 }
 function mountPhoto(){
  var h=host();if(!h||!openN(25))return;
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='25';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PHOTO DIAGNOSIS ASSISTANT</span><h3>Evidence Capture</h3></div><span class="v4-no-write">NO FALSE VISUAL CLAIM</span></div>'+
- info('Backend V4 saat ini tidak memiliki model visual terverifikasi. OMODOS tidak akan mengarang diagnosis dari foto. Fitur ini mengarahkan foto ke attachment Logbook existing dan diagnosis berbasis symptom/evidence tetap dilakukan manusia/AI tekstual.','warn')+
- '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label><label class="v4-form-wide">Symptom singkat<textarea rows="3" data-v4-photo-note placeholder="Contoh: suara abnormal di feeder, bekas gesekan terlihat di sisi operator."></textarea></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-photo-logbook><i class="ph-bold ph-camera"></i> Buka Logbook + Kamera</button><button class="btn btn-sm" data-v4-photo-text-ai><i class="ph-bold ph-brain"></i> Analisis Symptom Teks</button></div><div data-v4-sf-output></div>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BANTUAN DARI FOTO</span><h3>Catat Foto sebagai Bukti</h3></div><span class="v4-no-write">FOTO TIDAK DIANALISIS OTOMATIS</span></div>'+
+ info('OMODOS 4.0 belum memiliki pembaca foto yang terverifikasi. Foto akan dilampirkan ke Logbook, sedangkan pemeriksaan masalah tetap berdasarkan gejala tertulis dan penilaian petugas.','warn')+
+ '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label><label class="v4-form-wide">Gejala singkat<textarea rows="3" data-v4-photo-note placeholder="Contoh: suara abnormal di feeder, bekas gesekan terlihat di sisi operator."></textarea></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-photo-logbook><i class="ph-bold ph-camera"></i> Buka Logbook + Kamera</button><button class="btn btn-sm" data-v4-photo-text-ai><i class="ph-bold ph-brain"></i> Analisis Gejala Teks</button></div><div data-v4-sf-output></div>';
  h.prepend(sec);
 }
 function photoToLogbook(btn){
@@ -1816,9 +1819,9 @@ function photoToLogbook(btn){
 }
 async function photoTextAi(btn){
  var sec=btn.closest('.v4-sf-interaction'),machine=selected(sec,'[data-v4-sf-machine]'),q=selected(sec,'[data-v4-photo-note]'),out=sec.querySelector('[data-v4-sf-output]');
- if(!q.trim()){out.innerHTML=info('Isi symptom teks terlebih dahulu.','warn');return}
+ if(!q.trim()){out.innerHTML=info('Isi gejala dalam bentuk teks terlebih dahulu.','warn');return}
  busy(btn,true,'Menganalisis');
- try{var d=await backendAction('v4.aiAsk',{machine:machine,query:q.trim(),purpose:'troubleshooting'});out.innerHTML='<div class="v4-ai-answer">'+e(d.summary||'Evidence tersedia.').replace(/\n/g,'<br>')+'</div>'+info('Foto tidak dianalisis oleh model visual; jawaban hanya berdasarkan teks + evidence OMODOS.','safe')}
+ try{var d=await backendAction('v4.aiAsk',{machine:machine,query:q.trim(),purpose:'troubleshooting'});out.innerHTML='<div class="v4-ai-answer">'+e(d.summary||'Bukti data tersedia.').replace(/\n/g,'<br>')+'</div>'+info('Foto tidak dianalisis otomatis; jawaban hanya berdasarkan teks dan bukti data OMODOS.','safe')}
  catch(err){out.innerHTML=info(err.message||String(err),'error')}finally{busy(btn,false)}
 }
 function mountQr(){
@@ -1826,15 +1829,15 @@ function mountQr(){
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var supported=!!(window.BarcodeDetector&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='27';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">QR MACHINE ENTRY</span><h3>Scan or Manual Fallback</h3></div><span class="v4-no-write">'+(supported?'QR API READY':'MANUAL FALLBACK')+'</span></div>'+
- '<div class="v4-qr-zone"><video data-v4-qr-video playsinline muted style="display:none"></video><div data-v4-qr-status>'+info(supported?'Kamera baru aktif setelah tombol Scan dipilih.':'Browser ini tidak menyediakan BarcodeDetector QR. Gunakan fallback mesin manual.','safe')+'</div></div>'+
- '<div class="v4-form-grid"><label>Fallback Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-qr-start '+(supported?'':'disabled')+'><i class="ph-bold ph-qr-code"></i> Scan QR</button><button class="btn btn-sm" data-v4-qr-manual>Gunakan Mesin Terpilih</button></div><div data-v4-qr-result></div>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BUKA MESIN LEWAT QR</span><h3>Pindai QR atau Pilih Manual</h3></div><span class="v4-no-write">'+(supported?'QR SIAP':'PILIH MANUAL')+'</span></div>'+
+ '<div class="v4-qr-zone"><video data-v4-qr-video playsinline muted style="display:none"></video><div data-v4-qr-status>'+info(supported?'Kamera baru aktif setelah tombol Pindai QR dipilih.':'Browser ini belum mendukung pemindai QR langsung. Pilih mesin secara manual.','safe')+'</div></div>'+
+ '<div class="v4-form-grid"><label>Pilih Mesin Manual<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-qr-start '+(supported?'':'disabled')+'><i class="ph-bold ph-qr-code"></i> Pindai QR</button><button class="btn btn-sm" data-v4-qr-manual>Gunakan Mesin Terpilih</button></div><div data-v4-qr-result></div>';
  h.prepend(sec);
 }
 async function startQr(btn){
  var sec=btn.closest('.v4-sf-interaction'),video=sec.querySelector('[data-v4-qr-video]'),status=sec.querySelector('[data-v4-qr-status]'),result=sec.querySelector('[data-v4-qr-result]');
- if(!(window.BarcodeDetector&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){status.innerHTML=info('QR native API tidak tersedia.','warn');return}
+ if(!(window.BarcodeDetector&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){status.innerHTML=info('Pemindai QR bawaan tidak tersedia.','warn');return}
  stopQr();busy(btn,true,'Membuka kamera');
  try{
   var detector=new BarcodeDetector({formats:['qr_code']});
@@ -1862,10 +1865,10 @@ function mountNfc(){
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var supported='NDEFReader' in window;
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='28';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">NFC MAINTENANCE TAG</span><h3>Read-only Tag Entry</h3></div><span class="v4-no-write">'+(supported?'WEB NFC READY':'MANUAL FALLBACK')+'</span></div>'+
- info(supported?'NFC dibaca hanya setelah Anda memilih Scan NFC.':'Web NFC tidak didukung browser/perangkat ini. Fallback manual tetap tersedia; tidak ada error atau fitur palsu.','safe')+
- '<div class="v4-form-grid"><label>Fallback Mesin<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-nfc-start '+(supported?'':'disabled')+'><i class="ph-bold ph-wifi-high"></i> Scan NFC</button><button class="btn btn-sm" data-v4-nfc-manual>Gunakan Mesin Terpilih</button></div><div data-v4-nfc-result></div>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BUKA MESIN LEWAT NFC</span><h3>Baca NFC atau Pilih Manual</h3></div><span class="v4-no-write">'+(supported?'NFC SIAP':'PILIH MANUAL')+'</span></div>'+
+ info(supported?'NFC baru dibaca setelah Anda memilih Pindai NFC.':'Browser atau perangkat ini belum mendukung NFC. Pilih mesin secara manual.','safe')+
+ '<div class="v4-form-grid"><label>Pilih Mesin Manual<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-nfc-start '+(supported?'':'disabled')+'><i class="ph-bold ph-wifi-high"></i> Pindai NFC</button><button class="btn btn-sm" data-v4-nfc-manual>Gunakan Mesin Terpilih</button></div><div data-v4-nfc-result></div>';
  h.prepend(sec);
 }
 async function startNfc(btn){
@@ -1897,10 +1900,10 @@ function mountOffline(){
  try{q=JSON.parse(localStorage.getItem('logbook_pending_sync_queue')||'[]')}catch(err){}
  var online=navigator.onLine;
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='30';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OFFLINE EXPEDITION MODE</span><h3>Existing Offline Queue Status</h3></div><span class="v4-no-write">'+(online?'ONLINE':'OFFLINE')+'</span></div>'+
- '<div class="v4-statline"><div><b>'+(online?'Online':'Offline')+'</b><span>Browser network</span></div><div><b>'+q.length+'</b><span>Pending sync queue</span></div><div><b>Existing</b><span>Uses base OMODOS queue</span></div></div>'+
- info('OMODOS existing sudah menyimpan request gagal ke antrean lokal dan menyinkron otomatis saat koneksi kembali. V4 tidak membuat antrean kedua.','safe')+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-offline-logbook><i class="ph-bold ph-notebook"></i> Buka Input Logbook</button><button class="btn btn-sm" data-v4-offline-refresh>Refresh Status</button></div>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">MODE TANPA INTERNET</span><h3>Status Antrean Saat Offline</h3></div><span class="v4-no-write">'+(online?'TERHUBUNG':'TANPA INTERNET')+'</span></div>'+
+ '<div class="v4-statline"><div><b>'+(online?'Terhubung':'Tanpa Internet')+'</b><span>Koneksi browser</span></div><div><b>'+q.length+'</b><span>Menunggu sinkronisasi</span></div><div><b>OMODOS</b><span>Memakai antrean yang sama</span></div></div>'+
+ info('OMODOS menyimpan kiriman yang gagal ke antrean lokal dan mencoba menyinkronkannya saat koneksi kembali. OMODOS 4.0 tidak membuat antrean kedua.','safe')+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-offline-logbook><i class="ph-bold ph-notebook"></i> Buka Input Logbook</button><button class="btn btn-sm" data-v4-offline-refresh>Muat Ulang Status</button></div>';
  h.prepend(sec);
 }
 function mount(n){
@@ -2878,7 +2881,7 @@ function evidenceTitle(e){
  if(!e||typeof e!=='object')return String(e||'Evidence');
  var r=e.record&&typeof e.record==='object'?e.record:e;
  return first(r,['Nama Mesin','namaMesin','Machine','Mesin','Title','Judul','Problem','Deskripsi Masalah','Deskripsi','description','Nama Material','Nama','ID'])||
-        first(e,['machine','title','problem','description','sheet','source'])||'Evidence';
+        first(e,['machine','title','problem','description','sheet','source'])||'Bukti data';
 }
 function evidenceHtml(arr,limit){
  if(!Array.isArray(arr)||!arr.length)return empty('Tidak ada evidence source tambahan yang ditemukan.');
