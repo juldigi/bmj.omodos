@@ -133,16 +133,16 @@ var SIMPLE_FEATURE = {
  59:{name:'Ringkasan Data IPAL',help:'Lihat angka IPAL yang tercatat tanpa menyimpulkan lolos atau tidak terhadap batas resmi.'},
  60:{name:'Ringkasan 1 Menit',help:'Baca hal penting hari ini secara cepat.'},
 
- 61:{name:'Ringkasan Keahlian Teknisi',help:'Lihat ringkasan pengalaman, penilaian, mesin yang pernah ditangani, RCA, dan pengetahuan yang tercatat.'},
- 62:{name:'Teknisi & Mesin yang Dikuasai',help:'Lihat hubungan teknisi dengan mesin dari riwayat kerja.'},
- 63:{name:'Cari Orang Berpengalaman',help:'Cari orang yang pernah menangani masalah atau mesin serupa.'},
+ 61:{name:'Ringkasan Pengalaman & Penilaian Teknisi',help:'Lihat riwayat kerja, penilaian, mesin yang pernah ditangani, RCA, dan pengetahuan yang tercatat tanpa membuat nilai kinerja otomatis.'},
+ 62:{name:'Teknisi & Mesin yang Pernah Ditangani',help:'Lihat hubungan teknisi dengan mesin berdasarkan Logbook dan RCA yang tercatat.'},
+ 63:{name:'Cari Teknisi dengan Pengalaman Terkait',help:'Cari teknisi yang punya bukti keterlibatan pada mesin atau kasus serupa. Hasil bukan peringkat kinerja.'},
  64:{name:'Riwayat Pengalaman Teknisi',help:'Lihat pengalaman teknisi yang tercatat di OMODOS.'},
- 65:{name:'Risiko Hilangnya Pengetahuan',help:'Lihat area yang pengetahuannya hanya dimiliki sedikit orang.'},
- 66:{name:'Keahlian yang Perlu Dipelajari',help:'Lihat gap keahlian yang memang tercatat.'},
- 67:{name:'Rencana Belajar',help:'Lihat langkah belajar yang disusun dari gap, standar, pengalaman mesin, dan kandidat mentor yang tercatat.'},
- 68:{name:'Cari Mentor',help:'Cari kandidat mentor berdasarkan pengalaman yang tercatat.'},
- 69:{name:'Latihan Cari Masalah',help:'Belajar dari kasus nyata tanpa mengubah data.'},
- 70:{name:'Bukti Kompetensi',help:'Lihat bukti kompetensi yang sudah tercatat.'},
+ 65:{name:'Risiko Pengetahuan Terbatas',help:'Lihat mesin yang bukti pengalaman orang dan dokumentasi pengetahuannya masih terbatas.'},
+ 66:{name:'Kebutuhan Belajar yang Tercatat',help:'Lihat gap atau kebutuhan pengembangan yang memang tercatat pada penilaian.'},
+ 67:{name:'Saran Rencana Belajar',help:'Lihat saran langkah belajar dari gap, standar, riwayat mesin, dan kandidat mentor yang tersedia. Atasan tetap menentukan rencana resminya.'},
+ 68:{name:'Kandidat Mentor',help:'Lihat kandidat mentor berdasarkan bukti pengalaman yang tercatat. Penunjukan tetap perlu persetujuan.'},
+ 69:{name:'Latihan dari Kasus Nyata',help:'Berlatih membaca masalah berulang dan referensi RCA nyata tanpa mengubah data.'},
+ 70:{name:'Bukti Penilaian & Pengalaman',help:'Lihat penilaian, riwayat mesin, RCA, dan pengetahuan yang sudah tercatat tanpa menyimpulkan kinerja otomatis.'},
 
  71:{name:'Tanya OMODOS',help:'Tanyakan sesuatu dengan bahasa biasa dan lihat sumber datanya.'},
  72:{name:'Tanya Tentang Mesin',help:'Tanyakan kondisi satu mesin tanpa mencampur data mesin lain.'},
@@ -2778,8 +2778,8 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  Array.from(h.querySelectorAll('.v4-interaction[data-v4-interaction-feature="'+n+'"],.v4-people-intel')).forEach(function(x){x.remove()});
  var titles={
-  61:'Ringkasan Keahlian Teknisi',62:'Teknisi & Mesin yang Dikuasai',63:'Cari Orang Berpengalaman',64:'Riwayat Pengalaman Teknisi',65:'Risiko Hilangnya Pengetahuan',
-  66:'Keahlian yang Perlu Dipelajari',67:'Rencana Belajar',68:'Cari Mentor',69:'Latihan Cari Masalah',70:'Bukti Kompetensi'
+  61:'Ringkasan Pengalaman & Penilaian Teknisi',62:'Teknisi & Mesin yang Pernah Ditangani',63:'Cari Teknisi dengan Pengalaman Terkait',64:'Riwayat Pengalaman Teknisi',65:'Risiko Pengetahuan Terbatas',
+  66:'Kebutuhan Belajar yang Tercatat',67:'Saran Rencana Belajar',68:'Kandidat Mentor',69:'Latihan dari Kasus Nyata',70:'Bukti Penilaian & Pengalaman'
  };
  var controls='';
  if(n===63)controls='<div class="v4-form-grid"><label>Mesin<select data-v4-pi-machine><option value="">Muat data untuk melihat mesin</option></select></label><label class="v4-form-wide">Masalah / gejala<input data-v4-pi-query placeholder="Contoh: sensor register error"></label></div>';
@@ -2808,19 +2808,20 @@ function render61(d){
  ])+
  list(rows,function(x){
   var machines=Array.isArray(x.machines)&&x.machines.length?x.machines.slice(0,4).join(', '):'belum ada bukti pengalaman mesin';
-  return item(x.name||'Personel',(x.position||'Posisi belum tercatat')+' • '+machines+' • RCA '+fmt(x.rcaCount,0)+' • Pengetahuan '+fmt(x.knowledgeCount,0),chip('Bukti '+fmt(x.evidenceScore,0)));
- },80)+note('Jumlah catatan membantu menemukan pengalaman terkait; angka ini bukan nilai kemampuan atau kinerja.','warn');
+  var mc=Array.isArray(x.machines)?x.machines.length:0;
+  return item(x.name||'Personel',(x.position||'Posisi belum tercatat')+' • '+machines+' • RCA '+fmt(x.rcaCount,0)+' • Pengetahuan '+fmt(x.knowledgeCount,0),chip(fmt(mc,0)+' mesin tercatat'));
+ },80)+note('Ringkasan memakai catatan pengalaman dan penilaian yang sudah ada. Tidak ada skor kemampuan atau peringkat kinerja otomatis pada tampilan ini.','warn');
 }
 function render62(d){
  return list(d.skillToMachine,function(x){
   return item(x.person||'Personel',(x.machine||'Mesin')+' • Logbook '+fmt(x.logbook,0)+' • RCA '+fmt(x.rca,0)+' • Terakhir '+String(x.lastSeen||'—').slice(0,10),chip(fmt(x.evidenceEvents,0)+' kejadian'));
- },100)+note('Hubungan teknisi dan mesin berasal dari pekerjaan yang tercatat; petugas tetap perlu memastikan kewenangannya.','safe');
+ },100)+note('Hubungan ini berarti teknisi pernah tercatat bekerja pada mesin tersebut melalui Logbook/RCA. Ini tidak otomatis berarti teknisi sudah menguasai seluruh bagian mesin atau memiliki kewenangan tertentu.','safe');
 }
 function render65(d){
  function riskLabel(v){var u=String(v||'').toUpperCase();return u==='HIGH'?'Tinggi':u==='MEDIUM'?'Sedang':u==='LOW'?'Rendah':String(v||'—')}
  return list(d.knowledgeRisk,function(x){
-  return item(x.machine||'Mesin','Orang berpengalaman '+fmt(x.experiencedPeople,0)+' • Bukti '+fmt(x.evidenceEvents,0)+' • Pengetahuan '+fmt(x.knowledgeArticles,0)+' • RCA '+fmt(x.rca,0),chip('Risiko '+riskLabel(x.risk)+' • '+fmt(x.riskScore,0)));
- },100)+note('Jika pengetahuan hanya tercatat pada sedikit orang, pertimbangkan berbagi pengalaman atau melengkapi dokumentasi.','warn');
+  return item(x.machine||'Mesin','Orang dengan bukti pengalaman '+fmt(x.experiencedPeople,0)+' • Kejadian tercatat '+fmt(x.evidenceEvents,0)+' • Artikel pengetahuan '+fmt(x.knowledgeArticles,0)+' • RCA '+fmt(x.rca,0),chip('Sinyal risiko '+riskLabel(x.risk)+' • indeks data '+fmt(x.riskScore,0)));
+ },100)+note('Indeks ini diturunkan dari jumlah orang dengan bukti pengalaman, kejadian yang tercatat, artikel pengetahuan, dan RCA. Ini bukan ramalan seseorang akan keluar atau pengetahuan pasti hilang. Gunakan untuk menentukan area yang perlu lebih banyak dokumentasi dan berbagi pengalaman.','warn');
 }
 function gapText(x){
  var g=x&&x.gap;
@@ -2834,7 +2835,7 @@ function render66(d){
 }
 function render67(d){
  var rows=Array.isArray(d.adaptiveLearning)?d.adaptiveLearning:[];
- if(!rows.length)return empty('Belum ada gap kompetensi tercatat yang dapat dibuat menjadi rencana belajar.');
+ if(!rows.length)return empty('Belum ada kebutuhan belajar tercatat yang dapat disusun menjadi saran langkah belajar.');
  return '<div class="v4-sf-list">'+rows.slice(0,80).map(function(x){
   var gaps=Array.isArray(x.gaps)?x.gaps:[],standards=Array.isArray(x.standards)?x.standards:[],
       machines=Array.isArray(x.machines)?x.machines:[],mentors=Array.isArray(x.mentorCandidates)?x.mentorCandidates:[],
@@ -2849,12 +2850,12 @@ function render67(d){
    '</div>'+
    (steps.length?'<ol class="v4-learning-steps">'+steps.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ol>':'')+
    '</details>';
- }).join('')+'</div>'+note('Rencana ini disusun dari bukti yang tercatat. Atasan dan teknisi tetap menentukan prioritas, jadwal, mentor, dan penilaian ulang.','warn');
+ }).join('')+'</div>'+note('Ini adalah saran yang disusun dari bukti tercatat, bukan rencana training resmi. Atasan dan teknisi tetap menentukan prioritas, jadwal, mentor, metode belajar, dan penilaian ulang.','warn');
 }
 function render68(d){
  return list(d.mentorMatches,function(x){
   var mentors=(x.mentors||[]).map(function(m){return m.name+' ['+(m.sharedMachines||[]).slice(0,3).join(', ')+']'}).join(' • ');
-  return item(x.mentee||'Kandidat yang dibimbing',mentors||'Belum ada kandidat mentor',chip('KANDIDAT'));
+  return item(x.mentee||'Teknisi yang membutuhkan pendampingan',mentors||'Belum ada kandidat mentor',chip('Kandidat dari data'));
  },100)+note('Calon mentor dipilih dari pengalaman yang tercatat. Penunjukan mentor tetap perlu persetujuan.','warn');
 }
 function render69(d){
@@ -2880,11 +2881,11 @@ function render70Person(p){
  var ev=p.competencyEvidence||{};
  return metrics([
   ['Penilaian teknis',fmt(p.hardAssessments,0)],['Penilaian perilaku',fmt(p.softAssessments,0)],
-  ['Kompeten',fmt(p.competent,0)],['Perlu dikembangkan',fmt(p.notCompetent,0)],
+  ['Status kompeten tercatat',fmt(p.competent,0)],['Perlu dikembangkan tercatat',fmt(p.notCompetent,0)],
   ['Bukti RCA',fmt(p.rcaCount,0)],['Pengetahuan',fmt(p.knowledgeCount,0)]
  ])+
  list(p.machineEvidence,function(x){
-  return item(x.machine||'Mesin','Kejadian '+fmt(x.events,0)+' • Logbook '+fmt(x.logbook,0)+' • RCA '+fmt(x.rca,0)+' • Terakhir '+(x.lastSeen?new Date(x.lastSeen).toISOString().slice(0,10):'—'),chip('BUKTI MESIN'));
+  return item(x.machine||'Mesin','Kejadian '+fmt(x.events,0)+' • Logbook '+fmt(x.logbook,0)+' • RCA '+fmt(x.rca,0)+' • Terakhir '+(x.lastSeen?new Date(x.lastSeen).toISOString().slice(0,10):'—'),chip('Bukti pengalaman mesin'));
  },30)+
  note('Bagian ini mengumpulkan bukti pengalaman dan penilaian yang sudah ada. Sistem tidak memberi nilai kinerja otomatis.','warn');
 }
@@ -2895,7 +2896,7 @@ function passportView(p){
   ['Penilaian teknis',fmt(p.hardAssessments,0)],['Penilaian perilaku',fmt(p.softAssessments,0)],
   ['RCA',fmt(p.rcaCount,0)],['Pengetahuan',fmt(p.knowledgeCount,0)]
  ])+
- '<div class="v4-sf-list">'+item(p.name||'Personel',(p.position||'Posisi belum tercatat')+' • Mesin: '+machines,chip('RINGKASAN DATA'))+'</div>'+
+ '<div class="v4-sf-list">'+item(p.name||'Personel',(p.position||'Posisi belum tercatat')+' • Mesin: '+machines,chip('Ringkasan data'))+'</div>'+
  note('Riwayat ini merangkum pekerjaan yang tercatat. Isinya bukan penilaian kinerja resmi.','safe');
 }
 async function render63(sec,out){
@@ -2903,7 +2904,7 @@ async function render63(sec,out){
  if(!machine&&!query){out.innerHTML=note('Pilih mesin atau isi masalah/gejala agar pencarian orang berpengalaman tidak terlalu luas.','warn');return}
  var d=await window.OMODOS4.serverRead('v4.getExpertFinder',{machine:machine,query:query});
  out.innerHTML=list(d&&d.experts,function(x){
-  return item(x.name||'Personel','Kejadian tercatat '+fmt(x.events,0)+' • Kejadian pada mesin '+fmt(x.machineEvents,0)+' • Kasus mirip '+fmt(x.similarityEvidence,0)+' • Penilaian teknis '+fmt(x.hardSkillAssessments,0),chip('Kecocokan bukti '+fmt(x.score,0)));
+  return item(x.name||'Personel','Kejadian tercatat '+fmt(x.events,0)+' • Kejadian pada mesin '+fmt(x.machineEvents,0)+' • Kasus mirip '+fmt(x.similarityEvidence,0)+' • Penilaian teknis '+fmt(x.hardSkillAssessments,0),chip('Indeks bukti terkait '+fmt(x.score,0)));
  },30)+note('Urutan orang didasarkan pada keterlibatan dalam kasus serupa, bukan peringkat kinerja.','warn');
 }
 async function render64(sec,out){
