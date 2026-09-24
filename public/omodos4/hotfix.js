@@ -85,8 +85,8 @@ var SIMPLE_FEATURE = {
  15:{name:'Masalah Mirip Antar Mesin',help:'Bandingkan masalah serupa pada mesin yang berbeda.'},
  16:{name:'Penurunan Diam-Diam',help:'Cari perubahan kecil yang mungkin luput dari perhatian.'},
  17:{name:'Ciri Khas Kerusakan',help:'Lihat pola gejala yang sering muncul bersama.'},
- 18:{name:'Keyakinan Prediksi',help:'Lihat seberapa kuat bukti yang mendukung suatu risiko.'},
- 19:{name:'Perkiraan Sisa Umur',help:'Lihat perkiraan berbasis data, bukan kepastian kerusakan.'},
+ 18:{name:'Kekuatan Bukti Risiko',help:'Lihat seberapa kuat dan lengkap bukti yang mendukung suatu risiko.'},
+ 19:{name:'Perkiraan Jarak Penggantian',help:'Lihat perkiraan waktu penggantian berikutnya dari pola penggantian yang pernah tercatat.'},
  20:{name:'Bagian yang Perlu Dicek',help:'Lihat bagian atau mesin yang paling perlu diperiksa.'},
 
  21:{name:'Tugas Teknisi',help:'Lihat pekerjaan yang perlu dilakukan teknisi.'},
@@ -106,8 +106,8 @@ var SIMPLE_FEATURE = {
  34:{name:'Pemakaian Sparepart',help:'Lihat sparepart yang paling sering digunakan.'},
  35:{name:'Mesin & Sparepart Terkait',help:'Lihat sparepart yang tercatat terkait dengan mesin.'},
  36:{name:'Cari Sparepart Pengganti',help:'Cari kandidat sparepart pengganti untuk ditinjau manusia.'},
- 37:{name:'Kenali Sparepart dari Foto',help:'Gunakan foto untuk membantu mengenali sparepart.'},
- 38:{name:'Peta Rak Sparepart',help:'Lihat posisi dan hubungan data rak sparepart.'},
+ 37:{name:'Foto Referensi Sparepart',help:'Lihat foto referensi sparepart yang sudah tercatat tanpa menebak isi foto.'},
+ 38:{name:'Lokasi Sparepart',help:'Lihat lokasi atau rak sparepart yang sudah tercatat.'},
  39:{name:'Perkiraan Kebutuhan Sparepart',help:'Lihat kebutuhan sparepart berdasarkan catatan pemakaian.'},
  40:{name:'Urutan Pembelian Sparepart',help:'Lihat sparepart mana yang perlu dibeli lebih dulu.'},
 
@@ -2008,7 +2008,7 @@ function mount(n){
  var old=h.querySelector('.v4-sparepart-intel');if(old)old.remove();
  var titles={
  31:'Tingkat Penting Sparepart',32:'Risiko Stok Habis',33:'Sparepart Tidak Terpakai',34:'Pemakaian Sparepart',35:'Mesin & Sparepart Terkait',
- 36:'Cari Sparepart Pengganti',37:'Kenali Sparepart dari Foto',38:'Peta Rak Sparepart',39:'Perkiraan Kebutuhan Sparepart',40:'Urutan Pembelian Sparepart'
+ 36:'Cari Sparepart Pengganti',37:'Foto Referensi Sparepart',38:'Lokasi Sparepart',39:'Perkiraan Kebutuhan Sparepart',40:'Urutan Pembelian Sparepart'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-sparepart-intel';sec.dataset.v4SpFeature=String(n);
  var controls='';
