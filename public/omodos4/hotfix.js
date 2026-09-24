@@ -1183,7 +1183,7 @@ async function hydrateTimeMachine(){
 }
 document.addEventListener('click',function(e){
  var feature=e.target.closest&&e.target.closest('[data-v4-feature]');
- if(feature){var n=Number(feature.getAttribute('data-v4-feature'));setTimeout(function(){hydrateFeature(n)},0);return}
+ if(feature){var n=Number(feature.getAttribute('data-v4-feature'));/* Fitur 001–100 sudah memiliki renderer khusus. Jangan tambahkan panel server generik yang membuat semua halaman terasa sama. */if(n<1||n>100)setTimeout(function(){hydrateFeature(n)},0);return}
  if(e.target.closest&&e.target.closest('#v4-nav-group [data-v4-root]')){setTimeout(hydrateOverview,0);return}
  if(e.target.closest&&e.target.closest('[data-v4-time-machine-run]')){setTimeout(hydrateTimeMachine,0);return}
 },false);
