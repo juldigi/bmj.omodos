@@ -3090,9 +3090,7 @@ async function run72(sec,out,q,m){
 }
 async function run73or74(n,sec,out,q,m){
  var brief=await getBriefContext(m);
- var briefText=brief&&Array.isArray(brief.summary)?brief.summary.join(' | '):'';
- var enriched=q+(briefText?'\nInternal brief context: '+briefText:'');
- var ai=await action('v4.aiAsk',{query:enriched.slice(0,4000),purpose:AI2_CFG[n].purpose,machine:m||''});
+ var ai=await action('v4.aiAsk',{query:q,purpose:AI2_CFG[n].purpose,machine:m||''});
  out.innerHTML=briefHtml(brief)+aiHtml(ai);
 }
 async function run75(sec,out,q,m){
