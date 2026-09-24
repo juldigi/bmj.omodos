@@ -1076,13 +1076,17 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
         const dt = dateValue(events[i]) - dateValue(events[i - 1]);
         if (dt > 0) intervals.push(dt / 36e5);
       }
+      const repairEvents = events.filter((r) => downtimeMinutes(r) > 0);
+      const failureDowntimeMinutes = events.reduce((n, r) => n + downtimeMinutes(r), 0);
       return {
         ...m,
         mtbfDerivedHours: intervals.length ? Math.round(intervals.reduce((x, y) => x + y, 0) / intervals.length * 10) / 10 : null,
-        mttrDerivedMinutes: events.length ? Math.round(events.reduce((n, r) => n + downtimeMinutes(r), 0) / events.length) : null,
-        reliabilityEvidenceEvents: events.length
+        mttrDerivedMinutes: repairEvents.length ? Math.round(repairEvents.reduce((n, r) => n + downtimeMinutes(r), 0) / repairEvents.length) : null,
+        failureDowntimeMinutes: Math.round(failureDowntimeMinutes),
+        reliabilityEvidenceEvents: events.length,
+        repairDurationEvidenceEvents: repairEvents.length
       };
-    }).sort((x, y) => x.healthIndex - y.healthIndex || y.downtimeMinutes - x.downtimeMinutes);
+    }).sort((x, y) => x.healthIndex - y.healthIndex || y.failureDowntimeMinutes - x.failureDowntimeMinutes);
     const monthly = /* @__PURE__ */ new Map();
     failureEvents.forEach((r) => {
       const t = dateValue(r);
@@ -1097,7 +1101,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const reliabilityGrowth = [...monthly.values()].sort((x, y) => x.month.localeCompare(y.month)).map((x) => ({ month: x.month, breakdowns: x.breakdowns, downtimeMinutes: Math.round(x.downtimeMinutes), affectedMachines: x.machines.size }));
     const hidden = /* @__PURE__ */ new Map();
-    log.filter((r) => downtimeMinutes(r) > 0 && !/breakdown|emergency/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori"])))).forEach((r) => {
+    log.filter((r) => downtimeMinutes(r) > 0 && !/breakdown|emergency|failure|abnormal|corrective/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori", "Status"])))).forEach((r) => {
       const key = machineCode(r) || machineName(r) || "Unassigned", cur = hidden.get(key) || { machine: key, events: 0, downtimeMinutes: 0 };
       cur.events++;
       cur.downtimeMinutes += downtimeMinutes(r);
@@ -1172,7 +1176,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       countermeasureEffectiveness: correctiveEffectiveness,
       costIntelligence,
       totals: { machines: enriched.length, breakdowns: enriched.reduce((n, m) => n + m.breakdowns, 0), downtimeMinutes: totalDowntime, recurringPatterns: enriched.reduce((n, m) => n + m.recurring, 0), rca: rca.length, corrective: corrective.length },
-      logicVersion: "v4-reliability-4",
+      logicVersion: "v4-reliability-5",
       appliedScope: { machine: scope.machine || "", area: scope.area || "" },
       lineage: { sourceOfTruth: "EXISTING_OMODOS", operationalWrites: "NONE" },
       caveat: "Derived MTBF/MTTR and countermeasure signals use recorded event timing. They do not replace official KPI definitions where those are maintained separately."
