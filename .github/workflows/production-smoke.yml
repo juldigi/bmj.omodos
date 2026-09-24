@@ -31,9 +31,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT_URL="https://omodos.offsetbmj.workers.dev/"
-          API_URL="https://omodos.offsetbmj.workers.dev/api"
-          JS_URL="https://omodos.offsetbmj.workers.dev/omodos4/hotfix.js"
+          ROOT_URL="https://omodos.juldigi.workers.dev/"
+          API_URL="https://omodos.juldigi.workers.dev/api"
+          JS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.js"
           passed=0
 
           for i in $(seq 1 24); do
