@@ -3034,7 +3034,7 @@ function evidenceHtml(arr,limit){
   var src=first(e,['sheet','source','type','label'])||'OMODOS';
   var machine=first(e,['machine']);
   var score=e&&e.score!=null?' • kecocokan '+fmt(e.score,2):'';
-  return '<div class="v4-sf-item"><div><strong>'+esc(evidenceTitle(e))+'</strong><small>'+esc(src+(machine?' • '+machine:'')+score)+'</small></div>'+chip('SUMBER')+'</div>';
+  return '<div class="v4-sf-item"><div><strong>'+esc(evidenceTitle(e))+'</strong><small>'+esc(src+(machine?' • '+machine:'')+score)+'</small></div>'+chip('Sumber data')+'</div>';
  }).join('')+'</div>';
 }
 function aiHtml(d){
@@ -3071,11 +3071,12 @@ function controls(n,cfg){
   '<textarea data-v4-ai2-query rows="4" maxlength="4000" placeholder="'+esc(cfg.placeholder)+'">'+esc(cfg.defaultText)+'</textarea></label></div>';
 }
 function buttons(n){
+ var labels={71:'Tanyakan',72:'Tanyakan soal mesin',73:'Buat ringkasan shift',74:'Buat ringkasan pagi',75:'Buat draf RCA',76:'Cari kasus mirip',77:'Cari jawaban di manual',78:'Cari kandidat pengetahuan',79:'Sederhanakan istilah',80:'Periksa asumsi'};
  var extra='';
  if(n===71||n===72||n===73||n===74||n===79||n===80)extra='<button class="btn btn-sm" data-v4-open-copilot><i class="ph-bold ph-brain"></i> Buka Copilot</button>';
  if(n===75)extra='<button class="btn btn-sm" data-v4-open-existing="diagnostic"><i class="ph-bold ph-file-magnifying-glass"></i> Buka RCA Existing</button>';
  if(n===77||n===78)extra='<button class="btn btn-sm" data-v4-open-existing="knowledge"><i class="ph-bold ph-books"></i> Buka Pengetahuan</button>';
- return '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-ai2-run="'+n+'"><i class="ph-bold ph-sparkle"></i> '+(n===78?'Muat Kandidat':'Jalankan')+'</button>'+extra+'</div>';
+ return '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-ai2-run="'+n+'"><i class="ph-bold ph-sparkle"></i> '+esc(labels[n]||'Tampilkan hasil')+'</button>'+extra+'</div>';
 }
 function intro(n){
  var text='Bukti diambil dari data OMODOS yang sudah ada. Asisten tidak boleh mengubah data operasional secara otomatis.';
@@ -3096,7 +3097,7 @@ function mount(n){
  var sec=document.createElement('section');
  sec.className='v4-interaction v4-ai2-interaction';
  sec.setAttribute('data-v4-ai2-feature',String(n));
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ASISTEN • BERDASARKAN CATATAN</span><h3>'+esc(cfg.title)+'</h3></div><span class="v4-no-write">Tidak menyimpan otomatis</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ASISTEN OMODOS • DARI DATA TERCATAT</span><h3>'+esc(cfg.title)+'</h3></div><span class="v4-no-write">Tidak menyimpan otomatis</span></div>'+
   intro(n)+controls(n,cfg)+buttons(n)+'<div data-v4-ai2-out></div>';
  h.prepend(sec);
 }
@@ -3160,7 +3161,7 @@ function candidateHtml(d){
   var sourceIds=Array.isArray(x.sourceIds)&&x.sourceIds.length?' • ID sumber '+x.sourceIds.slice(0,5).join(', '):'';
   var sub=(x.machine||'Mesin belum tercatat')+' • Berulang '+fmt(x.recurrence,0)+'x • '+(x.problem||'Masalah belum tercatat')+
    (x.mostRecordedAction?' • Tindakan yang sering tercatat: '+x.mostRecordedAction:'')+sourceIds;
-  return '<div class="v4-sf-item"><div><strong>'+esc(x.label||'KANDIDAT_PENGETAHUAN')+'</strong><small>'+esc(sub)+'</small></div>'+chip(x.existingKnowledgePossibleMatch?'PERIKSA PENGETAHUAN YANG ADA':'KANDIDAT DRAF')+'</div>';
+  return '<div class="v4-sf-item"><div><strong>'+esc('Calon artikel pengetahuan')+'</strong><small>'+esc(sub)+'</small></div>'+chip(x.existingKnowledgePossibleMatch?'Periksa artikel yang ada':'Belum disimpan')+'</div>';
  }).join('')+'</div>':empty('Belum ada kandidat pengetahuan dari kasus berulang yang sudah diselesaikan atau RCA.');
  return head+body+note(d&&d.note||'Periksa Pengetahuan yang sudah ada lebih dulu agar tidak membuat duplikat.','warn');
 }
