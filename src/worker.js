@@ -1134,6 +1134,29 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     } : { status: "NOT AVAILABLE", records: 0, note: "No explicit failure/downtime cost field was recorded in the selected source rows." };
     const pareto = enriched.slice().sort((x, y) => y.downtimeMinutes + y.breakdowns * 60 - (x.downtimeMinutes + x.breakdowns * 60)).slice(0, 20);
     const paretoNarrative = pareto.slice(0, 5).map((m, i) => ({ rank: i + 1, machine: m.code || m.name || m.key, why: Math.round(m.downtimeMinutes) + " min downtime, " + m.breakdowns + " breakdown(s), " + m.recurring + " recurring pattern(s)", inspect: m.openIssues ? "Resolve " + m.openIssues + " open issue(s) and validate recurring evidence." : "Review highest loss drivers and prior RCA/corrective evidence." }));
+    const problemMap = /* @__PURE__ */ new Map();
+    failureEvents.forEach((r) => {
+      const label = description(r) || text(first(r, ["Problem", "Deskripsi Masalah", "Judul", "Title"]));
+      const key = lower(label).replace(/\s+/g, " ").trim();
+      if (!key) return;
+      const cur = problemMap.get(key) || { problem: label, events: 0, downtimeMinutes: 0, openEvents: 0, machines: /* @__PURE__ */ new Set(), latestAt: 0 };
+      cur.events++;
+      cur.downtimeMinutes += downtimeMinutes(r);
+      if (!isClosed(r)) cur.openEvents++;
+      const machine = machineCode(r) || machineName(r);
+      if (machine) cur.machines.add(machine);
+      cur.latestAt = Math.max(cur.latestAt, dateValue(r) || 0);
+      problemMap.set(key, cur);
+    });
+    const problemPareto = [...problemMap.values()].map((x) => ({
+      problem: x.problem,
+      events: x.events,
+      downtimeMinutes: Math.round(x.downtimeMinutes),
+      openEvents: x.openEvents,
+      machineCount: x.machines.size,
+      machines: [...x.machines].slice(0, 12),
+      latestAt: x.latestAt ? new Date(x.latestAt).toISOString() : ""
+    })).sort((a, b) => b.events - a.events || b.downtimeMinutes - a.downtimeMinutes || b.openEvents - a.openEvents).slice(0, 50);
     return { ok: true, data: {
       generatedAt: nowIso(),
       range: { since: new Date(range.since).toISOString(), until: new Date(range.until).toISOString() },
@@ -1142,13 +1165,14 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       acute: enriched.filter((m) => m.downtimeMinutes > 0 && m.recurring < 2).sort((x, y) => y.downtimeMinutes - x.downtimeMinutes).slice(0, 20),
       pareto,
       paretoNarrative,
+      problemPareto,
       hiddenFactory,
       reliabilityGrowth,
       rcaMemory: rca.slice().sort((x, y) => dateValue(y) - dateValue(x)).slice(0, 40).map((r) => cleanRecord(r, 14)),
       countermeasureEffectiveness: correctiveEffectiveness,
       costIntelligence,
       totals: { machines: enriched.length, breakdowns: enriched.reduce((n, m) => n + m.breakdowns, 0), downtimeMinutes: totalDowntime, recurringPatterns: enriched.reduce((n, m) => n + m.recurring, 0), rca: rca.length, corrective: corrective.length },
-      logicVersion: "v4-reliability-3",
+      logicVersion: "v4-reliability-4",
       appliedScope: { machine: scope.machine || "", area: scope.area || "" },
       lineage: { sourceOfTruth: "EXISTING_OMODOS", operationalWrites: "NONE" },
       caveat: "Derived MTBF/MTTR and countermeasure signals use recorded event timing. They do not replace official KPI definitions where those are maintained separately."
@@ -9195,8 +9219,53 @@ function createBackend(services, env = {}) {
       if (q.length > 4e3) throw { code: "VALIDATION_ERROR", message: "query terlalu panjang" };
       var allowedPurpose = ["ask", "machine", "shift", "morning-brief", "rca-draft", "kaizen-draft", "troubleshooting", "manual", "translate", "skeptic"];
       body.purpose = allowedPurpose.indexOf(String(body.purpose || "ask")) >= 0 ? String(body.purpose || "ask") : "ask";
-      var ev = JSON.parse(OMODOS4.dispatch({ action: "v4.ask", query: q, machine: body.machine || "", since: body.since, until: body.until }).getContent());
-      body._v4Evidence = ev && ev.ok ? ev.data : { query: q, evidence: [], confidence: "low", answer: "Belum ditemukan evidence internal." };
+      if (body.purpose === "translate") {
+        body._v4Evidence = {
+          query: q,
+          evidence: [],
+          confidence: "not-applicable",
+          answer: "Layanan terjemahan membutuhkan model bahasa. Data internal OMODOS sengaja tidak digunakan untuk fitur ini.",
+          assumptions: ["Terjemahan hanya memakai teks yang dimasukkan pengguna; tidak mencari Logbook, mesin, sparepart, KPI, atau data internal lain."],
+          recommendation: "Periksa kembali istilah yang menyangkut keselamatan, spesifikasi, atau nama komponen."
+        };
+      } else if (body.purpose === "manual") {
+        var manualMachine = String(body.machine || "").trim();
+        if (!manualMachine) throw { code: "VALIDATION_ERROR", message: "machine wajib untuk Tanya Manual" };
+        var passportRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getMachinePassport", machine: manualMachine }).getContent());
+        var passport = passportRes && passportRes.ok && passportRes.data ? passportRes.data : null;
+        var manualEvidence = [];
+        if (passport && passport.knowledge) {
+          var manual = passport.knowledge.manual || {};
+          if (manual.manualPdf || manual.reference || manual.sourceNote) {
+            manualEvidence.push({
+              sheet: "Master_Mesin",
+              score: 10,
+              machine: manualMachine,
+              record: {
+                "Nama Mesin": passport.identity && (passport.identity["Nama Mesin"] || passport.identity.name) || manualMachine,
+                "Manual PDF URL": manual.manualPdf || "",
+                "Link Manual/Referensi": manual.reference || "",
+                "Keterangan Sumber": manual.sourceNote || ""
+              }
+            });
+          }
+          (Array.isArray(passport.knowledge.kb) ? passport.knowledge.kb : []).slice(0, 12).forEach(function(record) {
+            manualEvidence.push({ sheet: "Knowledge_Base", score: 8, machine: manualMachine, record: record });
+          });
+        }
+        body._v4Evidence = {
+          query: q,
+          machine: manualMachine,
+          evidence: manualEvidence.slice(0, 12),
+          confidence: manualEvidence.length ? "medium" : "low",
+          answer: manualEvidence.length ? "Ditemukan referensi manual/pengetahuan untuk mesin " + manualMachine + ". Isi dokumen yang hanya berupa tautan belum dianggap telah dibaca." : "Belum ditemukan referensi manual atau pengetahuan untuk mesin " + manualMachine + ".",
+          assumptions: ["Bukti dibatasi ke manual metadata dan Knowledge Base mesin terpilih.", "Tautan PDF/referensi bukan bukti bahwa isi dokumen sudah dibaca oleh model."],
+          recommendation: "Bandingkan jawaban dengan manual atau artikel pengetahuan sumber sebelum mengikuti prosedur."
+        };
+      } else {
+        var ev = JSON.parse(OMODOS4.dispatch({ action: "v4.ask", query: q, machine: body.machine || "", since: body.since, until: body.until }).getContent());
+        body._v4Evidence = ev && ev.ok ? ev.data : { query: q, evidence: [], confidence: "low", answer: "Belum ditemukan evidence internal." };
+      }
     }
     checkRateLimit_(body.action, body.actor);
     return body;
