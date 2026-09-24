@@ -157,11 +157,11 @@ var SIMPLE_FEATURE = {
 
  81:{name:'Peluang Perbaikan',help:'Cari masalah berulang yang mungkin perlu improvement.'},
  82:{name:'Buat Draf Kaizen',help:'Buat draf Kaizen tanpa langsung menyimpan project baru.'},
- 83:{name:'Cek Bukti Manfaat Project',help:'Lihat apakah bukti manfaat project sudah cukup terisi.'},
+ 83:{name:'Cek Bukti Manfaat Proyek',help:'Lihat apakah bukti manfaat project sudah cukup terisi.'},
  84:{name:'Lihat Sebelum & Sesudah Kaizen',help:'Lihat bukti perubahan Kaizen yang sudah tercatat.'},
  85:{name:'Kumpulan Ide Perbaikan',help:'Lihat semua ide dan improvement yang masih terbuka.'},
  86:{name:'Cari Kaizen yang Mirip',help:'Cari improvement yang mungkin mirip agar tidak membuat duplikat.'},
- 87:{name:'Project yang Perlu Perhatian',help:'Lihat project terlambat atau masih terbuka.'},
+ 87:{name:'Proyek yang Perlu Perhatian',help:'Lihat project terlambat atau masih terbuka.'},
  88:{name:'Cerita SGA',help:'Baca ringkasan SGA dari data yang sudah dicatat.'},
  89:{name:'Hubungan Pengetahuan Perbaikan',help:'Lihat hubungan improvement dengan mesin, masalah, dan pengetahuan.'},
  90:{name:'Riwayat Perbaikan',help:'Lihat perjalanan project, Kaizen, dan SGA dari tahun ke tahun.'},
@@ -639,7 +639,7 @@ function renderWhatChanged(){
 }
 function renderTimeMachine(){
  var now=new Date(),local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
- return '<div class="v4-time-machine"><label>Tanggal & Waktu<input id="v4-time-machine-at" type="datetime-local" value="'+esc(local)+'"></label><button class="btn btn-primary btn-sm" data-v4-time-machine-run><i class="ph-bold ph-clock-counter-clockwise"></i> Rekonstruksi</button></div><div id="v4-time-machine-result"><div class="v4-empty">Pilih waktu lalu jalankan rekonstruksi. Sistem hanya memakai record yang benar-benar tersedia.</div></div>';
+ return '<div class="v4-time-machine"><label>Tanggal & Waktu<input id="v4-time-machine-at" type="datetime-local" value="'+esc(local)+'"></label><button class="btn btn-primary btn-sm" data-v4-time-machine-run><i class="ph-bold ph-clock-counter-clockwise"></i> Rekonstruksi</button></div><div id="v4-time-machine-result"><div class="v4-empty">Pilih waktu lalu jalankan rekonstruksi. Sistem hanya memakai catatan yang benar-benar tersedia.</div></div>';
 }
 function runTimeMachine(){
  var input=document.getElementById('v4-time-machine-at'),target=input?Date.parse(input.value):NaN,out=document.getElementById('v4-time-machine-result');
@@ -667,7 +667,7 @@ function brainCounts(){
  ];
 }
 function renderBrain(){
- return '<div class="v4-brain-canvas"><div class="v4-brain-center"><i class="ph-bold ph-cpu"></i><strong>OMODOS</strong><small>FACTORY BRAIN</small></div><div class="v4-brain-nodes">'+brainCounts().map(function(x){return '<button data-v4-open-existing="'+x[2]+'"><span>'+esc(x[0])+'</span><b>'+x[1]+'</b><small>'+(x[1]?'Tercatat / dihitung':'Belum tersedia')+'</small></button>'}).join('')+'</div></div><p class="v4-muted">Setiap bagian terhubung dengan catatan yang tersedia; jumlah kosong berarti datanya belum ada.</p>';
+ return '<div class="v4-brain-canvas"><div class="v4-brain-center"><i class="ph-bold ph-cpu"></i><strong>OMODOS</strong><small>RINGKASAN PABRIK</small></div><div class="v4-brain-nodes">'+brainCounts().map(function(x){return '<button data-v4-open-existing="'+x[2]+'"><span>'+esc(x[0])+'</span><b>'+x[1]+'</b><small>'+(x[1]?'Tercatat / dihitung':'Belum tersedia')+'</small></button>'}).join('')+'</div></div><p class="v4-muted">Setiap bagian terhubung dengan catatan yang tersedia; jumlah kosong berarti datanya belum ada.</p>';
 }
 function renderWarRoom(){
  var rows=getEntries().filter(isCritical).sort(function(a,b){return dateValue(b)-dateValue(a)}).slice(0,20);
@@ -1324,7 +1324,7 @@ function aiResultHtml(data){
  var summary=firstText(data,['summary','answer'])||'Tidak ada ringkasan.';
  var assumptions=Array.isArray(data.assumptions)?data.assumptions:[];
  return '<div class="v4-ai-result">'+
-  '<div class="v4-interaction-result-head"><span class="v4-server-badge">'+x(data.mode||'OMODOS AI')+'</span><span>Tingkat keyakinan: '+x(data.confidence||'belum tersedia')+'</span></div>'+
+  '<div class="v4-interaction-result-head"><span class="v4-server-badge">'+x(data.mode==='DETERMINISTIC_FALLBACK'?'Ringkasan dari data':'Asisten OMODOS')+'</span><span>Tingkat keyakinan: '+x(data.confidence||'belum tersedia')+'</span></div>'+
   '<div class="v4-ai-answer">'+x(summary).replace(/\n/g,'<br>')+'</div>'+
   (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi</strong><ul>'+assumptions.slice(0,8).map(function(a){return '<li>'+x(a)+'</li>'}).join('')+'</ul></div>':'')+
   resultCards(data.evidence)+
@@ -1361,7 +1361,7 @@ function mountKnowledgeHarvest(n){
  var host=bodyHost();if(!host||!featureOpen(n))return;
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction';sec.setAttribute('data-v4-interaction-feature',n);
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">CARI PENGETAHUAN BARU</span><h3>Periksa Kandidat Pengetahuan</h3></div><span class="v4-no-write">HANYA CEK</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">CARI PENGETAHUAN BARU</span><h3>Periksa Kandidat Pengetahuan</h3></div><span class="v4-no-write">Tidak menyimpan</span></div>'+
  note('OMODOS mencari solusi berulang dan RCA yang sudah ada. Tidak ada artikel pengetahuan yang dibuat otomatis.','safe')+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-harvest-refresh><i class="ph-bold ph-arrows-clockwise"></i> Muat Kandidat</button></div><div data-v4-harvest-output></div>';
  host.prepend(sec);
@@ -1766,11 +1766,11 @@ function mountMissionFeature(n){
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var titles={21:'Tugas Teknisi',23:'Daftar Pemeriksaan',26:'Bukti Sebelum & Sesudah',29:'Urutan Kunjungan Mesin'};
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature=String(n);
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BANTUAN KERJA LAPANGAN</span><h3>'+e(titles[n])+'</h3></div><span class="v4-no-write">PAKAI DATA YANG ADA</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BANTUAN KERJA LAPANGAN</span><h3>'+e(titles[n])+'</h3></div><span class="v4-no-write">Dari data tercatat</span></div>'+
  '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts(n===29?'Semua mesin':'Pilih mesin')+'</select></label></div>'+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sf-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Tampilkan '+e(titles[n])+'</button>'+
  (n===21||n===23?'<button class="btn btn-sm" data-v4-sf-patrol-current>Buka Patrol</button>':'')+
- '</div><div data-v4-sf-output>'+info('Data berasal dari Logbook, Patrol, dan Project yang sudah ada; tidak membuat input ganda.','safe')+'</div>';
+ '</div><div data-v4-sf-output>'+info('Data berasal dari Logbook, Patrol, dan Proyek yang sudah ada; tidak membuat input ganda.','safe')+'</div>';
  h.prepend(sec);
 }
 async function loadMission(btn,n){
@@ -1866,7 +1866,7 @@ function mountQr(){
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var supported=!!(window.BarcodeDetector&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='27';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BUKA MESIN LEWAT QR</span><h3>Pindai QR atau Pilih Manual</h3></div><span class="v4-no-write">'+(supported?'QR SIAP':'PILIH MANUAL')+'</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BUKA MESIN LEWAT QR</span><h3>Pindai QR atau Pilih Manual</h3></div><span class="v4-no-write">'+(supported?'Kamera siap':'Pilih mesin')+'</span></div>'+
  '<div class="v4-qr-zone"><video data-v4-qr-video playsinline muted style="display:none"></video><div data-v4-qr-status>'+info(supported?'Kamera baru aktif setelah tombol Pindai QR dipilih.':'Browser ini belum mendukung pemindai QR langsung. Pilih mesin secara manual.','safe')+'</div></div>'+
  '<div class="v4-form-grid"><label>Pilih Mesin Manual<select data-v4-sf-machine>'+opts('Pilih mesin')+'</select></label></div>'+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-qr-start '+(supported?'':'disabled')+'><i class="ph-bold ph-qr-code"></i> Pindai QR</button><button class="btn btn-sm" data-v4-qr-manual>Gunakan Mesin Terpilih</button></div><div data-v4-qr-result></div>';
@@ -1938,7 +1938,7 @@ function mountOffline(){
  var online=navigator.onLine;
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='30';
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ANTREAN OFFLINE</span><h3>Status Kiriman yang Menunggu Sinkronisasi</h3></div><span class="v4-no-write">'+(online?'Online':'Offline')+'</span></div>'+
- '<div class="v4-statline"><div><b>'+(online?'Terhubung':'Tanpa Internet')+'</b><span>Koneksi browser</span></div><div><b>'+q.length+'</b><span>Menunggu sinkronisasi</span></div><div><b>OMODOS</b><span>Memakai antrean yang sama</span></div></div>'+
+ '<div class="v4-statline"><div><b>'+(online?'Online':'Offline')+'</b><span>Koneksi browser</span></div><div><b>'+q.length+'</b><span>Menunggu sinkronisasi</span></div><div><b>OMODOS</b><span>Memakai antrean yang sama</span></div></div>'+
  info('OMODOS menyimpan kiriman yang gagal ke antrean lokal dan mencoba menyinkronkannya saat koneksi kembali. OMODOS 4.0 tidak membuat antrean kedua.','safe')+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-offline-logbook><i class="ph-bold ph-notebook"></i> Buka Input Logbook</button><button class="btn btn-sm" data-v4-offline-refresh>Muat Ulang Status</button></div>';
  h.prepend(sec);
@@ -2102,7 +2102,7 @@ function renderGraph(data,sec){
  var list=(data.machinePartGraph||[]).filter(function(x){return !machine||String(x.from||'')==='machine:'+machine});
  return rows(list,function(x){
   var m=String(x.from||'').replace(/^machine:/,'');
-  return item(m+' → '+partName(x),partNo(x)+' • '+(x.relation||'terkait / terpakai'),'<span class="v4-risk-chip">TERKAIT</span>');
+  return item(m+' → '+partName(x),partNo(x)+' • '+(x.relation||'terkait / terpakai'),'<span class="v4-risk-chip">Terkait</span>');
  },80)+note('Hubungan dibuat dari sparepart yang pernah tercatat atau terpakai pada mesin. Ini bukan daftar BOM engineering lengkap.','safe');
 }
 function renderEquivalent(data,sec){
@@ -2347,7 +2347,7 @@ function render44(d){
 function render45(d){
  return list(d.hiddenFactory,function(x){
   return item(x.machine||'Belum terkait mesin',fmtNum(x.events,0)+' kejadian di luar kategori breakdown/emergency dengan waktu berhenti tercatat',statusChip(fmtNum(x.downtimeMinutes,0)+' menit'));
- },40)+note('Bagian ini mencari catatan Logbook yang punya waktu berhenti tetapi kategorinya tidak mengandung breakdown, emergency, failure, abnormal, atau corrective. Ini bukan otomatis kerugian tersembunyi; petugas tetap perlu memeriksa konteksnya.','warn');
+ },40)+note('Bagian ini mencari catatan Logbook yang punya waktu berhenti tetapi belum diberi kategori yang menandakan gangguan atau perbaikan. Ini bukan otomatis kerugian tersembunyi; petugas tetap perlu memeriksa konteksnya.','warn');
 }
 function render46(d){
  var rows=d.reliabilityGrowth||[];
@@ -2605,7 +2605,7 @@ function render52(d){
  });
  return list(rows,function(x){
   var e=x.evidence.map(function(v){var d=String(v.domain||'bagian').toLowerCase();d=d==='maintenance'?'Maintenance':d==='energy'?'Energi':'Data terkait';return d+': '+(v.records||0)+' catatan • '+(v.reason||'')}).join(' | ');
-  return item(x.name||'KPI perlu perhatian',(x.status||'')+(e?' • '+e:''),chip('MUNGKIN TERKAIT'));
+  return item(x.name||'KPI perlu perhatian',(x.status||'')+(e?' • '+e:''),chip('Mungkin terkait'));
  },50)+note('Bagan ini menunjukkan data yang mungkin berkaitan. Hubungan tersebut belum membuktikan penyebab.','warn');
 }
 function render53(d){
@@ -3366,7 +3366,7 @@ function mount(n){
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PERBAIKAN & KAIZEN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===82?'Belum disimpan':'Tidak mengubah data')+'</span></div>'+
  intro(n)+controls(n)+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-imp-load="'+n+'"><i class="ph-bold '+(n===82?'ph-sparkle':'ph-arrows-clockwise')+'"></i> '+(n===82?'Buat draf Kaizen':'Tampilkan data')+'</button>'+
- '<button class="btn btn-sm" data-v4-open-existing="project-center"><i class="ph-bold ph-kanban"></i> Buka Project</button>'+
+ '<button class="btn btn-sm" data-v4-open-existing="project-center"><i class="ph-bold ph-kanban"></i> Buka Proyek</button>'+
  (n===84||n===85||n===88?'<button class="btn btn-sm" data-v4-open-existing="knowledge"><i class="ph-bold ph-books"></i> Buka Pengetahuan</button>':'')+
  '</div><div data-v4-imp-out></div>';
  h.prepend(sec);
@@ -3384,7 +3384,7 @@ function aiHtml(d){
  var assumptions=Array.isArray(d.assumptions)?d.assumptions:[];
  var mode={GENERATIVE_WITH_INTERNAL_EVIDENCE:'Draf dari Asisten OMODOS',DETERMINISTIC_FALLBACK:'Draf dari data tercatat'}[d.mode]||'Draf Asisten OMODOS';
  return '<div class="v4-ai-result"><div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(mode)+'</span><span>Tingkat keyakinan: '+esc(d.confidence||'belum tersedia')+'</span></div>'+
- '<div class="v4-ai-answer">'+esc(first(d,['summary','answer'])||'Belum ada draft.').replace(/\n/g,'<br>')+'</div>'+
+ '<div class="v4-ai-answer">'+esc(first(d,['summary','answer'])||'Belum ada draf.').replace(/\n/g,'<br>')+'</div>'+
  (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi / batasan</strong><ul>'+assumptions.slice(0,8).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>':'')+
  metrics([['Bukti data',fmt(ev.length,0)],['Persetujuan manusia','Wajib'],['Perubahan data operasional','Tidak ada']])+
  note('Draf belum tersimpan sebagai Kaizen atau proyek. Periksa isinya sebelum menyimpan lewat halaman asal.','warn')+'</div>';
