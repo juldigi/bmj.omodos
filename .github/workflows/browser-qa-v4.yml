@@ -195,6 +195,38 @@ jobs:
             }
             result.phases.push('recovered-deny');
 
+            console.log('[QA] source-truth machine selectors');
+            const sourceTruthMachineNames = await page.evaluate(() => {
+              const oldEntries = ENTRIES;
+              const oldMachines = MACHINES;
+              const oldPatrol = PM_REPORTS;
+              try {
+                MACHINES = [{ 'Kode Mesin':'QA-MASTER', 'Nama Mesin':'QA Master Current' }];
+                ENTRIES = [
+                  { 'Nama Mesin':'QA Old Logbook', 'Tanggal':'2026-08-31', 'Timestamp Input':'2026-08-31T08:00:00+07:00' },
+                  { 'Nama Mesin':'QA New Logbook', 'Tanggal':'2026-09-02', 'Timestamp Input':'2026-09-02T08:00:00+07:00' }
+                ];
+                PM_REPORTS = [
+                  { 'Nama Mesin':'QA Old Patrol', 'Tanggal':'2026-08-20' },
+                  { 'Nama Mesin':'QA New Patrol', 'Tanggal':'2026-09-03' }
+                ];
+                return window.OMODOS4.getMachineNames();
+              } finally {
+                ENTRIES = oldEntries;
+                MACHINES = oldMachines;
+                PM_REPORTS = oldPatrol;
+              }
+            });
+            result.sourceTruthMachineNames = sourceTruthMachineNames;
+            if (!sourceTruthMachineNames.includes('QA Master Current') ||
+                !sourceTruthMachineNames.includes('QA New Logbook') ||
+                !sourceTruthMachineNames.includes('QA New Patrol') ||
+                sourceTruthMachineNames.includes('QA Old Logbook') ||
+                sourceTruthMachineNames.includes('QA Old Patrol')) {
+              throw new Error('V4 machine selector cutoff failed: ' + JSON.stringify(sourceTruthMachineNames));
+            }
+            result.phases.push('source-truth-machine-selectors');
+
             console.log('[QA] physical OMODOS 4 sidebar module clicks');
             await page.evaluate(() => {
               CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };

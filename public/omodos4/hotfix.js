@@ -745,6 +745,7 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
  render:renderCommandCenter,
  renderWorkspace:renderWorkspace,
  renderFeature:renderFeature,
+ getMachineNames:getMachineNames,
  previousRender:previousRender
 });
 window.renderOmodos4=renderCommandCenter;
@@ -1270,9 +1271,11 @@ function bodyHost(){
  return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body');
 }
 function machineNames(){
+ try{
+  if(window.OMODOS4&&typeof window.OMODOS4.getMachineNames==='function')return window.OMODOS4.getMachineNames();
+ }catch(e){}
  var set=new Set();
  try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
- try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
  return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
 }
 function peopleNames(){
@@ -1586,9 +1589,11 @@ function info(t,kind){
  return '<div class="v4-interaction-note '+(kind||'')+'"><i class="ph-bold ph-info"></i><span>'+e(t)+'</span></div>';
 }
 function names(){
+ try{
+  if(window.OMODOS4&&typeof window.OMODOS4.getMachineNames==='function')return window.OMODOS4.getMachineNames();
+ }catch(e){}
  var set=new Set();
- try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(err){}
- try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(err){}
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
  return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
 }
 function opts(blank){
@@ -2164,13 +2169,11 @@ function busy(btn,on){
  else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
 }
 function machineNames(){
+ try{
+  if(window.OMODOS4&&typeof window.OMODOS4.getMachineNames==='function')return window.OMODOS4.getMachineNames();
+ }catch(e){}
  var set=new Set();
- try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){
-  var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n));
- })}catch(e){}
- try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){
-  var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n));
- })}catch(e){}
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
  return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
 }
 function machineOptions(){
@@ -2879,9 +2882,11 @@ function first(o,keys){
  return '';
 }
 function names(){
+ try{
+  if(window.OMODOS4&&typeof window.OMODOS4.getMachineNames==='function')return window.OMODOS4.getMachineNames();
+ }catch(e){}
  var set=new Set();
  try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
- try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
  return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
 }
 function machineOptions(blank){
@@ -3128,9 +3133,11 @@ function busy(btn,on,label){
  else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
 }
 function machineNames(){
+ try{
+  if(window.OMODOS4&&typeof window.OMODOS4.getMachineNames==='function')return window.OMODOS4.getMachineNames();
+ }catch(e){}
  var set=new Set();
  try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
- try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
  return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
 }
 function machineOptions(){return '<option value="">Semua mesin / tidak dibatasi</option>'+machineNames().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('')}
@@ -3368,9 +3375,11 @@ function busy(btn,on,label){
  else{btn.disabled=false;if(btn.dataset.old)btn.innerHTML=btn.dataset.old}
 }
 function machineNames(){
+ try{
+  if(window.OMODOS4&&typeof window.OMODOS4.getMachineNames==='function')return window.OMODOS4.getMachineNames();
+ }catch(e){}
  var set=new Set();
  try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
- try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
  return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
 }
 function machineOptions(blank){return '<option value="">'+esc(blank||'Semua mesin')+'</option>'+machineNames().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('')}
@@ -3654,9 +3663,11 @@ function list(arr,fn,msg,limit){
  return '<div class="v4-table-lite">'+arr.slice(0,limit||30).map(fn).join('')+'</div>';
 }
 function names(){
+ try{
+  if(window.OMODOS4&&typeof window.OMODOS4.getMachineNames==='function')return window.OMODOS4.getMachineNames();
+ }catch(e){}
  var set=new Set();
  try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
- try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
  return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
 }
 function options(blank){
