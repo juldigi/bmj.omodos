@@ -1420,14 +1420,14 @@ function mountScenario(){
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  LAST_SCENARIO=null;
  var sec=document.createElement('section');sec.className='v4-interaction v4-scenario';sec.setAttribute('data-v4-interaction-feature','97');
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">COBA SKENARIO</span><h3>Simulasi Berdasarkan Asumsi</h3></div><span class="v4-no-write">BUKAN RAMALAN</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">COBA SKENARIO</span><h3>Simulasi Berdasarkan Asumsi</h3></div><span class="v4-no-write">Simulasi saja</span></div>'+
  note('Masukkan asumsi perubahan. Simulasi tidak mengubah KPI, Logbook, stok, atau data operasional yang ada.','safe')+
  '<div class="v4-slider-grid">'+
   '<label>Pengurangan waktu mesin berhenti (%)<input type="number" min="0" max="100" value="0" data-v4-s-downtime></label>'+
   '<label>Pengurangan masalah berulang (%)<input type="number" min="0" max="100" value="0" data-v4-s-recurring></label>'+
   '<label>Pengurangan risiko stok habis (%)<input type="number" min="0" max="100" value="0" data-v4-s-stock></label>'+
   '<label>Penyelesaian tindakan (%)<input type="number" min="0" max="100" value="0" data-v4-s-action></label>'+
- '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-s-run><i class="ph-bold ph-play"></i> Jalankan Simulasi</button></div>'+
+ '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-s-run><i class="ph-bold ph-play"></i> Lihat hasil simulasi</button></div>'+
  '<div data-v4-s-output></div>'+
  '<div class="v4-save-box"><label>Nama skenario<input data-v4-s-name maxlength="200" placeholder="Contoh: Skenario PM Q4"></label><button class="btn btn-sm" data-v4-s-save disabled><i class="ph-bold ph-floppy-disk"></i> Simpan Skenario</button><small>Penyimpanan hanya mencatat skenario di area V4 dan tidak mengubah data operasional.</small></div><div data-v4-s-save-output></div>';
  host.prepend(sec);
@@ -1462,16 +1462,16 @@ function mountWarRoom(){
  var host=bodyHost();if(!host||!featureOpen(98))return;
  var old=host.querySelector('.v4-interaction');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction v4-war-interaction';sec.setAttribute('data-v4-interaction-feature','98');
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">RUANG KOORDINASI MASALAH</span><h3>Koordinasi Masalah Besar</h3></div><span class="v4-no-write">AREA KHUSUS V4</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">RUANG KOORDINASI MASALAH</span><h3>Koordinasi Masalah Besar</h3></div><span class="v4-no-write">Catatan koordinasi</span></div>'+
  note('Membuat ruang koordinasi tidak mengubah Logbook lama. Yang disimpan hanya catatan koordinasi di area V4.','safe')+
  '<details class="v4-war-create"><summary><i class="ph-bold ph-plus-circle"></i> Buat Ruang Koordinasi Baru</summary><div class="v4-form-grid">'+
   '<label>Mesin *<select data-v4-war-machine>'+options(machineNames(),'Pilih mesin')+'</select></label>'+
-  '<label>Tingkat masalah<select data-v4-war-severity><option value="P0">P0 – paling mendesak</option><option value="P1" selected>P1 – mendesak</option><option value="P2">P2 – sedang</option><option value="P3">P3 – rendah</option></select></label>'+
+  '<label>Tingkat masalah<select data-v4-war-severity><option value="P0">Sangat mendesak</option><option value="P1" selected>Mendesak</option><option value="P2">Sedang</option><option value="P3">Rendah</option></select></label>'+
   '<label>Judul *<input data-v4-war-title maxlength="200" placeholder="Masalah utama"></label>'+
   '<label>Penanggung jawab<input data-v4-war-owner maxlength="160" placeholder="Nama penanggung jawab"></label>'+
   '<label>Periksa lagi pada<input type="datetime-local" data-v4-war-checkpoint></label>'+
   '<label class="v4-form-wide">Ringkasan<textarea rows="3" data-v4-war-summary maxlength="4000"></textarea></label>'+
- '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-war-create><i class="ph-bold ph-siren"></i> Buat War Room</button></div><div data-v4-war-create-output></div></details>'+
+ '</div><div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-war-create><i class="ph-bold ph-siren"></i> Buat ruang koordinasi</button></div><div data-v4-war-create-output></div></details>'+
  '<div class="v4-war-columns"><div><div class="v4-interaction-subhead"><strong>Ruang Koordinasi yang Ada</strong><button class="btn btn-sm" data-v4-war-refresh><i class="ph-bold ph-arrows-clockwise"></i> Muat Ulang</button></div><div data-v4-war-list></div></div><div><div class="v4-interaction-subhead"><strong>Rincian dan Perkembangan</strong></div><div data-v4-war-detail>'+note('Pilih ruang koordinasi untuk melihat rinciannya.','safe')+'</div></div></div>';
  host.prepend(sec);
  if(actionReady())refreshWarList(sec);
@@ -1480,6 +1480,7 @@ function mountWarRoom(){
 function warId(r){return firstText(r,['ID','id','WarRoomID','warRoomId'])}
 function warTitle(r){return firstText(r,['Title','title'])||'Ruang Koordinasi'}
 function warStatusLabel(s){var v=String(s||'').toUpperCase();return v==='OPEN'?'Terbuka':v==='MONITORING'?'Dipantau':v==='CLOSED'?'Selesai':s||'—'}
+function warSeverityLabel(s){var v=String(s||'').toUpperCase();return v==='P0'?'Sangat mendesak':v==='P1'?'Mendesak':v==='P2'?'Sedang':v==='P3'?'Rendah':s||'—'}
 async function refreshWarList(sec,selectId){
  var out=sec.querySelector('[data-v4-war-list]');out.innerHTML=note('Memuat ruang koordinasi…','safe');
  try{
@@ -1516,7 +1517,7 @@ async function loadWar(sec,id){
   var d=await v4Action('v4.getWarRoom',{id:id});
   if(!d.war){out.innerHTML=note('Ruang koordinasi tidak ditemukan.','warn');return}
   var w=d.war,status=firstText(w,['Status','status'])||'OPEN',owner=firstText(w,['Owner','owner']),checkpoint=firstText(w,['NextCheckpoint','nextCheckpoint']),summary=firstText(w,['Summary','summary']);
-  out.innerHTML='<div class="v4-war-detail-card"><h4>'+x(warTitle(w))+'</h4><div class="v4-kv-stack"><div><span>Mesin</span><b>'+x(firstText(w,['Machine','machine']))+'</b></div><div><span>Tingkat masalah</span><b>'+x(firstText(w,['Severity','severity']))+'</b></div><div><span>Status</span><b>'+x(warStatusLabel(status))+'</b></div></div>'+
+  out.innerHTML='<div class="v4-war-detail-card"><h4>'+x(warTitle(w))+'</h4><div class="v4-kv-stack"><div><span>Mesin</span><b>'+x(firstText(w,['Machine','machine']))+'</b></div><div><span>Tingkat masalah</span><b>'+x(warSeverityLabel(firstText(w,['Severity','severity'])))+'</b></div><div><span>Status</span><b>'+x(warStatusLabel(status))+'</b></div></div>'+
    contextBlock(d.context)+
    '<div class="v4-war-update"><h4>Catat Perkembangan</h4><div class="v4-form-grid">'+
     '<label>Status<select data-v4-war-u-status><option value="OPEN"'+(status==='OPEN'?' selected':'')+'>Terbuka</option><option value="MONITORING"'+(status==='MONITORING'?' selected':'')+'>Dipantau</option><option value="CLOSED"'+(status==='CLOSED'?' selected':'')+'>Selesai</option></select></label>'+
@@ -1809,7 +1810,7 @@ function mountVoice(){
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='24';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ISI LOGBOOK DENGAN SUARA</span><h3>Draf dari Suara</h3></div><span class="v4-no-write">DRAF SAJA</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ISI LOGBOOK DENGAN SUARA</span><h3>Draf dari Suara</h3></div><span class="v4-no-write">Belum disimpan</span></div>'+
  '<div class="v4-form-grid"><label>Mesin (opsional)<select data-v4-sf-machine>'+opts('Pilih jika relevan')+'</select></label><label class="v4-form-wide">Hasil dikte<textarea rows="5" data-v4-voice-text placeholder="Hasil suara muncul di sini. Bisa diedit sebelum dikirim ke form Logbook."></textarea></label></div>'+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-voice-start '+(SR?'':'disabled')+'><i class="ph-bold ph-microphone"></i> Mulai Dikte</button><button class="btn btn-sm" data-v4-voice-to-logbook><i class="ph-bold ph-arrow-square-out"></i> Kirim Draf ke Form Logbook</button></div>'+
  '<div data-v4-sf-output>'+info(SR?'Fitur pengenal suara tersedia. Tidak ada data yang disimpan sebelum formulir Logbook disimpan.':'Browser ini belum mendukung pengenal suara. Ketik manual pada draf lalu kirim ke formulir Logbook.','safe')+'</div>';
@@ -1936,7 +1937,7 @@ function mountOffline(){
  try{q=JSON.parse(localStorage.getItem('logbook_pending_sync_queue')||'[]')}catch(err){}
  var online=navigator.onLine;
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature='30';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ANTREAN OFFLINE</span><h3>Status Kiriman yang Menunggu Sinkronisasi</h3></div><span class="v4-no-write">'+(online?'TERHUBUNG':'TANPA INTERNET')+'</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">ANTREAN OFFLINE</span><h3>Status Kiriman yang Menunggu Sinkronisasi</h3></div><span class="v4-no-write">'+(online?'Online':'Offline')+'</span></div>'+
  '<div class="v4-statline"><div><b>'+(online?'Terhubung':'Tanpa Internet')+'</b><span>Koneksi browser</span></div><div><b>'+q.length+'</b><span>Menunggu sinkronisasi</span></div><div><b>OMODOS</b><span>Memakai antrean yang sama</span></div></div>'+
  info('OMODOS menyimpan kiriman yang gagal ke antrean lokal dan mencoba menyinkronkannya saat koneksi kembali. OMODOS 4.0 tidak membuat antrean kedua.','safe')+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-offline-logbook><i class="ph-bold ph-notebook"></i> Buka Input Logbook</button><button class="btn btn-sm" data-v4-offline-refresh>Muat Ulang Status</button></div>';
@@ -2058,7 +2059,7 @@ function mount(n){
  var controls='';
  if(n===35)controls='<label>Mesin<select data-v4-sp-machine><option value="">Muat data untuk melihat mesin</option></select></label>';
  if(n===36)controls='<label class="v4-form-wide">Cari material / nomor SAP<input data-v4-sp-query placeholder="Ketik nama material atau nomor SAP"></label>';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">INFORMASI SPAREPART</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">HANYA LIHAT</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">INFORMASI SPAREPART</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
  (controls?'<div class="v4-form-grid">'+controls+'</div>':'')+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sp-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button><button class="btn btn-sm" data-v4-open-existing="sparepart"><i class="ph-bold ph-package"></i> Buka Sparepart</button></div>'+
  '<div data-v4-sp-out>'+note('Menggunakan data stok sparepart, lokasi, ETA, opname, gudang, status SAP, dan pemakaian di Logbook yang sudah ada. Tidak membuat data ganda.','safe')+'</div>';
@@ -2294,7 +2295,7 @@ function mount(n){
   46:'Tren Gangguan Bulanan',47:'Riwayat RCA',48:'Efek Tindakan Perbaikan',49:'Biaya Gangguan yang Tercatat',50:'Biaya per Menit Berhenti'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-reliability-loss';sec.dataset.v4RelFeature=String(n);
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">KEANDALAN & KERUGIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">HANYA LIHAT</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">KEANDALAN & KERUGIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
  '<div class="v4-form-grid"><label>Periode analisis<select data-v4-rel-days><option value="30">30 hari</option><option value="90" selected>90 hari</option><option value="180">180 hari</option><option value="365">365 hari</option></select></label><label>Mesin<select data-v4-rel-machine>'+machineOptions()+'</select></label></div>'+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-rel-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>'+
  (n===47?'<button class="btn btn-sm" data-v4-open-existing="diagnostic"><i class="ph-bold ph-magnifying-glass"></i> Buka Diagnostik</button>':'')+
@@ -2524,7 +2525,7 @@ function mount(n){
   '<label>KPI<select data-v4-op-kpi><option value="">Memuat KPI…</option></select></label>'+
   '<label>Nilai yang ingin dicoba<input type="number" step="any" data-v4-op-kpi-value placeholder="Isi angka KPI untuk dibandingkan dengan target"></label>'+
   '</div>':'';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OPERASI & KPI</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===54?'TIDAK DISIMPAN':'HANYA LIHAT')+'</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OPERASI & KPI</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===54?'Tidak disimpan':'Tidak mengubah data')+'</span></div>'+
  (machine?'<div class="v4-form-grid">'+machine+'</div>':'')+simulator+
  '<div class="v4-interaction-actions">'+
  (n===54?'<button class="btn btn-primary btn-sm" data-v4-op-kpi-sim><i class="ph-bold ph-function"></i> Bandingkan dengan Target</button>':'<button class="btn btn-primary btn-sm" data-v4-op-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>')+
@@ -2785,7 +2786,7 @@ function mount(n){
  if(n===63)controls='<div class="v4-form-grid"><label>Mesin<select data-v4-pi-machine><option value="">Muat data untuk melihat mesin</option></select></label><label class="v4-form-wide">Masalah / gejala<input data-v4-pi-query placeholder="Contoh: sensor register error"></label></div>';
  if(n===64||n===70)controls='<div class="v4-form-grid"><label>Personel<select data-v4-pi-person><option value="">Muat data untuk melihat teknisi</option></select></label></div>';
  var sec=document.createElement('section');sec.className='v4-interaction v4-people-intel';sec.dataset.v4PiFeature=String(n);
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">TEKNISI & KEAHLIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">HANYA LIHAT</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">TEKNISI & KEAHLIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
  controls+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-pi-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Tampilkan Bukti</button>'+
  '<button class="btn btn-sm" data-v4-open-existing="pi-dashboard"><i class="ph-bold ph-users-three"></i> Buka Data Teknisi</button>'+
@@ -3889,7 +3890,7 @@ function mount(n){
  var controls='';
  if(showMachine)controls+='<label>Mesin '+(requireMachine?'<b>*</b>':'(opsional)')+'<select data-v4-mp-machine>'+options(requireMachine?'Pilih mesin':'Semua mesin')+'</select></label>';
  if(n===6)controls+='<label class="v4-form-wide">Masalah yang ingin dicari<input data-v4-mp-query placeholder="Opsional: contoh bearing panas, sensor error, kebocoran"></label>';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BERDASARKAN DATA OMODOS</span><h3>'+esc((window.OMODOS4&&window.OMODOS4.simpleFeatures&&window.OMODOS4.simpleFeatures[n]||{}).name||('Fitur '+n))+'</h3></div><span class="v4-no-write">HANYA LIHAT</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BERDASARKAN DATA OMODOS</span><h3>'+esc((window.OMODOS4&&window.OMODOS4.simpleFeatures&&window.OMODOS4.simpleFeatures[n]||{}).name||('Fitur '+n))+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
   '<p class="v4-muted">'+esc(intro(n))+'</p>'+
   (controls?'<div class="v4-form-grid">'+controls+'</div>':'')+
   '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-mp-load="'+n+'"><i class="ph-bold ph-magnifying-glass"></i> Tampilkan Data</button></div>'+
@@ -4063,11 +4064,11 @@ var EXACT={
  'Historical similarity':'Kasus Lama yang Mirip',
  'Periksa oleh petugas queue':'Hal yang Perlu Dicek',
  'Ringkasan Singkat':'Ringkasan Singkat',
- 'READ ONLY':'HANYA LIHAT',
+ 'READ ONLY':'Tidak mengubah data',
  'Tidak menyimpan otomatis':'DATA AMAN',
- 'DRAFT ONLY':'DRAF SAJA',
+ 'DRAFT ONLY':'Belum disimpan',
  'NOT A PREDICTION':'BUKAN RAMALAN',
- 'ISOLATED V4 STATE':'AREA KHUSUS V4',
+ 'ISOLATED V4 STATE':'Catatan koordinasi',
  'REVIEW ONLY':'HANYA CEK',
  'USES EXISTING DATA':'PAKAI DATA YANG ADA',
  'INTERACTIVE • Bukti data-FIRST':'BERDASARKAN DATA',
