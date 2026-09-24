@@ -112,14 +112,14 @@ var SIMPLE_FEATURE = {
  40:{name:'Prioritas Pembelian Sparepart',help:'Lihat sparepart yang lebih mendesak untuk proses pembelian berdasarkan stok, ETA, dan tingkat perhatian datanya.'},
 
  41:{name:'Ringkasan Keandalan',help:'Lihat gambaran umum keandalan mesin.'},
- 42:{name:'Mesin yang Sering Bermasalah',help:'Lihat mesin dengan masalah terbanyak atau berulang.'},
- 43:{name:'Masalah Terbanyak',help:'Lihat masalah yang paling banyak menyumbang gangguan.'},
- 44:{name:'Masalah Sering vs Mendadak',help:'Bedakan masalah yang sering terjadi dan yang muncul tiba-tiba.'},
- 45:{name:'Kerugian yang Tersembunyi',help:'Lihat waktu atau gangguan yang sering tidak terlihat.'},
- 46:{name:'Perubahan Keandalan',help:'Lihat apakah kondisi keandalan membaik atau memburuk.'},
+ 42:{name:'Mesin Paling Perlu Perhatian',help:'Lihat mesin yang perlu diperiksa lebih dulu berdasarkan kesehatan, gangguan, waktu berhenti, masalah berulang, dan masalah yang belum selesai.'},
+ 43:{name:'Masalah Terbanyak',help:'Lihat jenis masalah yang paling sering tercatat dan waktu berhentinya.'},
+ 44:{name:'Pola Gangguan Mesin',help:'Kelompokkan mesin dengan masalah berulang dan mesin yang punya waktu berhenti tetapi belum membentuk pola berulang.'},
+ 45:{name:'Waktu Berhenti yang Tidak Berlabel Gangguan',help:'Cari waktu berhenti di Logbook yang tidak diberi kategori gangguan atau perbaikan.'},
+ 46:{name:'Tren Gangguan Bulanan',help:'Lihat jumlah gangguan, waktu berhenti, dan jumlah mesin terdampak dari bulan ke bulan.'},
  47:{name:'Riwayat RCA',help:'Cari RCA lama yang berkaitan dengan masalah sekarang.'},
  48:{name:'Efek Tindakan Perbaikan',help:'Bandingkan kondisi sebelum dan sesudah tindakan.'},
- 49:{name:'Biaya Kerusakan',help:'Lihat biaya kerusakan yang memang tercatat.'},
+ 49:{name:'Biaya Gangguan yang Tercatat',help:'Lihat angka biaya yang memang sudah dicatat pada data gangguan, Logbook, atau tindakan perbaikan.'},
  50:{name:'Biaya per Menit Berhenti',help:'Lihat dampak biaya dari waktu mesin berhenti jika datanya ada.'},
 
  51:{name:'Cerita KPI',help:'Baca KPI dalam bentuk ringkasan yang mudah dipahami.'},
@@ -2290,8 +2290,8 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-reliability-loss');if(old)old.remove();
  var titles={
-  41:'Ringkasan Keandalan',42:'Mesin yang Sering Bermasalah',43:'Masalah Terbanyak',44:'Masalah Sering vs Mendadak',45:'Kerugian yang Tersembunyi',
-  46:'Perubahan Keandalan',47:'Riwayat RCA',48:'Efek Tindakan Perbaikan',49:'Biaya Kerusakan',50:'Biaya per Menit Berhenti'
+  41:'Ringkasan Keandalan',42:'Mesin Paling Perlu Perhatian',43:'Masalah Terbanyak',44:'Pola Gangguan Mesin',45:'Waktu Berhenti yang Tidak Berlabel Gangguan',
+  46:'Tren Gangguan Bulanan',47:'Riwayat RCA',48:'Efek Tindakan Perbaikan',49:'Biaya Gangguan yang Tercatat',50:'Biaya per Menit Berhenti'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-reliability-loss';sec.dataset.v4RelFeature=String(n);
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">KEANDALAN & KERUGIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">HANYA LIHAT</span></div>'+
@@ -2312,7 +2312,7 @@ function render41(d){
  ])+
  list(top,function(x){
   return item(machineOf(x),'Nilai kesehatan '+fmtNum(x.healthIndex,0)+' • '+fmtNum(x.breakdowns,0)+' gangguan • '+fmtNum(x.downtimeMinutes,0)+' menit berhenti',
-   statusChip('MTBF* '+fmtNum(x.mtbfDerivedHours,1)+'h • MTTR* '+fmtNum(x.mttrDerivedMinutes,0)+'m'));
+   statusChip('Antar gangguan* '+fmtNum(x.mtbfDerivedHours,1)+' jam • Perbaikan* '+fmtNum(x.mttrDerivedMinutes,0)+' menit'));
  },12)+note('* MTBF/MTTR di halaman ini dihitung dari waktu kejadian yang tercatat pada periode terpilih, bukan pengganti KPI resmi.','warn');
 }
 function render42(d){
@@ -2320,7 +2320,7 @@ function render42(d){
   return item(machineOf(x),
    'Waktu berhenti '+fmtNum(x.downtimeMinutes,0)+' menit • Gangguan '+fmtNum(x.breakdowns,0)+' • Berulang '+fmtNum(x.recurring,0)+' • Belum selesai '+fmtNum(x.openIssues,0),
    statusChip('Kesehatan '+fmtNum(x.healthIndex,0)));
- },30)+note('Urutan mesin memakai gabungan nilai kesehatan dan kerugian yang tercatat. Gunakan sebagai urutan pemeriksaan, bukan penilaian mutlak mesin.','safe');
+ },30)+note('Urutan ini bukan daftar mesin yang paling sering rusak. Backend mengurutkan terutama dari nilai kesehatan, lalu bukti waktu berhenti akibat gangguan. Gunakan sebagai urutan pemeriksaan.','safe');
 }
 function render43(d){
  var rows=Array.isArray(d.problemPareto)?d.problemPareto:[];
@@ -2337,16 +2337,16 @@ function render43(d){
  },30)+note('Urutan dibuat berdasarkan jumlah kejadian masalah yang sama, lalu waktu berhentinya. Gunakan untuk memilih masalah yang perlu dianalisis lebih dulu.','safe');
 }
 function render44(d){
- var chronic='<section class="v4-server-section"><div class="v4-server-section-head"><strong>Sering Berulang</strong><span>Berulang ≥ 2</span></div>'+
-  list(d.chronic,function(x){return item(machineOf(x),'Berulang '+fmtNum(x.recurring,0)+' • Waktu berhenti '+fmtNum(x.downtimeMinutes,0)+' menit',statusChip('Kesehatan '+fmtNum(x.healthIndex,0)))},30)+'</section>';
- var acute='<section class="v4-server-section"><div class="v4-server-section-head"><strong>Mendadak</strong><span>Kerugian tinggi, berulang &lt; 2</span></div>'+
-  list(d.acute,function(x){return item(machineOf(x),'Gangguan '+fmtNum(x.breakdowns,0)+' • Waktu berhenti '+fmtNum(x.downtimeMinutes,0)+' menit',statusChip('MENDADAK'))},30)+'</section>';
- return chronic+acute+note('Pengelompokan ini dibuat dengan aturan sederhana untuk membantu pemeriksaan keandalan.','safe');
+ var chronic='<section class="v4-server-section"><div class="v4-server-section-head"><strong>Sudah Berulang</strong><span>Pola berulang ≥ 2</span></div>'+
+  list(d.chronic,function(x){return item(machineOf(x),'Pola berulang '+fmtNum(x.recurring,0)+' • Waktu berhenti '+fmtNum(x.downtimeMinutes,0)+' menit',statusChip('Kesehatan '+fmtNum(x.healthIndex,0)))},30)+'</section>';
+ var acute='<section class="v4-server-section"><div class="v4-server-section-head"><strong>Belum Berulang</strong><span>Ada waktu berhenti • pola berulang &lt; 2</span></div>'+
+  list(d.acute,function(x){return item(machineOf(x),'Gangguan '+fmtNum(x.breakdowns,0)+' • Waktu berhenti '+fmtNum(x.downtimeMinutes,0)+' menit',statusChip('BELUM BERULANG'))},30)+'</section>';
+ return chronic+acute+note('Kelompok kedua tidak berarti gangguannya mendadak. Artinya hanya ada waktu berhenti tercatat tetapi pola berulangnya masih kurang dari 2.','safe');
 }
 function render45(d){
  return list(d.hiddenFactory,function(x){
   return item(x.machine||'Belum terkait mesin',fmtNum(x.events,0)+' kejadian di luar kategori breakdown/emergency dengan waktu berhenti tercatat',statusChip(fmtNum(x.downtimeMinutes,0)+' menit'));
- },40)+note('Bagian ini mencari waktu berhenti di Logbook yang tidak diberi kategori breakdown atau emergency. Konteks operasional tetap perlu diperiksa.','warn');
+ },40)+note('Bagian ini mencari catatan Logbook yang punya waktu berhenti tetapi kategorinya tidak mengandung breakdown, emergency, failure, abnormal, atau corrective. Ini bukan otomatis kerugian tersembunyi; petugas tetap perlu memeriksa konteksnya.','warn');
 }
 function render46(d){
  var rows=d.reliabilityGrowth||[];
@@ -2355,7 +2355,7 @@ function render46(d){
  return '<div class="v4-sf-list">'+rows.slice(-24).map(function(x){
   var pct=Math.max(2,Math.round((Number(x.downtimeMinutes)||0)/max*100));
   return '<div class="v4-sf-item"><div style="width:100%"><strong>'+esc(x.month||'Periode')+'</strong><small>'+esc(fmtNum(x.breakdowns,0)+' gangguan • '+fmtNum(x.downtimeMinutes,0)+' menit • '+fmtNum(x.affectedMachines,0)+' mesin')+'</small><div style="height:5px;margin-top:6px;border-radius:999px;background:var(--line-soft);overflow:hidden"><span style="display:block;height:100%;width:'+pct+'%;background:currentColor;opacity:.5"></span></div></div>'+statusChip(fmtNum(x.downtimeMinutes,0)+' menit')+'</div>';
- }).join('')+'</div>'+note('Perubahan dihitung dari kejadian bulanan pada periode terpilih. Baca bersama volume produksi dan jam operasi.','safe');
+ }).join('')+'</div>'+note('Grafik ini menunjukkan tren jumlah gangguan dan waktu berhenti bulanan dari catatan yang tersedia. Grafik tidak langsung menyatakan keandalan membaik atau memburuk tanpa melihat jam operasi dan volume produksi.','safe');
 }
 function render47(d){
  return list(d.rcaMemory,function(r){
@@ -2365,7 +2365,7 @@ function render47(d){
 function render48(d){
  return list(d.countermeasureEffectiveness,function(x){
   var delta=Number(x.delta);
-  var badge=x.status==='IMPROVED_SIGNAL'?'IMPROVED SIGNAL':x.status==='WORSE_SIGNAL'?'WORSE SIGNAL':x.status==='NO_CHANGE_SIGNAL'?'NO CHANGE':'WINDOW INCOMPLETE';
+  var badge=x.status==='IMPROVED_SIGNAL'?'Gangguan berkurang':x.status==='WORSE_SIGNAL'?'Gangguan bertambah':x.status==='NO_CHANGE_SIGNAL'?'Tidak berubah':'Data sesudah belum 30 hari';
   return item(x.machine||'Mesin','Perbaikan '+(x.correctiveId||'—')+' • '+String(x.date||'').slice(0,10)+' • 30 hari sebelum '+fmtNum(x.before30d,0)+' → 30 hari sesudah '+fmtNum(x.after30d,0)+' • Δ '+fmtNum(delta,0),statusChip(badge));
  },40,'Belum ada catatan perbaikan dengan data sebelum/sesudah yang dapat dibandingkan.')+
  note('Perbandingan sebelum/sesudah menunjukkan hubungan waktu, bukan bukti bahwa tindakan tersebut pasti menyebabkan perubahan.','warn');
@@ -2375,7 +2375,7 @@ function render49(d){
  if(c.status!=='RECORDED_COST_ONLY')return empty('Biaya kerusakan belum tersedia karena belum ada angka biaya yang tercatat.')+note(c.note||'Biaya yang belum tercatat tidak diperkirakan.','warn');
  return metrics([
   ['Catatan biaya',fmtNum(c.records,0)],
-  ['Total recorded cost',rupiah(c.totalRecordedCost)],
+  ['Total biaya tercatat',rupiah(c.totalRecordedCost)],
   ['Biaya / menit berhenti',rupiah(c.recordedCostPerDowntimeMinute)]
  ])+note('Biaya kerusakan hanya memakai angka biaya yang benar-benar tercatat. Biaya yang kosong tidak diisi dengan asumsi.','safe');
 }
