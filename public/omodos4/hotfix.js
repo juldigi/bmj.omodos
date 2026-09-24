@@ -108,7 +108,7 @@ var SIMPLE_FEATURE = {
  36:{name:'Cari Sparepart Pengganti',help:'Cari kandidat sparepart pengganti untuk ditinjau manusia.'},
  37:{name:'Foto Referensi Sparepart',help:'Lihat foto referensi sparepart yang sudah tercatat tanpa menebak isi foto.'},
  38:{name:'Lokasi Sparepart',help:'Lihat lokasi atau rak sparepart yang sudah tercatat.'},
- 39:{name:'Perkiraan Kebutuhan Sparepart',help:'Lihat kebutuhan sparepart berdasarkan catatan pemakaian.'},
+ 39:{name:'Perkiraan Frekuensi Kebutuhan Sparepart',help:'Lihat perkiraan seberapa sering sparepart mungkin dibutuhkan berdasarkan catatan pemakaian yang valid.'},
  40:{name:'Urutan Pembelian Sparepart',help:'Lihat sparepart mana yang perlu dibeli lebih dulu.'},
 
  41:{name:'Ringkasan Keandalan',help:'Lihat gambaran umum keandalan mesin.'},
@@ -1996,7 +1996,7 @@ function mount(n){
  var old=h.querySelector('.v4-sparepart-intel');if(old)old.remove();
  var titles={
  31:'Tingkat Penting Sparepart',32:'Risiko Stok Habis',33:'Sparepart Tidak Terpakai',34:'Pemakaian Sparepart',35:'Mesin & Sparepart Terkait',
- 36:'Cari Sparepart Pengganti',37:'Foto Referensi Sparepart',38:'Lokasi Sparepart',39:'Perkiraan Kebutuhan Sparepart',40:'Urutan Pembelian Sparepart'
+ 36:'Cari Sparepart Pengganti',37:'Foto Referensi Sparepart',38:'Lokasi Sparepart',39:'Perkiraan Frekuensi Kebutuhan Sparepart',40:'Urutan Pembelian Sparepart'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-sparepart-intel';sec.dataset.v4SpFeature=String(n);
  var controls='';
@@ -2035,7 +2035,7 @@ function renderDead(data){
 function renderConsumption(data){
  return rows(data.consumptionTop,function(x){
   var machines=Array.isArray(x.machines)&&x.machines.length?x.machines.slice(0,5).join(', '):'mesin belum terhubung';
-  return item(partName(x),partNo(x)+' • '+x.count+' konsumsi • '+machines,'<span class="v4-risk-chip">'+esc(x.count)+'x</span>');
+  return item(partName(x),partNo(x)+' • '+x.count+' kali tercatat dipakai • '+machines,'<span class="v4-risk-chip">'+esc(x.count)+'x</span>');
  },60)+note('Pola pemakaian dihitung dari hubungan catatan Logbook dengan nomor SAP atau nama material yang sudah ada.','safe');
 }
 function renderGraph(data,sec){
@@ -2070,9 +2070,12 @@ function renderShelf(data){
  },80)+note('Peta rak merangkum lokasi yang tercatat pada data lokasi, opname, dan gudang.','safe');
 }
 function renderReservation(data){
+ function confidence(v){var s=String(v||'').toLowerCase();return s==='medium'?'Sedang':s==='low-medium'?'Terbatas':s==='low'?'Rendah':String(v||'—')}
  return rows(data.reservationForecast,function(x){
-  return item(partName(x),partNo(x)+' • '+x.observedConsumptions+' konsumsi / '+x.windowDays+' hari','<span class="v4-risk-chip">Perkiraan 30 hari '+esc(x.expectedNext30)+' • '+esc(x.confidence)+'</span>');
- },60)+note('Perkiraan kebutuhan memakai pola pemakaian historis. Hasilnya bukan jumlah kebutuhan yang pasti.','warn');
+  var start=x.coverageStart?String(x.coverageStart).slice(0,10):'—';
+  return item(partName(x),partNo(x)+' • '+x.observedConsumptions+' kali tercatat / '+x.windowDays+' hari valid • mulai '+start,
+   '<span class="v4-risk-chip">Perkiraan 30 hari '+esc(x.expectedNext30)+' kali • '+esc(confidence(x.confidence))+'</span>');
+ },60)+note('Perkiraan ini menghitung frekuensi kejadian pemakaian yang tercatat, bukan jumlah unit/qty sparepart. Hari pengamatan otomatis dimulai paling awal 1 September 2026.','warn');
 }
 function renderUrgency(data){
  return rows(data.procurementUrgency,function(x){

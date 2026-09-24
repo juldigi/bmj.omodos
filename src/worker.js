@@ -1375,12 +1375,15 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       const x = infoFor(materialNumber(source), materialName(source));
       if (x) x.sap.push(cleanRecord(r, 10));
     });
-    const now = Date.now(), last90 = log.filter((r) => {
+    const now = Date.now();
+    const forecastSince = Math.max(SOURCE_TRUTH_START_MS, now - 90 * 864e5);
+    const forecastWindowDays = Math.max(1, Math.ceil((now - forecastSince) / 864e5));
+    const forecastRows = log.filter((r) => {
       const t = dateValue(r);
-      return t && t >= now - 90 * 864e5;
+      return t && t >= forecastSince && t <= now;
     });
     const recentCount = /* @__PURE__ */ new Map();
-    partRefsFromLogbook(last90).forEach((p, k) => recentCount.set(k, p.consumptionCount));
+    partRefsFromLogbook(forecastRows).forEach((p, k) => recentCount.set(k, p.consumptionCount));
     const criticality = [...materialInfo.values()].map((x) => {
       const stockRisk = x.stock.some((r) => {
         const qty = num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"]));
@@ -1404,7 +1407,16 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
         criticalityScore: score,
         priority: score >= 70 ? "P0" : score >= 45 ? "P1" : score >= 25 ? "P2" : "P3",
         factors: { consumptionCount: x.consumptionCount, machines: x.machines.size, criticalMachineCount, stockRisk, stockout, etaOverdue },
-        reservationForecast: { windowDays: 90, observedConsumptions: recent, expectedNext30: recent ? Number((recent / 3).toFixed(1)) : 0, confidence: recent >= 6 ? "medium" : recent >= 2 ? "low-medium" : "low", label: "HISTORICAL_RATE_PROJECTION" },
+        reservationForecast: {
+          windowDays: forecastWindowDays,
+          observedConsumptions: recent,
+          expectedNext30: recent ? Number((recent / forecastWindowDays * 30).toFixed(1)) : 0,
+          confidence: forecastWindowDays >= 60 && recent >= 6 ? "medium" : forecastWindowDays >= 30 && recent >= 3 ? "low-medium" : "low",
+          coverageStart: new Date(forecastSince).toISOString(),
+          coverageEnd: new Date(now).toISOString(),
+          metric: "RECORDED_USAGE_EVENTS_NOT_QUANTITY",
+          label: "HISTORICAL_RATE_PROJECTION"
+        },
         machines: [...x.machines].slice(0, 30),
         latestConsumption: x.latest ? new Date(x.latest).toISOString() : "",
         records: { stock: x.stock, location: x.location, eta: x.eta, opname: x.opname, warehouse: x.warehouse, sap: x.sap }
@@ -1441,7 +1453,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     criticality.forEach((x) => x.machines.forEach((m) => machinePartGraph.push({ from: "machine:" + m, to: "part:" + (x.materialNumber || x.material), relation: "uses/consumed", material: x.material, materialNumber: x.materialNumber })));
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-sparepart-2",
+      logicVersion: "v4-sparepart-3",
       risks,
       criticalityMatrix: criticality.slice(0, 150),
       consumptionTop: criticality.filter((x) => x.factors.consumptionCount > 0).sort((x, y) => y.factors.consumptionCount - x.factors.consumptionCount).slice(0, 50).map((x) => ({ material: x.material, materialNumber: x.materialNumber, count: x.factors.consumptionCount, machines: x.machines, latest: x.latestConsumption })),
