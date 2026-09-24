@@ -3549,6 +3549,225 @@ window.OMODOS4=Object.assign(window.OMODOS4||{},{
 })();
 
 
+
+/* OMODOS4_MACHINE_PREDICTIVE_SPECIFIC_V1
+   Feature-specific presentation for Machine (001-010) and Predictive (011-020).
+   Read-only: uses existing OMODOS 4 server reads and never writes operational data. */
+(function(){
+'use strict';
+var LAST_LOAD=0;
+
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function openNo(){
+ var el=document.querySelector('#v4-safe-stage .v4-feature-no');
+ return el?parseInt(el.textContent,10)||0:0;
+}
+function host(){return document.querySelector('#v4-safe-stage .v4-detail-card .v4-detail-body')}
+function note(t,k){return '<div class="v4-interaction-note '+(k||'safe')+'"><i class="ph-bold ph-info"></i><span>'+esc(t)+'</span></div>'}
+function empty(t){return '<div class="v4-empty">'+esc(t||'Belum ada data yang cocok.')+'</div>'}
+function chip(t){return '<span class="v4-risk-chip">'+esc(t||'Data')+'</span>'}
+function fmt(v,d){
+ var n=Number(v);if(!Number.isFinite(n))return v==null||v===''?'—':esc(v);
+ return n.toLocaleString('id-ID',{maximumFractionDigits:d==null?1:d});
+}
+function dateText(v){
+ if(!v)return '—';
+ var d=new Date(v);return Number.isNaN(d.getTime())?esc(v):d.toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
+}
+function first(o,keys){
+ if(!o||typeof o!=='object')return '';
+ for(var i=0;i<keys.length;i++){var v=o[keys[i]];if(v!=null&&String(v).trim())return v}
+ return '';
+}
+function metric(label,value,sub){
+ return '<div class="v4-subcard"><span class="v4-muted">'+esc(label)+'</span><h3>'+esc(value==null||value===''?'—':value)+'</h3>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div>';
+}
+function metrics(items){return '<div class="v4-metric-grid">'+items.join('')+'</div>'}
+function item(title,sub,right){
+ return '<div class="v4-table-row"><strong>'+esc(title||'—')+'</strong><span>'+esc(sub||'')+'</span><b>'+esc(right==null?'':right)+'</b></div>';
+}
+function list(arr,fn,msg,limit){
+ arr=Array.isArray(arr)?arr:[];
+ if(!arr.length)return empty(msg);
+ return '<div class="v4-table-lite">'+arr.slice(0,limit||30).map(fn).join('')+'</div>';
+}
+function names(){
+ var set=new Set();
+ try{(Array.isArray(MACHINES)?MACHINES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ try{(Array.isArray(ENTRIES)?ENTRIES:[]).forEach(function(m){var n=m['Nama Mesin']||m.namaMesin||m['Kode Mesin']||m.kodeMesin;if(n)set.add(String(n))})}catch(e){}
+ return Array.from(set).sort(function(a,b){return a.localeCompare(b,'id')});
+}
+function options(blank){
+ return '<option value="">'+esc(blank||'Pilih mesin')+'</option>'+names().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('');
+}
+function read(action,payload){
+ if(!(window.OMODOS4&&typeof window.OMODOS4.serverRead==='function'))return Promise.resolve(null);
+ return window.OMODOS4.serverRead(action,payload||{});
+}
+function machineRequired(n){return [1,3,4,5,7,8,9,10].indexOf(n)>=0}
+function actionFor(n){
+ if(n===2)return 'v4.getMachineHealth';
+ if(n===3||n===10)return 'v4.getMachineGraph';
+ if(n===6)return 'v4.getFailureMemory';
+ if(n>=11&&n<=20)return 'v4.getPredictiveRisk';
+ return 'v4.getMachinePassport';
+}
+function intro(n){
+ var map={
+ 1:'Satu halaman untuk melihat identitas, kondisi terkini, riwayat gangguan, sparepart, dan orang yang pernah menangani mesin.',
+ 2:'Nilai kesehatan dihitung dari bukti gangguan, waktu berhenti, masalah terbuka, dan pola berulang. Nilai ini bukan diagnosis otomatis.',
+ 3:'Menunjukkan hubungan mesin dengan gangguan, RCA, pengetahuan, project, orang, dan data terkait.',
+ 4:'Menampilkan bagian/subsistem yang benar-benar tercatat pada pemeriksaan mesin.',
+ 5:'Menampilkan lama waktu sejak penggantian komponen yang tercatat. Ini bukan umur teknis dari pabrikan.',
+ 6:'Mencari masalah lama dan pola yang berulang agar petugas tidak mulai dari nol.',
+ 7:'Merangkum pola masalah yang paling sering tercatat pada mesin.',
+ 8:'Membandingkan tekanan historis mesin per bulan: kejadian, gangguan, downtime, masalah terbuka, dan temuan predictive.',
+ 9:'Menyusun ulang urutan kejadian mesin dari catatan Logbook, Breakdown, Predictive, RCA, dan Corrective.',
+ 10:'Menampilkan peta hubungan data di sekitar satu mesin agar sumber informasi yang saling terkait mudah ditemukan.',
+ 11:'Mengurutkan mesin berdasarkan sinyal risiko berbasis data yang tersedia. Ini bukan probabilitas kerusakan.',
+ 12:'Menampilkan mesin yang perlu diperiksa lebih dulu berdasarkan sinyal risiko dan bukti masalah.',
+ 13:'Mencari temuan predictive yang pernah muncul sebelum gangguan pada mesin yang sama.',
+ 14:'Menunjukkan mesin yang memiliki pola masalah berulang pada periode data yang dipakai.',
+ 15:'Mencari pola gangguan serupa yang muncul pada lebih dari satu mesin.',
+ 16:'Mencari kenaikan kejadian, downtime, atau masalah terbuka antara paruh awal dan paruh akhir periode.',
+ 17:'Merangkum kata/gejala yang paling sering muncul bersama pada riwayat gangguan tiap mesin.',
+ 18:'Menjelaskan kuat-lemahnya bukti di balik setiap sinyal risiko.',
+ 19:'Menghitung perkiraan jarak waktu penggantian berikutnya dari pola penggantian historis yang cukup. Bukan umur teknis resmi.',
+ 20:'Menampilkan komponen atau mesin yang paling layak diperiksa berikutnya berdasarkan bukti yang tersedia.'
+ };
+ return map[n]||'';
+}
+function mount(n){
+ n=Number(n);if(n<1||n>20)return;
+ var h=host();if(!h||openNo()!==n)return;
+ var old=h.querySelector('.v4-mp-specific');if(old)old.remove();
+ var sec=document.createElement('section');sec.className='v4-interaction v4-mp-specific';sec.setAttribute('data-v4-mp-feature',String(n));
+ var requireMachine=machineRequired(n),showMachine=n!==15;
+ var controls='';
+ if(showMachine)controls+='<label>Mesin '+(requireMachine?'<b>*</b>':'(opsional)')+'<select data-v4-mp-machine>'+options(requireMachine?'Pilih mesin':'Semua mesin')+'</select></label>';
+ if(n===6)controls+='<label class="v4-form-wide">Masalah yang ingin dicari<input data-v4-mp-query placeholder="Opsional: contoh bearing panas, sensor error, kebocoran"></label>';
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BERDASARKAN DATA OMODOS</span><h3>'+esc((window.OMODOS4&&window.OMODOS4.simpleFeatures&&window.OMODOS4.simpleFeatures[n]||{}).name||('Fitur '+n))+'</h3></div><span class="v4-no-write">HANYA LIHAT</span></div>'+
+  '<p class="v4-muted">'+esc(intro(n))+'</p>'+
+  (controls?'<div class="v4-form-grid">'+controls+'</div>':'')+
+  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-mp-load="'+n+'"><i class="ph-bold ph-magnifying-glass"></i> Tampilkan Data</button></div>'+
+  '<div data-v4-mp-output>'+note(requireMachine?'Pilih satu mesin, lalu tampilkan datanya.':'Data dapat ditampilkan tanpa mengubah catatan apa pun.')+'</div>';
+ h.prepend(sec);
+ if(!requireMachine&&n!==6)setTimeout(function(){var b=sec.querySelector('[data-v4-mp-load]');if(b)load(b,n)},0);
+}
+function evidenceText(e){
+ if(!e||typeof e!=='object')return '';
+ var parts=[];
+ if(e.predictiveRecords!=null)parts.push(e.predictiveRecords+' temuan predictive');
+ if(e.breakdowns!=null)parts.push(e.breakdowns+' gangguan');
+ if(e.recurringPatterns!=null)parts.push(e.recurringPatterns+' pola berulang');
+ if(e.downtimeMinutes!=null)parts.push(fmt(e.downtimeMinutes,0)+' menit berhenti');
+ if(e.openIssues!=null)parts.push(e.openIssues+' masalah terbuka');
+ return parts.join(' • ');
+}
+function machineHtml(n,d){
+ d=d||{};
+ if(n===1){
+  var c=d.currentCondition||{},r=d.reliability||{},id=d.identity||{},open=Array.isArray(c.openIssues)?c.openIssues:[];
+  return metrics([
+   metric('Nilai kesehatan',c.healthIndex==null?'Belum tersedia':fmt(c.healthIndex,0)+'/100',c.currentRisk||''),
+   metric('Gangguan tercatat',fmt(r.failureCount,0),'Riwayat gangguan'),
+   metric('Waktu berhenti',fmt(r.downtimeMinutes,0)+' menit','Dari catatan yang tersedia'),
+   metric('Masalah belum selesai',open.length,'Perlu diperiksa')
+  ])+
+  '<div class="v4-subcard"><h3>Identitas Mesin</h3><div class="v4-kv-stack">'+Object.keys(id).slice(0,12).map(function(k){return '<div><span>'+esc(k)+'</span><b>'+esc(id[k])+'</b></div>'}).join('')+'</div></div>'+
+  list(open,function(x){return item(first(x,['Deskripsi Masalah','Problem','Deskripsi','description','Nama Mesin'])||'Catatan mesin',String(first(x,['Status','Severity','Prioritas'])||''),dateText(first(x,['Tanggal','Timestamp','Created At'])))},'Tidak ada masalah terbuka pada data yang tersedia.',12);
+ }
+ if(n===2){
+  var ms=Array.isArray(d.machines)?d.machines:[];
+  return list(ms,function(x){return item(x.code||x.name||x.key||'Mesin','Gangguan '+fmt(x.breakdowns,0)+' • downtime '+fmt(x.downtimeMinutes,0)+' menit • terbuka '+fmt(x.openIssues,0),fmt(x.healthIndex,0)+'/100')},'Belum ada mesin yang dapat dihitung nilai kesehatannya.',40);
+ }
+ if(n===3||n===10){
+  var nodes=Array.isArray(d.nodes)?d.nodes:[],edges=Array.isArray(d.edges)?d.edges:[];
+  var counts={};nodes.forEach(function(x){var t=x.type||'lainnya';counts[t]=(counts[t]||0)+1});
+  return metrics([metric('Titik data',nodes.length,'Data yang terhubung'),metric('Hubungan',edges.length,'Koneksi antar data'),metric('Jenis data',Object.keys(counts).length,'Kelompok informasi')])+
+   '<div class="v4-subcard"><h3>Jenis Data yang Terhubung</h3><div class="v4-kv-stack">'+Object.keys(counts).sort(function(a,b){return counts[b]-counts[a]}).map(function(k){return '<div><span>'+esc(k)+'</span><b>'+counts[k]+'</b></div>'}).join('')+'</div></div>'+
+   list(nodes.slice(0,30),function(x){return item(x.label||x.id,x.type||'data','')},'Belum ada hubungan data untuk mesin ini.',30);
+ }
+ var intel=d.intelligence||{};
+ if(n===4)return list(intel.anatomy,function(x){return item(x.subsystem||'Bagian mesin',fmt(x.checks,0)+' pemeriksaan',(Array.isArray(x.standards)?x.standards.slice(0,2).join(' • '):''))},'Bagian mesin belum tercatat pada template pemeriksaan.',30);
+ if(n===5)return list(intel.componentLifeClock,function(x){return item(x.material||x.materialNumber||'Komponen','Terakhir diganti '+dateText(x.lastReplacement),x.elapsedDays==null?'—':fmt(x.elapsedDays,0)+' hari')},'Belum ada riwayat penggantian komponen yang cukup.',30)+note('Angka hari adalah waktu sejak penggantian yang tercatat, bukan batas umur pabrikan.');
+ if(n===7)return list(intel.machinePersonality,function(x){return item(x.description||'Pola masalah',fmt(x.count,0)+' kejadian','Terakhir '+dateText(x.last&&new Date(x.last).toISOString()))},'Belum ada pola masalah berulang yang cukup.',20);
+ if(n===8)return list(intel.agingCurve,function(x){return item(x.month,fmt(x.failures,0)+' gangguan • '+fmt(x.openIssues,0)+' terbuka',fmt(x.downtimeMinutes,0)+' menit')},'Belum ada riwayat bulanan yang cukup.',24)+note('Grafik ini menunjukkan tekanan historis, bukan umur fisik mesin.');
+ if(n===9)return list(intel.eventReplay,function(x){return item(x.description||x.source||'Kejadian',x.source||'',dateText(x.timestamp))},'Belum ada kejadian yang dapat diputar ulang.',40);
+ return empty();
+}
+function failureHtml(d){
+ d=d||{};
+ if(Array.isArray(d.hits)&&d.hits.length)return list(d.hits,function(x){return item(x.description||'Kasus lama',(x.machine||'')+' • '+(x.sheet||''),'kemiripan '+fmt((Number(x.score)||0)*100,0)+'%')},'Tidak ada kasus mirip.',25)+note(d.note||'Kemiripan teks bukan bukti akar penyebab yang sama.');
+ var p=Array.isArray(d.patterns)?d.patterns:[];
+ return list(p,function(x){return item(x.code||x.name||x.key||'Mesin',fmt(x.recurring,0)+' pola berulang',fmt(x.openIssues,0)+' terbuka')},'Belum ada pola berulang yang ditemukan.',30);
+}
+function predictiveHtml(n,d){
+ d=d||{};
+ var risks=Array.isArray(d.risks)?d.risks:[],q=Array.isArray(d.attentionQueue)?d.attentionQueue:[],
+     pre=Array.isArray(d.anomalyBeforeFailure)?d.anomalyBeforeFailure:[],
+     cross=Array.isArray(d.crossMachineClusters)?d.crossMachineClusters:[],
+     silent=Array.isArray(d.silentDeterioration)?d.silentDeterioration:[],
+     sig=Array.isArray(d.failureSignatures)?d.failureSignatures:[],
+     rul=Array.isArray(d.remainingUsefulLife)?d.remainingUsefulLife:[];
+ if(n===11)return list(risks,function(x){return item(x.machine,evidenceText(x.evidence),fmt(x.riskScore,0)+'/100')},'Tidak ada sinyal risiko pada periode ini.',40)+note('Skor adalah indikator berbasis aturan, bukan peluang kerusakan.');
+ if(n===12)return list(q,function(x){return item(x.machine,(x.factors||[]).join(' • ')||evidenceText(x.evidence),String(x.risk||'').toUpperCase())},'Tidak ada peringatan yang perlu diprioritaskan.',30);
+ if(n===13)return list(pre,function(x){return item(x.pattern,fmt(x.count,0)+' kejadian pendahulu','Mesin: '+(x.machines||[]).slice(0,4).join(', '))},'Belum ada pola yang konsisten muncul sebelum gangguan.',30)+note('Hubungan waktu tidak membuktikan bahwa temuan tersebut menyebabkan gangguan.');
+ if(n===14){
+  var rec=risks.filter(function(x){return x.evidence&&Number(x.evidence.recurringPatterns)>0}).sort(function(a,b){return Number(b.evidence.recurringPatterns)-Number(a.evidence.recurringPatterns)});
+  return list(rec,function(x){return item(x.machine,fmt(x.evidence.recurringPatterns,0)+' pola berulang',evidenceText(x.evidence))},'Belum ada masalah berulang yang cukup.',30);
+ }
+ if(n===15)return list(cross,function(x){return item(x.signature.replace(/\|/g,' • '),fmt(x.count,0)+' kejadian',(x.machines||[]).join(', '))},'Belum ada pola yang cukup mirip pada beberapa mesin.',30);
+ if(n===16)return list(silent,function(x){return item(x.machine,'Awal: '+fmt(x.early&&x.early.events,0)+' kejadian • Akhir: '+fmt(x.late&&x.late.events,0)+' kejadian','skor perubahan '+fmt(x.deteriorationScore,0))},'Belum ada penurunan tersembunyi yang terdeteksi.',30)+note('Sinyal ini membandingkan dua bagian periode; tetap perlu pemeriksaan lapangan.');
+ if(n===17)return list(sig,function(x){return item(x.machine,x.signature||'Belum ada ciri kata yang dominan',fmt(x.events,0)+' kejadian')},'Belum ada ciri khas gangguan yang cukup.',30);
+ if(n===18)return list(risks,function(x){return item(x.machine,'Bukti: '+evidenceText(x.evidence),'Keyakinan '+String(x.confidence||'rendah'))},'Belum ada sinyal risiko untuk dinilai.',40)+note('Tingkat keyakinan menunjukkan kelengkapan bukti yang tersedia, bukan kepastian prediksi.');
+ if(n===19)return list(rul,function(x){return item(x.machine+' • '+x.component,fmt(x.replacementEvents,0)+' penggantian • rata-rata '+fmt(x.averageHistoricalIntervalDays,0)+' hari',fmt(x.remainingIntervalEstimateDays,0)+' hari tersisa')},'Belum ada minimal tiga catatan penggantian untuk komponen yang sama.',40)+note('Perkiraan hanya dari interval historis penggantian; bukan Remaining Useful Life dari pabrikan.');
+ if(n===20){
+  var parts=rul.slice().sort(function(a,b){return Number(a.remainingIntervalEstimateDays)-Number(b.remainingIntervalEstimateDays)});
+  return (parts.length?'<h3 class="v4-detail-heading">Komponen yang Perlu Dicek</h3>'+list(parts,function(x){return item(x.machine+' • '+x.component,'Riwayat '+fmt(x.replacementEvents,0)+' kali penggantian',fmt(x.remainingIntervalEstimateDays,0)+' hari')},'',20):'')+
+   '<h3 class="v4-detail-heading">Mesin yang Perlu Dicek</h3>'+list(q,function(x){return item(x.machine,evidenceText(x.evidence),fmt(x.riskScore,0)+'/100')},'Belum ada antrean mesin yang perlu dicek.',20)+note('Daftar ini adalah urutan pemeriksaan berbasis bukti, bukan ramalan bagian yang pasti rusak.');
+ }
+ return empty();
+}
+async function load(btn,n){
+ var sec=btn.closest('.v4-mp-specific'),out=sec&&sec.querySelector('[data-v4-mp-output]');if(!sec||!out)return;
+ var machineEl=sec.querySelector('[data-v4-mp-machine]'),machine=machineEl?machineEl.value:'';
+ if(machineRequired(n)&&!machine){out.innerHTML=note('Pilih mesin terlebih dahulu.','warn');return}
+ var payload={};if(machine)payload.machine=machine;
+ if(n===6){var q=sec.querySelector('[data-v4-mp-query]');if(q&&q.value.trim())payload.query=q.value.trim()}
+ var seq=++LAST_LOAD;
+ btn.disabled=true;var old=btn.innerHTML;btn.innerHTML='<i class="ph-bold ph-spinner-gap v4-spin"></i> Memuat data';
+ out.innerHTML=note('Mengambil data yang sesuai dengan fitur ini…');
+ try{
+  var d=await read(actionFor(n),payload);
+  if(seq!==LAST_LOAD||openNo()!==n)return;
+  if(!d){out.innerHTML=note('Data server belum dapat dimuat. Coba muat ulang setelah sesi login aktif.','warn');return}
+  out.innerHTML=n===6?failureHtml(d):(n<=10?machineHtml(n,d):predictiveHtml(n,d));
+ }catch(e){if(seq===LAST_LOAD)out.innerHTML=note(e&&e.message?e.message:String(e),'error')}
+ finally{btn.disabled=false;btn.innerHTML=old}
+}
+document.addEventListener('click',function(e){
+ var tile=e.target.closest&&e.target.closest('[data-v4-feature]');
+ if(tile){
+  var n=Number(tile.getAttribute('data-v4-feature'));
+  if(n>=1&&n<=20)setTimeout(function(){if(openNo()===n)mount(n)},0);
+  return;
+ }
+ var b=e.target.closest&&e.target.closest('[data-v4-mp-load]');
+ if(b){e.preventDefault();load(b,Number(b.getAttribute('data-v4-mp-load')));return}
+},false);
+document.addEventListener('change',function(e){
+ if(e.target&&e.target.matches('[data-v4-mp-machine]')){
+  var sec=e.target.closest('.v4-mp-specific'),b=sec&&sec.querySelector('[data-v4-mp-load]');
+  if(b&&e.target.value)load(b,Number(b.getAttribute('data-v4-mp-load')));
+ }
+},false);
+window.OMODOS4=Object.assign(window.OMODOS4||{},{
+ machinePredictiveSpecificVersion:'1',
+ machinePredictiveSpecificFeatures:Array.from({length:20},function(_,i){return i+1})
+});
+})();
+
 /* OMODOS4_LOW_COGNITIVE_DOM_V1
    Keeps later feature-specific panels plain-language without changing their actions. */
 (function(){
