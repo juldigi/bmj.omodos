@@ -1,0 +1,41 @@
+name: Deploy isolated OMODOS backup bridge
+on:
+  push:
+    branches:
+      - migration/cloudflare-new-preflight
+    paths:
+      - ".github/workflows/deploy-omodos-export-bridge.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 3c0bf44ff86c9587390f09b6d0bc42dd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate isolated source
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          node --check src/migration-export-bridge.js
+          node -e "const c=require('./wrangler.migration-export.jsonc'); if(c.name!=='omodos-migration-export'||c.durable_objects.bindings[0].script_name!=='omodos')process.exit(1)"
+          test "$(node -p "require('./wrangler.jsonc').name")" = "omodos"
+      - name: Install pinned Wrangler
+        run: npm install --no-audit --no-fund
+      - name: Dry run new sibling Worker
+        run: npx wrangler deploy --dry-run --config wrangler.migration-export.jsonc --outdir /tmp/omodos-export-dryrun
+      - name: Deploy sibling Worker only
+        run: npx wrangler deploy --config wrangler.migration-export.jsonc
+      - name: Smoke test isolated bridge and existing app
+        run: |
+          test "$(curl -sS -o /tmp/omodos-export-page -w '%{http_code}' https://omodos-migration-export.offsetbmj.workers.dev/)" = "200"
+          grep -q 'Cadangan OMODOS' /tmp/omodos-export-page
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://omodos-migration-export.offsetbmj.workers.dev/api/backup)" = "401"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://omodos.offsetbmj.workers.dev/)" = "200"
+          echo "Backup bridge ready; old application and database remain in place."
