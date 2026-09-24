@@ -465,7 +465,7 @@ jobs:
                   featureClickQA.checked++;
                   if (!featureNo || !state.active || !state.featureOpen || !state.detail ||
                       !state.detailBodyHasContent || state.dedicatedPanelCount !== 1 ||
-                      state.heading !== featureLabel || state.serverPanelCount > 1 ||
+                      state.heading !== featureLabel || state.serverPanelCount !== 0 ||
                       newErrors.some(x => /TypeError|ReferenceError|SyntaxError|insertBefore/i.test(x))) {
                     featureClickQA.failures.push({ featureNo, featureLabel, state, errors: newErrors.slice(0, 5) });
                   }
