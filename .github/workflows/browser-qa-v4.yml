@@ -53,6 +53,11 @@ jobs:
           grep -Fq 'function improvementMentionsMachine(record, machine)' src/worker.js
           ! grep -Fq 'existingText.includes(key)' src/worker.js
 
+          # Shift and morning briefs must use OMODOS brief evidence, not generic keyword retrieval.
+          grep -Fq 'body.purpose === "shift" || body.purpose === "morning-brief"' src/worker.js
+          grep -Fq 'OMODOS4.dispatch({ action: "v4.getBrief"' src/worker.js
+          ! grep -Fq 'Internal brief context:' public/omodos4/hotfix.js
+
           # Empty stock cells must not be interpreted as stockout.
           grep -Fq 'function stockQtyValue(r)' src/worker.js
           grep -Fq 'return qty !== null && qty <= 0;' src/worker.js

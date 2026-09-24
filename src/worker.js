@@ -9398,9 +9398,32 @@ function createBackend(services, env = {}) {
           assumptions: ["Bukti dibatasi ke manual metadata dan Knowledge Base mesin terpilih.", "Tautan PDF/referensi bukan bukti bahwa isi dokumen sudah dibaca oleh model."],
           recommendation: "Bandingkan jawaban dengan manual atau artikel pengetahuan sumber sebelum mengikuti prosedur."
         };
+      } else if (body.purpose === "shift" || body.purpose === "morning-brief") {
+        var briefRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getBrief", machine: body.machine || "", since: body.since, until: body.until }).getContent());
+        var brief = briefRes && briefRes.ok && briefRes.data ? briefRes.data : null;
+        var briefEvidence = [];
+        if (brief && Array.isArray(brief.thingsToLookAt)) {
+          brief.thingsToLookAt.slice(0, 12).forEach(function(item) {
+            briefEvidence.push({
+              sheet: "OMODOS_Brief",
+              score: item.priority === "P0" ? 10 : item.priority === "P1" ? 8 : 5,
+              machine: item.machine || body.machine || "",
+              record: item
+            });
+          });
+        }
+        body._v4Evidence = {
+          query: q,
+          machine: body.machine || "",
+          evidence: briefEvidence,
+          confidence: brief && brief.confidence || (briefEvidence.length ? "medium" : "low"),
+          answer: brief && Array.isArray(brief.summary) && brief.summary.length ? brief.summary.join(" ") : "Belum ada ringkasan operasional yang cukup untuk periode ini.",
+          assumptions: ["Ringkasan memakai data OMODOS pada scope/periode yang dipilih.", "Prioritas adalah bantuan triase dan tetap perlu diperiksa petugas."],
+          recommendation: briefEvidence.length ? "Periksa item prioritas dan teruskan tindakan yang belum selesai ke petugas atau shift terkait." : "Lengkapi catatan operasional bila kondisi lapangan belum tercermin di OMODOS."
+        };
       } else {
         var ev = JSON.parse(OMODOS4.dispatch({ action: "v4.ask", query: q, machine: body.machine || "", since: body.since, until: body.until }).getContent());
-        body._v4Evidence = ev && ev.ok ? ev.data : { query: q, evidence: [], confidence: "low", answer: "Belum ditemukan evidence internal." };
+        body._v4Evidence = ev && ev.ok ? ev.data : { query: q, evidence: [], confidence: "low", answer: "Belum ditemukan bukti internal." };
       }
     }
     checkRateLimit_(body.action, body.actor);
@@ -9413,16 +9436,16 @@ function createBackend(services, env = {}) {
       return { source: x.sheet, score: x.score, record: x.record };
     });
     var purposes = {
-      ask: "Jawab pertanyaan maintenance secara ringkas dan evidence-first.",
-      machine: "Bertindak sebagai Machine Copilot. Jelaskan kondisi, pola, risiko, dan inspeksi manusia yang relevan.",
-      shift: "Buat Shift Copilot brief: perubahan penting, open issue, risiko, dan handover action.",
-      "morning-brief": "Buat Morning Maintenance Brief yang ringkas dan actionable.",
-      "rca-draft": "Buat DRAFT RCA saja: fakta, hipotesis akar masalah, evidence pendukung/kontra, pertanyaan verifikasi, dan langkah validasi. Jangan menyatakan root cause final.",
-      "kaizen-draft": "Buat DRAFT Kaizen: masalah, evidence, ide, expected benefit sebagai hipotesis, risiko, dan cara verifikasi. Jangan menyimpan apa pun.",
-      troubleshooting: "Susun troubleshooting bertahap: symptom \u2192 inspection \u2192 evidence \u2192 next step \u2192 stop/escalation criteria.",
-      manual: "Jelaskan evidence seperti Manual Whisperer. Jangan mengarang isi manual yang tidak ada di evidence.",
-      translate: "Terjemahkan/normalisasi istilah maintenance pada pertanyaan tanpa mengubah makna teknis.",
-      skeptic: "AI Skeptic Mode: cari kelemahan asumsi, alternative explanation, evidence yang kurang, dan apa yang harus diverifikasi manusia."
+      ask: "Jawab pertanyaan maintenance secara ringkas dan berdasarkan bukti data OMODOS.",
+      machine: "Jelaskan kondisi mesin, pola, risiko, dan pemeriksaan manusia yang relevan berdasarkan bukti OMODOS.",
+      shift: "Buat ringkasan pergantian shift: perubahan penting, masalah belum selesai, risiko, dan tindakan yang perlu diteruskan.",
+      "morning-brief": "Buat ringkasan maintenance pagi yang singkat dan jelas tentang hal yang perlu ditindaklanjuti.",
+      "rca-draft": "Buat draf RCA saja: fakta, dugaan akar masalah, bukti pendukung/kontra, pertanyaan verifikasi, dan langkah validasi. Jangan menyatakan akar penyebab sebagai kepastian.",
+      "kaizen-draft": "Buat draf Kaizen: masalah, bukti, ide, perkiraan manfaat sebagai hipotesis, risiko, dan cara verifikasi. Jangan menyimpan apa pun.",
+      troubleshooting: "Susun pemeriksaan bertahap: gejala \u2192 pemeriksaan \u2192 bukti \u2192 langkah berikutnya \u2192 kapan harus berhenti atau eskalasi.",
+      manual: "Jelaskan hanya isi manual atau pengetahuan yang benar-benar tersedia sebagai bukti. Jangan mengarang isi dokumen yang belum dibaca.",
+      translate: "Terjemahkan atau sederhanakan istilah maintenance tanpa mengubah makna teknis.",
+      skeptic: "Periksa ulang asumsi: cari penjelasan lain, bukti yang masih kurang, dan hal yang harus diverifikasi manusia."
     };
     var prompt = [
       "PURPOSE: " + (purposes[body.purpose] || purposes.ask),
