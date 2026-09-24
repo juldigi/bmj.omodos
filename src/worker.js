@@ -473,10 +473,20 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     return (machineCode(o) || machineName(o)).toLowerCase();
   }
   __name(machineKey, "machineKey");
+  function normalizedMachineText(v) {
+    return lower(v).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+  __name(normalizedMachineText, "normalizedMachineText");
+  function machinePhraseMatch(value, q) {
+    const v = normalizedMachineText(value), needle = normalizedMachineText(q);
+    if (!needle) return true;
+    if (!v) return false;
+    return v === needle || (" " + v + " ").includes(" " + needle + " ");
+  }
+  __name(machinePhraseMatch, "machinePhraseMatch");
   function matchesMachine(o, q) {
-    q = lower(q);
-    if (!q) return true;
-    return machineKey(o) === q || lower(machineCode(o)).includes(q) || lower(machineName(o)).includes(q);
+    if (!text(q)) return true;
+    return machinePhraseMatch(machineCode(o), q) || machinePhraseMatch(machineName(o), q);
   }
   __name(matchesMachine, "matchesMachine");
   function status(o) {
