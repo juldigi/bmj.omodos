@@ -9407,12 +9407,7 @@ function createBackend(services, env = {}) {
         var changeRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getWhatChanged", preset: briefPreset, machine: body.machine || "" }).getContent());
         var changes = changeRes && changeRes.ok && changeRes.data ? changeRes.data : null;
         var changeRange = changes && changes.range || {};
-        var briefRes = JSON.parse(OMODOS4.dispatch({
-          action: "v4.getBrief",
-          machine: body.machine || "",
-          since: changeRange.since || body.since,
-          until: changeRange.until || body.until
-        }).getContent());
+        var briefRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getBrief", machine: body.machine || "", since: changeRange.since || body.since, until: changeRange.until || body.until }).getContent());
         var brief = briefRes && briefRes.ok && briefRes.data ? briefRes.data : null;
         var briefEvidence = [];
         if (brief && Array.isArray(brief.thingsToLookAt)) {
