@@ -679,6 +679,7 @@ function renderFeature(n){
  // This avoids showing the old generic preview underneath the specific feature UI.
  var body='';
  s.innerHTML='<div class="v4-card v4-detail-card">'+
+  '<span class="v4-feature-no" hidden aria-hidden="true">'+f.n+'</span>'+
   '<div class="v4-module-head"><div><div class="v4-simple-kicker">'+esc(simpleWs.name)+' • Fitur '+String(f.n).padStart(3,'0')+'</div>'+
   '<h2>'+esc(info.name)+'</h2><p>'+esc(info.help)+'</p><div class="v4-tech-name">Nama teknis: '+esc(f.name)+'</div></div>'+
   '<div class="v4-head-actions"><button class="btn btn-sm" data-v4-tech-toggle><i class="ph-bold ph-sliders-horizontal"></i> Detail teknis</button>'+
