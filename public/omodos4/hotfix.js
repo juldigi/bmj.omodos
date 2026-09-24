@@ -124,13 +124,13 @@ var SIMPLE_FEATURE = {
 
  51:{name:'Cerita KPI',help:'Baca KPI dalam bentuk ringkasan yang mudah dipahami.'},
  52:{name:'Data yang Berkaitan dengan KPI',help:'Lihat data maintenance atau energi yang mungkin berkaitan dengan perubahan KPI.'},
- 53:{name:'Arah KPI',help:'Lihat arah perubahan KPI dari data yang tersedia.'},
- 54:{name:'Simulasi Target KPI',help:'Coba nilai KPI secara hipotetis dan bandingkan langsung dengan target yang tercatat.'},
- 55:{name:'Hubungan Maintenance & Produksi',help:'Lihat apakah perubahan maintenance bergerak bersama data produksi.'},
- 56:{name:'Keanehan Energi',help:'Cari pemakaian energi yang tidak biasa.'},
- 57:{name:'Energi per Hasil Baik',help:'Bandingkan energi dengan hasil produksi yang baik.'},
- 58:{name:'Ringkasan Utilitas',help:'Lihat kondisi utilitas dari data yang tersedia.'},
- 59:{name:'Kondisi IPAL',help:'Lihat ringkasan data dan tanda yang perlu diperiksa pada IPAL.'},
+ 53:{name:'Tren & Perkiraan KPI',help:'Lihat arah perubahan KPI dan perkiraan nilai berikutnya bila data sejak 1 September 2026 sudah cukup.'},
+ 54:{name:'Coba Nilai KPI vs Target',help:'Masukkan angka KPI hipotetis lalu lihat apakah angka tersebut mencapai target yang tercatat. Tidak memprediksi dampak maintenance.'},
+ 55:{name:'Hubungan Breakdown & Hasil Produksi',help:'Lihat apakah jam breakdown dan good output bergerak bersama pada periode yang sama.'},
+ 56:{name:'Energi yang Jauh dari Pola',help:'Lihat catatan energi yang nilainya jauh dari rata-rata kelompok area dan jenis yang sama.'},
+ 57:{name:'Energi per Hasil Baik',help:'Bandingkan energi dengan hasil produksi yang baik pada pasangan data yang tersedia.'},
+ 58:{name:'Ringkasan Catatan Utilitas',help:'Lihat jumlah catatan dan nilai rata-rata utilitas per area dan jenis.'},
+ 59:{name:'Ringkasan Data IPAL',help:'Lihat angka IPAL yang tercatat tanpa menyimpulkan lolos atau tidak terhadap batas resmi.'},
  60:{name:'Ringkasan 1 Menit',help:'Baca hal penting hari ini secara cepat.'},
 
  61:{name:'Ringkasan Keahlian Teknisi',help:'Lihat ringkasan pengalaman, penilaian, mesin yang pernah ditangani, RCA, dan pengetahuan yang tercatat.'},
@@ -2474,6 +2474,21 @@ function machineOptions(){
  return '<option value="">Semua / level departemen</option>'+machineNames().map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('');
 }
 function chip(t){return '<span class="v4-risk-chip">'+esc(t||'Bukti data')+'</span>'}
+function plainPriority(v){
+ var p=String(v||'').toUpperCase();
+ return {P0:'Sangat mendesak',P1:'Perlu segera',P2:'Perlu dipantau',P3:'Belum mendesak',HIGH:'Tinggi',MEDIUM:'Sedang',LOW:'Rendah'}[p]||String(v||'Periksa');
+}
+function plainConfidence(v){
+ var x=String(v||'').toLowerCase();
+ return {high:'Tinggi',medium:'Sedang','low-medium':'Terbatas',low:'Rendah'}[x]||String(v||'');
+}
+function sourceLabel(v){
+ var x=String(v||'');
+ return x==='Energy_Cost_TOE'?'Data Energi & Hasil Produksi':x==='Energy_Utility_ENPI'?'Data Utilitas / ENPI':x;
+}
+function metricLabel(v){
+ return String(v||'').replace(/^daily\./i,'Harian • ').replace(/^chemical\./i,'Kimia • ').replace(/\./g,' › ');
+}
 function item(title,sub,right){
  return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
 }
@@ -2500,23 +2515,23 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-operation-intel');if(old)old.remove();
  var titles={
-  51:'Cerita KPI',52:'Data yang Berkaitan dengan KPI',53:'Arah KPI',54:'Simulasi Target KPI',55:'Hubungan Maintenance & Produksi',
-  56:'Keanehan Energi',57:'Energi per Hasil Baik',58:'Ringkasan Utilitas',59:'Kondisi IPAL',60:'Ringkasan 1 Menit'
+  51:'Cerita KPI',52:'Data yang Berkaitan dengan KPI',53:'Tren & Perkiraan KPI',54:'Coba Nilai KPI vs Target',55:'Hubungan Breakdown & Hasil Produksi',
+  56:'Energi yang Jauh dari Pola',57:'Energi per Hasil Baik',58:'Ringkasan Catatan Utilitas',59:'Ringkasan Data IPAL',60:'Ringkasan 1 Menit'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-operation-intel';sec.dataset.v4OpFeature=String(n);
  var machine=(n<=53||n===55)?'<label>Konteks mesin<select data-v4-op-machine>'+machineOptions()+'</select></label>':'';
  var simulator=n===54?'<div class="v4-form-grid">'+
   '<label>KPI<select data-v4-op-kpi><option value="">Memuat KPI…</option></select></label>'+
-  '<label>Nilai skenario<input type="number" step="any" data-v4-op-kpi-value placeholder="Isi nilai KPI yang ingin dicoba"></label>'+
+  '<label>Nilai yang ingin dicoba<input type="number" step="any" data-v4-op-kpi-value placeholder="Isi angka KPI untuk dibandingkan dengan target"></label>'+
   '</div>':'';
- sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OPERASI & KPI</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===54?'SIMULASI SAJA':'HANYA LIHAT')+'</span></div>'+
+ sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OPERASI & KPI</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===54?'TIDAK DISIMPAN':'HANYA LIHAT')+'</span></div>'+
  (machine?'<div class="v4-form-grid">'+machine+'</div>':'')+simulator+
  '<div class="v4-interaction-actions">'+
  (n===54?'<button class="btn btn-primary btn-sm" data-v4-op-kpi-sim><i class="ph-bold ph-function"></i> Bandingkan dengan Target</button>':'<button class="btn btn-primary btn-sm" data-v4-op-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>')+
  (n===51||n===52||n===53||n===54?'<button class="btn btn-sm" data-v4-open-existing="kpi-department"><i class="ph-bold ph-target"></i> Buka KPI</button>':'')+
  (n===56||n===57||n===58?'<button class="btn btn-sm" data-v4-open-existing="energy-utility"><i class="ph-bold ph-lightning"></i> Buka Energi</button>':'')+
  (n===59?'<button class="btn btn-sm" data-v4-open-existing="report"><i class="ph-bold ph-file-text"></i> Buka Laporan</button>':'')+
- '</div><div data-v4-op-out>'+note(n===54?'Pilih KPI dan coba nilai hipotetis. Perbandingan ini tidak menebak dampak maintenance dan tidak mengubah KPI tersimpan.':'OMODOS 4.0 memakai catatan sejak 1 September 2026. Data operasional tidak diubah.','safe')+'</div>';
+ '</div><div data-v4-op-out>'+note(n===54?'Pilih KPI, isi angka yang ingin dicoba, lalu bandingkan dengan target. Angka ini hanya percobaan di layar: tidak disimpan dan tidak menebak dampak maintenance.':'OMODOS 4.0 memakai catatan sejak 1 September 2026. Data operasional tidak diubah.','safe')+'</div>';
  h.prepend(sec);
  if(n===54)setTimeout(function(){loadTargetKpis(sec,false)},0);
 }
@@ -2570,7 +2585,7 @@ function compareTarget(btn){
  var met=targetStatus(k,scenario),delta=scenario-Number(k.actual),unit=k.unit?' '+k.unit:'';
  out.innerHTML=metrics([
   ['KPI',k.name||'KPI'],['Nilai terbaru',fmt(k.actual)+unit],['Target',fmt(k.target)+unit],
-  ['Nilai skenario',fmt(scenario)+unit],['Perubahan dari terbaru',(delta>=0?'+':'')+fmt(delta)+unit],['Status skenario',met?'Mencapai target':'Belum mencapai target']
+  ['Nilai yang dicoba',fmt(scenario)+unit],['Selisih dari nilai terbaru',(delta>=0?'+':'')+fmt(delta)+unit],['Hasil perbandingan',met?'Mencapai target':'Belum mencapai target']
  ])+
  note(targetNeed(k),'safe')+
  note('Nilai skenario berasal dari angka yang Anda masukkan. OMODOS tidak menganggap perubahan downtime, sparepart, atau tindakan maintenance otomatis menyebabkan KPI ini berubah.','warn');
@@ -2578,8 +2593,9 @@ function compareTarget(btn){
 function render51(d){
  return list(d.kpiStories,function(x){
   var sub=(x.story||'')+(x.unit?' • '+x.unit:'');
-  return item(x.name||'KPI',sub,chip(x.atRisk?'PERLU PERHATIAN':'OK / DATA'));
- },80)+note('Ringkasan membandingkan hasil yang tercatat dengan target pada periode yang dipilih.','safe');
+  var status=x.actual==null?'Belum ada realisasi':x.target==null?'Target belum tercatat':x.atRisk?'Perlu perhatian':'Sesuai target periode';
+  return item(x.name||'KPI',sub,chip(status));
+ },80)+note('Ringkasan membandingkan realisasi dan target yang benar-benar tersedia sejak 1 September 2026. KPI tanpa target tidak diberi status seolah-olah sudah aman.','safe');
 }
 function render52(d){
  var rows=(d.kpiAtRisk||[]).map(function(x){
@@ -2587,7 +2603,7 @@ function render52(d){
   return {name:x.name,status:x.status,evidence:ev};
  });
  return list(rows,function(x){
-  var e=x.evidence.map(function(v){return (v.domain||'bagian')+': '+(v.records||0)+' catatan • '+(v.reason||'')}).join(' | ');
+  var e=x.evidence.map(function(v){var d=String(v.domain||'bagian').toLowerCase();d=d==='maintenance'?'Maintenance':d==='energy'?'Energi':'Data terkait';return d+': '+(v.records||0)+' catatan • '+(v.reason||'')}).join(' | ');
   return item(x.name||'KPI perlu perhatian',(x.status||'')+(e?' • '+e:''),chip('MUNGKIN TERKAIT'));
  },50)+note('Bagan ini menunjukkan data yang mungkin berkaitan. Hubungan tersebut belum membuktikan penyebab.','warn');
 }
@@ -2595,7 +2611,7 @@ function render53(d){
  var rows=(d.kpiStories||[]).filter(function(x){return x.forecast&&x.forecast.nextValue!=null});
  return list(rows,function(x){
   var f=x.forecast||{};
-  return item(x.name||'KPI','Terbaru '+fmt(x.actual)+' • Target '+fmt(x.target)+' • Tren/bulan '+fmt(f.trendPerMonth),chip('Berikutnya '+fmt(f.nextValue)+' • '+(f.confidence||'rendah')));
+  return item(x.name||'KPI','Terbaru '+fmt(x.actual)+' • Target '+fmt(x.target)+' • Perubahan tren/bulan '+fmt(f.trendPerMonth),chip('Perkiraan berikutnya '+fmt(f.nextValue)+' • keyakinan '+plainConfidence(f.confidence||'rendah')));
  },60,'Belum cukup titik data sejak 1 September 2026 untuk membuat proyeksi tren.')+
  note('Perkiraan mengikuti arah data sebelumnya. Hasil sebenarnya bisa berbeda.','warn');
 }
@@ -2603,22 +2619,22 @@ function render55(d){
  var c=d.maintenanceProductionCorrelation||{};
  if(typeof c.pearson!=='number')return empty('Data maintenance–production belum cukup untuk korelasi.')+note('Minimal perlu periode berpasangan breakdown dan good output.','safe');
  return metrics([
-  ['Pasangan periode',fmt(c.pairs,0)],['Pearson r',fmt(c.pearson,3)],['X','Jam breakdown'],['Y','Good output']
- ])+note('Angka ini menunjukkan seberapa sering dua perubahan terjadi bersama. Angka tersebut tidak membuktikan bahwa satu perubahan menyebabkan yang lain.','warn');
+  ['Periode yang bisa dibandingkan',fmt(c.pairs,0)],['Kekuatan hubungan (Pearson r)',fmt(c.pearson,3)],['Data 1','Jam breakdown'],['Data 2','Good output']
+ ])+note('Nilai mendekati +1 berarti keduanya cenderung bergerak searah; mendekati -1 berlawanan; mendekati 0 berarti hubungan linear lemah. Ini tetap bukan bukti sebab-akibat dan hasil dengan sedikit periode perlu dibaca hati-hati.','warn');
 }
 function render56(d){
  return list(d.energyAnomalies,function(x){
-  return item((x.area||'Area')+' • '+(x.type||'Energi'), 'Nilai '+fmt(x.value)+' • rata-rata pembanding '+fmt(x.baselineMean),chip('z '+fmt(x.zScore,2)));
- },60,'Tidak ada statistical outlier |z| ≥ 2 pada data energi yang cukup.')+
- note('Pemakaian yang jauh berbeda dari kelompok sejenis ditandai untuk diperiksa petugas.','safe');
+  return item((x.area||'Area')+' • '+(x.type||'Energi'), 'Nilai '+fmt(x.value)+' • rata-rata kelompok '+fmt(x.baselineMean),chip('Jarak pola '+fmt(x.zScore,2)+'σ'));
+ },60,'Tidak ditemukan nilai energi yang berjarak sekurangnya 2 standar deviasi dari rata-rata kelompoknya.')+
+ note('Fitur ini hanya menandai nilai yang jauh dari pola statistik area dan jenis yang sama. Nilai yang jauh belum tentu salah atau boros; petugas tetap perlu memeriksa penyebabnya.','safe');
 }
 function render57(d){
  return list(d.energyPerGoodOutput,function(x){
   var label=(x.month||'')+' '+(x.year||'');
   var ratio=x.energyPerGoodSheet!=null?x.energyPerGoodSheet:x.ratio;
-  var sub=(x.area?x.area+' • ':'')+(x.type?x.type+' • ':'')+'Hasil '+fmt(x.goodOutput!=null?x.goodOutput:x.output)+' • Sumber '+(x.source||'');
+  var sub=(x.area?x.area+' • ':'')+(x.type?x.type+' • ':'')+'Hasil baik '+fmt(x.goodOutput!=null?x.goodOutput:x.output)+' • Sumber '+sourceLabel(x.source||'');
   return item(label.trim()||'Periode',sub,chip('Energi/Hasil baik '+fmt(ratio,6)));
- },80,'Belum ada pasangan energy + good output yang valid.')+
+ },80,'Belum ada pasangan data energi + hasil baik yang valid.')+
  note('Bandingkan angka hanya jika jenis dan satuan datanya sama.','warn');
 }
 function render58(d){
@@ -2629,19 +2645,19 @@ function render58(d){
 function render59(d){
  return list(d.ipalIntelligence,function(x){
   var nums=Array.isArray(x.numericMetrics)?x.numericMetrics.slice(0,5):[];
-  var sub=nums.map(function(m){return m.metric+'='+fmt(m.value,3)}).join(' • ');
-  return item((x.outlet||'IPAL')+' • '+(x.month||''),String(x.timestamp||'').slice(0,16)+(sub?' • '+sub:''),chip(nums.length+' ukuran'));
+  var sub=nums.map(function(m){return metricLabel(m.metric)+' = '+fmt(m.value,3)}).join(' • ');
+  return item((x.outlet||'IPAL')+' • '+(x.month||''),String(x.timestamp||'').slice(0,16)+(sub?' • '+sub:''),chip(nums.length+' angka tercatat'));
  },80,'Belum ada laporan IPAL pada periode data OMODOS 4.0.')+
- note('Angka IPAL berasal dari catatan yang tersedia. Penilaian apakah hasil memenuhi batas resmi tetap perlu merujuk standar yang berlaku.','warn');
+ note('Fitur ini hanya merangkum angka yang tersimpan. OMODOS tidak menyatakan aman/tidak aman atau memenuhi/tidak memenuhi baku mutu tanpa batas resmi yang tervalidasi.','warn');
 }
 function render60(d){
  if(!d)return empty('Ringkasan singkat belum tersedia.');
  var summary=Array.isArray(d.summary)?d.summary:[];
  var look=Array.isArray(d.thingsToLookAt)?d.thingsToLookAt:[];
- return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>'+esc(d.headline||'Ringkasan 1 Menit')+'</strong><span>'+esc(d.confidence||'')+'</span></div>'+
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>'+esc(d.headline||'Ringkasan 1 Menit')+'</strong><span>Keyakinan '+esc(plainConfidence(d.confidence||''))+'</span></div>'+
  '<div class="v4-sf-list">'+summary.map(function(x){return item(String(x),'','')}).join('')+'</div></section>'+
  (look.length?'<section class="v4-server-section"><div class="v4-server-section-head"><strong>Perlu Diperhatikan</strong><span>'+look.length+'</span></div>'+
- list(look,function(x){return item(x.title||x.machine||x.type||'Perlu diperhatikan',x.reason||x.note||x.description||'',chip(x.priority||x.severity||'PERIKSA'))},12)+'</section>':'')+
+ list(look,function(x){return item(x.title||x.machine||x.type||'Perlu diperhatikan',x.reason||x.note||x.description||'',chip(plainPriority(x.priority||x.severity||'PERIKSA')))},12)+'</section>':'')+
  note('Ringkasan prioritas dibuat dari catatan OMODOS yang tersedia.','safe');
 }
 function render(n,d){
