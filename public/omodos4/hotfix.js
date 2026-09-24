@@ -102,7 +102,7 @@ var SIMPLE_FEATURE = {
 
  31:{name:'Tingkat Penting Sparepart',help:'Lihat sparepart mana yang paling penting untuk diperhatikan.'},
  32:{name:'Risiko Stok Habis',help:'Lihat sparepart yang berisiko habis.'},
- 33:{name:'Sparepart Tidak Terpakai',help:'Cari sparepart yang lama tidak terlihat dipakai.'},
+ 33:{name:'Stok Tanpa Catatan Pemakaian',help:'Lihat stok positif yang belum memiliki catatan pemakaian pada histori OMODOS 4.0 yang tersedia.'},
  34:{name:'Pemakaian Sparepart',help:'Lihat sparepart yang paling sering digunakan.'},
  35:{name:'Mesin & Sparepart Terkait',help:'Lihat sparepart yang tercatat terkait dengan mesin.'},
  36:{name:'Cari Sparepart Pengganti',help:'Cari kandidat sparepart pengganti untuk ditinjau manusia.'},
@@ -2010,7 +2010,7 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-sparepart-intel');if(old)old.remove();
  var titles={
- 31:'Tingkat Penting Sparepart',32:'Risiko Stok Habis',33:'Sparepart Tidak Terpakai',34:'Pemakaian Sparepart',35:'Mesin & Sparepart Terkait',
+ 31:'Tingkat Penting Sparepart',32:'Risiko Stok Habis',33:'Stok Tanpa Catatan Pemakaian',34:'Pemakaian Sparepart',35:'Mesin & Sparepart Terkait',
  36:'Cari Sparepart Pengganti',37:'Foto Referensi Sparepart',38:'Lokasi Sparepart',39:'Perkiraan Frekuensi Kebutuhan Sparepart',40:'Urutan Pembelian Sparepart'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-sparepart-intel';sec.dataset.v4SpFeature=String(n);
@@ -2044,8 +2044,9 @@ function renderStockout(data){
 }
 function renderDead(data){
  return rows(data.deadStockCandidates,function(x){
-  return item(partName(x),partNo(x)+' • '+(x.reason||'Kandidat untuk diperiksa'),'<span class="v4-risk-chip">KANDIDAT</span>');
- },60)+note('Daftar ini hanya menunjukkan kandidat sparepart yang tampak tidak terpakai. Periksa riwayat, kebutuhan engineering, dan reservasi sebelum mengambil keputusan.','warn');
+  var days=Number(x.historyDays)||0,start=x.coverageStart?String(x.coverageStart).slice(0,10):'2026-09-01';
+  return item(partName(x),partNo(x)+' • belum ada pemakaian yang terhubung pada '+days+' hari histori sejak '+start,'<span class="v4-risk-chip">PERLU CEK</span>');
+ },60)+note('Daftar ini BUKAN klasifikasi dead stock. Isinya hanya stok positif yang belum memiliki catatan pemakaian yang cocok sejak source-of-truth OMODOS 4.0. Periksa histori lebih panjang, kebutuhan engineering, reservasi, dan rencana pekerjaan sebelum keputusan disposal.','warn');
 }
 function renderConsumption(data){
  return rows(data.consumptionTop,function(x){
