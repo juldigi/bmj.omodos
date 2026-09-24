@@ -1482,13 +1482,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const energy = sourceRows(SHEETS.energy), cost = sourceRows(SHEETS.energyCost), record = sourceRows(SHEETS.recordYtd).filter((r) => !scope.active || scope.record(r)), run = sourceRows(SHEETS.runHour), ipal = sourceRows(SHEETS.ipal);
     const MONTHS = KPI_MONTHS;
     const periodIndex = /* @__PURE__ */ __name((year, month) => {
-      const y = num(year);
-      let m = num(month);
-      if (!m) {
-        const txt = lower(month);
-        const names = ["jan", "feb", "mar", "apr", "mei", "jun", "jul", "agust", "sep", "okt", "nop", "des"];
-        m = names.findIndex((x) => txt.startsWith(x)) + 1;
-      }
+      const y = num(year), m = monthNumber(month);
       return y && m ? y * 12 + m : null;
     }, "periodIndex");
     const pearson = /* @__PURE__ */ __name((pairs) => {
@@ -1635,7 +1629,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
   }
   __name(getKpiStory, "getKpiStory");
   function getPeopleSkillGraph(body) {
-    const people = sourceRows(SHEETS.personnel), soft = sourceRows(SHEETS.peopleSoft), hard = sourceRows(SHEETS.peopleHard), detail = sourceRows(SHEETS.peopleHardDetail), standard = sourceRows(SHEETS.peopleHardStandard);
+    const people = sourceRows(SHEETS.personnel), soft = sourceRows(SHEETS.peopleSoft), hard = sourceRows(SHEETS.peopleHard), detail = sourceRows(SHEETS.peopleHardDetail), standard = sourceRows(SHEETS.peopleHardStandard), machineMaster = sourceRows(SHEETS.machines);
     const log = sourceRows(SHEETS.logbook), rca = sourceRows(SHEETS.rca), projects = sourceRows(SHEETS.project), kaizen = sourceRows(SHEETS.kaizen), sga = sourceRows(SHEETS.sga), kb = sourceRows(SHEETS.kb);
     const byName = /* @__PURE__ */ new Map();
     function pkey(v) {
@@ -1757,6 +1751,12 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     personnel.forEach((p) => p.machineEvidence.forEach((m) => skillToMachine.push({ person: p.name, machine: m.machine, evidenceEvents: m.events, logbook: m.logbook, rca: m.rca, lastSeen: m.lastSeen ? new Date(m.lastSeen).toISOString() : "", competent: p.competent, gaps: p.gaps.length })));
     skillToMachine.sort((x, y) => y.evidenceEvents - x.evidenceEvents);
     const machineCoverage = /* @__PURE__ */ new Map();
+    machineMaster.forEach((r) => {
+      const machine = machineCode(r) || machineName(r);
+      if (!machine) return;
+      const key = lower(machine);
+      if (!machineCoverage.has(key)) machineCoverage.set(key, { machine, people: /* @__PURE__ */ new Set(), events: 0 });
+    });
     skillToMachine.forEach((x) => {
       const key = lower(x.machine), cur = machineCoverage.get(key) || { machine: x.machine, people: /* @__PURE__ */ new Set(), events: 0 };
       cur.people.add(x.person);
@@ -1773,9 +1773,17 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       p.gaps.slice(0, 8).forEach((g) => learning.push({ person: p.name, position: p.position, gap: first(g, ["Unit Kompetensi", "Kriteria Unjuk Kerja", "Elemen Unit", "Penjelasan Belum Kompeten"]) || "Recorded competency gap", recommendation: "Review existing standard/evidence, then use mentoring/coaching or self-learning workflow.", source: "PI_Hardskill_Assessment_Detail", label: "RECOMMENDATION_REQUIRES_HUMAN_PLAN" }));
     });
     const mentorMatches = [];
-    personnel.filter((p) => p.machineEvidence.length && p.competent > 0).forEach((mentee) => {
-      const candidates = personnel.filter((m) => m.name !== mentee.name && m.competent > mentee.competent && m.machineEvidence.some((mm) => mentee.machines.includes(mm.machine))).sort((x, y) => y.competent + y.evidenceScore - (x.competent + x.evidenceScore)).slice(0, 3);
-      if (candidates.length) mentorMatches.push({ mentee: mentee.name, mentors: candidates.map((m) => ({ name: m.name, competent: m.competent, evidenceScore: m.evidenceScore, sharedMachines: m.machines.filter((x) => mentee.machines.includes(x)).slice(0, 10) })), label: "CANDIDATE_MATCH_HUMAN_APPROVAL_REQUIRED" });
+    personnel.filter((p) => p.machineEvidence.length && (p.gaps.length > 0 || p.notCompetent > 0)).forEach((mentee) => {
+      const menteeMachines = new Set((mentee.machines || []).map(lower));
+      const candidates = personnel.filter((m) => {
+        if (m.name === mentee.name || m.competent <= mentee.competent) return false;
+        return (m.machineEvidence || []).some((mm) => menteeMachines.has(lower(mm.machine)));
+      }).sort((x, y) => y.competent + y.evidenceScore - (x.competent + x.evidenceScore)).slice(0, 3);
+      if (candidates.length) mentorMatches.push({
+        mentee: mentee.name,
+        mentors: candidates.map((m) => ({ name: m.name, competent: m.competent, evidenceScore: m.evidenceScore, sharedMachines: (m.machines || []).filter((x) => menteeMachines.has(lower(x))).slice(0, 10) })),
+        label: "CANDIDATE_MATCH_HUMAN_APPROVAL_REQUIRED"
+      });
     });
     const adaptiveLearningPlans = personnel.filter((p) => p.gaps.length).map((p) => {
       const gapLabels = [...new Set(p.gaps.map((g) => text(first(g, ["Unit Kompetensi", "Kriteria Unjuk Kerja", "Elemen Unit", "Penjelasan Belum Kompeten"]))).filter(Boolean))].slice(0, 6);
@@ -1852,7 +1860,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-people-4",
+      logicVersion: "v4-people-5",
       personnel: personnel.slice(0, 500),
       skillToMachine: skillToMachine.slice(0, 2e3),
       knowledgeRisk: knowledgeRisk.slice(0, 100),
