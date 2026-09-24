@@ -2895,8 +2895,10 @@ function aiHtml(d){
  var evidence=Array.isArray(d.evidence)?d.evidence:[];
  var recommendation=first(d,['recommendation']);
  var provider=d.providerStatus==='unavailable'?'Layanan bantuan belum tersedia • ringkasan memakai catatan OMODOS':(d.modelUsed?'Asisten aktif':'Berdasarkan catatan');
+ var mode={GENERATIVE_WITH_INTERNAL_EVIDENCE:'Jawaban Asisten',DETERMINISTIC_FALLBACK:'Ringkasan dari Data'}[d.mode]||'Asisten OMODOS';
+ var confidence={'not-applicable':'Tidak diperlukan',high:'Kuat',medium:'Sedang','low-medium':'Terbatas',low:'Rendah'}[String(d.confidence||'').toLowerCase()]||d.confidence||'belum tersedia';
  return '<div class="v4-ai-result">'+
-  '<div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(d.mode||'OMODOS AI')+'</span><span>Tingkat keyakinan: '+esc(d.confidence||'belum tersedia')+'</span></div>'+
+  '<div class="v4-interaction-result-head"><span class="v4-server-badge">'+esc(mode)+'</span><span>Tingkat keyakinan: '+esc(confidence)+'</span></div>'+
   '<div class="v4-ai-answer">'+esc(summary).replace(/\n/g,'<br>')+'</div>'+
   '<div class="v4-statline"><div><b>'+esc(evidence.length)+'</b><span>Sumber catatan</span></div><div><b>'+esc(d.humanReviewRequired===false?'Tidak':'Ya')+'</b><span>Periksa oleh petugas</span></div><div><b>'+esc(provider)+'</b><span>Mode</span></div></div>'+
   (assumptions.length?'<div class="v4-assumptions"><strong>Asumsi / batasan</strong><ul>'+assumptions.slice(0,8).map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>':'')+
@@ -2979,8 +2981,8 @@ function candidateHtml(d){
  var head='<div class="v4-interaction-result-head"><span>'+rows.length+' kandidat</span><span>Artikel yang ada: '+esc(d&&d.existingKnowledgeRecords==null?'—':d.existingKnowledgeRecords)+'</span></div>';
  var body=rows.length?'<div class="v4-sf-list">'+rows.slice(0,60).map(function(x){
   var sourceIds=Array.isArray(x.sourceIds)&&x.sourceIds.length?' • ID sumber '+x.sourceIds.slice(0,5).join(', '):'';
-  var sub=(x.machine||'Mesin belum tercatat')+' • Recurrence '+fmt(x.recurrence,0)+' • '+(x.problem||'Problem belum tercatat')+
-   (x.mostRecordedAction?' • Action: '+x.mostRecordedAction:'')+sourceIds;
+  var sub=(x.machine||'Mesin belum tercatat')+' • Berulang '+fmt(x.recurrence,0)+'x • '+(x.problem||'Masalah belum tercatat')+
+   (x.mostRecordedAction?' • Tindakan yang sering tercatat: '+x.mostRecordedAction:'')+sourceIds;
   return '<div class="v4-sf-item"><div><strong>'+esc(x.label||'KANDIDAT_PENGETAHUAN')+'</strong><small>'+esc(sub)+'</small></div>'+chip(x.existingKnowledgePossibleMatch?'PERIKSA PENGETAHUAN YANG ADA':'KANDIDAT DRAF')+'</div>';
  }).join('')+'</div>':empty('Belum ada kandidat pengetahuan dari kasus berulang yang sudah diselesaikan atau RCA.');
  return head+body+note(d&&d.note||'Periksa Pengetahuan yang sudah ada lebih dulu agar tidak membuat duplikat.','warn');
