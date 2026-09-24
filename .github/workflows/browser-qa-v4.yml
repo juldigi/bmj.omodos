@@ -44,6 +44,12 @@ jobs:
           grep -Fq 'if (!machineCoverage.has(key)) machineCoverage.set(key' src/worker.js
           grep -Fq 'p.gaps.length > 0 || p.notCompetent > 0' src/worker.js
 
+          # Machine scoping must use normalized whole-phrase matching, not loose substring matching.
+          grep -Fq 'function machinePhraseMatch(value, q)' src/worker.js
+          grep -Fq '(" " + v + " ").includes(" " + needle + " ")' src/worker.js
+          ! grep -Fq 'lower(machineName(o)).includes(q)' src/worker.js
+          ! grep -Fq 'lower(n.label).includes(lower(q))' src/worker.js
+
           grep -Fq 'function improvementMentionsMachine(record, machine)' src/worker.js
           ! grep -Fq 'existingText.includes(key)' src/worker.js
 
