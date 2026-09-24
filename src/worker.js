@@ -220,6 +220,19 @@ function createStorage(sql, env = {}, origin = "http://localhost:8787") {
     commit,
     rollback,
     importSheet,
+    importFile(id, name, mime, data) {
+      const existing = [...sql.exec("SELECT id FROM files WHERE id=?", id)][0];
+      if (existing) {
+        const current = this.file(id);
+        if (current.name === name && current.mime === mime && current.data.equals(data)) return false;
+        throw Error("FILE_IMPORT_CONFLICT");
+      }
+      sql.exec("INSERT INTO files(id,name,mime,size) VALUES(?,?,?,?)", id, name, mime, data.length);
+      for (let offset = 0, n = 0; offset < data.length; offset += 512e3, n++) {
+        sql.exec("INSERT INTO file_chunks(id,n,data) VALUES(?,?,?)", id, n, new Uint8Array(data.subarray(offset, offset + 512e3)));
+      }
+      return true;
+    },
     spreadsheet,
     cache,
     clear() {
@@ -9361,9 +9374,11 @@ var Application = class {
     const transact = /* @__PURE__ */ __name((fn) => this.state.storage.transactionSync(fn), "transact");
     try {
       if (url.pathname.startsWith("/api/setup/")) {
-        if (request.method !== "POST" || !equal(request.headers.get("X-Setup-Token"), this.env.SETUP_TOKEN)) return json({ ok: false, error: "FORBIDDEN" }, 403);
+        if (request.method !== "POST") return json({ ok: false, error: "FORBIDDEN" }, 403);
         if (store.services.PropertiesService.getScriptProperties().getProperty("MIGRATION_READY") === "1") return json({ ok: false, error: "SETUP_CLOSED" }, 409);
+        if (Number(request.headers.get("Content-Length") || 0) > 15e6) return json({ ok: false, error: "IMPORT_TOO_LARGE" }, 413);
         const body = await request.json();
+        if (!equal(request.headers.get("X-Setup-Token"), this.env.SETUP_TOKEN)) return json({ ok: false, error: "FORBIDDEN" }, 403);
         if (url.pathname === "/api/setup/import") {
           if (typeof body.name !== "string" || !Array.isArray(body.rows) || body.rows.some((r) => !Array.isArray(r))) return json({ ok: false, error: "INVALID_IMPORT" }, 400);
           const hash = createHash2("sha256").update(encode(body.rows)).digest("hex");
@@ -9375,12 +9390,44 @@ var Application = class {
           transact(() => store.commit());
           return json({ ok: true, sheet: body.name, records: Math.max(0, body.rows.length - 1) });
         }
+        if (url.pathname === "/api/setup/config") {
+          if (!body.properties || typeof body.properties !== "object" || Array.isArray(body.properties) ||
+              Object.keys(body.properties).some((key) => ![
+                "FOLDER_Logbook Maintenance - Attachments",
+                "KPI_DEPARTMENT_SOURCE_VERSION",
+                "PATROL_CATEGORY_CONFIG",
+                "PATROL_GENERAL_CHECKLIST"
+              ].includes(key) || typeof body.properties[key] !== "string")) {
+            return json({ ok: false, error: "INVALID_CONFIG_IMPORT" }, 400);
+          }
+          const props = store.services.PropertiesService.getScriptProperties();
+          for (const [key, value] of Object.entries(body.properties)) props.setProperty(key, value);
+          transact(() => store.commit());
+          return json({ ok: true, count: Object.keys(body.properties).length });
+        }
+        if (url.pathname === "/api/setup/file") {
+          if (typeof body.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(body.id) ||
+              typeof body.name !== "string" || body.name.length > 255 ||
+              typeof body.mime !== "string" || body.mime.length > 128 ||
+              typeof body.base64 !== "string" || body.base64.length > 15e6 ||
+              typeof body.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(body.sha256)) {
+            return json({ ok: false, error: "INVALID_FILE_IMPORT" }, 400);
+          }
+          const data = Buffer.from(body.base64, "base64");
+          if (data.length > 10e6 || createHash2("sha256").update(data).digest("hex") !== body.sha256) return json({ ok: false, error: "FILE_HASH_MISMATCH" }, 400);
+          const added = transact(() => store.importFile(body.id, body.name, body.mime, data));
+          return json({ ok: true, file: body.id, bytes: data.length, reused: !added });
+        }
         if (url.pathname === "/api/setup/finish") {
           const sheets = store.spreadsheet.getSheets();
           if (!Array.isArray(body.sheets) || body.sheets.length !== sheets.length) return json({ ok: false, error: "IMPORT_INCOMPLETE" }, 400);
           for (const item of body.sheets) {
             const s = store.spreadsheet.getSheetByName(item.name);
             if (!s || Math.max(0, s.getLastRow() - 1) !== item.rows) return json({ ok: false, error: "IMPORT_COUNT_MISMATCH: " + item.name }, 400);
+          }
+          if (!Array.isArray(body.files) || body.files.length !== store.listFiles().length ||
+              body.files.some((item) => !store.listFiles().some((f) => f.id === item.id && f.size === item.size))) {
+            return json({ ok: false, error: "FILE_IMPORT_INCOMPLETE" }, 400);
           }
           const users = store.spreadsheet.getSheetByName("Users");
           if (!users || users.getLastRow() < 2) return json({ ok: false, error: "USERS_REQUIRED" }, 400);
