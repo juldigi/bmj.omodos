@@ -8,6 +8,12 @@ on:
     paths:
       - "public/**"
       - ".github/workflows/browser-qa-v4.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "public/**"
+      - ".github/workflows/browser-qa-v4.yml"
   workflow_dispatch:
 
 permissions:
