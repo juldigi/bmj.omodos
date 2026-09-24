@@ -1984,6 +1984,10 @@ function factors(f){
 }
 function partName(x){return (x&&x.material)||'(nama material belum tersedia)'}
 function partNo(x){return (x&&x.materialNumber)||'No SAP belum tersedia'}
+function safeMediaUrl(v){
+ var s=String(v||'').trim();
+ return /^https?:\/\//i.test(s)||s.indexOf('/')===0?s:'';
+}
 function rows(list,renderer,limit){
  if(!Array.isArray(list)||!list.length)return empty('Tidak ada bukti data yang memenuhi kriteria fitur ini.');
  return '<div class="v4-sf-list">'+list.slice(0,limit||50).map(renderer).join('')+'</div>';
@@ -2069,11 +2073,16 @@ function renderEquivalent(data,sec){
  },60)+note('Hanya kandidat pengganti yang memiliki sumber tercatat yang ditampilkan. Engineering tetap wajib memeriksa sebelum substitusi.','warn');
 }
 function renderPhoto(data){
- var status=data.photoRecognition||{};
- var list=data.partPhotoAssets||[];
- return note('Status model: '+(status.status||'Belum tersedia')+'. '+(status.note||'Tidak ada identifikasi foto otomatis tanpa model yang sudah diverifikasi.'),status.status&&status.status!=='NOT AVAILABLE'?'safe':'warn')+
- rows(list,function(x){return item(partName(x),partNo(x)+' • Foto referensi tercatat pada data yang ada','<span class="v4-risk-chip">FOTO</span>')},40)+
- note('OMODOS tidak akan menebak identitas sparepart dari foto tanpa model visual yang sudah diverifikasi.','safe');
+ var list=Array.isArray(data.partPhotoAssets)?data.partPhotoAssets:[];
+ if(!list.length)return empty('Belum ada foto referensi sparepart yang tercatat.')+
+  note('Tambahkan foto atau URL foto melalui data sparepart yang digunakan aplikasi. OMODOS tidak akan menebak identitas part tanpa model visual yang diverifikasi.','safe');
+ return note('Foto di bawah berasal dari data sparepart yang sudah tercatat. Foto hanya sebagai referensi visual; OMODOS tidak mengenali atau mendiagnosis isi foto secara otomatis.','safe')+
+ rows(list,function(x){
+  var u=safeMediaUrl(x.image);
+  var action=u?'<a class="btn btn-sm" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer"><i class="ph-bold ph-image"></i> Lihat Foto</a>':'<span class="v4-risk-chip">URL TIDAK DIDUKUNG</span>';
+  return item(partName(x),partNo(x)+' • Foto referensi tercatat',action);
+ },40)+
+ note('Hanya tautan http/https atau path aplikasi yang ditampilkan sebagai tombol. URL lain ditolak agar tidak menjalankan tautan berbahaya.','warn');
 }
 function renderShelf(data){
  return rows(data.shelfDigitalTwin,function(x){
