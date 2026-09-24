@@ -138,8 +138,8 @@ var SIMPLE_FEATURE = {
  63:{name:'Cari Teknisi dengan Pengalaman Terkait',help:'Cari teknisi yang punya bukti keterlibatan pada mesin atau kasus serupa. Hasil bukan peringkat kinerja.'},
  64:{name:'Riwayat Pengalaman Teknisi',help:'Lihat pengalaman teknisi yang tercatat di OMODOS.'},
  65:{name:'Risiko Pengetahuan Terbatas',help:'Lihat mesin yang bukti pengalaman orang dan dokumentasi pengetahuannya masih terbatas.'},
- 66:{name:'Kebutuhan Belajar yang Tercatat',help:'Lihat gap atau kebutuhan pengembangan yang memang tercatat pada penilaian.'},
- 67:{name:'Saran Rencana Belajar',help:'Lihat saran langkah belajar dari gap, standar, riwayat mesin, dan kandidat mentor yang tersedia. Atasan tetap menentukan rencana resminya.'},
+ 66:{name:'Kebutuhan Belajar yang Tercatat',help:'Lihat kesenjangan atau kebutuhan pengembangan yang memang tercatat pada penilaian.'},
+ 67:{name:'Saran Rencana Belajar',help:'Lihat saran langkah belajar dari kebutuhan yang tercatat, standar, riwayat mesin, dan calon mentor yang tersedia. Atasan tetap menentukan rencana resminya.'},
  68:{name:'Kandidat Mentor',help:'Lihat kandidat mentor berdasarkan bukti pengalaman yang tercatat. Penunjukan tetap perlu persetujuan.'},
  69:{name:'Latihan dari Kasus Nyata',help:'Berlatih membaca masalah berulang dan referensi RCA nyata tanpa mengubah data.'},
  70:{name:'Bukti Penilaian & Pengalaman',help:'Lihat penilaian, riwayat mesin, RCA, dan pengetahuan yang sudah tercatat tanpa menyimpulkan kinerja otomatis.'},
@@ -155,16 +155,16 @@ var SIMPLE_FEATURE = {
  79:{name:'Terjemahkan Istilah Maintenance',help:'Ubah istilah teknis menjadi bahasa yang lebih mudah.'},
  80:{name:'Periksa Ulang Asumsi',help:'Cari kelemahan asumsi sebelum mengambil keputusan.'},
 
- 81:{name:'Peluang Perbaikan',help:'Cari masalah berulang yang mungkin perlu improvement.'},
- 82:{name:'Buat Draf Kaizen',help:'Buat draf Kaizen tanpa langsung menyimpan project baru.'},
- 83:{name:'Cek Bukti Manfaat Proyek',help:'Lihat apakah bukti manfaat project sudah cukup terisi.'},
+ 81:{name:'Peluang Perbaikan',help:'Cari masalah berulang yang mungkin perlu perbaikan.'},
+ 82:{name:'Buat Draf Kaizen',help:'Buat draf Kaizen tanpa langsung menyimpan proyek baru.'},
+ 83:{name:'Cek Bukti Manfaat Proyek',help:'Lihat apakah bukti manfaat proyek sudah cukup terisi.'},
  84:{name:'Lihat Sebelum & Sesudah Kaizen',help:'Lihat bukti perubahan Kaizen yang sudah tercatat.'},
- 85:{name:'Kumpulan Ide Perbaikan',help:'Lihat semua ide dan improvement yang masih terbuka.'},
- 86:{name:'Cari Kaizen yang Mirip',help:'Cari improvement yang mungkin mirip agar tidak membuat duplikat.'},
- 87:{name:'Proyek yang Perlu Perhatian',help:'Lihat project terlambat atau masih terbuka.'},
+ 85:{name:'Kumpulan Ide Perbaikan',help:'Lihat semua ide dan perbaikan yang masih terbuka.'},
+ 86:{name:'Cari Kaizen yang Mirip',help:'Cari perbaikan yang mungkin mirip agar tidak membuat catatan ganda.'},
+ 87:{name:'Proyek yang Perlu Perhatian',help:'Lihat proyek yang terlambat atau masih terbuka.'},
  88:{name:'Cerita SGA',help:'Baca ringkasan SGA dari data yang sudah dicatat.'},
- 89:{name:'Hubungan Pengetahuan Perbaikan',help:'Lihat hubungan improvement dengan mesin, masalah, dan pengetahuan.'},
- 90:{name:'Riwayat Perbaikan',help:'Lihat perjalanan project, Kaizen, dan SGA dari tahun ke tahun.'},
+ 89:{name:'Hubungan Pengetahuan Perbaikan',help:'Lihat hubungan perbaikan dengan mesin, masalah, dan pengetahuan.'},
+ 90:{name:'Riwayat Perbaikan',help:'Lihat perjalanan proyek, Kaizen, dan SGA dari tahun ke tahun.'},
 
  91:{name:'Gambaran Pabrik dari Data',help:'Lihat hubungan mesin dan maintenance sebagai gambaran besar.'},
  92:{name:'Pantau Risiko Maintenance',help:'Saring periode atau mesin lalu lihat risiko utama beserta sumber datanya.'},
@@ -805,7 +805,7 @@ Object.assign(FEATURE_ACTIONS,{
  96:'v4.getFactoryBrain',
  97:'v4.getScenarios',
  98:'v4.getWarRoom',
- 99:'v4.getOverview',
+ 99:'v4.getFieldMission',
  100:'v4.getFactoryBrain'
 });
 
@@ -899,7 +899,7 @@ var FEATURE_PATHS={
  96:['nodes','edges','domains'],
  97:['scenarios'],
  98:['wars'],
- 99:['summary','topRisks','topOpportunities'],
+ 99:['missions'],
  100:['nodes','edges','domains']
 };
 function pathValue(obj,path){
