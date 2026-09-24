@@ -42,7 +42,7 @@ jobs:
               if not data.get("success"):
                   raise SystemExit("Cloudflare API verification failed.")
               return data.get("result")
-          check("/user/tokens/verify")
+          check("/accounts/" + account + "/tokens/verify")
           check("/accounts/" + account + "/workers/scripts")
           print("Token is valid and can list Workers in the target account.")
           PY
