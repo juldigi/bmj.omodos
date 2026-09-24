@@ -1,0 +1,39 @@
+name: Compare OMODOS Worker bindings after migration
+on:
+  push:
+    branches:
+      - migration/cloudflare-new-preflight
+    paths:
+      - ".github/workflows/cloudflare-bindings-audit.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      OLD_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+      NEW_TOKEN: ${{ secrets.CLOUDFLARE_NEW_API_TOKEN }}
+      NEW_ACCOUNT: ${{ secrets.CLOUDFLARE_NEW_ACCOUNT_ID }}
+    steps:
+      - name: Compare names and types only
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request,urllib.error
+          def bindings(account,token):
+              url=f"https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/omodos/settings"
+              req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token})
+              try:
+                  with urllib.request.urlopen(req,timeout=20) as response: result=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit(f"Worker settings lookup HTTP {exc.code}") from None
+              if not result.get("success"): raise SystemExit("Settings lookup denied")
+              data=result.get("result") or {}
+              return sorted((x.get("name"),x.get("type")) for x in data.get("bindings",[]))
+          for label,account,token in [
+              ("old","3c0bf44ff86c9587390f09b6d0bc42dd",os.environ["OLD_TOKEN"]),
+              ("new",os.environ["NEW_ACCOUNT"],os.environ["NEW_TOKEN"])
+          ]:
+              print(label,json.dumps(bindings(account,token)))
+          PY
