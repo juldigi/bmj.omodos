@@ -125,7 +125,7 @@ var SIMPLE_FEATURE = {
  51:{name:'Cerita KPI',help:'Baca KPI dalam bentuk ringkasan yang mudah dipahami.'},
  52:{name:'Data yang Berkaitan dengan KPI',help:'Lihat data maintenance atau energi yang mungkin berkaitan dengan perubahan KPI.'},
  53:{name:'Arah KPI',help:'Lihat arah perubahan KPI dari data yang tersedia.'},
- 54:{name:'Simulasi Capai Target',help:'Coba asumsi untuk melihat kemungkinan pemulihan target.'},
+ 54:{name:'Simulasi Target KPI',help:'Coba nilai KPI secara hipotetis dan bandingkan langsung dengan target yang tercatat.'},
  55:{name:'Hubungan Maintenance & Produksi',help:'Lihat apakah perubahan maintenance bergerak bersama data produksi.'},
  56:{name:'Keanehan Energi',help:'Cari pemakaian energi yang tidak biasa.'},
  57:{name:'Energi per Hasil Baik',help:'Bandingkan energi dengan hasil produksi yang baik.'},
@@ -2450,26 +2450,80 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-operation-intel');if(old)old.remove();
  var titles={
-  51:'Cerita KPI',52:'Data yang Berkaitan dengan KPI',53:'Arah KPI',54:'Simulasi Capai Target',55:'Hubungan Maintenance & Produksi',
+  51:'Cerita KPI',52:'Data yang Berkaitan dengan KPI',53:'Arah KPI',54:'Simulasi Target KPI',55:'Hubungan Maintenance & Produksi',
   56:'Keanehan Energi',57:'Energi per Hasil Baik',58:'Ringkasan Utilitas',59:'Kondisi IPAL',60:'Ringkasan 1 Menit'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-operation-intel';sec.dataset.v4OpFeature=String(n);
- var machine=n<=55?'<label>Konteks mesin<select data-v4-op-machine>'+machineOptions()+'</select></label>':'';
+ var machine=(n<=53||n===55)?'<label>Konteks mesin<select data-v4-op-machine>'+machineOptions()+'</select></label>':'';
  var simulator=n===54?'<div class="v4-form-grid">'+
-  '<label>Pengurangan waktu mesin berhenti (%)<input type="number" min="0" max="100" step="1" value="10" data-v4-op-down></label>'+
-  '<label>Pengurangan masalah berulang (%)<input type="number" min="0" max="100" step="1" value="10" data-v4-op-rec></label>'+
-  '<label>Pengurangan risiko stok habis (%)<input type="number" min="0" max="100" step="1" value="10" data-v4-op-stock></label>'+
-  '<label>Penyelesaian tugas penting (%)<input type="number" min="0" max="100" step="1" value="20" data-v4-op-close></label>'+
+  '<label>KPI<select data-v4-op-kpi><option value="">Memuat KPI…</option></select></label>'+
+  '<label>Nilai skenario<input type="number" step="any" data-v4-op-kpi-value placeholder="Isi nilai KPI yang ingin dicoba"></label>'+
   '</div>':'';
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OPERASI & KPI</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===54?'SIMULASI SAJA':'HANYA LIHAT')+'</span></div>'+
  (machine?'<div class="v4-form-grid">'+machine+'</div>':'')+simulator+
  '<div class="v4-interaction-actions">'+
- (n===54?'<button class="btn btn-primary btn-sm" data-v4-op-sim><i class="ph-bold ph-function"></i> Jalankan Simulasi</button>':'<button class="btn btn-primary btn-sm" data-v4-op-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>')+
- (n===51||n===52||n===53?'<button class="btn btn-sm" data-v4-open-existing="kpi-department"><i class="ph-bold ph-target"></i> Buka KPI</button>':'')+
+ (n===54?'<button class="btn btn-primary btn-sm" data-v4-op-kpi-sim><i class="ph-bold ph-function"></i> Bandingkan dengan Target</button>':'<button class="btn btn-primary btn-sm" data-v4-op-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>')+
+ (n===51||n===52||n===53||n===54?'<button class="btn btn-sm" data-v4-open-existing="kpi-department"><i class="ph-bold ph-target"></i> Buka KPI</button>':'')+
  (n===56||n===57||n===58?'<button class="btn btn-sm" data-v4-open-existing="energy-utility"><i class="ph-bold ph-lightning"></i> Buka Energi</button>':'')+
  (n===59?'<button class="btn btn-sm" data-v4-open-existing="report"><i class="ph-bold ph-file-text"></i> Buka Laporan</button>':'')+
- '</div><div data-v4-op-out>'+note('OMODOS 4.0 memakai catatan sejak 1 September 2026. Simulasi ini tidak mengubah data yang tersimpan.','safe')+'</div>';
+ '</div><div data-v4-op-out>'+note(n===54?'Pilih KPI dan coba nilai hipotetis. Perbandingan ini tidak menebak dampak maintenance dan tidak mengubah KPI tersimpan.':'OMODOS 4.0 memakai catatan sejak 1 September 2026. Data operasional tidak diubah.','safe')+'</div>';
  h.prepend(sec);
+ if(n===54)setTimeout(function(){loadTargetKpis(sec,false)},0);
+}
+function targetStories(d){
+ return (d&&Array.isArray(d.kpiStories)?d.kpiStories:[]).filter(function(x){
+  return x&&x.actual!=null&&x.target!=null&&Number.isFinite(Number(x.actual))&&Number.isFinite(Number(x.target));
+ });
+}
+function targetStatus(kpi,val){
+ var target=Number(kpi.target),lowerBetter=String(kpi.polarity||'').toLowerCase().indexOf('min')>=0;
+ return lowerBetter?val<=target:val>=target;
+}
+function targetNeed(kpi){
+ var actual=Number(kpi.actual),target=Number(kpi.target),lowerBetter=String(kpi.polarity||'').toLowerCase().indexOf('min')>=0;
+ var gap=lowerBetter?actual-target:target-actual;
+ if(gap<=0)return 'Target pada data terbaru sudah tercapai.';
+ return (lowerBetter?'Perlu turun sekurangnya ':'Perlu naik sekurangnya ')+fmt(gap)+(kpi.unit?' '+kpi.unit:'')+' dari nilai terbaru agar menyentuh target.';
+}
+function targetBaselineHtml(kpi){
+ if(!kpi)return empty('Pilih KPI yang memiliki nilai aktual dan target sejak 1 September 2026.');
+ return metrics([
+  ['KPI',kpi.name||'KPI'],['Periode terbaru',kpi.latestPeriod||'—'],['Nilai terbaru',fmt(kpi.actual)+(kpi.unit?' '+kpi.unit:'')],
+  ['Target',fmt(kpi.target)+(kpi.unit?' '+kpi.unit:'')]
+ ])+note(targetNeed(kpi),'safe');
+}
+async function loadTargetKpis(sec,force){
+ var sel=sec&&sec.querySelector('[data-v4-op-kpi]'),input=sec&&sec.querySelector('[data-v4-op-kpi-value]'),out=sec&&sec.querySelector('[data-v4-op-out]');
+ if(!sel)return;
+ try{
+  var d=await getOperation({},!!force),stories=targetStories(d);
+  sec.__v4TargetStories=stories;
+  sel.innerHTML=stories.length?stories.map(function(x,i){return '<option value="'+i+'">'+esc(x.name||('KPI '+(i+1)))+' — '+esc(x.latestPeriod||'')+'</option>'}).join(''):'<option value="">Belum ada KPI dengan actual + target</option>';
+  var k=stories[0]||null;
+  if(input)input.value=k&&k.actual!=null?String(k.actual):'';
+  if(out)out.innerHTML=targetBaselineHtml(k);
+ }catch(err){
+  if(out)out.innerHTML=note(err&&err.message||String(err),'error');
+  sel.innerHTML='<option value="">KPI belum dapat dimuat</option>';
+ }
+}
+function selectedTargetKpi(sec){
+ var rows=sec&&Array.isArray(sec.__v4TargetStories)?sec.__v4TargetStories:[],idx=Number(value(sec,'[data-v4-op-kpi]'));
+ return Number.isInteger(idx)&&idx>=0&&idx<rows.length?rows[idx]:null;
+}
+function compareTarget(btn){
+ var sec=btn.closest('.v4-operation-intel'),out=sec&&sec.querySelector('[data-v4-op-out]'),k=selectedTargetKpi(sec);
+ if(!sec||!out)return;
+ if(!k){out.innerHTML=note('Pilih KPI yang memiliki nilai aktual dan target.','warn');return}
+ var raw=value(sec,'[data-v4-op-kpi-value]'),scenario=Number(raw);
+ if(raw===''||!Number.isFinite(scenario)){out.innerHTML=note('Isi nilai skenario KPI dengan angka yang valid.','warn');return}
+ var met=targetStatus(k,scenario),delta=scenario-Number(k.actual),unit=k.unit?' '+k.unit:'';
+ out.innerHTML=metrics([
+  ['KPI',k.name||'KPI'],['Nilai terbaru',fmt(k.actual)+unit],['Target',fmt(k.target)+unit],
+  ['Nilai skenario',fmt(scenario)+unit],['Perubahan dari terbaru',(delta>=0?'+':'')+fmt(delta)+unit],['Status skenario',met?'Mencapai target':'Belum mencapai target']
+ ])+
+ note(targetNeed(k),'safe')+
+ note('Nilai skenario berasal dari angka yang Anda masukkan. OMODOS tidak menganggap perubahan downtime, sparepart, atau tindakan maintenance otomatis menyebabkan KPI ini berubah.','warn');
 }
 function render51(d){
  return list(d.kpiStories,function(x){
@@ -2566,28 +2620,6 @@ async function load(btn,n,force){
  }catch(err){out.innerHTML=note(err&&err.message||String(err),'error')}
  finally{busy(btn,false)}
 }
-function pct(sec,sel){var n=Number(value(sec,sel));return Math.max(0,Math.min(100,Number.isFinite(n)?n:0))}
-async function simulate(btn){
- var sec=btn.closest('.v4-operation-intel'),out=sec&&sec.querySelector('[data-v4-op-out]');
- if(!sec||!out)return;
- if(!(window.OMODOS4&&typeof window.OMODOS4.interactiveAction==='function')){out.innerHTML=note('Fitur simulasi belum tersedia pada sesi ini.','warn');return}
- var p=scopePayload(sec);
- p.downtimeReductionPct=pct(sec,'[data-v4-op-down]');
- p.recurringReductionPct=pct(sec,'[data-v4-op-rec]');
- p.stockRiskReductionPct=pct(sec,'[data-v4-op-stock]');
- p.actionClosurePct=pct(sec,'[data-v4-op-close]');
- busy(btn,true,'Menghitung');
- try{
-  var d=await window.OMODOS4.interactiveAction('v4.runScenario',p);
-  var b=d&&d.baseline||{},q=d&&d.projected||{};
-  out.innerHTML=metrics([
-   ['Waktu berhenti awal',fmt(b.downtimeMinutes,0)+' menit'],['Waktu berhenti skenario',fmt(q.downtimeMinutes,0)+' menit'],
-   ['Waktu berhenti yang berkurang',fmt(q.avoidedDowntimeMinutes,0)+' menit'],['Masalah berulang awal',fmt(b.recurringPatterns,0)],
-   ['Masalah berulang skenario',fmt(q.recurringPatterns,0)],['Risiko sparepart skenario',fmt(q.sparepartRisks,0)]
-  ])+note('Persentase di atas adalah asumsi Anda. Hasil simulasi bukan prediksi pasti dan tidak mengubah KPI tersimpan.','warn');
- }catch(err){out.innerHTML=note(err&&err.message||String(err),'error')}
- finally{busy(btn,false)}
-}
 document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
@@ -2597,12 +2629,19 @@ document.addEventListener('click',function(ev){
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-op-load]');
  if(b){ev.preventDefault();load(b,Number(b.getAttribute('data-v4-op-load')),true);return}
- var sim=ev.target.closest&&ev.target.closest('[data-v4-op-sim]');
- if(sim){ev.preventDefault();simulate(sim);return}
+ var sim=ev.target.closest&&ev.target.closest('[data-v4-op-kpi-sim]');
+ if(sim){ev.preventDefault();compareTarget(sim);return}
+},false);
+document.addEventListener('change',function(ev){
+ if(ev.target&&ev.target.matches('[data-v4-op-kpi]')){
+  var sec=ev.target.closest('.v4-operation-intel'),k=selectedTargetKpi(sec),input=sec&&sec.querySelector('[data-v4-op-kpi-value]'),out=sec&&sec.querySelector('[data-v4-op-out]');
+  if(input)input.value=k&&k.actual!=null?String(k.actual):'';
+  if(out)out.innerHTML=targetBaselineHtml(k);
+ }
 },false);
 
 window.OMODOS4=Object.assign(window.OMODOS4||{},{
- operationIntelVersion:'1',
+ operationIntelVersion:'2',
  operationIntelFeatures:[51,52,53,54,55,56,57,58,59,60]
 });
 })();
