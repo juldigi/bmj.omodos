@@ -1773,6 +1773,30 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       const candidates = personnel.filter((m) => m.name !== mentee.name && m.competent > mentee.competent && m.machineEvidence.some((mm) => mentee.machines.includes(mm.machine))).sort((x, y) => y.competent + y.evidenceScore - (x.competent + x.evidenceScore)).slice(0, 3);
       if (candidates.length) mentorMatches.push({ mentee: mentee.name, mentors: candidates.map((m) => ({ name: m.name, competent: m.competent, evidenceScore: m.evidenceScore, sharedMachines: m.machines.filter((x) => mentee.machines.includes(x)).slice(0, 10) })), label: "CANDIDATE_MATCH_HUMAN_APPROVAL_REQUIRED" });
     });
+    const adaptiveLearningPlans = personnel.filter((p) => p.gaps.length).map((p) => {
+      const gapLabels = [...new Set(p.gaps.map((g) => text(first(g, ["Unit Kompetensi", "Kriteria Unjuk Kerja", "Elemen Unit", "Penjelasan Belum Kompeten"]))).filter(Boolean))].slice(0, 6);
+      const standardLabels = [...new Set((p.expectedStandards || []).map((r) => text(first(r, ["Unit Kompetensi", "Kriteria Unjuk Kerja", "Elemen Unit", "Nama Kompetensi", "Kompetensi"]))).filter(Boolean))].slice(0, 6);
+      const match = mentorMatches.find((x) => lower(x.mentee) === lower(p.name));
+      const mentorNames = match ? match.mentors.map((m) => m.name).slice(0, 3) : [];
+      const machines = (p.machines || []).slice(0, 5);
+      const steps = [];
+      if (standardLabels.length) steps.push("Pelajari ulang standar: " + standardLabels.slice(0, 2).join(" • "));
+      if (machines.length) steps.push("Latihan/observasi pada mesin yang sudah pernah ditangani: " + machines.slice(0, 3).join(", "));
+      if (mentorNames.length) steps.push("Diskusikan gap dengan kandidat mentor: " + mentorNames.join(", "));
+      steps.push("Kumpulkan bukti praktik lalu lakukan penilaian ulang sesuai proses People Intelligence.");
+      return {
+        person: p.name,
+        position: p.position,
+        gapCount: p.gaps.length,
+        gaps: gapLabels,
+        standards: standardLabels,
+        machines,
+        mentorCandidates: mentorNames,
+        nextSteps: steps,
+        lastEvidence: p.lastEvidence,
+        label: "LEARNING_PLAN_DERIVED_FROM_RECORDED_GAPS"
+      };
+    }).sort((a, b) => b.gapCount - a.gapCount || String(a.person).localeCompare(String(b.person)));
     const challengeMap = /* @__PURE__ */ new Map();
     log.forEach((r) => {
       const machine = machineCode(r) || machineName(r), problem = description(r);
@@ -1824,12 +1848,12 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-people-3",
+      logicVersion: "v4-people-4",
       personnel: personnel.slice(0, 500),
       skillToMachine: skillToMachine.slice(0, 2e3),
       knowledgeRisk: knowledgeRisk.slice(0, 100),
       skillGapRadar: learning.slice(0, 300),
-      adaptiveLearning: learning.slice(0, 100),
+      adaptiveLearning: adaptiveLearningPlans.slice(0, 100),
       mentorMatches: mentorMatches.slice(0, 100),
       troubleshootingChallenges,
       counts: { personnel: people.length, soft: soft.length, hard: hard.length, detail: detail.length, standard: standard.length, linkedPeople: personnel.length },
