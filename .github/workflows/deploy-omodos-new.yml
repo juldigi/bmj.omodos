@@ -1,0 +1,52 @@
+name: Deploy OMODOS to new Cloudflare account
+on:
+  push:
+    branches:
+      - migration/cloudflare-new-preflight
+    paths:
+      - ".github/workflows/deploy-omodos-new.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_NEW_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_NEW_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate source and target credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          node --check src/worker.js
+          npm install --no-audit --no-fund
+          npx wrangler deploy --dry-run --outdir /tmp/omodos-new-dry-run
+      - name: Deploy fresh Worker and create temporary setup secret
+        run: |
+          set -euo pipefail
+          cat > /tmp/setup-public.pem <<'PEM'
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEApYK1nPzKVV8CU5wF9Cm8
+          Pyah/Rq8xJQyRdnF7T1n4ZaXU0aVkvMh7INNxI8MzPq/nBCSE/nQ8DK9KzpfPG7C
+          4+feD6FyrXpM5PbT11xE8OBxc89cCc6oj+GuUymdbTvtszdhjoXXIHPn0kke/rXd
+          c9lWk69VoaNV80wG7OjiypXTBKkZTEH7uR6PjgNeOa21iQm3HWA7ca3BowOooapV
+          jYVvmVT9gHEu7oYYUKQV3Cv23qL9uRL4Ys55CzN1InK/055EoU1CbrsVcvT+lhkA
+          Y59rL68D5q7DjsVGOmsojObaYIrKMtigyRYllVyv7k9+qsBQ+GUNewUiXE01NrAS
+          eY7f0lK+pjxzKlDnUf5TirGxpxm62qeqvWlwYeYQ4EUfruYb2YdxQ2RcjZHrdn4P
+          C8C98qUTF2E6OWNgbw4mG9jPJLbcXiiPt7m8N/SrQ6JSj3hE8KLExo084b51pn4N
+          yIc9DUVVfK0nIDwi4N4XrgwXqDKrNWk1AVvnmWENz31lAgMBAAE=
+          -----END PUBLIC KEY-----
+          PEM
+          setup_token="$(openssl rand -hex 32)"
+          echo "::add-mask::$setup_token"
+          npx wrangler deploy
+          printf '%s' "$setup_token" | npx wrangler secret put SETUP_TOKEN
+          encrypted="$(printf '%s' "$setup_token" | openssl pkeyutl -encrypt -pubin -inkey /tmp/setup-public.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 -w0)"
+          echo "Encrypted setup token for migration operator: $encrypted"
+          echo "The setup token itself is never printed."
