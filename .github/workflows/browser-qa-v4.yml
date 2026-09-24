@@ -47,6 +47,16 @@ jobs:
           grep -Fq 'function improvementMentionsMachine(record, machine)' src/worker.js
           ! grep -Fq 'existingText.includes(key)' src/worker.js
 
+          # Empty stock cells must not be interpreted as stockout.
+          grep -Fq 'function stockQtyValue(r)' src/worker.js
+          grep -Fq 'return qty !== null && qty <= 0;' src/worker.js
+          grep -Fq '(x.factors.stockRisk || x.factors.stockout || x.factors.etaOverdue)' src/worker.js
+
+          # MTTR uses only failure events with recorded positive repair/downtime duration.
+          grep -Fq 'const repairEvents = events.filter((r) => downtimeMinutes(r) > 0);' src/worker.js
+          grep -Fq 'repairDurationEvidenceEvents: repairEvents.length' src/worker.js
+          grep -Fq '!/breakdown|emergency|failure|abnormal|corrective/' src/worker.js
+
           grep -Fq 'const SOURCE_TRUTH_START_MS = Date.parse(SOURCE_TRUTH_START_ISO);' src/worker.js
           grep -Fq 'return data.filter((r) => sourceTimestamp(r) >= SOURCE_TRUTH_START_MS);' src/worker.js
 
