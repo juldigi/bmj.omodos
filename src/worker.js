@@ -2380,7 +2380,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const q = text(body.machine || body.machineCode || body.id);
     if (!q) return { ok: false, error: "VALIDATION_ERROR: machine wajib" };
     const graph = getFactoryBrain({ maxMachines: 100 }).data;
-    const center = (graph.nodes || []).find((n) => n.type === "machine" && (lower(n.label) === lower(q) || lower(n.label).includes(lower(q))));
+    const center = (graph.nodes || []).find((n) => n.type === "machine" && machinePhraseMatch(n.label, q));
     if (!center) return { ok: true, data: { machine: q, nodes: [], edges: [], label: "NOT AVAILABLE" } };
     const keep = /* @__PURE__ */ new Set([center.id]);
     for (let depth = 0; depth < 2; depth++) {
@@ -2669,7 +2669,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
   __name(getWarRoom, "getWarRoom");
   function getKnowledgeCandidates(body) {
     const scope = scopeContext(body || {}), log = sourceRows(SHEETS.logbook).filter(scope.record), rca = sourceRows(SHEETS.rca).filter(scope.record), kb = sourceRows(SHEETS.kb);
-    const known = kb.map((r) => lower([first(r, ["Judul", "Title"]), first(r, ["Konten", "Content"]), machineCode(r), machineName(r)].join(" "))).join(" || ");
+    const known = kb.map((r) => ({ record: r, text: lower([first(r, ["Judul", "Title"]), first(r, ["Konten", "Content"]), machineCode(r), machineName(r)].join(" ")) }));
     const groups = /* @__PURE__ */ new Map();
     log.filter((r) => isClosed(r) && text(first(r, ["Tindakan Perbaikan", "Corrective Action"]))).forEach((r) => {
       const machine = machineCode(r) || machineName(r), problem = description(r), action = text(first(r, ["Tindakan Perbaikan", "Corrective Action"]));
@@ -2685,7 +2685,9 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const candidates = [...groups.values()].filter((x) => x.count >= 2).map((x) => {
       const top = [...x.actions.entries()].sort((a, b) => b[1] - a[1])[0] || ["", 0];
-      const corpus = lower(x.machine + " " + x.problem + " " + top[0]), hasMatch = words(corpus).some((w) => w.length > 4 && known.includes(w)) && known.includes(lower(x.machine));
+      const corpus = lower(x.machine + " " + x.problem + " " + top[0]);
+      const corpusWords = words(corpus).filter((w) => w.length > 4);
+      const hasMatch = known.some((k) => matchesMachine(k.record, x.machine) && corpusWords.some((w) => k.text.includes(w)));
       return { machine: x.machine, problem: x.problem, recurrence: x.count, mostRecordedAction: top[0], actionFrequency: top[1], sourceIds: x.sourceIds, latest: x.latest ? new Date(x.latest).toISOString() : "", existingKnowledgePossibleMatch: hasMatch, label: hasMatch ? "REVIEW_EXISTING_KB_FIRST" : "KNOWLEDGE_DRAFT_CANDIDATE" };
     }).sort((a, b) => b.recurrence - a.recurrence).slice(0, 50);
     const rcaCandidates = rca.filter((r) => text(first(r, ["Title", "Judul"]))).slice(0, 30).map((r) => ({ machine: machineCode(r) || machineName(r), problem: first(r, ["Title", "Judul"]), recurrence: 1, sourceIds: [first(r, ["ID"])], latest: dateValue(r) ? new Date(dateValue(r)).toISOString() : "", existingKnowledgePossibleMatch: false, label: "RCA_REVIEW_CANDIDATE" }));
