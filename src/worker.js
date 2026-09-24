@@ -1761,12 +1761,58 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       const candidates = personnel.filter((m) => m.name !== mentee.name && m.competent > mentee.competent && m.machineEvidence.some((mm) => mentee.machines.includes(mm.machine))).sort((x, y) => y.competent + y.evidenceScore - (x.competent + x.evidenceScore)).slice(0, 3);
       if (candidates.length) mentorMatches.push({ mentee: mentee.name, mentors: candidates.map((m) => ({ name: m.name, competent: m.competent, evidenceScore: m.evidenceScore, sharedMachines: m.machines.filter((x) => mentee.machines.includes(x)).slice(0, 10) })), label: "CANDIDATE_MATCH_HUMAN_APPROVAL_REQUIRED" });
     });
-    const failureMemory = getFailureMemory({ since: new Date(Date.now() - 365 * 864e5).toISOString(), until: (/* @__PURE__ */ new Date()).toISOString() }).data;
-    const challengePatterns = (failureMemory.patterns || []).slice(0, 15);
-    const troubleshootingChallenges = challengePatterns.map((x, i) => ({ id: "challenge-" + (i + 1), machine: x.code || x.name || x.key, title: "Diagnose recurring issue on " + (x.code || x.name || x.key), evidence: { recurring: x.recurring, downtimeMinutes: x.downtimeMinutes, openIssues: x.openIssues }, mode: "READ_ONLY_TRAINING", note: "Use real historical evidence; answers are not written to operational data." }));
+    const challengeMap = /* @__PURE__ */ new Map();
+    log.forEach((r) => {
+      const machine = machineCode(r) || machineName(r), problem = description(r);
+      if (!machine || !problem) return;
+      const key = lower(machine) + "|" + lower(problem).replace(/\s+/g, " ").trim();
+      const cur = challengeMap.get(key) || { machine, problem, occurrences: 0, downtimeMinutes: 0, openIssues: 0, lastSeen: 0 };
+      cur.occurrences++;
+      cur.downtimeMinutes += downtimeMinutes(r);
+      if (!isClosed(r)) cur.openIssues++;
+      cur.lastSeen = Math.max(cur.lastSeen, dateValue(r) || 0);
+      challengeMap.set(key, cur);
+    });
+    const challengePatterns = [...challengeMap.values()].filter((x) => x.occurrences >= 2).sort((a, b) => b.occurrences - a.occurrences || b.downtimeMinutes - a.downtimeMinutes || b.openIssues - a.openIssues).slice(0, 20);
+    const troubleshootingChallenges = challengePatterns.map((x, i) => {
+      const candidates = rca.filter((r) => matchesMachine(r, x.machine)).map((r) => {
+        const compareText = [
+          description(r),
+          first(r, ["Problem", "Masalah", "Judul", "Title"]),
+          first(r, ["Root Cause", "Akar Masalah", "Penyebab"]),
+          first(r, ["Corrective Action", "Tindakan Perbaikan", "Action"])
+        ].filter(Boolean).join(" ");
+        return { record: r, score: textSimilarity(x.problem, compareText) };
+      }).filter((m) => m.score > 0).sort((a, b) => b.score - a.score);
+      const best = candidates[0];
+      const referenceRca = best && best.score >= 0.2 ? {
+        similarity: Number(best.score.toFixed(2)),
+        id: first(best.record, ["ID"]),
+        title: first(best.record, ["Judul", "Title"]) || "RCA tercatat",
+        rootCause: first(best.record, ["Root Cause", "Akar Masalah", "Penyebab"]),
+        action: first(best.record, ["Corrective Action", "Tindakan Perbaikan", "Action"]),
+        date: dateValue(best.record) ? new Date(dateValue(best.record)).toISOString() : ""
+      } : null;
+      return {
+        id: "challenge-" + (i + 1),
+        machine: x.machine,
+        title: "Kasus " + (i + 1) + " — " + x.machine,
+        problem: x.problem,
+        prompt: "Sebelum membuka referensi, tuliskan tiga pemeriksaan awal, bukti yang ingin dicari, dan kapan masalah perlu dieskalasikan.",
+        evidence: {
+          occurrences: x.occurrences,
+          downtimeMinutes: Math.round(x.downtimeMinutes),
+          openIssues: x.openIssues,
+          lastSeen: x.lastSeen ? new Date(x.lastSeen).toISOString() : ""
+        },
+        referenceRca,
+        mode: "READ_ONLY_CASE_TRAINING",
+        note: "Referensi RCA dipilih berdasarkan kemiripan teks pada mesin yang sama. Kemiripan bukan bukti bahwa akar penyebabnya identik."
+      };
+    });
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-people-2",
+      logicVersion: "v4-people-3",
       personnel: personnel.slice(0, 500),
       skillToMachine: skillToMachine.slice(0, 2e3),
       knowledgeRisk: knowledgeRisk.slice(0, 100),

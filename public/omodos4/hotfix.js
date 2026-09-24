@@ -97,7 +97,7 @@ var SIMPLE_FEATURE = {
  26:{name:'Bukti Sebelum & Sesudah',help:'Bandingkan kondisi sebelum dan sesudah pekerjaan.'},
  27:{name:'Buka Mesin lewat QR',help:'Pindai QR untuk membuka mesin yang tepat.'},
  28:{name:'Buka Mesin lewat NFC',help:'Gunakan NFC untuk membuka data mesin.'},
- 29:{name:'Urutan Pekerjaan Maintenance',help:'Lihat urutan pekerjaan dari awal sampai selesai.'},
+ 29:{name:'Urutan Kunjungan Mesin',help:'Lihat mesin mana yang sebaiknya didatangi lebih dulu berdasarkan prioritas data.'},
  30:{name:'Mode Tanpa Internet',help:'Bantu pekerjaan lapangan saat koneksi internet terbatas.'},
 
  31:{name:'Tingkat Penting Sparepart',help:'Lihat sparepart mana yang paling penting untuk diperhatikan.'},
@@ -133,7 +133,7 @@ var SIMPLE_FEATURE = {
  59:{name:'Kondisi IPAL',help:'Lihat ringkasan data dan tanda yang perlu diperiksa pada IPAL.'},
  60:{name:'Ringkasan 1 Menit',help:'Baca hal penting hari ini secara cepat.'},
 
- 61:{name:'Peta Keahlian Teknisi',help:'Lihat bukti keahlian dan pengalaman yang tercatat.'},
+ 61:{name:'Ringkasan Keahlian Teknisi',help:'Lihat ringkasan pengalaman, penilaian, mesin yang pernah ditangani, RCA, dan pengetahuan yang tercatat.'},
  62:{name:'Teknisi & Mesin yang Dikuasai',help:'Lihat hubungan teknisi dengan mesin dari riwayat kerja.'},
  63:{name:'Cari Orang Berpengalaman',help:'Cari orang yang pernah menangani masalah atau mesin serupa.'},
  64:{name:'Riwayat Pengalaman Teknisi',help:'Lihat pengalaman teknisi yang tercatat di OMODOS.'},
@@ -1685,8 +1685,8 @@ function missionList(data,mode){
  if(!list.length)return '<div class="v4-empty">BELUM CUKUP DATA untuk konteks ini.</div>';
  return '<div class="v4-sf-list">'+list.slice(0,30).map(function(m){
   var machine=m.machine||m.Machine||'-';
-  var title=mode==='journey'?('Tugas '+(m.order||'')):((m.priority||'')+' '+machine);
-  var detail=m.reason||((m.checklist||[]).length+' item pemeriksaan')||'Dasar tugas';
+  var title=mode==='journey'?('Urutan '+(m.order||'')+' • '+machine):((m.priority||'')+' '+machine);
+  var detail=mode==='journey'?((m.priority||'')+' • '+(m.reason||'Perlu pemeriksaan')):(m.reason||((m.checklist||[]).length+' item pemeriksaan')||'Dasar tugas');
   return '<div class="v4-sf-item"><div><strong>'+e(title)+'</strong><small>'+e(detail)+'</small></div><button class="btn btn-sm" data-v4-sf-open-patrol="'+e(machine)+'">Buka Patrol</button></div>';
  }).join('')+'</div>';
 }
@@ -1715,7 +1715,7 @@ function proofHtml(data,machine){
 function mountMissionFeature(n){
  var h=host();if(!h||!openN(n))return;
  var old=h.querySelector('.v4-sf-interaction');if(old)old.remove();
- var titles={21:'Tugas Teknisi',23:'Daftar Pemeriksaan',26:'Bukti Sebelum & Sesudah',29:'Urutan Pekerjaan Maintenance'};
+ var titles={21:'Tugas Teknisi',23:'Daftar Pemeriksaan',26:'Bukti Sebelum & Sesudah',29:'Urutan Kunjungan Mesin'};
  var sec=document.createElement('section');sec.className='v4-interaction v4-sf-interaction';sec.dataset.v4SfFeature=String(n);
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BANTUAN KERJA LAPANGAN</span><h3>'+e(titles[n])+'</h3></div><span class="v4-no-write">PAKAI DATA YANG ADA</span></div>'+
  '<div class="v4-form-grid"><label>Mesin<select data-v4-sf-machine>'+opts(n===29?'Semua mesin':'Pilih mesin')+'</select></label></div>'+
@@ -2661,7 +2661,7 @@ function mount(n){
  var h=host();if(!h||!openN(n))return;
  Array.from(h.querySelectorAll('.v4-interaction[data-v4-interaction-feature="'+n+'"],.v4-people-intel')).forEach(function(x){x.remove()});
  var titles={
-  61:'Peta Keahlian Teknisi',62:'Teknisi & Mesin yang Dikuasai',63:'Cari Orang Berpengalaman',64:'Riwayat Pengalaman Teknisi',65:'Risiko Hilangnya Pengetahuan',
+  61:'Ringkasan Keahlian Teknisi',62:'Teknisi & Mesin yang Dikuasai',63:'Cari Orang Berpengalaman',64:'Riwayat Pengalaman Teknisi',65:'Risiko Hilangnya Pengetahuan',
   66:'Keahlian yang Perlu Dipelajari',67:'Saran Belajar',68:'Cari Mentor',69:'Latihan Cari Masalah',70:'Bukti Kompetensi'
  };
  var controls='';
@@ -2671,7 +2671,9 @@ function mount(n){
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">TEKNISI & KEAHLIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">HANYA LIHAT</span></div>'+
  controls+
  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-pi-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Tampilkan Bukti</button>'+
- '<button class="btn btn-sm" data-v4-open-existing="pi-dashboard"><i class="ph-bold ph-users-three"></i> Buka Data Teknisi</button></div>'+
+ '<button class="btn btn-sm" data-v4-open-existing="pi-dashboard"><i class="ph-bold ph-users-three"></i> Buka Data Teknisi</button>'+
+ (n===69?'<button class="btn btn-sm" data-v4-open-existing="diagnostic"><i class="ph-bold ph-stethoscope"></i> Buka Diagnostik</button>':'')+
+ '</div>'+
  '<div data-v4-pi-out>'+note('Menggabungkan penilaian, riwayat kerja, RCA, proyek, dan pengetahuan yang tercatat. Banyaknya catatan bukan nilai kinerja karyawan.','safe')+'</div>';
  h.prepend(sec);
 }
@@ -2698,8 +2700,9 @@ function render62(d){
  },100)+note('Hubungan teknisi dan mesin berasal dari pekerjaan yang tercatat; petugas tetap perlu memastikan kewenangannya.','safe');
 }
 function render65(d){
+ function riskLabel(v){var u=String(v||'').toUpperCase();return u==='HIGH'?'Tinggi':u==='MEDIUM'?'Sedang':u==='LOW'?'Rendah':String(v||'—')}
  return list(d.knowledgeRisk,function(x){
-  return item(x.machine||'Mesin','Orang berpengalaman '+fmt(x.experiencedPeople,0)+' • Bukti '+fmt(x.evidenceEvents,0)+' • Pengetahuan '+fmt(x.knowledgeArticles,0)+' • RCA '+fmt(x.rca,0),chip((x.risk||'')+' '+fmt(x.riskScore,0)));
+  return item(x.machine||'Mesin','Orang berpengalaman '+fmt(x.experiencedPeople,0)+' • Bukti '+fmt(x.evidenceEvents,0)+' • Pengetahuan '+fmt(x.knowledgeArticles,0)+' • RCA '+fmt(x.rca,0),chip('Risiko '+riskLabel(x.risk)+' • '+fmt(x.riskScore,0)));
  },100)+note('Jika pengetahuan hanya tercatat pada sedikit orang, pertimbangkan berbagi pengalaman atau melengkapi dokumentasi.','warn');
 }
 function gapText(x){
@@ -2724,10 +2727,22 @@ function render68(d){
  },100)+note('Calon mentor dipilih dari pengalaman yang tercatat. Penunjukan mentor tetap perlu persetujuan.','warn');
 }
 function render69(d){
- return list(d.troubleshootingChallenges,function(x){
-  var e=x.evidence||{};
-  return item(x.title||'Latihan Cari Masalah',(x.machine||'Mesin')+' • Berulang '+fmt(e.recurring,0)+' • Waktu berhenti '+fmt(e.downtimeMinutes,0)+' menit • Belum selesai '+fmt(e.openIssues,0),chip('LATIHAN SAJA'));
- },50)+note('Latihan memakai kasus yang pernah tercatat. Jawaban latihan tidak mengubah Logbook atau RCA.','safe');
+ var rows=Array.isArray(d.troubleshootingChallenges)?d.troubleshootingChallenges:[];
+ if(!rows.length)return empty('Belum ada masalah berulang yang cukup untuk dijadikan latihan.')+note('Latihan hanya dibuat dari kasus nyata yang benar-benar tercatat.','safe');
+ return '<div class="v4-sf-list">'+rows.slice(0,30).map(function(x,i){
+  var e=x.evidence||{},ref=x.referenceRca||null;
+  var refHtml=ref?'<div class="v4-kv-stack">'+
+   '<div><span>RCA</span><b>'+esc(ref.title||ref.id||'RCA tercatat')+'</b></div>'+
+   '<div><span>Kemiripan teks</span><b>'+esc(fmt(ref.similarity,2))+'</b></div>'+
+   (ref.rootCause?'<div><span>Akar penyebab tercatat</span><b>'+esc(ref.rootCause)+'</b></div>':'')+
+   (ref.action?'<div><span>Tindakan tercatat</span><b>'+esc(ref.action)+'</b></div>':'')+
+   '</div>':empty('Belum ada RCA yang cukup mirip untuk dijadikan referensi.');
+  return '<details class="v4-simple-details"><summary><strong>'+esc(x.title||('Latihan '+(i+1)))+'</strong> — '+esc(x.problem||'Masalah belum bernama')+'</summary>'+
+   '<div class="v4-statline"><div><b>'+esc(fmt(e.occurrences,0))+'</b><span>Kejadian</span></div><div><b>'+esc(fmt(e.downtimeMinutes,0))+'</b><span>Menit berhenti</span></div><div><b>'+esc(fmt(e.openIssues,0))+'</b><span>Belum selesai</span></div></div>'+
+   '<div class="v4-interaction-note safe"><i class="ph-bold ph-question"></i><span>'+esc(x.prompt||'Apa yang akan Anda periksa terlebih dahulu?')+'</span></div>'+
+   '<details class="v4-simple-details"><summary>Lihat referensi setelah mencoba</summary>'+refHtml+
+   note(x.note||'Referensi membantu belajar dari histori dan bukan jawaban mutlak.','warn')+'</details></details>';
+ }).join('')+'</div>'+note('Latihan tidak memberi nilai dan tidak mengubah Logbook/RCA. Tujuannya membantu teknisi berlatih membaca bukti kasus nyata.','safe');
 }
 function render70Person(p){
  if(!p)return empty('Pilih personel lalu tampilkan bukti.');
