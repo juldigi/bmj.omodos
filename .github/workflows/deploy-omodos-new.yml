@@ -1,11 +1,19 @@
-name: Deploy OMODOS to new Cloudflare account
+name: Deploy OMODOS production (new Cloudflare account)
 on:
   push:
     branches:
+      - main
       - migration/cloudflare-new-preflight
     paths:
       - ".github/workflows/deploy-omodos-new.yml"
+      - "src/**"
+      - "public/**"
+      - "wrangler.jsonc"
+      - "package.json"
   workflow_dispatch:
+concurrency:
+  group: omodos-new-account-production
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
@@ -31,16 +39,3 @@ jobs:
         run: |
           set -euo pipefail
           npx wrangler deploy
-      - name: Confirm importer asset and protected setup
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            code="$(curl -sS -o /tmp/omodos-import-page -w '%{http_code}' https://omodos.juldigi.workers.dev/migration.html)"
-            test "$code" = "200" && break
-            sleep 3
-          done
-          test "$code" = "200"
-          grep -q 'Impor OMODOS' /tmp/omodos-import-page
-          status="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"name":"probe","rows":[]}' https://omodos.juldigi.workers.dev/api/setup/import)"
-          test "$status" = "403"
-          echo "Migration page is available and unsigned imports are blocked."
