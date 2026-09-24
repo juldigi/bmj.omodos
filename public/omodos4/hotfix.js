@@ -2055,13 +2055,14 @@ function mount(n){
  31:'Prioritas Perhatian Sparepart',32:'Stok Habis atau Menipis',33:'Belum Tercatat Dipakai',34:'Pemakaian Sparepart',35:'Mesin & Sparepart Terkait',
  36:'Pengganti Sparepart yang Tercatat',37:'Foto Referensi Sparepart',38:'Lokasi Sparepart',39:'Perkiraan Frekuensi Kebutuhan Sparepart',40:'Prioritas Pembelian Sparepart'
  };
+ var actionLabels={31:'Tampilkan prioritas',32:'Tampilkan stok bermasalah',33:'Tampilkan yang belum dipakai',34:'Tampilkan pemakaian',35:'Tampilkan hubungan mesin',36:'Cari pengganti',37:'Tampilkan foto',38:'Tampilkan lokasi',39:'Hitung perkiraan kebutuhan',40:'Tampilkan prioritas pembelian'};
  var sec=document.createElement('section');sec.className='v4-interaction v4-sparepart-intel';sec.dataset.v4SpFeature=String(n);
  var controls='';
  if(n===35)controls='<label>Mesin<select data-v4-sp-machine><option value="">Muat data untuk melihat mesin</option></select></label>';
  if(n===36)controls='<label class="v4-form-wide">Cari material / nomor SAP<input data-v4-sp-query placeholder="Ketik nama material atau nomor SAP"></label>';
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">INFORMASI SPAREPART</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
  (controls?'<div class="v4-form-grid">'+controls+'</div>':'')+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sp-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button><button class="btn btn-sm" data-v4-open-existing="sparepart"><i class="ph-bold ph-package"></i> Buka Sparepart</button></div>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-sp-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> '+esc(actionLabels[n]||'Tampilkan data')+'</button><button class="btn btn-sm" data-v4-open-existing="sparepart"><i class="ph-bold ph-package"></i> Buka Sparepart</button></div>'+
  '<div data-v4-sp-out>'+note('Menggunakan data stok sparepart, lokasi, ETA, opname, gudang, status SAP, dan pemakaian di Logbook yang sudah ada. Tidak membuat data ganda.','safe')+'</div>';
  h.prepend(sec);
 }
@@ -2294,10 +2295,11 @@ function mount(n){
   41:'Ringkasan Keandalan',42:'Mesin Paling Perlu Perhatian',43:'Masalah Terbanyak',44:'Pola Gangguan Mesin',45:'Waktu Berhenti yang Tidak Berlabel Gangguan',
   46:'Tren Gangguan Bulanan',47:'Riwayat RCA',48:'Efek Tindakan Perbaikan',49:'Biaya Gangguan yang Tercatat',50:'Biaya per Menit Berhenti'
  };
+ var actionLabels={41:'Tampilkan ringkasan',42:'Tampilkan mesin prioritas',43:'Tampilkan masalah terbanyak',44:'Tampilkan pola gangguan',45:'Cari waktu berhenti',46:'Tampilkan tren',47:'Cari RCA lama',48:'Bandingkan sebelum & sesudah',49:'Tampilkan biaya gangguan',50:'Hitung biaya per menit'};
  var sec=document.createElement('section');sec.className='v4-interaction v4-reliability-loss';sec.dataset.v4RelFeature=String(n);
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">KEANDALAN & KERUGIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
  '<div class="v4-form-grid"><label>Periode analisis<select data-v4-rel-days><option value="30">30 hari</option><option value="90" selected>90 hari</option><option value="180">180 hari</option><option value="365">365 hari</option></select></label><label>Mesin<select data-v4-rel-machine>'+machineOptions()+'</select></label></div>'+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-rel-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-rel-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> '+esc(actionLabels[n]||'Tampilkan data')+'</button>'+
  (n===47?'<button class="btn btn-sm" data-v4-open-existing="diagnostic"><i class="ph-bold ph-magnifying-glass"></i> Buka Diagnostik</button>':'')+
  (n===48?'<button class="btn btn-sm" data-v4-open-existing="corrective-report"><i class="ph-bold ph-wrench"></i> Buka Laporan Perbaikan</button>':'')+
  (n===41||n===42||n===43||n===44||n===45||n===46?'<button class="btn btn-sm" data-v4-open-existing="downtime"><i class="ph-bold ph-clock-counter-clockwise"></i> Buka Waktu Berhenti</button>':'')+
@@ -2525,10 +2527,11 @@ function mount(n){
   '<label>KPI<select data-v4-op-kpi><option value="">Memuat KPI…</option></select></label>'+
   '<label>Nilai yang ingin dicoba<input type="number" step="any" data-v4-op-kpi-value placeholder="Isi angka KPI untuk dibandingkan dengan target"></label>'+
   '</div>':'';
+ var actionLabels={51:'Buat ringkasan KPI',52:'Tampilkan data terkait KPI',53:'Tampilkan tren & perkiraan',55:'Tampilkan hubungan breakdown & hasil',56:'Cari nilai energi yang menyimpang',57:'Hitung energi per hasil baik',58:'Tampilkan ringkasan utilitas',59:'Tampilkan data IPAL',60:'Buat ringkasan 1 menit'};
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">OPERASI & KPI</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===54?'Tidak disimpan':'Tidak mengubah data')+'</span></div>'+
  (machine?'<div class="v4-form-grid">'+machine+'</div>':'')+simulator+
  '<div class="v4-interaction-actions">'+
- (n===54?'<button class="btn btn-primary btn-sm" data-v4-op-kpi-sim><i class="ph-bold ph-function"></i> Bandingkan dengan Target</button>':'<button class="btn btn-primary btn-sm" data-v4-op-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Muat Analisis</button>')+
+ (n===54?'<button class="btn btn-primary btn-sm" data-v4-op-kpi-sim><i class="ph-bold ph-function"></i> Bandingkan dengan Target</button>':'<button class="btn btn-primary btn-sm" data-v4-op-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> '+esc(actionLabels[n]||'Tampilkan data')+'</button>')+
  (n===51||n===52||n===53||n===54?'<button class="btn btn-sm" data-v4-open-existing="kpi-department"><i class="ph-bold ph-target"></i> Buka KPI</button>':'')+
  (n===56||n===57||n===58?'<button class="btn btn-sm" data-v4-open-existing="energy-utility"><i class="ph-bold ph-lightning"></i> Buka Energi</button>':'')+
  (n===59?'<button class="btn btn-sm" data-v4-open-existing="report"><i class="ph-bold ph-file-text"></i> Buka Laporan</button>':'')+
@@ -2785,10 +2788,11 @@ function mount(n){
  var controls='';
  if(n===63)controls='<div class="v4-form-grid"><label>Mesin<select data-v4-pi-machine><option value="">Muat data untuk melihat mesin</option></select></label><label class="v4-form-wide">Masalah / gejala<input data-v4-pi-query placeholder="Contoh: sensor register error"></label></div>';
  if(n===64||n===70)controls='<div class="v4-form-grid"><label>Personel<select data-v4-pi-person><option value="">Muat data untuk melihat teknisi</option></select></label></div>';
+ var actionLabels={61:'Tampilkan ringkasan teknisi',62:'Tampilkan hubungan teknisi & mesin',63:'Cari teknisi berpengalaman',64:'Buka riwayat teknisi',65:'Tampilkan risiko pengetahuan',66:'Tampilkan kebutuhan belajar',67:'Tampilkan saran belajar',68:'Tampilkan calon mentor',69:'Buka latihan kasus',70:'Tampilkan bukti pengalaman'};
  var sec=document.createElement('section');sec.className='v4-interaction v4-people-intel';sec.dataset.v4PiFeature=String(n);
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">TEKNISI & KEAHLIAN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
  controls+
- '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-pi-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> Tampilkan Bukti</button>'+
+ '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-pi-load="'+n+'"><i class="ph-bold ph-arrows-clockwise"></i> '+esc(actionLabels[n]||'Tampilkan data')+'</button>'+
  '<button class="btn btn-sm" data-v4-open-existing="pi-dashboard"><i class="ph-bold ph-users-three"></i> Buka Data Teknisi</button>'+
  (n===69?'<button class="btn btn-sm" data-v4-open-existing="diagnostic"><i class="ph-bold ph-stethoscope"></i> Buka Diagnostik</button>':'')+
  '</div>'+
@@ -3360,7 +3364,7 @@ function mount(n){
  removeOlder(n,h);
  var titles={
   81:'Peluang Perbaikan',82:'Buat Draf Kaizen',83:'Cek Bukti Manfaat Project',84:'Lihat Sebelum & Sesudah Kaizen',85:'Kumpulan Ide Perbaikan',
-  86:'Cari Kaizen yang Mirip',87:'Project yang Perlu Perhatian',88:'Cerita SGA',89:'Hubungan Pengetahuan Perbaikan',90:'Riwayat Perbaikan'
+  86:'Cari Kaizen yang Mirip',87:'Proyek yang Perlu Perhatian',88:'Cerita SGA',89:'Hubungan Pengetahuan Perbaikan',90:'Riwayat Perbaikan'
  };
  var sec=document.createElement('section');sec.className='v4-interaction v4-improvement-intel';sec.setAttribute('data-v4-imp-feature',String(n));
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">PERBAIKAN & KAIZEN</span><h3>'+esc(titles[n])+'</h3></div><span class="v4-no-write">'+(n===82?'Belum disimpan':'Tidak mengubah data')+'</span></div>'+
@@ -3911,13 +3915,14 @@ function mount(n){
  var old=h.querySelector('.v4-mp-specific');if(old)old.remove();
  var sec=document.createElement('section');sec.className='v4-interaction v4-mp-specific';sec.setAttribute('data-v4-mp-feature',String(n));
  var requireMachine=machineRequired(n),showMachine=n!==15;
+ var actionLabels={1:'Buka profil mesin',2:'Hitung nilai kesehatan',3:'Tampilkan hubungan data',4:'Tampilkan bagian mesin',5:'Tampilkan umur komponen',6:'Cari riwayat masalah',7:'Tampilkan kebiasaan mesin',8:'Tampilkan perubahan kondisi',9:'Putar ulang kejadian',10:'Buka pusat informasi',11:'Tampilkan risiko kerusakan',12:'Tampilkan peringatan dini',13:'Cari tanda sebelum rusak',14:'Tampilkan masalah berulang',15:'Bandingkan antar mesin',16:'Cari penurunan kondisi',17:'Tampilkan ciri kerusakan',18:'Tampilkan kekuatan bukti',19:'Hitung jarak penggantian',20:'Tampilkan bagian prioritas'};
  var controls='';
  if(showMachine)controls+='<label>Mesin '+(requireMachine?'<b>*</b>':'(opsional)')+'<select data-v4-mp-machine>'+options(requireMachine?'Pilih mesin':'Semua mesin')+'</select></label>';
  if(n===6)controls+='<label class="v4-form-wide">Masalah yang ingin dicari<input data-v4-mp-query placeholder="Opsional: contoh bearing panas, sensor error, kebocoran"></label>';
  sec.innerHTML='<div class="v4-interaction-head"><div><span class="v4-eyebrow">BERDASARKAN DATA OMODOS</span><h3>'+esc((window.OMODOS4&&window.OMODOS4.simpleFeatures&&window.OMODOS4.simpleFeatures[n]||{}).name||('Fitur '+n))+'</h3></div><span class="v4-no-write">Tidak mengubah data</span></div>'+
   '<p class="v4-muted">'+esc(intro(n))+'</p>'+
   (controls?'<div class="v4-form-grid">'+controls+'</div>':'')+
-  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-mp-load="'+n+'"><i class="ph-bold ph-magnifying-glass"></i> Tampilkan Data</button></div>'+
+  '<div class="v4-interaction-actions"><button class="btn btn-primary btn-sm" data-v4-mp-load="'+n+'"><i class="ph-bold ph-magnifying-glass"></i> '+esc(actionLabels[n]||'Tampilkan data')+'</button></div>'+
   '<div data-v4-mp-output>'+note(requireMachine?'Pilih satu mesin, lalu tampilkan datanya.':'Data dapat ditampilkan tanpa mengubah catatan apa pun.')+'</div>';
  h.prepend(sec);
  if(!requireMachine&&n!==6)setTimeout(function(){var b=sec.querySelector('[data-v4-mp-load]');if(b)load(b,n)},0);
