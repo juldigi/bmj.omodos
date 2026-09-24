@@ -3080,6 +3080,8 @@ function buttons(n){
 function intro(n){
  var text='Bukti diambil dari data OMODOS yang sudah ada. Asisten tidak boleh mengubah data operasional secara otomatis.';
  if(n===72)text='Data dibatasi ke mesin yang dipilih di server. Bukti dari mesin lain tidak ikut dicari.';
+ if(n===73)text='Ringkasan memakai catatan perubahan pada shift sebelumnya dan masalah yang perlu diteruskan. Data di luar periode shift tidak dipakai sebagai perubahan shift.';
+ if(n===74)text='Ringkasan memakai catatan hari ini sejak awal hari waktu Jakarta dan menyorot hal yang perlu ditindaklanjuti.';
  if(n===75)text='Fitur ini hanya membuat draf RCA. Akar penyebab akhir dan tindakan perbaikan wajib diperiksa manusia sebelum disimpan.';
  if(n===76)text='Pencarian kasus mirip memakai riwayat lama. Kemiripan teks bukan bukti bahwa akar penyebabnya sama.';
  if(n===77)text='Asisten tidak boleh mengarang isi manual. Jika yang tersedia hanya tautan atau informasi dokumen, sistem akan menjelaskan batasannya.';
@@ -3098,16 +3100,42 @@ function mount(n){
   intro(n)+controls(n,cfg)+buttons(n)+'<div data-v4-ai2-out></div>';
  h.prepend(sec);
 }
-async function getBriefContext(machine){
- var d=await read('v4.getBrief',machine?{machine:machine}:{});
+async function getBriefContext(machine,purpose){
+ var preset=purpose==='shift'?'previousShift':purpose==='morning-brief'?'today':'';
+ var payload=machine?{machine:machine}:{};
+ var changes=null;
+ if(preset){
+  changes=await read('v4.getWhatChanged',Object.assign({},payload,{preset:preset}));
+  if(changes&&changes.range){
+   payload.since=changes.range.since;
+   payload.until=changes.range.until;
+  }
+ }
+ var d=await read('v4.getBrief',payload);
+ if(d&&changes&&changes.range){
+  d.__v4Period={
+   purpose:purpose,
+   since:changes.range.since||'',
+   until:changes.range.until||'',
+   shift:changes.range.shift||'',
+   preset:changes.range.preset||''
+  };
+ }
  return d||null;
 }
 function briefHtml(d){
  if(!d)return '';
  var s=Array.isArray(d.summary)?d.summary:[];
  var look=Array.isArray(d.thingsToLookAt)?d.thingsToLookAt:[];
- return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Ringkasan Dasar dari Data</strong><span>'+esc(d.confidence||'')+'</span></div>'+
- (s.length?'<div class="v4-sf-list">'+s.slice(0,8).map(function(x){return '<div class="v4-sf-item"><div><strong>'+esc(x)+'</strong></div>'+chip('Tercatat/Dihitung')+'</div>'}).join('')+'</div>':'')+
+ var conf={high:'Kuat',medium:'Sedang','low-medium':'Terbatas',low:'Rendah'}[String(d.confidence||'').toLowerCase()]||d.confidence||'—';
+ var p=d.__v4Period||null,periodNote='';
+ if(p&&p.since&&p.until){
+  var label=p.purpose==='shift'?'Shift sebelumnya'+(p.shift?' ('+p.shift+')':''):'Hari ini';
+  periodNote=note(label+' • '+String(p.since).slice(0,16)+' s.d. '+String(p.until).slice(0,16),'safe');
+ }
+ return '<section class="v4-server-section"><div class="v4-server-section-head"><strong>Ringkasan Dasar dari Data</strong><span>Keyakinan '+esc(conf)+'</span></div>'+
+ periodNote+
+ (s.length?'<div class="v4-sf-list">'+s.slice(0,8).map(function(x){return '<div class="v4-sf-item"><div><strong>'+esc(x)+'</strong></div>'+chip('Tercatat / dihitung')+'</div>'}).join('')+'</div>':'')+
  (look.length?evidenceHtml(look,8):'')+'</section>';
 }
 function passportHtml(d){
@@ -3147,8 +3175,9 @@ async function run72(sec,out,q,m){
  out.innerHTML=passportHtml(passport)+aiHtml(ai);
 }
 async function run73or74(n,sec,out,q,m){
- var brief=await getBriefContext(m);
- var ai=await action('v4.aiAsk',{query:q,purpose:AI2_CFG[n].purpose,machine:m||''});
+ var purpose=AI2_CFG[n].purpose;
+ var brief=await getBriefContext(m,purpose);
+ var ai=await action('v4.aiAsk',{query:q,purpose:purpose,machine:m||''});
  out.innerHTML=briefHtml(brief)+aiHtml(ai);
 }
 async function run75(sec,out,q,m){

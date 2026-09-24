@@ -672,6 +672,10 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
   __name(previousShiftRange, "previousShiftRange");
   function resolveChangeRange(body) {
     const preset = text(body && body.preset);
+    if (preset === "today") {
+      const r = enforceSourceTruthRange(jakartaDayRange(0));
+      return { ...r, label: "TODAY" };
+    }
     if (preset === "yesterday") {
       const r = enforceSourceTruthRange(jakartaDayRange(1));
       return { ...r, label: "YESTERDAY" };
@@ -9399,11 +9403,15 @@ function createBackend(services, env = {}) {
           recommendation: "Bandingkan jawaban dengan manual atau artikel pengetahuan sumber sebelum mengikuti prosedur."
         };
       } else if (body.purpose === "shift" || body.purpose === "morning-brief") {
-        var briefRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getBrief", machine: body.machine || "", since: body.since, until: body.until }).getContent());
+        var briefPreset = body.purpose === "shift" ? "previousShift" : "today";
+        var changeRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getWhatChanged", preset: briefPreset, machine: body.machine || "" }).getContent());
+        var changes = changeRes && changeRes.ok && changeRes.data ? changeRes.data : null;
+        var changeRange = changes && changes.range || {};
+        var briefRes = JSON.parse(OMODOS4.dispatch({ action: "v4.getBrief", machine: body.machine || "", since: changeRange.since || body.since, until: changeRange.until || body.until }).getContent());
         var brief = briefRes && briefRes.ok && briefRes.data ? briefRes.data : null;
         var briefEvidence = [];
         if (brief && Array.isArray(brief.thingsToLookAt)) {
-          brief.thingsToLookAt.slice(0, 12).forEach(function(item) {
+          brief.thingsToLookAt.slice(0, 8).forEach(function(item) {
             briefEvidence.push({
               sheet: "OMODOS_Brief",
               score: item.priority === "P0" ? 10 : item.priority === "P1" ? 8 : 5,
@@ -9412,14 +9420,38 @@ function createBackend(services, env = {}) {
             });
           });
         }
+        var changeEvidence = [];
+        if (changes && Array.isArray(changes.categories)) {
+          changes.categories.forEach(function(category) {
+            (Array.isArray(category.latest) ? category.latest : []).slice(0, 3).forEach(function(record) {
+              changeEvidence.push({
+                sheet: category.sheet || ("OMODOS_Changes_" + (category.category || "data")),
+                score: 7,
+                machine: body.machine || "",
+                record: record
+              });
+            });
+          });
+        }
+        var combinedEvidence = briefEvidence.concat(changeEvidence).slice(0, 12);
+        var rangeText = changeRange.since && changeRange.until ? String(changeRange.since).slice(0, 16) + " s.d. " + String(changeRange.until).slice(0, 16) : "periode yang dipilih";
+        var contextText = body.purpose === "shift"
+          ? "Ringkasan memakai shift sebelumnya" + (changeRange.shift ? " (" + changeRange.shift + ")" : "") + ", " + rangeText + "."
+          : "Ringkasan memakai data hari ini, " + rangeText + ".";
         body._v4Evidence = {
           query: q,
           machine: body.machine || "",
-          evidence: briefEvidence,
-          confidence: brief && brief.confidence || (briefEvidence.length ? "medium" : "low"),
-          answer: brief && Array.isArray(brief.summary) && brief.summary.length ? brief.summary.join(" ") : "Belum ada ringkasan operasional yang cukup untuk periode ini.",
-          assumptions: ["Ringkasan memakai data OMODOS pada scope/periode yang dipilih.", "Prioritas adalah bantuan triase dan tetap perlu diperiksa petugas."],
-          recommendation: briefEvidence.length ? "Periksa item prioritas dan teruskan tindakan yang belum selesai ke petugas atau shift terkait." : "Lengkapi catatan operasional bila kondisi lapangan belum tercermin di OMODOS."
+          evidence: combinedEvidence,
+          confidence: combinedEvidence.length ? "medium" : brief && brief.confidence || "low",
+          answer: contextText + " " + (brief && Array.isArray(brief.summary) && brief.summary.length ? brief.summary.join(" ") : "Belum ada ringkasan operasional yang cukup untuk periode ini."),
+          assumptions: [
+            contextText,
+            "Perubahan diambil dari catatan OMODOS yang bertanggal pada periode tersebut.",
+            "Prioritas adalah bantuan triase dan tetap perlu diperiksa petugas."
+          ],
+          recommendation: combinedEvidence.length
+            ? (body.purpose === "shift" ? "Teruskan masalah yang belum selesai dan perubahan penting ke shift berikutnya." : "Periksa item prioritas hari ini dan pastikan kondisi lapangan sudah tercatat.")
+            : "Lengkapi catatan operasional bila kondisi lapangan belum tercermin di OMODOS."
         };
       } else {
         var ev = JSON.parse(OMODOS4.dispatch({ action: "v4.ask", query: q, machine: body.machine || "", since: body.since, until: body.until }).getContent());
