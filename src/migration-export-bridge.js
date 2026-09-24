@@ -2,7 +2,7 @@ const HTML = `<!doctype html><html lang="id"><meta charset="utf-8"><meta name="v
 <title>Cadangan OMODOS</title><style>body{font:16px system-ui;max-width:640px;margin:4rem auto;padding:0 1.2rem}label{display:block;margin:1rem 0}input{display:block;width:100%;box-sizing:border-box;padding:.7rem}button{padding:.75rem;margin:.4rem}#status{white-space:pre-wrap}</style>
 <h1>Cadangan OMODOS</h1><p>Masuk dengan akun Superadmin. Unduhan tersimpan di perangkat ini.</p>
 <form id="login"><label>Username<input name="username" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">Masuk</button></form>
-<section id="exports" hidden><button id="database">Unduh database</button><button id="inventory">Daftar lampiran</button><div id="files"></div></section><pre id="status" role="status"></pre><script src="/export.js" defer></script></html>`;
+<section id="exports" hidden><button id="database">Unduh database</button><button id="inventory">Daftar lampiran</button><button id="metadata">Unduh metadata migrasi</button><div id="files"></div></section><pre id="status" role="status"></pre><script src="/export.js" defer></script></html>`;
 
 const JS = `let token = '';
 const status = document.getElementById('status');
@@ -46,6 +46,16 @@ document.getElementById('inventory').addEventListener('click', async () => {
       holder.append(button);
     }
     status.textContent=fileCount+' lampiran; total '+totalBytes+' byte.';
+  } catch(error) {status.textContent=error.message;}
+});
+document.getElementById('metadata').addEventListener('click', async () => {
+  status.textContent='Menyiapkan metadata…';
+  try {
+    const config=await (await request('/api/backup/config')).json();
+    const inventory=await (await request('/api/backup/files')).json();
+    if(!config.ok||!inventory.ok) throw Error('Akses ditolak.');
+    save(new Blob([JSON.stringify({config:config.data,files:inventory.data.files},null,2)],{type:'application/json'}),'omodos-migration-metadata.json');
+    status.textContent='Metadata migrasi siap.';
   } catch(error) {status.textContent=error.message;}
 });`;
 
