@@ -9296,27 +9296,6 @@ __name(createBackend, "createBackend");
 
 // src/application.mjs
 import { timingSafeEqual, createHash as createHash2 } from "node:crypto";
-const MIGRATION_PUBLIC_KEY = "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEApYK1nPzKVV8CU5wF9Cm8Pyah/Rq8xJQyRdnF7T1n4ZaXU0aVkvMh7INNxI8MzPq/nBCSE/nQ8DK9KzpfPG7C4+feD6FyrXpM5PbT11xE8OBxc89cCc6oj+GuUymdbTvtszdhjoXXIHPn0kke/rXdc9lWk69VoaNV80wG7OjiypXTBKkZTEH7uR6PjgNeOa21iQm3HWA7ca3BowOooapVjYVvmVT9gHEu7oYYUKQV3Cv23qL9uRL4Ys55CzN1InK/055EoU1CbrsVcvT+lhkAY59rL68D5q7DjsVGOmsojObaYIrKMtigyRYllVyv7k9+qsBQ+GUNewUiXE01NrASeY7f0lK+pjxzKlDnUf5TirGxpxm62qeqvWlwYeYQ4EUfruYb2YdxQ2RcjZHrdn4PC8C98qUTF2E6OWNgbw4mG9jPJLbcXiiPt7m8N/SrQ6JSj3hE8KLExo084b51pn4NyIc9DUVVfK0nIDwi4N4XrgwXqDKrNWk1AVvnmWENz31lAgMBAAE=";
-let migrationVerifyKey;
-async function verifyMigrationRequest(request, body, path) {
-  const signature = request.headers.get("X-Migration-Signature");
-  const expiry = Number(request.headers.get("X-Migration-Expiry"));
-  if (!signature || !Number.isSafeInteger(expiry) || expiry < Date.now() || expiry > Date.now() + 86400000) return false;
-  try {
-    migrationVerifyKey ??= crypto.subtle.importKey(
-      "spki",
-      Uint8Array.from(atob(MIGRATION_PUBLIC_KEY), (c) => c.charCodeAt(0)),
-      { name: "RSA-PSS", hash: "SHA-256" },
-      false, ["verify"]
-    );
-    const key = await migrationVerifyKey;
-    const data = new TextEncoder().encode(path + "\\n" + expiry + "\\n" + JSON.stringify(body));
-    const sig = Uint8Array.from(atob(signature), (c) => c.charCodeAt(0));
-    return await crypto.subtle.verify({ name: "RSA-PSS", saltLength: 32 }, key, sig, data);
-  } catch {
-    return false;
-  }
-}
 var json = /* @__PURE__ */ __name((v, status = 200) => new Response(JSON.stringify(v), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } }), "json");
 var v4Status = /* @__PURE__ */ __name((error) => {
   const s = String(error || "");
@@ -9399,8 +9378,7 @@ var Application = class {
         if (store.services.PropertiesService.getScriptProperties().getProperty("MIGRATION_READY") === "1") return json({ ok: false, error: "SETUP_CLOSED" }, 409);
         if (Number(request.headers.get("Content-Length") || 0) > 15e6) return json({ ok: false, error: "IMPORT_TOO_LARGE" }, 413);
         const body = await request.json();
-        if (!equal(request.headers.get("X-Setup-Token"), this.env.SETUP_TOKEN) &&
-            !await verifyMigrationRequest(request, body, url.pathname)) return json({ ok: false, error: "FORBIDDEN" }, 403);
+        if (!equal(request.headers.get("X-Setup-Token"), this.env.SETUP_TOKEN)) return json({ ok: false, error: "FORBIDDEN" }, 403);
         if (url.pathname === "/api/setup/import") {
           if (typeof body.name !== "string" || !Array.isArray(body.rows) || body.rows.some((r) => !Array.isArray(r))) return json({ ok: false, error: "INVALID_IMPORT" }, 400);
           const hash = createHash2("sha256").update(encode(body.rows)).digest("hex");
