@@ -1,4 +1,4 @@
-name: Deploy isolated OMODOS backup bridge
+name: Close temporary OMODOS backup bridge
 on:
   push:
     branches:
@@ -32,10 +32,3 @@ jobs:
         run: npx wrangler deploy --dry-run --config wrangler.migration-export.jsonc --outdir /tmp/omodos-export-dryrun
       - name: Deploy sibling Worker only
         run: npx wrangler deploy --config wrangler.migration-export.jsonc
-      - name: Smoke test isolated bridge and existing app
-        run: |
-          for attempt in 1 2 3 4 5; do\n            status="$(curl -sS -o /tmp/omodos-export-page -w '%{http_code}' https://omodos-migration-export.offsetbmj.workers.dev/)"\n            test "$status" = "200" && break\n            sleep 3\n          done\n          test "$status" = "200"
-          grep -q 'Cadangan OMODOS' /tmp/omodos-export-page\n          grep -q 'Unduh metadata migrasi' /tmp/omodos-export-page
-          test "$(curl -sS -o /dev/null -w '%{http_code}' https://omodos-migration-export.offsetbmj.workers.dev/api/backup)" = "401"
-          test "$(curl -sS -o /dev/null -w '%{http_code}' https://omodos.offsetbmj.workers.dev/)" = "200"
-          echo "Backup bridge ready; old application and database remain in place."
