@@ -1305,7 +1305,11 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       const recurring = /* @__PURE__ */ new Map();
       relevant.forEach((r) => {
         const d = description(r);
-        if (d) recurring.set(lower(d), (recurring.get(lower(d)) || { label: d, count: 0 }).count + 1);
+        if (!d) return;
+        const k = lower(d);
+        const cur = recurring.get(k) || { label: d, count: 0 };
+        cur.count++;
+        recurring.set(k, cur);
       });
       const template = templates.filter((r) => matchesMachine(r, key)).slice(0, 20).map((r) => ({ type: "RECORDED_TEMPLATE", category: first(r, ["Kategori"]), area: first(r, ["Area/Sub Area", "Area"]), check: first(r, ["Deskripsi Pemeriksaan", "Checklist", "Description"]), standard: first(r, ["Kondisi Standar", "Standard Condition"]) }));
       const history = [...recurring.values()].filter((x) => x.count >= 2).sort((a, b) => b.count - a.count).slice(0, 5).map((x) => ({ type: "DERIVED_HISTORY", check: "Review recurring issue evidence: " + x.label, count: x.count, standard: "Human inspection / compare with recorded normal condition" }));
