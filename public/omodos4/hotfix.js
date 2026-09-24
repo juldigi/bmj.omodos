@@ -3262,6 +3262,29 @@ function chip(t){return '<span class="v4-risk-chip">'+esc(t||'Bukti data')+'</sp
 function item(title,sub,right){
  return '<div class="v4-sf-item"><div><strong>'+esc(title)+'</strong><small>'+esc(sub||'')+'</small></div>'+(right||'')+'</div>';
 }
+function mediaRefs(raw){
+ var out=[];
+ function add(v){
+  if(v==null||v==='')return;
+  if(Array.isArray(v)){v.forEach(add);return}
+  if(typeof v==='object'){
+   ['url','src','downloadUrl','download_url','webViewLink','webContentLink','fileUrl','link'].forEach(function(k){if(v[k])add(v[k])});
+   return;
+  }
+  var t=String(v).trim();if(!t)return;
+  if(/^https?:\/\//i.test(t)||t.indexOf('/')===0){out.push(t);return}
+  try{add(JSON.parse(t))}catch(e){}
+ }
+ add(raw);
+ return Array.from(new Set(out)).slice(0,4);
+}
+function mediaButtons(raw,label){
+ var refs=mediaRefs(raw);
+ if(!refs.length)return '';
+ return refs.map(function(url,i){
+  return '<a class="btn btn-sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+(refs.length>1?' '+(i+1):'')+'</a>';
+ }).join('');
+}
 function list(arr,fn,limit,msg){
  if(!Array.isArray(arr)||!arr.length)return empty(msg);
  return '<div class="v4-sf-list">'+arr.slice(0,limit||60).map(fn).join('')+'</div>';
@@ -3374,18 +3397,19 @@ function render83(d){
 }
 function render84(d){
  return list(d.beforeAfterTimeline,function(x){
-  var evidence=[];
-  if(x.beforeAfter)evidence.push('Teks sebelum–sesudah');
-  if(x.beforePhoto)evidence.push('Foto sebelum');
-  if(x.afterPhoto)evidence.push('Foto sesudah');
-  if(x.benefit)evidence.push('Manfaat');
-  return item(x.theme||x.id||'Kaizen',(x.date||'Tanggal —')+' • '+(x.machine||x.area||'')+' • '+evidence.join(', ')+' • Status '+(x.status||'—'),chip('Tercatat'));
- },80)+note('Foto ditampilkan sebagai bukti yang tercatat. Foto asli tidak diubah.','safe');
+  var detail=[x.date||'Tanggal belum tercatat',x.machine||x.area||'Lokasi/mesin belum tercatat','Status '+(x.status||'—')];
+  if(x.beforeAfter)detail.push('Catatan sebelum–sesudah: '+String(x.beforeAfter).slice(0,320));
+  if(x.benefit)detail.push('Manfaat tercatat: '+String(x.benefit).slice(0,220));
+  var buttons=mediaButtons(x.beforePhoto,'Buka foto sebelum')+mediaButtons(x.afterPhoto,'Buka foto sesudah');
+  if(!buttons&&(x.beforePhoto||x.afterPhoto))buttons=chip('Referensi foto tercatat');
+  if(!buttons)buttons=chip('Bukti teks');
+  return item(x.theme||x.id||'Kaizen',detail.join(' • '),'<div class="v4-interaction-actions">'+buttons+'</div>');
+ },80)+note('Isi sebelum–sesudah dan manfaat ditampilkan dari catatan Kaizen. Tombol foto hanya muncul bila field foto berisi URL yang dapat dibuka; referensi foto yang tidak berbentuk URL tidak direkayasa menjadi tautan.','safe');
 }
 function render85(d){
  return list(d.ideaMarketplace,function(x){
-  var detail=(x.type||'Improvement')+' • '+(x.area||x.machine||'')+' • PIC '+(x.pic||'—')+' • Status '+(x.status||'—')+(x.progress!==''&&x.progress!=null?' • Progress '+x.progress:'');
-  var content=[x.problem?('Problem: '+x.problem):'',x.idea?('Idea: '+x.idea):''].filter(Boolean).join(' • ');
+  var detail=(x.type||'Improvement')+' • '+(x.area||x.machine||'')+' • PIC '+(x.pic||'—')+' • Status '+(x.status||'—')+(x.progress!==''&&x.progress!=null?' • Progres '+x.progress:'');
+  var content=[x.problem?('Masalah: '+x.problem):'',x.idea?('Ide: '+x.idea):''].filter(Boolean).join(' • ');
   return item(x.title||x.id||x.type,detail+(content?' • '+content:''),chip('SUDAH ADA'));
  },100)+note('Ini adalah daftar ide perbaikan yang masih terbuka.','safe');
 }
@@ -3413,8 +3437,8 @@ function render87(d){
 function render88(d){
  return list(d.sgaStories,function(x){
   var team=x.team||'SGA';
-  var members=x.members?' • Members '+x.members:'';
-  var result=x.result||x.achievement||'Hasil/Achievement belum tercatat';
+  var members=x.members?' • Anggota '+x.members:'';
+  var result=x.result||x.achievement||'Hasil belum tercatat';
   return item((x.theme||'Tema belum tercatat')+' — '+team,'Ketua '+(x.leader||'—')+members+' • Target '+(x.target||'—')+' • Progres '+(x.progress||'—')+' • '+result,chip(x.status||'Tercatat'));
  },80)+note('Ringkasan hanya memakai hasil yang benar-benar dicatat; bagian kosong tidak dianggap berhasil.','safe');
 }
