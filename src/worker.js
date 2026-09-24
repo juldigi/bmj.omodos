@@ -416,7 +416,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       startAt: SOURCE_TRUTH_START_ISO,
       timezone: SOURCE_TRUTH_TIMEZONE,
       historicalRule: "Analisis historis OMODOS 4.0 hanya memakai record bertanggal/periode mulai 1 September 2026. Knowledge Base tanpa tanggal atau sebelum cutoff tidak dipakai sebagai bukti V4.",
-      referenceRule: "Master/current-state seperti mesin, stok, lokasi sparepart, template Patrol, personel master, Knowledge Base dan standar kompetensi tetap dipakai sebagai referensi kondisi saat ini."
+      referenceRule: "Master/current-state yang tidak bersifat historis seperti mesin, stok, lokasi sparepart, template Patrol, personel master, dan standar kompetensi tetap dipakai sebagai referensi kondisi saat ini. Knowledge Base dan data historis lain tetap mengikuti batas tanggal bila dipakai sebagai bukti OMODOS 4.0."
     };
   }
   __name(sourceTruthInfo, "sourceTruthInfo");
@@ -473,10 +473,20 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     return (machineCode(o) || machineName(o)).toLowerCase();
   }
   __name(machineKey, "machineKey");
+  function normalizedMachineText(v) {
+    return lower(v).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+  __name(normalizedMachineText, "normalizedMachineText");
+  function machinePhraseMatch(value, q) {
+    const v = normalizedMachineText(value), needle = normalizedMachineText(q);
+    if (!needle) return true;
+    if (!v) return false;
+    return v === needle || (" " + v + " ").includes(" " + needle + " ");
+  }
+  __name(machinePhraseMatch, "machinePhraseMatch");
   function matchesMachine(o, q) {
-    q = lower(q);
-    if (!q) return true;
-    return machineKey(o) === q || lower(machineCode(o)).includes(q) || lower(machineName(o)).includes(q);
+    if (!text(q)) return true;
+    return machinePhraseMatch(machineCode(o), q) || machinePhraseMatch(machineName(o), q);
   }
   __name(matchesMachine, "matchesMachine");
   function status(o) {
@@ -1076,13 +1086,17 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
         const dt = dateValue(events[i]) - dateValue(events[i - 1]);
         if (dt > 0) intervals.push(dt / 36e5);
       }
+      const repairEvents = events.filter((r) => downtimeMinutes(r) > 0);
+      const failureDowntimeMinutes = events.reduce((n, r) => n + downtimeMinutes(r), 0);
       return {
         ...m,
         mtbfDerivedHours: intervals.length ? Math.round(intervals.reduce((x, y) => x + y, 0) / intervals.length * 10) / 10 : null,
-        mttrDerivedMinutes: events.length ? Math.round(events.reduce((n, r) => n + downtimeMinutes(r), 0) / events.length) : null,
-        reliabilityEvidenceEvents: events.length
+        mttrDerivedMinutes: repairEvents.length ? Math.round(repairEvents.reduce((n, r) => n + downtimeMinutes(r), 0) / repairEvents.length) : null,
+        failureDowntimeMinutes: Math.round(failureDowntimeMinutes),
+        reliabilityEvidenceEvents: events.length,
+        repairDurationEvidenceEvents: repairEvents.length
       };
-    }).sort((x, y) => x.healthIndex - y.healthIndex || y.downtimeMinutes - x.downtimeMinutes);
+    }).sort((x, y) => x.healthIndex - y.healthIndex || y.failureDowntimeMinutes - x.failureDowntimeMinutes);
     const monthly = /* @__PURE__ */ new Map();
     failureEvents.forEach((r) => {
       const t = dateValue(r);
@@ -1097,7 +1111,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const reliabilityGrowth = [...monthly.values()].sort((x, y) => x.month.localeCompare(y.month)).map((x) => ({ month: x.month, breakdowns: x.breakdowns, downtimeMinutes: Math.round(x.downtimeMinutes), affectedMachines: x.machines.size }));
     const hidden = /* @__PURE__ */ new Map();
-    log.filter((r) => downtimeMinutes(r) > 0 && !/breakdown|emergency/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori"])))).forEach((r) => {
+    log.filter((r) => downtimeMinutes(r) > 0 && !/breakdown|emergency|failure|abnormal|corrective/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori", "Status"])))).forEach((r) => {
       const key = machineCode(r) || machineName(r) || "Unassigned", cur = hidden.get(key) || { machine: key, events: 0, downtimeMinutes: 0 };
       cur.events++;
       cur.downtimeMinutes += downtimeMinutes(r);
@@ -1172,7 +1186,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       countermeasureEffectiveness: correctiveEffectiveness,
       costIntelligence,
       totals: { machines: enriched.length, breakdowns: enriched.reduce((n, m) => n + m.breakdowns, 0), downtimeMinutes: totalDowntime, recurringPatterns: enriched.reduce((n, m) => n + m.recurring, 0), rca: rca.length, corrective: corrective.length },
-      logicVersion: "v4-reliability-4",
+      logicVersion: "v4-reliability-5",
       appliedScope: { machine: scope.machine || "", area: scope.area || "" },
       lineage: { sourceOfTruth: "EXISTING_OMODOS", operationalWrites: "NONE" },
       caveat: "Derived MTBF/MTTR and countermeasure signals use recorded event timing. They do not replace official KPI definitions where those are maintained separately."
@@ -1305,10 +1319,14 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       const recurring = /* @__PURE__ */ new Map();
       relevant.forEach((r) => {
         const d = description(r);
-        if (d) recurring.set(lower(d), (recurring.get(lower(d)) || { label: d, count: 0 }).count + 1);
+        if (!d) return;
+        const k = lower(d);
+        const cur = recurring.get(k) || { label: d, count: 0 };
+        cur.count++;
+        recurring.set(k, cur);
       });
       const template = templates.filter((r) => matchesMachine(r, key)).slice(0, 20).map((r) => ({ type: "RECORDED_TEMPLATE", category: first(r, ["Kategori"]), area: first(r, ["Area/Sub Area", "Area"]), check: first(r, ["Deskripsi Pemeriksaan", "Checklist", "Description"]), standard: first(r, ["Kondisi Standar", "Standard Condition"]) }));
-      const history = [...recurring.values()].filter((x) => x.count >= 2).sort((a, b) => b.count - a.count).slice(0, 5).map((x) => ({ type: "DERIVED_HISTORY", check: "Review recurring issue evidence: " + x.label, count: x.count, standard: "Human inspection / compare with recorded normal condition" }));
+      const history = [...recurring.values()].filter((x) => x.count >= 2).sort((a, b) => b.count - a.count).slice(0, 5).map((x) => ({ type: "DERIVED_HISTORY", check: "Periksa bukti masalah berulang: " + x.label, count: x.count, standard: "Periksa langsung dan bandingkan dengan kondisi normal yang tercatat" }));
       const checklist = [...template, ...history];
       const p = m.healthIndex < 40 ? "P0" : m.openIssues > 0 || m.healthIndex < 70 ? "P1" : "P2";
       const beforeAfterProof = kaizen.filter((r) => matchesMachine(r, key) && (text(first(r, ["Before-After"])) || text(first(r, ["Foto Before (JSON)"])) || text(first(r, ["Foto After (JSON)"])))).sort((a, b) => dateValue(b) - dateValue(a)).slice(0, 8).map((r) => ({
@@ -1322,9 +1340,9 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
         status: first(r, ["Status"]),
         label: "RECORDED_KAIZEN_BEFORE_AFTER"
       }));
-      return { priority: p, machine: key, healthIndex: m.healthIndex, reason: m.openIssues ? m.openIssues + " open issue(s)" : m.recurring ? m.recurring + " recurring pattern(s)" : "Scheduled risk review", openIssues: open.map((r) => cleanRecord(r, 10)), checklist, beforeAfterProof, sourceCounts: { template: template.length, history: history.length, beforeAfter: beforeAfterProof.length } };
+      return { priority: p, machine: key, healthIndex: m.healthIndex, reason: m.openIssues ? m.openIssues + " masalah belum selesai" : m.recurring ? m.recurring + " pola masalah berulang" : "Pemeriksaan kondisi terjadwal", openIssues: open.map((r) => cleanRecord(r, 10)), checklist, beforeAfterProof, sourceCounts: { template: template.length, history: history.length, beforeAfter: beforeAfterProof.length } };
     }).filter((x) => x.priority !== "P2" || x.checklist.length).sort((a, b) => ({ P0: 0, P1: 1, P2: 2 })[a.priority] - { P0: 0, P1: 1, P2: 2 }[b.priority] || a.healthIndex - b.healthIndex);
-    return { ok: true, data: { generatedAt: nowIso(), range: { since: new Date(range.since).toISOString(), until: new Date(range.until).toISOString() }, missions, journey: missions.map((m, i) => ({ order: i + 1, machine: m.machine, priority: m.priority, reason: m.reason })), appliedScope: { machine: scope.machine || "", area: scope.area || "" }, lineage: { sourceOfTruth: "EXISTING_OMODOS", operationalWrites: "NONE" }, note: "Dynamic checklist supplements the existing Patrol template. It does not overwrite the official checklist or Logbook." } };
+    return { ok: true, data: { generatedAt: nowIso(), range: { since: new Date(range.since).toISOString(), until: new Date(range.until).toISOString() }, missions, journey: missions.map((m, i) => ({ order: i + 1, machine: m.machine, priority: m.priority, reason: m.reason })), appliedScope: { machine: scope.machine || "", area: scope.area || "" }, lineage: { sourceOfTruth: "EXISTING_OMODOS", operationalWrites: "NONE" }, note: "Daftar pemeriksaan dinamis melengkapi template Patrol yang sudah ada. Fitur ini tidak menimpa checklist resmi atau Logbook." } };
   }
   __name(getFieldMission, "getFieldMission");
   function getSparepartRisk() {
@@ -1384,13 +1402,23 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const recentCount = /* @__PURE__ */ new Map();
     partRefsFromLogbook(forecastRows).forEach((p, k) => recentCount.set(k, p.consumptionCount));
+    function stockQtyValue(r) {
+      const raw = first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"], null);
+      if (raw === null || raw === void 0 || text(raw) === "") return null;
+      return num(raw);
+    }
+    __name(stockQtyValue, "stockQtyValue");
     const criticality = [...materialInfo.values()].map((x) => {
       const stockRisk = x.stock.some((r) => {
-        const qty = num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"]));
-        const min = num(first(r, ["Min Stock", "Minimum Stock", "Safety Stock", "ROP", "Reorder Point"]));
-        return min > 0 && qty <= min;
+        const qty = stockQtyValue(r);
+        const minRaw = first(r, ["Min Stock", "Minimum Stock", "Safety Stock", "ROP", "Reorder Point"], null);
+        const min = minRaw === null || minRaw === void 0 || text(minRaw) === "" ? null : num(minRaw);
+        return qty !== null && min !== null && min > 0 && qty <= min;
       });
-      const stockout = x.stock.some((r) => num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"])) <= 0);
+      const stockout = x.stock.some((r) => {
+        const qty = stockQtyValue(r);
+        return qty !== null && qty <= 0;
+      });
       const etaOverdue = x.eta.some((r) => {
         const d = timeMs(first(r, ["Estimasi ETA", "ETA", "Tanggal ETA", "Expected Date"]), NaN);
         return Number.isFinite(d) && d < now && !isClosed(r);
@@ -1427,7 +1455,10 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
       risks.push({ severity: x.priority, type: x.factors.stockout ? "stockout" : x.factors.stockRisk ? "stock-risk" : "eta-overdue", material: x.material, materialNumber: x.materialNumber, score: x.criticalityScore, factors: x.factors });
     });
     const deadStockCandidates = criticality.filter((x) => {
-      const hasPositive = x.records.stock.some((r) => num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"])) > 0);
+      const hasPositive = x.records.stock.some((r) => {
+        const qty = stockQtyValue(r);
+        return qty !== null && qty > 0;
+      });
       return hasPositive && x.factors.consumptionCount === 0;
     }).slice(0, 100).map((x) => ({ material: x.material, materialNumber: x.materialNumber, label: "CANDIDATE_ONLY", reason: "Positive stock with no exact linked Logbook consumption in available history", records: x.records.stock }));
     const shelfMap = /* @__PURE__ */ new Map();
@@ -1453,14 +1484,14 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     criticality.forEach((x) => x.machines.forEach((m) => machinePartGraph.push({ from: "machine:" + m, to: "part:" + (x.materialNumber || x.material), relation: "uses/consumed", material: x.material, materialNumber: x.materialNumber })));
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-sparepart-3",
+      logicVersion: "v4-sparepart-4",
       risks,
       criticalityMatrix: criticality.slice(0, 150),
       consumptionTop: criticality.filter((x) => x.factors.consumptionCount > 0).sort((x, y) => y.factors.consumptionCount - x.factors.consumptionCount).slice(0, 50).map((x) => ({ material: x.material, materialNumber: x.materialNumber, count: x.factors.consumptionCount, machines: x.machines, latest: x.latestConsumption })),
       deadStockCandidates,
       shelfDigitalTwin: shelfDigitalTwin.slice(0, 100),
       reservationForecast: criticality.filter((x) => x.reservationForecast.observedConsumptions > 0).slice(0, 100).map((x) => ({ material: x.material, materialNumber: x.materialNumber, ...x.reservationForecast })),
-      procurementUrgency: criticality.filter((x) => x.priority === "P0" || x.priority === "P1").slice(0, 50).map((x) => ({ material: x.material, materialNumber: x.materialNumber, priority: x.priority, score: x.criticalityScore, factors: x.factors, eta: x.records.eta.slice(0, 5), stock: x.records.stock.slice(0, 5) })),
+      procurementUrgency: criticality.filter((x) => (x.priority === "P0" || x.priority === "P1") && (x.factors.stockRisk || x.factors.stockout || x.factors.etaOverdue)).slice(0, 50).map((x) => ({ material: x.material, materialNumber: x.materialNumber, priority: x.priority, score: x.criticalityScore, factors: x.factors, eta: x.records.eta.slice(0, 5), stock: x.records.stock.slice(0, 5) })),
       machinePartGraph: machinePartGraph.slice(0, 1e3),
       equivalentParts: explicitEquivalents,
       partPhotoAssets: partPhotos,
@@ -1478,13 +1509,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const energy = sourceRows(SHEETS.energy), cost = sourceRows(SHEETS.energyCost), record = sourceRows(SHEETS.recordYtd).filter((r) => !scope.active || scope.record(r)), run = sourceRows(SHEETS.runHour), ipal = sourceRows(SHEETS.ipal);
     const MONTHS = KPI_MONTHS;
     const periodIndex = /* @__PURE__ */ __name((year, month) => {
-      const y = num(year);
-      let m = num(month);
-      if (!m) {
-        const txt = lower(month);
-        const names = ["jan", "feb", "mar", "apr", "mei", "jun", "jul", "agust", "sep", "okt", "nop", "des"];
-        m = names.findIndex((x) => txt.startsWith(x)) + 1;
-      }
+      const y = num(year), m = monthNumber(month);
       return y && m ? y * 12 + m : null;
     }, "periodIndex");
     const pearson = /* @__PURE__ */ __name((pairs) => {
@@ -1631,7 +1656,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
   }
   __name(getKpiStory, "getKpiStory");
   function getPeopleSkillGraph(body) {
-    const people = sourceRows(SHEETS.personnel), soft = sourceRows(SHEETS.peopleSoft), hard = sourceRows(SHEETS.peopleHard), detail = sourceRows(SHEETS.peopleHardDetail), standard = sourceRows(SHEETS.peopleHardStandard);
+    const people = sourceRows(SHEETS.personnel), soft = sourceRows(SHEETS.peopleSoft), hard = sourceRows(SHEETS.peopleHard), detail = sourceRows(SHEETS.peopleHardDetail), standard = sourceRows(SHEETS.peopleHardStandard), machineMaster = sourceRows(SHEETS.machines);
     const log = sourceRows(SHEETS.logbook), rca = sourceRows(SHEETS.rca), projects = sourceRows(SHEETS.project), kaizen = sourceRows(SHEETS.kaizen), sga = sourceRows(SHEETS.sga), kb = sourceRows(SHEETS.kb);
     const byName = /* @__PURE__ */ new Map();
     function pkey(v) {
@@ -1753,6 +1778,12 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     personnel.forEach((p) => p.machineEvidence.forEach((m) => skillToMachine.push({ person: p.name, machine: m.machine, evidenceEvents: m.events, logbook: m.logbook, rca: m.rca, lastSeen: m.lastSeen ? new Date(m.lastSeen).toISOString() : "", competent: p.competent, gaps: p.gaps.length })));
     skillToMachine.sort((x, y) => y.evidenceEvents - x.evidenceEvents);
     const machineCoverage = /* @__PURE__ */ new Map();
+    machineMaster.forEach((r) => {
+      const machine = machineCode(r) || machineName(r);
+      if (!machine) return;
+      const key = lower(machine);
+      if (!machineCoverage.has(key)) machineCoverage.set(key, { machine, people: /* @__PURE__ */ new Set(), events: 0 });
+    });
     skillToMachine.forEach((x) => {
       const key = lower(x.machine), cur = machineCoverage.get(key) || { machine: x.machine, people: /* @__PURE__ */ new Set(), events: 0 };
       cur.people.add(x.person);
@@ -1762,16 +1793,24 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const knowledgeRisk = [...machineCoverage.values()].map((x) => {
       const docs = kb.filter((r) => matchesMachine(r, x.machine)).length, rcaCount = rca.filter((r) => matchesMachine(r, x.machine)).length;
       const score = clamp(100 - (x.people.size * 20 + Math.min(30, x.events * 2) + Math.min(30, (docs + rcaCount) * 5)), 0, 100);
-      return { machine: x.machine, riskScore: score, risk: score >= 70 ? "HIGH" : score >= 40 ? "MEDIUM" : "LOW", experiencedPeople: x.people.size, evidenceEvents: x.events, knowledgeArticles: docs, rca: rcaCount, reason: "Coverage risk decreases only when recorded people experience and knowledge evidence exist." };
+      return { machine: x.machine, riskScore: score, risk: score >= 70 ? "HIGH" : score >= 40 ? "MEDIUM" : "LOW", experiencedPeople: x.people.size, evidenceEvents: x.events, knowledgeArticles: docs, rca: rcaCount, reason: "Risiko berkurang bila ada bukti pengalaman personel dan dokumentasi pengetahuan yang tercatat." };
     }).sort((x, y) => y.riskScore - x.riskScore);
     const learning = [];
     personnel.forEach((p) => {
-      p.gaps.slice(0, 8).forEach((g) => learning.push({ person: p.name, position: p.position, gap: first(g, ["Unit Kompetensi", "Kriteria Unjuk Kerja", "Elemen Unit", "Penjelasan Belum Kompeten"]) || "Recorded competency gap", recommendation: "Review existing standard/evidence, then use mentoring/coaching or self-learning workflow.", source: "PI_Hardskill_Assessment_Detail", label: "RECOMMENDATION_REQUIRES_HUMAN_PLAN" }));
+      p.gaps.slice(0, 8).forEach((g) => learning.push({ person: p.name, position: p.position, gap: first(g, ["Unit Kompetensi", "Kriteria Unjuk Kerja", "Elemen Unit", "Penjelasan Belum Kompeten"]) || "Recorded competency gap", recommendation: "Periksa standar dan bukti yang sudah ada, lalu tentukan pembelajaran melalui mentoring, coaching, atau belajar mandiri.", source: "PI_Hardskill_Assessment_Detail", label: "RECOMMENDATION_REQUIRES_HUMAN_PLAN" }));
     });
     const mentorMatches = [];
-    personnel.filter((p) => p.machineEvidence.length && p.competent > 0).forEach((mentee) => {
-      const candidates = personnel.filter((m) => m.name !== mentee.name && m.competent > mentee.competent && m.machineEvidence.some((mm) => mentee.machines.includes(mm.machine))).sort((x, y) => y.competent + y.evidenceScore - (x.competent + x.evidenceScore)).slice(0, 3);
-      if (candidates.length) mentorMatches.push({ mentee: mentee.name, mentors: candidates.map((m) => ({ name: m.name, competent: m.competent, evidenceScore: m.evidenceScore, sharedMachines: m.machines.filter((x) => mentee.machines.includes(x)).slice(0, 10) })), label: "CANDIDATE_MATCH_HUMAN_APPROVAL_REQUIRED" });
+    personnel.filter((p) => p.machineEvidence.length && (p.gaps.length > 0 || p.notCompetent > 0)).forEach((mentee) => {
+      const menteeMachines = new Set((mentee.machines || []).map(lower));
+      const candidates = personnel.filter((m) => {
+        if (m.name === mentee.name || m.competent <= mentee.competent) return false;
+        return (m.machineEvidence || []).some((mm) => menteeMachines.has(lower(mm.machine)));
+      }).sort((x, y) => y.competent + y.evidenceScore - (x.competent + x.evidenceScore)).slice(0, 3);
+      if (candidates.length) mentorMatches.push({
+        mentee: mentee.name,
+        mentors: candidates.map((m) => ({ name: m.name, competent: m.competent, evidenceScore: m.evidenceScore, sharedMachines: (m.machines || []).filter((x) => menteeMachines.has(lower(x))).slice(0, 10) })),
+        label: "CANDIDATE_MATCH_HUMAN_APPROVAL_REQUIRED"
+      });
     });
     const adaptiveLearningPlans = personnel.filter((p) => p.gaps.length).map((p) => {
       const gapLabels = [...new Set(p.gaps.map((g) => text(first(g, ["Unit Kompetensi", "Kriteria Unjuk Kerja", "Elemen Unit", "Penjelasan Belum Kompeten"]))).filter(Boolean))].slice(0, 6);
@@ -1848,7 +1887,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-people-4",
+      logicVersion: "v4-people-5",
       personnel: personnel.slice(0, 500),
       skillToMachine: skillToMachine.slice(0, 2e3),
       knowledgeRisk: knowledgeRisk.slice(0, 100),
@@ -1927,14 +1966,27 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const legacy = [...legacyMap.values()].sort((x, y) => String(y.year).localeCompare(String(x.year)));
     const reliability = getReliability(body || {}).data;
-    const existingText = open.map((x) => lower([first(x.record, ["Judul", "Tema"]), first(x.record, ["Permasalahan", "Background"]), machineCode(x.record), machineName(x.record)].join(" "))).join(" || ");
+    function improvementMentionsMachine(record, machine) {
+      if (!record || !machine) return false;
+      if (matchesMachine(record, machine)) return true;
+      const key = lower(machine).replace(/\s+/g, " ").trim();
+      if (!key) return false;
+      const corpus = lower([
+        first(record, ["Judul", "Tema", "Nama Project"]),
+        first(record, ["Permasalahan", "Background"]),
+        first(record, ["Ide Perbaikan", "Objective", "Target"])
+      ].join(" ")).replace(/\s+/g, " ").trim();
+      return (" " + corpus + " ").includes(" " + key + " ");
+    }
+    __name(improvementMentionsMachine, "improvementMentionsMachine");
     const opportunityRadar = (reliability.badActors || []).filter((m) => m.recurring > 0 || m.healthIndex < 60).map((m) => {
-      const key = lower(m.code || m.name || m.key), covered = key && existingText.includes(key);
-      return { machine: m.code || m.name || m.key, healthIndex: m.healthIndex, recurring: m.recurring, downtimeMinutes: Math.round(m.downtimeMinutes), openIssues: m.openIssues, existingImprovementCoverage: covered ? "POSSIBLE_MATCH" : "NO_MACHINE_NAME_MATCH", priority: !covered && (m.healthIndex < 40 || m.recurring >= 3) ? "P1" : "P2", reason: covered ? "Existing open improvement mentions this machine; review before creating duplicate." : "Recurring/loss evidence exists and no open improvement directly names the machine." };
+      const machine = m.code || m.name || m.key;
+      const covered = open.some((x) => improvementMentionsMachine(x.record, machine));
+      return { machine, healthIndex: m.healthIndex, recurring: m.recurring, downtimeMinutes: Math.round(m.downtimeMinutes), openIssues: m.openIssues, existingImprovementCoverage: covered ? "POSSIBLE_MATCH" : "NO_MACHINE_NAME_MATCH", priority: !covered && (m.healthIndex < 40 || m.recurring >= 3) ? "P1" : "P2", reason: covered ? "Ada improvement terbuka yang menyebut mesin ini; periksa sebelum membuat pekerjaan baru." : "Ada bukti masalah berulang atau kerugian, dan belum ditemukan improvement terbuka yang secara jelas menyebut mesin ini." };
     }).sort((x, y) => ({ P1: 0, P2: 1 })[x.priority] - { P1: 0, P2: 1 }[y.priority] || x.healthIndex - y.healthIndex).slice(0, 40);
     return { ok: true, data: {
       generatedAt: nowIso(),
-      logicVersion: "v4-improvement-2",
+      logicVersion: "v4-improvement-3",
       counts: { project: project.length, kaizen: kaizen.length, sga: sga.length, overdue: overdue.length, open: open.length },
       overdueProjects: overdue.slice(0, 40).map((r) => cleanRecord(r, 12)),
       openImprovements: opportunity,
@@ -1980,13 +2032,13 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const overview = getOverview(body || {}).data;
     const s = overview.summary || {}, items = overview.thingsToLookAt || [];
     const lines = [];
-    if (s.activeBreakdown) lines.push(s.activeBreakdown + " active breakdown(s) need review.");
-    if (s.criticalMachines) lines.push(s.criticalMachines + " critical/open-risk machine(s) detected by current rules.");
-    if (s.sparepartRisks) lines.push(s.sparepartRisks + " sparepart stock/ETA risk signal(s).");
-    if (s.kpiAtRisk) lines.push(s.kpiAtRisk + " KPI record(s) are flagged at risk.");
-    if (s.openHighPriorityActions) lines.push(s.openHighPriorityActions + " high-priority/open action(s).");
-    if (!lines.length) lines.push("No P0/P1 signal was derived for the selected data window.");
-    return { ok: true, data: { generatedAt: nowIso(), mode: "DETERMINISTIC_BRIEF", headline: lines[0], summary: lines, thingsToLookAt: items.slice(0, 8), confidence: items.length ? "medium" : "low", sourceStatus: overview.sourceStatus, note: "Deterministic fallback brief from OMODOS data; no generative provider was required." } };
+    if (s.activeBreakdown) lines.push(s.activeBreakdown + " gangguan aktif perlu diperiksa.");
+    if (s.criticalMachines) lines.push(s.criticalMachines + " mesin perlu perhatian berdasarkan aturan dan data saat ini.");
+    if (s.sparepartRisks) lines.push(s.sparepartRisks + " risiko stok atau ETA sparepart perlu diperiksa.");
+    if (s.kpiAtRisk) lines.push(s.kpiAtRisk + " KPI perlu diperiksa karena tidak sesuai kondisi target yang tersedia.");
+    if (s.openHighPriorityActions) lines.push(s.openHighPriorityActions + " tindakan penting belum selesai.");
+    if (!lines.length) lines.push("Tidak ada sinyal P0/P1 pada periode data yang dipilih.");
+    return { ok: true, data: { generatedAt: nowIso(), mode: "DETERMINISTIC_BRIEF", headline: lines[0], summary: lines, thingsToLookAt: items.slice(0, 8), confidence: items.length ? "medium" : "low", sourceStatus: overview.sourceStatus, note: "Ringkasan dibuat langsung dari data OMODOS yang tersedia tanpa memerlukan layanan generatif." } };
   }
   __name(getBrief, "getBrief");
   function runScenario(body) {
@@ -2328,7 +2380,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const q = text(body.machine || body.machineCode || body.id);
     if (!q) return { ok: false, error: "VALIDATION_ERROR: machine wajib" };
     const graph = getFactoryBrain({ maxMachines: 100 }).data;
-    const center = (graph.nodes || []).find((n) => n.type === "machine" && (lower(n.label) === lower(q) || lower(n.label).includes(lower(q))));
+    const center = (graph.nodes || []).find((n) => n.type === "machine" && machinePhraseMatch(n.label, q));
     if (!center) return { ok: true, data: { machine: q, nodes: [], edges: [], label: "NOT AVAILABLE" } };
     const keep = /* @__PURE__ */ new Set([center.id]);
     for (let depth = 0; depth < 2; depth++) {
@@ -2617,7 +2669,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
   __name(getWarRoom, "getWarRoom");
   function getKnowledgeCandidates(body) {
     const scope = scopeContext(body || {}), log = sourceRows(SHEETS.logbook).filter(scope.record), rca = sourceRows(SHEETS.rca).filter(scope.record), kb = sourceRows(SHEETS.kb);
-    const known = kb.map((r) => lower([first(r, ["Judul", "Title"]), first(r, ["Konten", "Content"]), machineCode(r), machineName(r)].join(" "))).join(" || ");
+    const known = kb.map((r) => ({ record: r, text: lower([first(r, ["Judul", "Title"]), first(r, ["Konten", "Content"]), machineCode(r), machineName(r)].join(" ")) }));
     const groups = /* @__PURE__ */ new Map();
     log.filter((r) => isClosed(r) && text(first(r, ["Tindakan Perbaikan", "Corrective Action"]))).forEach((r) => {
       const machine = machineCode(r) || machineName(r), problem = description(r), action = text(first(r, ["Tindakan Perbaikan", "Corrective Action"]));
@@ -2633,7 +2685,9 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
     const candidates = [...groups.values()].filter((x) => x.count >= 2).map((x) => {
       const top = [...x.actions.entries()].sort((a, b) => b[1] - a[1])[0] || ["", 0];
-      const corpus = lower(x.machine + " " + x.problem + " " + top[0]), hasMatch = words(corpus).some((w) => w.length > 4 && known.includes(w)) && known.includes(lower(x.machine));
+      const corpus = lower(x.machine + " " + x.problem + " " + top[0]);
+      const corpusWords = words(corpus).filter((w) => w.length > 4);
+      const hasMatch = known.some((k) => matchesMachine(k.record, x.machine) && corpusWords.some((w) => k.text.includes(w)));
       return { machine: x.machine, problem: x.problem, recurrence: x.count, mostRecordedAction: top[0], actionFrequency: top[1], sourceIds: x.sourceIds, latest: x.latest ? new Date(x.latest).toISOString() : "", existingKnowledgePossibleMatch: hasMatch, label: hasMatch ? "REVIEW_EXISTING_KB_FIRST" : "KNOWLEDGE_DRAFT_CANDIDATE" };
     }).sort((a, b) => b.recurrence - a.recurrence).slice(0, 50);
     const rcaCandidates = rca.filter((r) => text(first(r, ["Title", "Judul"]))).slice(0, 30).map((r) => ({ machine: machineCode(r) || machineName(r), problem: first(r, ["Title", "Judul"]), recurrence: 1, sourceIds: [first(r, ["ID"])], latest: dateValue(r) ? new Date(dateValue(r)).toISOString() : "", existingKnowledgePossibleMatch: false, label: "RCA_REVIEW_CANDIDATE" }));
