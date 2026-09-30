@@ -34,6 +34,32 @@ jobs:
           set -euo pipefail
           node --check src/worker.js
 
+          node <<'NODE'
+          const fs=require('fs');
+          const s=fs.readFileSync('src/worker.js','utf8');
+          const regStart=s.indexOf('const ACTION_REGISTRY = {');
+          const regEnd=s.indexOf('function resolveAction_',regStart);
+          const regBlock=s.slice(regStart,regEnd);
+          const runtime=new Set([...regBlock.matchAll(/^\s*"([^"]+)":\s*\{\s*permission:/gm)].map(m=>m[1]));
+          const dynStart=s.indexOf('function registerAllPublicActions_()');
+          const dynEnd=s.indexOf('"registerAllPublicActions_"))();',dynStart);
+          const dyn=s.slice(dynStart,dynEnd);
+          for(const m of dyn.matchAll(/add\("([^"]+)"/g)) runtime.add(m[1]);
+          for(const m of dyn.matchAll(/\[([^\]]+)\]\.forEach\(function\(a\)\s*\{\s*add\(a,/g)){
+            for(const q of m[1].matchAll(/"([^"]+)"/g)) runtime.add(q[1]);
+          }
+          const actions=[];
+          for(const fn of ['handleLegacyGet_(e)','handleLegacyPost_(body)']){
+            const st=s.indexOf('function '+fn);
+            const en=s.indexOf('__name('+fn.split('(')[0],st);
+            const block=s.slice(st,en);
+            for(const m of block.matchAll(/if\s*\(action\s*===\s*"([^"]+)"/g)) actions.push(m[1]);
+          }
+          const missing=[...new Set(actions.filter(a=>!runtime.has(a)))];
+          if(missing.length){ console.error('Unregistered legacy actions:',missing.join(', ')); process.exit(1); }
+          console.log('Legacy action registry coverage OK:',new Set(actions).size,'actions');
+          NODE
+
           # Attachments must be private: direct /files links require a valid HttpOnly session cookie.
           grep -Fq '__Host-OMODOSFileSession' src/worker.js
           grep -Fq 'SameSite=Strict' src/worker.js
