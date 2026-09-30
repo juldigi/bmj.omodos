@@ -9603,7 +9603,8 @@ __name(validFileSessionTokens, "validFileSessionTokens");
 function buildFileSessionCookie(request, backend, sessionToken) {
   const tokens = validFileSessionTokens(request, backend, sessionToken);
   const value = encodeURIComponent(tokens.join("~"));
-  return FILE_SESSION_COOKIE + "=" + value + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + FILE_SESSION_MAX_AGE_SECONDS;
+  const maxAge = tokens.length ? FILE_SESSION_MAX_AGE_SECONDS : 0;
+  return FILE_SESSION_COOKIE + "=" + value + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + maxAge;
 }
 __name(buildFileSessionCookie, "buildFileSessionCookie");
 function requireFileSession(request, backend) {
@@ -9902,6 +9903,8 @@ var Application = class {
       const response = json(parsed, !parsed.ok && String(requestedAction).startsWith("v4.") ? v4Status(parsed.error) : 200);
       if (request.method === "POST" && parsed.ok && requestedAction === "login" && parsed.sessionToken) {
         response.headers.append("Set-Cookie", buildFileSessionCookie(request, backend, parsed.sessionToken));
+      } else if (request.method === "POST" && parsed.ok && requestedAction === "logout") {
+        response.headers.append("Set-Cookie", buildFileSessionCookie(request, backend, ""));
       }
       return response;
     } catch (e) {
