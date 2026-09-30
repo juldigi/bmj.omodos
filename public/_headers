@@ -1,11 +1,19 @@
+/*
+  X-OMODOS-Build: omodos-20261001-r1
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+
 /
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
-  X-OMODOS-Build: bantuan-copilot-20260920
 
 /index.html
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
-  X-OMODOS-Build: bantuan-copilot-20260920
+
+/omodos4/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Pragma: no-cache
+  Expires: 0
