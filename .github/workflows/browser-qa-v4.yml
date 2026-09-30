@@ -34,6 +34,13 @@ jobs:
           set -euo pipefail
           node --check src/worker.js
 
+          # Attachments must be private: direct /files links require a valid HttpOnly session cookie.
+          grep -Fq '__Host-OMODOSFileSession' src/worker.js
+          grep -Fq 'SameSite=Strict' src/worker.js
+          grep -Fq 'requireFileSession(request, backend)' src/worker.js
+          grep -Fq 'response.headers.append("Set-Cookie"' src/worker.js
+          grep -Fq '"Cache-Control": "private, no-store, max-age=0"' src/worker.js
+
           ! grep -Fq 'recurring.set(lower(d), (recurring.get(lower(d)) || { label: d, count: 0 }).count + 1)' src/worker.js
           grep -Fq 'const cur = recurring.get(k) || { label: d, count: 0 };' src/worker.js
           grep -Fq 'cur.count++;' src/worker.js
