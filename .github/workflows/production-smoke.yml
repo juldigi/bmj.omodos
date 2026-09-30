@@ -26,6 +26,7 @@ jobs:
           grep -q '"no_bundle": true' wrangler.jsonc
           node --check public/omodos4/hotfix.js
           test -s public/omodos4/hotfix.css
+          grep -Fq "X-OMODOS-Build: omodos-20261001-r1" public/_headers
 
       - name: Verify production login and V4 assets
         shell: bash
@@ -34,14 +35,19 @@ jobs:
           ROOT_URL="https://omodos.juldigi.workers.dev/"
           API_URL="https://omodos.juldigi.workers.dev/api"
           JS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.js"
+          CSS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.css"
+          EXPECTED_BUILD="omodos-20261001-r1"
           passed=0
 
           for i in $(seq 1 24); do
             HTML="$(curl -fsS "$ROOT_URL" || true)"
             JS="$(curl -fsS "$JS_URL" || true)"
+            CSS="$(curl -fsS "$CSS_URL" || true)"
+            HEADERS="$(curl -fsSI "$ROOT_URL" 2>/dev/null | tr -d '\r' || true)"
+            BUILD="$(awk -F': *' 'tolower($1)=="x-omodos-build"{print $2}' <<< "$HEADERS" | tail -1)"
             STATUS="$(curl -sS -o /tmp/login.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}' "$API_URL" || true)"
 
-            if grep -q 'id="form-login"' <<< "$HTML" && grep -q 'OMODOS4_FRONTEND_SAFE_V3' <<< "$HTML" && grep -q '/omodos4/hotfix.css' <<< "$HTML" && grep -q '/omodos4/hotfix.js' <<< "$HTML" && grep -q 'frontend-only recovery' <<< "$JS" && [ "$STATUS" = "200" ]; then
+            if grep -q 'id="form-login"' <<< "$HTML" && grep -q 'OMODOS4_FRONTEND_SAFE_V3' <<< "$HTML" && grep -q '/omodos4/hotfix.css' <<< "$HTML" && grep -q '/omodos4/hotfix.js' <<< "$HTML" && grep -q 'frontend-only recovery' <<< "$JS" && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ]; then
               if node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));if(!x||typeof x!=='object'||x.ok!==false)process.exit(1)"; then
                 passed=1
                 break
@@ -59,5 +65,10 @@ jobs:
           grep -Fq "Buka profil mesin" /tmp/omodos-hotfix.js
           grep -Fq "Tampilkan prioritas pembelian" /tmp/omodos-hotfix.js
           grep -Fq "Cari teknisi berpengalaman" /tmp/omodos-hotfix.js
+          grep -Fq "Nilai hubungan (-1 sampai +1)" /tmp/omodos-hotfix.js
+          grep -Fq "Tingkat perbedaan " /tmp/omodos-hotfix.js
+          grep -Fq "function confidenceLabel" /tmp/omodos-hotfix.js
           grep -Fq "if(n<1||n>100)" /tmp/omodos-hotfix.js
+          ! grep -Fq "Kekuatan hubungan (Pearson r)" /tmp/omodos-hotfix.js
+          ! grep -Fq "Jarak pola " /tmp/omodos-hotfix.js
           ! grep -Fq "Muat Analisis" /tmp/omodos-hotfix.js
