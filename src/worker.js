@@ -9568,6 +9568,53 @@ var v4Status = /* @__PURE__ */ __name((error) => {
   return 400;
 }, "v4Status");
 var equal = /* @__PURE__ */ __name((a, b) => !!a && !!b && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b)), "equal");
+var FILE_SESSION_COOKIE = "__Host-OMODOSFileSession";
+var FILE_SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
+var FILE_SESSION_MAX_TOKENS = 4;
+function readCookieValue(request, name) {
+  const raw = request.headers.get("Cookie") || "";
+  for (const part of raw.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return "";
+}
+__name(readCookieValue, "readCookieValue");
+function fileSessionTokens(request) {
+  const raw = readCookieValue(request, FILE_SESSION_COOKIE);
+  if (!raw) return [];
+  let decoded = raw;
+  try { decoded = decodeURIComponent(raw); } catch {}
+  return decoded.split("~").map((x) => x.trim()).filter(Boolean).slice(0, FILE_SESSION_MAX_TOKENS);
+}
+__name(fileSessionTokens, "fileSessionTokens");
+function validFileSessionTokens(request, backend, extraToken) {
+  const input = [extraToken || "", ...fileSessionTokens(request)].filter(Boolean);
+  const out = [];
+  for (const token of input) {
+    if (out.includes(token)) continue;
+    try { backend.requireSession(token); out.push(token); } catch {}
+    if (out.length >= FILE_SESSION_MAX_TOKENS) break;
+  }
+  return out;
+}
+__name(validFileSessionTokens, "validFileSessionTokens");
+function buildFileSessionCookie(request, backend, sessionToken) {
+  const tokens = validFileSessionTokens(request, backend, sessionToken);
+  const value = encodeURIComponent(tokens.join("~"));
+  const maxAge = tokens.length ? FILE_SESSION_MAX_AGE_SECONDS : 0;
+  return FILE_SESSION_COOKIE + "=" + value + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + maxAge;
+}
+__name(buildFileSessionCookie, "buildFileSessionCookie");
+function requireFileSession(request, backend) {
+  const tokens = fileSessionTokens(request);
+  for (const token of tokens) {
+    try { return backend.requireSession(token); } catch {}
+  }
+  throw { code: "AUTH_REQUIRED", message: "File session required" };
+}
+__name(requireFileSession, "requireFileSession");
 var Application = class {
   static {
     __name(this, "Application");
@@ -9704,10 +9751,15 @@ var Application = class {
       }
       if (store.services.PropertiesService.getScriptProperties().getProperty("MIGRATION_READY") !== "1") return json({ ok: false, error: "DATABASE_NOT_IMPORTED: Administrator perlu mengimpor database." }, 503);
       if (url.pathname.startsWith("/files/")) {
+        try {
+          requireFileSession(request, backend);
+        } catch {
+          return json({ ok: false, error: "AUTH_REQUIRED: File session required" }, 401);
+        }
         const f = store.file(url.pathname.slice(7));
         if (!f) return json({ ok: false, error: "FILE_NOT_FOUND" }, 404);
         const inline = /^(image\/(png|jpeg|gif|webp)|video\/|audio\/|application\/pdf)/.test(f.mime);
-        const headers = { "Content-Type": f.mime, "Content-Length": String(f.size), "Accept-Ranges": "bytes", "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(f.name)}`, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox; default-src 'none'" };
+        const headers = { "Content-Type": f.mime, "Content-Length": String(f.size), "Accept-Ranges": "bytes", "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(f.name)}`, "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox; default-src 'none'" };
         const range = request.headers.get("Range");
         if (range) {
           const m = /^bytes=(\d*)-(\d*)$/.exec(range);
@@ -9848,7 +9900,13 @@ var Application = class {
       if (parsed.ok) transact(() => store.commit());
       else store.rollback();
       const requestedAction = request.method === "POST" ? parsedBody && parsedBody.action || "" : url.searchParams.get("action") || "";
-      return json(parsed, !parsed.ok && String(requestedAction).startsWith("v4.") ? v4Status(parsed.error) : 200);
+      const response = json(parsed, !parsed.ok && String(requestedAction).startsWith("v4.") ? v4Status(parsed.error) : 200);
+      if (request.method === "POST" && parsed.ok && requestedAction === "login" && parsed.sessionToken) {
+        response.headers.append("Set-Cookie", buildFileSessionCookie(request, backend, parsed.sessionToken));
+      } else if (request.method === "POST" && parsed.ok && requestedAction === "logout") {
+        response.headers.append("Set-Cookie", buildFileSessionCookie(request, backend, ""));
+      }
+      return response;
     } catch (e) {
       store.rollback();
       const err = (e.code ? e.code + ": " : "") + (e.message || String(e));

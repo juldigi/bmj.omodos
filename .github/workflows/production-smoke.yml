@@ -27,6 +27,9 @@ jobs:
           node --check public/omodos4/hotfix.js
           test -s public/omodos4/hotfix.css
           grep -Fq "X-OMODOS-Build: omodos-20261001-r1" public/_headers
+          grep -Fq '__Host-OMODOSFileSession' src/worker.js
+          grep -Fq 'requireFileSession(request, backend)' src/worker.js
+          grep -Fq '"Cache-Control": "private, no-store, max-age=0"' src/worker.js
 
       - name: Verify production login and V4 assets
         shell: bash
@@ -46,8 +49,9 @@ jobs:
             HEADERS="$(curl -fsSI "$ROOT_URL" 2>/dev/null | tr -d '\r' || true)"
             BUILD="$(awk -F': *' 'tolower($1)=="x-omodos-build"{print $2}' <<< "$HEADERS" | tail -1)"
             STATUS="$(curl -sS -o /tmp/login.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}' "$API_URL" || true)"
+            FILE_STATUS="$(curl -sS -o /tmp/file-guard.json -w '%{http_code}' "$ROOT_URL/files/__omodos_smoke_missing__" || true)"
 
-            if grep -q 'id="form-login"' <<< "$HTML" && grep -q 'OMODOS4_FRONTEND_SAFE_V3' <<< "$HTML" && grep -q '/omodos4/hotfix.css' <<< "$HTML" && grep -q '/omodos4/hotfix.js' <<< "$HTML" && grep -q 'frontend-only recovery' <<< "$JS" && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ]; then
+            if grep -q 'id="form-login"' <<< "$HTML" && grep -q 'OMODOS4_FRONTEND_SAFE_V3' <<< "$HTML" && grep -q '/omodos4/hotfix.css' <<< "$HTML" && grep -q '/omodos4/hotfix.js' <<< "$HTML" && grep -q 'frontend-only recovery' <<< "$JS" && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ] && [ "$FILE_STATUS" = "401" ]; then
               if node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));if(!x||typeof x!=='object'||x.ok!==false)process.exit(1)"; then
                 passed=1
                 break
