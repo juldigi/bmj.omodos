@@ -8104,13 +8104,23 @@ async function flushSyncQueue_(){
       const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
       const res = await fetchWithTimeout_(WEB_APP_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({...item.payload, sessionToken:requestToken}) }, 60000); // PATCHED 60s
       const json = await parseApiResponse_(res);
-      if(!json.ok) throw new Error(json.error || 'gagal');
+      if(!json.ok){
+        const serverErr = new Error(json.error || 'gagal');
+        serverErr.omodosServerRejected = true;
+        throw serverErr;
+      }
     }catch(e){
-      remaining.push(item); // masih gagal, coba lagi di kesempatan berikutnya
+      const terminal = !!(e&&e.omodosServerRejected) &&
+        /FORBIDDEN|PERMISSION|VALIDATION|UNKNOWN_ACTION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/i.test(String(e&&e.message||e));
+      if(terminal){ discardedSecurityConfig++; console.warn('[OMODOS] Antrean offline ditolak server dan dihentikan:', item&&item.payload&&item.payload.action, e); }
+      else remaining.push(item);
     }
   }
   const successCount = q.length - remaining.length - discardedSecurityConfig;
   saveSyncQueue_(remaining);
+  if(discardedSecurityConfig > 0){
+    toast(`${discardedSecurityConfig} data tertunda tidak dapat disinkron karena izin/validasi sudah berubah. Periksa data lalu simpan ulang.`, true);
+  }
   if(successCount > 0){
     setAppOnlineStatus(true);
     toast(`${successCount} data berhasil disinkron otomatis ke server.`);
@@ -24138,14 +24148,19 @@ async function seedPiPersonnelMaster(){
   const statusEl = $('#pi-personnel-seed-status');
   if(statusEl) statusEl.textContent = 'Mengimpor...';
   try{
-    const res = await apiPost({ action:'seedPiPersonnelMasterBulk', items: PI_PERSONNEL_SEED });
+    const res = await apiPost({ action:'seedPiPersonnelMasterBulk', items: PI_PERSONNEL_SEED, transactionId:'PI-PERSONNEL-SEED-'+Date.now() });
     await syncPiPersonnelMasterFromBackend();
     if(typeof renderPiPersonnelView === 'function') renderPiPersonnelView();
     toast(`Impor selesai: ${res.added} personil baru ditambahkan${res.skipped ? ', '+res.skipped+' dilewati (sudah ada)' : ''}.`);
     if(statusEl) statusEl.textContent = `Terakhir impor: ${res.added} baru ditambahkan.`;
   }catch(err){
-    // Belum ada koneksi backend / action belum tersedia — simpan ke cache lokal saja
-    // supaya tetap bisa dipakai di menu People Intelligent tanpa koneksi.
+    const msg = String(err&&err.message||err);
+    const networkErr = /NO_URL|Failed to fetch|NetworkError|Load failed|Backend timeout|AbortError|aborted/i.test(msg);
+    if(!networkErr){
+      toast('Impor personil ditolak server: '+msg, true);
+      if(statusEl) statusEl.textContent = 'Impor gagal. Data lokal tidak diubah.';
+      return;
+    }
     const existingKeys = new Set(PI_PERSONNEL_MASTER.map(p=> String(p['ID Karyawan']||p['Nama'])));
     let added = 0;
     const merged = PI_PERSONNEL_MASTER.slice();
@@ -24158,8 +24173,8 @@ async function seedPiPersonnelMaster(){
     });
     savePiPersonnelMasterLocal(merged);
     if(typeof renderPiPersonnelView === 'function') renderPiPersonnelView();
-    toast(`Impor tersimpan lokal (${added} baru): ${err.message}`, true);
-    if(statusEl) statusEl.textContent = `Tersimpan lokal (belum tersinkron ke server): ${added} baru ditambahkan.`;
+    toast(`Koneksi belum tersedia. ${added} personil tampil sementara dan sudah masuk antrean sinkronisasi.`);
+    if(statusEl) statusEl.textContent = `Menunggu sinkronisasi server: ${added} personil baru.`;
   }
 }
 const btnSeedPiPersonnel = $('#btn-seed-pi-personnel');
