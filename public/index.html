@@ -8634,7 +8634,7 @@ async function prepareAllData_(){
   PATROL_TEMPLATE = patrolTemplateSource;
   HOME_PATROL_STATUS = Array.isArray(bootstrap.homePatrolLatest) ? bootstrap.homePatrolLatest.slice() : [];
 
-  const tasks = [['predictiveReports',syncPmReportsFromBackend],['generalReports',syncGrReportsFromBackend],['ipalReports',syncIpalReportsFromBackend],['rcaReports',syncRcaReportsFromBackend],['kbEntries',loadKbEntries],['sparepartLokasi',syncSparepartLokasiFromBackend],['sparepartStatus',syncSparepartStatusFromBackend],['sparepartEta',syncSparepartEtaFromBackend],['sparepartWarehouse',syncSparepartWarehouseFromBackend],['sparepartOpname',syncSparepartOpnameFromBackend],['kpiKerjaList',syncKpiKerjaFromBackend],['kpiDepartmentData',syncKpiDepartmentData],['machineBreakdownList',loadMachineBreakdownList],['recordYtdList',loadRecordYtdList],['runHourComparisonList',loadRunHourComparisonList],['energyCostToeList',loadEnergyCostToeList],['correctiveReportList',loadCorrectiveReportList],['energyUtilityList',loadEnergyUtilityList],['analitikConfig',syncAnalitikConfigFromBackend],['patrolCategoryConfig',syncPatrolCategoryConfigFromBackend],['patrolGeneralChecklist',syncPatrolGeneralChecklistFromBackend],['piHardSkillStandard',piSyncHardSkillFromBackend],['piPersonnelMaster',syncPiPersonnelMasterFromBackend]];
+  const tasks = [['predictiveReports',syncPmReportsFromBackend],['generalReports',syncGrReportsFromBackend],['ipalReports',syncIpalReportsFromBackend],['rcaReports',syncRcaReportsFromBackend],['kbEntries',loadKbEntries],['sparepartLokasi',syncSparepartLokasiFromBackend],['sparepartStatus',syncSparepartStatusFromBackend],['sparepartEta',syncSparepartEtaFromBackend],['sparepartWarehouse',syncSparepartWarehouseFromBackend],['sparepartOpname',syncSparepartOpnameFromBackend],['kpiKerjaList',syncKpiKerjaFromBackend],['kpiDepartmentData',syncKpiDepartmentData],['machineBreakdownList',loadMachineBreakdownList],['recordYtdList',loadRecordYtdList],['runHourComparisonList',loadRunHourComparisonList],['energyCostToeList',loadEnergyCostToeList],['correctiveReportList',loadCorrectiveReportList],['energyUtilityList',loadEnergyUtilityList],['analitikConfig',syncAnalitikConfigFromBackend],['patrolCategoryConfig',syncPatrolCategoryConfigFromBackend],['patrolGeneralChecklist',syncPatrolGeneralChecklistFromBackend],['piHardSkillStandard',piSyncHardSkillFromBackend],['piSoftskillAssessments',piSyncSoftskillFromBackend],['piPersonnelMaster',syncPiPersonnelMasterFromBackend]];
   for(const [action,fn] of tasks){
     if(Object.prototype.hasOwnProperty.call(data,action)){
       try{ await fn(); }
@@ -23838,11 +23838,67 @@ function renderPiHardSkillHistory(){
     </div>
   `).join('') : '<div class="wiki-empty">Belum ada data hard skill assessment.</div>';
 }
-function loadPiSoftskill(){ try{ return JSON.parse(localStorage.getItem(LS_PI_SOFTSKILL_KEY) || '[]'); }catch(e){ return []; } }
-function savePiSoftskill(list){
-  localStorage.setItem(LS_PI_SOFTSKILL_KEY, JSON.stringify(list));
-  // Ikut pola sinkronisasi offline->online yang sudah ada di app ini, kalau tersedia.
-  try{ if(typeof queueForSync_ === 'function' && WEB_APP_URL){ /* no-op: penyimpanan lokal cukup untuk modul ini */ } }catch(e){}
+let PI_SOFTSKILL_ASSESSMENTS = [];
+function loadPiSoftskillLocal_(){ try{ const v=JSON.parse(localStorage.getItem(LS_PI_SOFTSKILL_KEY) || '[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
+function savePiSoftskillLocal_(list){ try{ localStorage.setItem(LS_PI_SOFTSKILL_KEY, JSON.stringify(Array.isArray(list)?list:[])); }catch(e){} }
+function piSoftskillMergeById_(serverRows, localRows){
+  const map = new Map();
+  (serverRows||[]).forEach(r=>{ if(r&&r.id) map.set(String(r.id),r); });
+  (localRows||[]).forEach(r=>{ if(r&&r.id&&!map.has(String(r.id))) map.set(String(r.id),r); });
+  return Array.from(map.values());
+}
+function loadPiSoftskill(){
+  return (PI_SOFTSKILL_ASSESSMENTS&&PI_SOFTSKILL_ASSESSMENTS.length)
+    ? PI_SOFTSKILL_ASSESSMENTS
+    : loadPiSoftskillLocal_();
+}
+async function piSyncSoftskillFromBackend(){
+  const legacyLocal = loadPiSoftskillLocal_();
+  const serverRows = await apiGet('piSoftskillAssessments', {}, 1);
+  if(!Array.isArray(serverRows)) throw new Error('Format Soft Skill Assessment dari server tidak valid.');
+  PI_SOFTSKILL_ASSESSMENTS = piSoftskillMergeById_(serverRows, legacyLocal);
+  savePiSoftskillLocal_(PI_SOFTSKILL_ASSESSMENTS);
+  const serverIds = new Set(serverRows.map(r=>String(r&&r.id||'')).filter(Boolean));
+  const missingLegacy = legacyLocal.filter(r=>r&&r.id&&r.nama&&!serverIds.has(String(r.id)));
+  for(const assessment of missingLegacy){
+    try{
+      await apiPost({
+        action:'savePiSoftskill',
+        assessment,
+        transactionId:'PI-SS-MIGRATE-'+String(assessment.id),
+        actor:(CURRENT_USER&&CURRENT_USER.username)||''
+      });
+      serverIds.add(String(assessment.id));
+    }catch(err){
+      if(/FORBIDDEN|PERMISSION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED/.test(String(err&&err.message||err))) break;
+      console.warn('[OMODOS] Soft Skill legacy migration tertunda:',assessment.id,err);
+      break;
+    }
+  }
+  return PI_SOFTSKILL_ASSESSMENTS;
+}
+async function savePiSoftskill(assessment){
+  if(!assessment||!assessment.nama) throw new Error('Data Soft Skill Assessment tidak valid.');
+  const id = assessment.id || ('ss_'+Date.now()+'_'+Math.random().toString(36).slice(2,8));
+  const record = {...assessment,id};
+  const current = piSoftskillMergeById_(PI_SOFTSKILL_ASSESSMENTS, loadPiSoftskillLocal_()).filter(r=>String(r&&r.id)!==String(id));
+  current.push(record);
+  PI_SOFTSKILL_ASSESSMENTS = current;
+  savePiSoftskillLocal_(current);
+  const transactionId = 'PI-SS-'+String(id);
+  try{
+    await apiPost({action:'savePiSoftskill',assessment:record,transactionId,actor:(CURRENT_USER&&CURRENT_USER.username)||''});
+    await piSyncSoftskillFromBackend();
+    return record;
+  }catch(err){
+    // apiPost otomatis memasukkan kegagalan jaringan ke offline sync queue.
+    // Cache lokal dipertahankan agar assessment tidak hilang saat perangkat offline.
+    if(/FORBIDDEN|PERMISSION|VALIDATION|UNKNOWN_ACTION/.test(String(err&&err.message||err))){
+      PI_SOFTSKILL_ASSESSMENTS = current.filter(r=>String(r&&r.id)!==String(id));
+      savePiSoftskillLocal_(PI_SOFTSKILL_ASSESSMENTS);
+    }
+    throw err;
+  }
 }
 
 function piNormalizeName(name){
@@ -25141,7 +25197,7 @@ function renderPiSoftskillHistoryTable(){
 }
 
 const btnPiSsSave = document.getElementById('btn-pi-ss-save');
-if(btnPiSsSave) btnPiSsSave.addEventListener('click', ()=>{
+if(btnPiSsSave) btnPiSsSave.addEventListener('click', async ()=>{
   const nama = $('#pi-ss-employee').value;
   const assessor = $('#pi-ss-assessor').value.trim();
   const tanggal = $('#pi-ss-date').value;
@@ -25157,11 +25213,23 @@ if(btnPiSsSave) btnPiSsSave.addEventListener('click', ()=>{
   }));
   if(items.some(it=>!it.score)){ toast('Isi skor 1-5 untuk semua 10 aspek.', true); return; }
 
-  const list = loadPiSoftskill();
-  list.push({ id: 'ss_'+Date.now(), nama, assessor, tanggal, items, createdAt: new Date().toISOString() });
-  savePiSoftskill(list);
-  toast('Soft Skill Assessment tersimpan untuk ' + nama + '.');
-  renderPiSoftskillView();
+  const assessment = { id: 'ss_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), nama, assessor, tanggal, items, createdAt: new Date().toISOString() };
+  btnPiSsSave.disabled = true;
+  try{
+    await savePiSoftskill(assessment);
+    toast('Soft Skill Assessment tersimpan & tersinkron untuk ' + nama + '.');
+    renderPiSoftskillView();
+    if(typeof renderPiPersonnelView === 'function'){ try{ renderPiPersonnelView(); }catch(e){} }
+    if(typeof renderPiDashboardView === 'function'){ try{ renderPiDashboardView(); }catch(e){} }
+  }catch(err){
+    const networkErr = /Failed to fetch|NetworkError|Load failed|Backend timeout|AbortError|aborted|NO_URL/i.test(String(err&&err.message||err));
+    if(networkErr){
+      toast('Soft Skill Assessment disimpan di perangkat dan akan tersinkron otomatis saat koneksi pulih.');
+      renderPiSoftskillView();
+    }else{
+      toast('Gagal menyimpan Soft Skill Assessment: '+String(err&&err.message||err), true);
+    }
+  }finally{ btnPiSsSave.disabled = false; }
 });
 
 </script>
