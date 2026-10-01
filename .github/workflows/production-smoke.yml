@@ -30,6 +30,7 @@ jobs:
           grep -Fq '__Host-OMODOSFileSession' src/worker.js
           grep -Fq 'requireFileSession(request, backend)' src/worker.js
           grep -Fq '"Cache-Control": "private, no-store, max-age=0"' src/worker.js
+          grep -Fq 'add("updateApprovalDecision", "report.manage", "POST", true);' src/worker.js
 
       - name: Verify production login and V4 assets
         shell: bash

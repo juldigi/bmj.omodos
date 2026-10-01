@@ -8984,6 +8984,7 @@ function createBackend(services, env = {}) {
       add(a, "ai.groq", "POST", false);
     });
     add("fixLogbookDataQuality", "logbook.manage", "POST", true);
+    add("updateApprovalDecision", "report.manage", "POST", true);
   }), "registerAllPublicActions_"))();
   var _compatGetFallback = typeof _origHandleLegacyGet === "function" ? _origHandleLegacyGet : handleLegacyGet_;
   handleLegacyGet_ = /* @__PURE__ */ __name(function(e) {
