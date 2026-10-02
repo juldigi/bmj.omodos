@@ -31,6 +31,7 @@ jobs:
         run: |
           grep -q '"main": "src/worker.js"' wrangler.jsonc
           grep -q '"no_bundle": true' wrangler.jsonc
+          grep -Fq '"/files*"' wrangler.jsonc
           node --check public/omodos4/hotfix.js
           node --check public/omodos4/offset-ways.js
           test -s public/omodos4/hotfix.css
@@ -105,7 +106,7 @@ jobs:
             OW_THEME="no"; has_marker 'omodos-2.0' "$OW_JS" && OW_THEME="yes"
             OW_STYLE="no"; has_marker '.ow-hero' "$OW_CSS" && OW_STYLE="yes"
 
-            echo "[SMOKE_DIAG] build='$BUILD' expected='$EXPECTED_BUILD' html_login=$HTML_LOGIN html_v4=$HTML_V4 html_hotfix=$HTML_HOTFIX html_css=$HTML_CSS html_js=$HTML_JS recovery=$JS_RECOVERY css_bytes=\${#CSS} login_http=$STATUS login_json_ok=$LOGIN_JSON_OK login_ok=$LOGIN_OK_VALUE file_guard_http=$FILE_STATUS offset_js_bytes=\${#OW_JS} offset_module=$OW_MODULE offset_theme=$OW_THEME offset_css_bytes=\${#OW_CSS} offset_style=$OW_STYLE"
+            echo "[SMOKE_DIAG] build='$BUILD' expected='$EXPECTED_BUILD' html_login=$HTML_LOGIN html_v4=$HTML_V4 html_hotfix=$HTML_HOTFIX html_css=$HTML_CSS html_js=$HTML_JS recovery=$JS_RECOVERY css_bytes=$(printf '%s' "$CSS" | wc -c | tr -d ' ') login_http=$STATUS login_json_ok=$LOGIN_JSON_OK login_ok=$LOGIN_OK_VALUE file_guard_http=$FILE_STATUS offset_js_bytes=$(printf '%s' "$OW_JS" | wc -c | tr -d ' ') offset_module=$OW_MODULE offset_theme=$OW_THEME offset_css_bytes=$(printf '%s' "$OW_CSS" | wc -c | tr -d ' ') offset_style=$OW_STYLE"
 
             if [ "$HTML_LOGIN" = "yes" ] && [ "$HTML_V4" = "yes" ] && [ "$HTML_HOTFIX" = "yes" ] && [ "$HTML_CSS" = "yes" ] && [ "$HTML_JS" = "yes" ] && [ "$JS_RECOVERY" = "yes" ] && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ] && [ "$FILE_STATUS" = "401" ] && [ "$LOGIN_JSON_OK" = "yes" ] && [ "$OW_MODULE" = "yes" ] && [ "$OW_THEME" = "yes" ] && [ "$OW_STYLE" = "yes" ]; then
               passed=1
