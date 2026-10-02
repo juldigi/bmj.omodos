@@ -25,7 +25,9 @@ jobs:
           grep -q '"main": "src/worker.js"' wrangler.jsonc
           grep -q '"no_bundle": true' wrangler.jsonc
           node --check public/omodos4/hotfix.js
+          node --check public/omodos4/offset-ways.js
           test -s public/omodos4/hotfix.css
+          test -s public/omodos4/offset-ways.css
           grep -Fq "X-OMODOS-Build: omodos-20261001-r1" public/_headers
           grep -Fq '__Host-OMODOSFileSession' src/worker.js
           grep -Fq 'requireFileSession(request, backend)' src/worker.js
@@ -40,40 +42,95 @@ jobs:
           API_URL="https://omodos.juldigi.workers.dev/api"
           JS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.js"
           CSS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.css"
+          OW_JS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.js"
+          OW_CSS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.css"
           EXPECTED_BUILD="omodos-20261001-r1"
           passed=0
 
-          for i in $(seq 1 24); do
-            HTML="$(curl -fsS "$ROOT_URL" || true)"
-            JS="$(curl -fsS "$JS_URL" || true)"
-            CSS="$(curl -fsS "$CSS_URL" || true)"
-            HEADERS="$(curl -fsSI "$ROOT_URL" 2>/dev/null | tr -d '\r' || true)"
-            BUILD="$(awk -F': *' 'tolower($1)=="x-omodos-build"{print $2}' <<< "$HEADERS" | tail -1)"
-            STATUS="$(curl -sS -o /tmp/login.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}' "$API_URL" || true)"
-            FILE_STATUS="$(curl -sS -o /tmp/file-guard.json -w '%{http_code}' "$ROOT_URL/files/__omodos_smoke_missing__" || true)"
+          has_marker() { grep -Fq "$1" <<< "$2"; }
+          has_not_marker() { ! grep -Fq "$1" <<< "$2"; }
+          check_marker() {
+            local label="$1" marker="$2" content="$3"
+            if has_marker "$marker" "$content"; then
+              echo "[SMOKE_PASS] $label"
+            else
+              echo "[SMOKE_FAIL] $label (required marker missing)"
+              return 1
+            fi
+          }
+          check_absent() {
+            local label="$1" marker="$2" content="$3"
+            if has_not_marker "$marker" "$content"; then
+              echo "[SMOKE_PASS] $label"
+            else
+              echo "[SMOKE_FAIL] $label (deprecated marker found)"
+              return 1
+            fi
+          }
 
-            if grep -q 'id="form-login"' <<< "$HTML" && grep -q 'OMODOS4_FRONTEND_SAFE_V3' <<< "$HTML" && grep -q '/omodos4/hotfix.css' <<< "$HTML" && grep -q '/omodos4/hotfix.js' <<< "$HTML" && grep -q 'frontend-only recovery' <<< "$JS" && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ] && [ "$FILE_STATUS" = "401" ]; then
-              if node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));if(!x||typeof x!=='object'||x.ok!==false)process.exit(1)"; then
-                passed=1
-                break
-              fi
+          for i in $(seq 1 6); do
+            echo "[SMOKE] attempt $i/6"
+            HTML="$(curl --max-time 10 -fsS "$ROOT_URL" || true)"
+            JS="$(curl --max-time 10 -fsS "$JS_URL" || true)"
+            CSS="$(curl --max-time 10 -fsS "$CSS_URL" || true)"
+            OW_JS="$(curl --max-time 10 -fsS "$OW_JS_URL" || true)"
+            OW_CSS="$(curl --max-time 10 -fsS "$OW_CSS_URL" || true)"
+            HEADERS="$(curl --max-time 10 -fsSI "$ROOT_URL" 2>/dev/null | tr -d '\r' || true)"
+            BUILD="$(awk -F': *' 'tolower($1)=="x-omodos-build"{print $2}' <<< "$HEADERS" | tail -1)"
+            STATUS="$(curl --max-time 10 -sS -o /tmp/login.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}' "$API_URL" || true)"
+            FILE_STATUS="$(curl --max-time 10 -sS -o /tmp/file-guard.json -w '%{http_code}' "$ROOT_URL/files/__omodos_smoke_missing__" || true)"
+            LOGIN_JSON_OK="no"
+            LOGIN_OK_VALUE="missing"
+            if node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));if(!x||typeof x!=='object'||x.ok!==false)process.exit(1)" 2>/dev/null; then
+              LOGIN_JSON_OK="yes"
+              LOGIN_OK_VALUE="false"
+            elif node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));console.log(String(x&&x.ok))" >/tmp/login-ok.txt 2>/dev/null; then
+              LOGIN_OK_VALUE="$(cat /tmp/login-ok.txt)"
+            fi
+
+            HTML_LOGIN="no"; has_marker 'id="form-login"' "$HTML" && HTML_LOGIN="yes"
+            HTML_V4="no"; has_marker 'id="v4-nav-group"' "$HTML" && HTML_V4="yes"
+            HTML_HOTFIX="no"; has_marker 'OMODOS4_FRONTEND_SAFE_V3' "$HTML" && HTML_HOTFIX="yes"
+            HTML_CSS="no"; has_marker '/omodos4/hotfix.css' "$HTML" && HTML_CSS="yes"
+            HTML_JS="no"; has_marker '/omodos4/hotfix.js' "$HTML" && HTML_JS="yes"
+            JS_RECOVERY="no"; has_marker 'frontend-only recovery' "$JS" && JS_RECOVERY="yes"
+            OW_MODULE="no"; has_marker 'window.OMODOS_OFFSET_WAYS' "$OW_JS" && OW_MODULE="yes"
+            OW_THEME="no"; has_marker 'omodos-2.0' "$OW_JS" && OW_THEME="yes"
+            OW_STYLE="no"; has_marker '.ow-hero' "$OW_CSS" && OW_STYLE="yes"
+
+            echo "[SMOKE_DIAG] build='$BUILD' expected='$EXPECTED_BUILD' html_login=$HTML_LOGIN html_v4=$HTML_V4 html_hotfix=$HTML_HOTFIX html_css=$HTML_CSS html_js=$HTML_JS recovery=$JS_RECOVERY css_bytes=\${#CSS} login_http=$STATUS login_json_ok=$LOGIN_JSON_OK login_ok=$LOGIN_OK_VALUE file_guard_http=$FILE_STATUS offset_js_bytes=\${#OW_JS} offset_module=$OW_MODULE offset_theme=$OW_THEME offset_css_bytes=\${#OW_CSS} offset_style=$OW_STYLE"
+
+            if [ "$HTML_LOGIN" = "yes" ] && [ "$HTML_V4" = "yes" ] && [ "$HTML_HOTFIX" = "yes" ] && [ "$HTML_CSS" = "yes" ] && [ "$HTML_JS" = "yes" ] && [ "$JS_RECOVERY" = "yes" ] && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ] && [ "$FILE_STATUS" = "401" ] && [ "$LOGIN_JSON_OK" = "yes" ] && [ "$OW_MODULE" = "yes" ] && [ "$OW_THEME" = "yes" ] && [ "$OW_STYLE" = "yes" ]; then
+              passed=1
+              break
             fi
             sleep 5
           done
 
-          test "$passed" = "1"
-          grep -q 'id="v4-nav-group"' <<< "$HTML"
+          if [ "$passed" != "1" ]; then
+            echo "::error::Production smoke failed. Review [SMOKE_DIAG] values above to identify the mismatched host, asset, header, or API contract."
+            exit 1
+          fi
+
+          check_marker "single V4 frontend marker" 'OMODOS4_FRONTEND_SAFE_V3' "$HTML"
           test "$(printf '%s' "$HTML" | grep -o 'OMODOS4_FRONTEND_SAFE_V3' | wc -l | tr -d ' ')" = "1"
           test "$(printf '%s' "$HTML" | grep -o '/omodos4/hotfix.css' | wc -l | tr -d ' ')" = "1"
+
           printf '%s' "$JS" > /tmp/omodos-hotfix.js
+          printf '%s' "$OW_JS" > /tmp/omodos-offset-ways.js
           node --check /tmp/omodos-hotfix.js
-          grep -Fq "Buka profil mesin" /tmp/omodos-hotfix.js
-          grep -Fq "Tampilkan prioritas pembelian" /tmp/omodos-hotfix.js
-          grep -Fq "Cari teknisi berpengalaman" /tmp/omodos-hotfix.js
-          grep -Fq "Nilai hubungan (-1 sampai +1)" /tmp/omodos-hotfix.js
-          grep -Fq "Tingkat perbedaan " /tmp/omodos-hotfix.js
-          grep -Fq "function confidenceLabel" /tmp/omodos-hotfix.js
-          grep -Fq "if(n<1||n>100)" /tmp/omodos-hotfix.js
-          ! grep -Fq "Kekuatan hubungan (Pearson r)" /tmp/omodos-hotfix.js
-          ! grep -Fq "Jarak pola " /tmp/omodos-hotfix.js
-          ! grep -Fq "Muat Analisis" /tmp/omodos-hotfix.js
+          node --check /tmp/omodos-offset-ways.js
+          check_marker "machine profile link" "Buka profil mesin" "$JS"
+          check_marker "sparepart purchase priority" "Tampilkan prioritas pembelian" "$JS"
+          check_marker "expert technician finder" "Cari teknisi berpengalaman" "$JS"
+          check_marker "correlation scale label" "Nilai hubungan (-1 sampai +1)" "$JS"
+          check_marker "difference level label" "Tingkat perbedaan " "$JS"
+          check_marker "confidence label helper" "function confidenceLabel" "$JS"
+          check_marker "percentage validation" "if(n<1||n>100)" "$JS"
+          check_absent "legacy Pearson label removed" "Kekuatan hubungan (Pearson r)" "$JS"
+          check_absent "legacy pattern distance removed" "Jarak pola " "$JS"
+          check_absent "legacy load-analysis control removed" "Muat Analisis" "$JS"
+          check_marker "Offset Ways database read action" "offsetWaysRead" "$OW_JS"
+          check_marker "Offset Ways database write action" "offsetWaysSave" "$OW_JS"
+          check_marker "native theme registry integration" "registerThemeInThemeManager" "$OW_JS"
+          echo "[SMOKE_PASS] Production login contract, OMODOS 4 assets, and Offset Ways/OMODOS 2.0 assets."
