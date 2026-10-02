@@ -3811,9 +3811,6 @@ function createBackend(services, env = {}) {
         validateRequired_(body, ["query"]);
         validateStringMax_(body, "query", 4e3);
         break;
-      default:
-        break;
-    }
       case "offsetWaysSave":
         validateRequired_(body, ["record", "transactionId"]);
         break;
@@ -3823,6 +3820,9 @@ function createBackend(services, env = {}) {
         break;
       case "offsetWaysRead":
         break;
+      default:
+        break;
+    }
     var fileFields = ["files", "attachmentFiles", "fotoBeforeFiles", "fotoAfterFiles", "presentasiFiles", "photos"];
     fileFields.forEach(function(ff) {
       if (body[ff] && Array.isArray(body[ff])) {
