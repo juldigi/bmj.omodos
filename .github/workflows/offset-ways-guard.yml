@@ -38,3 +38,7 @@ jobs:
           node --check public/omodos4/offset-ways.js
       - name: Verify calculations, poster coverage, and access guards
         run: node tools/test_offset_ways.cjs
+      - name: Validate Cloudflare Worker build
+        run: |
+          npm install --no-audit --no-fund
+          npx wrangler deploy --dry-run --outdir /tmp/omodos-offset-ways-build
