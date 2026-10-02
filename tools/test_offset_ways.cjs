@@ -83,6 +83,10 @@ const overIdealOee = api.calculateOee({
   pot: 8, psd: 1, downtime: 1, speed: 15000, total: 90001, good: 90000
 });
 assert.equal(overIdealOee.valid, false, 'production above ideal output should not be saved with OEE over 100%');
+const noOperatingTimeOee = api.calculateOee({
+  pot: 8, psd: 1, downtime: 7, speed: 15000, total: 100, good: 100
+});
+assert.equal(noOperatingTimeOee.valid, false, 'positive production with zero operating time must be rejected');
 const blankOee = api.calculateOee({
   pot: 8, psd: NaN, downtime: 1, speed: 15000, total: 72000, good: 70000
 });
