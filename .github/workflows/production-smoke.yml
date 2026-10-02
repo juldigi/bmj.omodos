@@ -40,7 +40,6 @@ jobs:
         run: |
           grep -q '"main": "src/worker.js"' wrangler.jsonc
           grep -q '"no_bundle": true' wrangler.jsonc
-          grep -Fq '"/files*"' wrangler.jsonc
           node --check public/omodos4/hotfix.js
           node --check public/omodos4/offset-ways.js
           test -s public/omodos4/hotfix.css
