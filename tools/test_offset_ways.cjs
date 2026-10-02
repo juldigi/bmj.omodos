@@ -59,8 +59,16 @@ const invalidOee = api.calculateOee({
   pot: 8, psd: 1, downtime: 8, speed: 15000, total: 72000, good: 70000
 });
 assert.equal(invalidOee.valid, false, 'downtime longer than PPT must be rejected');
+const blankOee = api.calculateOee({
+  pot: 8, psd: NaN, downtime: 1, speed: 15000, total: 72000, good: 70000
+});
+assert.equal(blankOee.valid, false, 'blank numeric OEE inputs must not silently fall back to poster examples');
 const invalidTeep = api.calculateTeep({ shifts: 3, hours: 8, psd: 8, oee: 2/3 });
 assert.equal(invalidTeep.valid, false, 'shutdown equal to shift length must be rejected');
+const blankTeep = api.calculateTeep({ shifts: 3, hours: 8, psd: NaN, oee: 2/3 });
+assert.equal(blankTeep.valid, false, 'blank PSD must be rejected');
+const outOfRangeTeep = api.calculateTeep({ shifts: 3, hours: 8, psd: 1, oee: 1.2 });
+assert.equal(outOfRangeTeep.valid, false, 'TEEP calculation must reject OEE outside 0–100%');
 
 for (const marker of [
   'Safety First', 'Quality #1', 'Zero Losses', '100% Ownership',
