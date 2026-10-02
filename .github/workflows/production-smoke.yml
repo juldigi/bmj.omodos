@@ -27,6 +27,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate Wrangler bundle
+        run: |
+          npm install --no-audit --no-fund
+          npx wrangler deploy --dry-run --outdir /tmp/omodos-smoke-dry-run
+
       - name: Guard stable Worker configuration
         run: |
           grep -q '"main": "src/worker.js"' wrangler.jsonc
@@ -43,6 +52,7 @@ jobs:
           grep -Fq 'add("updateApprovalDecision", "report.manage", "POST", true);' src/worker.js
 
       - name: Verify production login and V4 assets
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
