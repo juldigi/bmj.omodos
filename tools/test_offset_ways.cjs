@@ -114,6 +114,12 @@ assert.ok(/THEME_REGISTRY\.push\s*\(/.test(moduleSource), 'OMODOS 2.0 must be re
 assert.ok(moduleSource.includes("document.documentElement.setAttribute('data-theme',THEME_KEY)"), 'OMODOS 2.0 must use the native theme attribute');
 assert.ok(css.includes('html[data-theme="omodos-2.0"]'), 'theme should render from saved app_theme on first page paint');
 assert.ok(css.includes('.ow-hero') && css.includes('.ow-motto-grid') && css.includes('.ow-role-grid'), 'poster-inspired graphics/styles should exist');
+assert.ok(css.includes('application-wide high-contrast icon system'), 'OMODOS 2.0 must define the global icon contrast layer');
+assert.ok(css.includes('color: #064b96 !important;'), 'icons on light surfaces must use a high-contrast navy');
+assert.ok(css.includes('.sidebar') && css.includes('color: inherit !important;'), 'sidebar icons must preserve high-contrast active/inactive text colors');
+assert.ok(css.includes('.ow-tab.active') && css.includes('.ow-btn.primary'), 'filled primary controls must preserve their foreground icon colors');
+assert.ok(css.includes('.badge, [class*="badge-"]'), 'status and badge icons must follow their semantic foreground colors');
+assert.ok(css.includes('color: #b7f5c9 !important;'), 'dark footer icon accent must remain visible');
 assert.ok(!css.includes('font:600 12px/1.4 inherit'), 'invalid form font shorthand must not return');
 
 const registryStart = worker.indexOf('const ACTION_REGISTRY = {');
