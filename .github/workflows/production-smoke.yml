@@ -8,6 +8,13 @@ on:
       - "src/**"
       - "wrangler.jsonc"
       - ".github/workflows/production-smoke.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "public/**"
+      - "src/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/production-smoke.yml"
   workflow_dispatch:
 
 permissions:
