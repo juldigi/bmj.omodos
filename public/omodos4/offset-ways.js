@@ -635,8 +635,13 @@ function ensureThemeOption(){
 }
 function applyTheme(){
   document.documentElement.classList.add('omodos-theme-20');
+  document.documentElement.setAttribute('data-theme',THEME_KEY);
   if(document.body) document.body.classList.add('omodos-theme-20');
-  try{localStorage.setItem('omodos-theme-pref-v1',THEME_KEY);}catch(e){}
+  try{
+    localStorage.setItem('omodos-theme-pref-v1',THEME_KEY);
+    localStorage.setItem('app_theme',THEME_KEY);
+  }catch(e){}
+  try{if(typeof renderThemeManagerActiveState_==='function')renderThemeManagerActiveState_();}catch(e){}
   updateThemeCardStatus();
 }
 function clearTheme(){
@@ -668,12 +673,11 @@ async function applyAndSaveTheme(){
 }
 function applySavedThemePreference(){
   var u=currentUser();
-  if(!u){clearTheme();return;}
-  var pref=u.ThemePref || u.themePref || u.theme || '';
+  var pref=u ? (u.ThemePref || u.themePref || u.theme || '') : '';
   if(String(pref).toLowerCase()===THEME_KEY){applyTheme();return;}
   if(pref){clearTheme();return;}
   try{
-    if(localStorage.getItem('omodos-theme-pref-v1')===THEME_KEY) applyTheme();
+    if(localStorage.getItem('omodos-theme-pref-v1')===THEME_KEY || localStorage.getItem('app_theme')===THEME_KEY) applyTheme();
     else clearTheme();
   }catch(e){clearTheme();}
 }
@@ -682,17 +686,35 @@ function installThemeHook(){
     if(typeof window.setAppTheme==='function' && !window.setAppTheme.__omodos20Wrapped){
       var original=window.setAppTheme;
       var wrapped=function(name){
-        if(String(name||'').toLowerCase()===THEME_KEY){applyTheme();return true;}
-        clearTheme();
-        return original.apply(this,arguments);
+        var isOmodos20=String(name||'').toLowerCase()===THEME_KEY;
+        if(!isOmodos20) clearTheme();
+        var result=original.apply(this,arguments);
+        if(isOmodos20) applyTheme();
+        return result;
       };
       wrapped.__omodos20Wrapped=true;
       window.setAppTheme=wrapped;
     }
   }catch(e){}
 }
+function registerThemeInThemeManager(){
+  try{
+    if(typeof THEME_REGISTRY!=='undefined' && Array.isArray(THEME_REGISTRY) && !THEME_REGISTRY.some(function(t){return t && t.key===THEME_KEY;})){
+      THEME_REGISTRY.push({
+        key:THEME_KEY,
+        label:THEME_LABEL,
+        desc:'Tema terang terinspirasi poster Offset Ways: biru BMJ, aksen hijau, emas dan oranye, serta kartu visual yang jelas.',
+        swatch:['#eaf4ff','#ffffff','#0876df']
+      });
+    }
+    if(typeof renderThemeManager==='function') renderThemeManager();
+  }catch(e){
+    console.warn('[Offset Ways] Theme Manager registration skipped:',e);
+  }
+}
 function bindThemePreference(){
   installThemeHook();
+  registerThemeInThemeManager();
   ensureThemeOption();
   applySavedThemePreference();
   var view=$('view-tema');
