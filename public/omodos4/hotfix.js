@@ -4160,3 +4160,26 @@ var target=document.getElementById('view-omodos4')||document.body;
 new MutationObserver(queue).observe(target,{childList:true,subtree:true});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',queue);else queue();
 })();
+
+
+/* OFFSET_WAYS_MODULE_LOADER_V1 — isolated module; no changes to the login bootstrap */
+(function(){
+'use strict';
+function loadOffsetWaysModule(){
+  if(!document.getElementById('omodos-offset-ways-style')){
+    var style=document.createElement('link');
+    style.id='omodos-offset-ways-style';
+    style.rel='stylesheet';
+    style.href='/omodos4/offset-ways.css';
+    document.head.appendChild(style);
+  }
+  if(document.getElementById('omodos-offset-ways-script')) return;
+  var script=document.createElement('script');
+  script.id='omodos-offset-ways-script';
+  script.src='/omodos4/offset-ways.js';
+  script.async=true;
+  document.head.appendChild(script);
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',loadOffsetWaysModule,{once:true});
+else loadOffsetWaysModule();
+})();

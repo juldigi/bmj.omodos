@@ -3814,6 +3814,15 @@ function createBackend(services, env = {}) {
       default:
         break;
     }
+      case "offsetWaysSave":
+        validateRequired_(body, ["record", "transactionId"]);
+        break;
+      case "offsetWaysDelete":
+        validateRequired_(body, ["id", "transactionId"]);
+        validateStringMax_(body, "id", 200);
+        break;
+      case "offsetWaysRead":
+        break;
     var fileFields = ["files", "attachmentFiles", "fotoBeforeFiles", "fotoAfterFiles", "presentasiFiles", "photos"];
     fileFields.forEach(function(ff) {
       if (body[ff] && Array.isArray(body[ff])) {
@@ -3963,6 +3972,10 @@ function createBackend(services, env = {}) {
     "v4.getWarRoom": { permission: "omodos4.warroom", audit: false, idempotent: false, handler: "handleOmodos4_", method: "POST" },
     "v4.createWarRoom": { permission: "omodos4.warroom", audit: true, idempotent: true, handler: "handleOmodos4_", method: "POST" },
     "v4.updateWarRoom": { permission: "omodos4.warroom", audit: true, idempotent: true, handler: "handleOmodos4_", method: "POST" },
+    // OFFSET WAYS — dedicated superadmin-only records in the existing SQLite-backed store
+    "offsetWaysRead": { permission: null, audit: false, idempotent: false, handler: "handleOffsetWaysRead_" },
+    "offsetWaysSave": { permission: null, audit: true, idempotent: true, handler: "handleOffsetWaysSave_" },
+    "offsetWaysDelete": { permission: null, audit: true, idempotent: true, handler: "handleOffsetWaysDelete_" },
     // THEME
     "saveThemePref": { permission: null, audit: true, idempotent: true, handler: "handleSaveThemePref_" },
     "saveStylePref": { permission: null, audit: true, idempotent: true, handler: "handleSaveStylePref_" }
@@ -4229,6 +4242,9 @@ function createBackend(services, env = {}) {
   function handleLegacyPost_(body) {
     var action = body.action;
     if (String(action || "").indexOf("v4.") === 0) return handleOmodos4_(body);
+    if (action === "offsetWaysRead") return handleOffsetWaysRead_(body);
+    if (action === "offsetWaysSave") return handleOffsetWaysSave_(body);
+    if (action === "offsetWaysDelete") return handleOffsetWaysDelete_(body);
     if (action === "login") return handleLogin_(body);
     if (action === "logout") return handleLogout_(body);
     if (action === "createUser") return handleCreateUser_(body);
@@ -8682,6 +8698,106 @@ function createBackend(services, env = {}) {
     }
   }
   __name(handleSaveRoleAccessConfig_, "handleSaveRoleAccessConfig_");
+  const OFFSET_WAYS_HEADERS = ["ID","Type","Title","Machine","Owner","DueDate","Status","PayloadJSON","CreatedAt","UpdatedAt","CreatedBy","UpdatedBy","DeletedAt"];
+  const OFFSET_WAYS_TYPES = ["oee-calculation","teep-calculation","behavior-action"];
+  function handleOffsetWaysRead_(body) {
+    requireSuperadmin_(body.actor);
+    var rows = getGenericRows_("OMODOS_OffsetWays", OFFSET_WAYS_HEADERS);
+    rows.sort(function(a,b){ return String(b.UpdatedAt || b.CreatedAt || "").localeCompare(String(a.UpdatedAt || a.CreatedAt || "")); });
+    return jsonOut_({ ok: true, data: rows.slice(0, 500) });
+  }
+  __name(handleOffsetWaysRead_, "handleOffsetWaysRead_");
+  function handleOffsetWaysSave_(body) {
+    requireSuperadmin_(body.actor);
+    var item = body && body.record && typeof body.record === "object" ? body.record : null;
+    if (!item || Array.isArray(item)) throw { code: "VALIDATION_ERROR", message: "record wajib berupa objek" };
+    var type = String(item.type || "").trim();
+    if (OFFSET_WAYS_TYPES.indexOf(type) < 0) throw { code: "VALIDATION_ERROR", message: "Jenis catatan Offset Ways tidak dikenal" };
+    var title = String(item.title || "").trim();
+    if (!title) throw { code: "VALIDATION_ERROR", message: "Judul catatan wajib diisi" };
+    var machine = String(item.machine || "").trim();
+    var owner = String(item.owner || "").trim();
+    var dueDate = String(item.dueDate || "").trim();
+    var status = String(item.status || "Tersimpan").trim();
+    var payload = item.payload == null ? {} : item.payload;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw { code: "VALIDATION_ERROR", message: "payload harus berupa objek" };
+    if (title.length > 160 || machine.length > 120 || owner.length > 120 || dueDate.length > 10 || status.length > 40) {
+      throw { code: "VALIDATION_ERROR", message: "Salah satu kolom catatan terlalu panjang" };
+    }
+    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw { code: "VALIDATION_ERROR", message: "Format tanggal harus YYYY-MM-DD" };
+    var payloadJSON = JSON.stringify(payload);
+    if (payloadJSON.length > 40000) throw { code: "VALIDATION_ERROR", message: "Isi catatan terlalu besar" };
+    var sh = getOrCreateSheet_("OMODOS_OffsetWays", OFFSET_WAYS_HEADERS);
+    var values = sh.getDataRange().getValues();
+    var headers = values.length ? values[0].map(function(x){ return String(x); }) : OFFSET_WAYS_HEADERS.slice();
+    var idCol = headers.indexOf("ID");
+    var deletedCol = headers.indexOf("DeletedAt");
+    var createdAtCol = headers.indexOf("CreatedAt");
+    var createdByCol = headers.indexOf("CreatedBy");
+    var id = String(item.id || "").trim();
+    var rowNumber = 0;
+    var oldCreatedAt = "";
+    var oldCreatedBy = "";
+    if (id) {
+      for (var i = 1; i < values.length; i++) {
+        if (String(values[i][idCol] || "") === id && (deletedCol < 0 || !String(values[i][deletedCol] || "").trim())) {
+          rowNumber = i + 1;
+          oldCreatedAt = createdAtCol < 0 ? "" : String(values[i][createdAtCol] || "");
+          oldCreatedBy = createdByCol < 0 ? "" : String(values[i][createdByCol] || "");
+          break;
+        }
+      }
+      if (!rowNumber) throw { code: "NOT_FOUND", message: "Catatan tidak ditemukan untuk diperbarui" };
+    } else {
+      id = "OW-" + Utilities.getUuid();
+    }
+    var now = new Date().toISOString();
+    var rowObj = {
+      ID: id,
+      Type: type,
+      Title: title,
+      Machine: machine,
+      Owner: owner,
+      DueDate: dueDate,
+      Status: status,
+      PayloadJSON: payloadJSON,
+      CreatedAt: oldCreatedAt || now,
+      UpdatedAt: now,
+      CreatedBy: oldCreatedBy || String(body.actor || ""),
+      UpdatedBy: String(body.actor || ""),
+      DeletedAt: ""
+    };
+    var rowData = headers.map(function(key){ return rowObj[key] == null ? "" : rowObj[key]; });
+    if (rowNumber) sh.getRange(rowNumber, 1, 1, headers.length).setValues([rowData]);
+    else sh.appendRow(rowData);
+    invalidateCacheForSheet_("OMODOS_OffsetWays");
+    return jsonOut_({ ok: true, data: rowObj });
+  }
+  __name(handleOffsetWaysSave_, "handleOffsetWaysSave_");
+  function handleOffsetWaysDelete_(body) {
+    requireSuperadmin_(body.actor);
+    var id = String(body.id || "").trim();
+    if (!id) throw { code: "VALIDATION_ERROR", message: "id wajib diisi" };
+    var sh = getOrCreateSheet_("OMODOS_OffsetWays", OFFSET_WAYS_HEADERS);
+    var values = sh.getDataRange().getValues();
+    var headers = values.length ? values[0].map(function(x){ return String(x); }) : OFFSET_WAYS_HEADERS.slice();
+    var idCol = headers.indexOf("ID");
+    var deletedCol = headers.indexOf("DeletedAt");
+    var updatedCol = headers.indexOf("UpdatedAt");
+    if (idCol < 0 || deletedCol < 0) throw { code: "SERVER_ERROR", message: "Struktur tabel Offset Ways tidak lengkap" };
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][idCol] || "") === id && !String(values[i][deletedCol] || "").trim()) {
+        var now = new Date().toISOString();
+        sh.getRange(i + 1, deletedCol + 1).setValue(now);
+        if (updatedCol >= 0) sh.getRange(i + 1, updatedCol + 1).setValue(now);
+        invalidateCacheForSheet_("OMODOS_OffsetWays");
+        return jsonOut_({ ok: true, data: { id: id, deletedAt: now } });
+      }
+    }
+    return jsonOut_({ ok: false, error: "Catatan Offset Ways tidak ditemukan" });
+  }
+  __name(handleOffsetWaysDelete_, "handleOffsetWaysDelete_");
+
   function handleSaveThemePref_(body) {
     return saveUserPreference_(body, "ThemePref", body.theme || body.value || "");
   }

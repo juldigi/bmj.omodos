@@ -1,0 +1,40 @@
+name: Offset Ways and OMODOS 2.0 Guard
+
+on:
+  push:
+    branches:
+      - feat/offset-ways-omodos20-20261002
+    paths:
+      - "public/omodos4/**"
+      - "src/worker.js"
+      - "tools/test_offset_ways.cjs"
+      - ".github/workflows/offset-ways-guard.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "public/omodos4/**"
+      - "src/worker.js"
+      - "tools/test_offset_ways.cjs"
+      - ".github/workflows/offset-ways-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-offset-ways:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check JavaScript syntax
+        run: |
+          node --check src/worker.js
+          node --check public/omodos4/hotfix.js
+          node --check public/omodos4/offset-ways.js
+      - name: Verify calculations, poster coverage, and access guards
+        run: node tools/test_offset_ways.cjs
