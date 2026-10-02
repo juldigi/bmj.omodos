@@ -6,7 +6,7 @@ var THEME_KEY = 'omodos-2.0';
 var THEME_LABEL = 'OMODOS 2.0';
 var PAGE_ID = 'view-offset-ways';
 var NAV_ID = 'nav-offset-ways';
-var STATE = { records: [], loaded: false, loading: false, activeTab: 'overview', oee: null, teep: null, editingId: '' };
+var STATE = { records: [], loaded: false, loading: false, saving: false, activeTab: 'overview', oee: null, teep: null, editingId: '' };
 var BEHAVIORS = [
   {key:'daily-management', title:'Daily Management Discipline', local:'Disiplin Manajemen Harian', detail:'Review KPI secara rutin, tindak lanjuti aksi, dan pastikan rencana berjalan dengan baik.', icon:'ph-calendar-check'},
   {key:'fast-response', title:'Fast Problem Response', local:'Respons Cepat terhadap Masalah', detail:'Identifikasi masalah dengan cepat, libatkan tim lintas departemen, dan selesaikan bersama.', icon:'ph-lightning'},
@@ -509,7 +509,7 @@ function fullRecord(type, title, machine, owner, dueDate, status, payload, id){
   return {id:id||'', type:type, title:title, machine:machine||'', owner:owner||'', dueDate:dueDate||'', status:status||'Tersimpan', payload:payload||{}};
 }
 async function saveCalculation(kind){
-  if(!isSuperadmin()) return;
+  if(!isSuperadmin() || STATE.saving) return;
   var oee=kind==='oee';
   var input=oee?oeeInputs():teepInputs();
   if(!input.date){
@@ -525,12 +525,20 @@ async function saveCalculation(kind){
   }
   var type=oee?'oee-calculation':'teep-calculation';
   var title=(oee?'OEE':'TEEP')+' · '+(input.machine||'Mesin/area belum diisi')+' · '+(input.date||localDate())+(oee?' · Shift '+input.shift:' · '+input.shifts+' shift');
+  var button=document.querySelector(oee?'[data-ow-save-oee]':'[data-ow-save-teep]');
+  var oldLabel=button?button.innerHTML:'';
+  STATE.saving=true;
+  if(button){button.disabled=true;button.innerHTML='<i class="ph-bold ph-spinner-gap ow-spin"></i> Menyimpan…';}
   try{
     await apiRequest('offsetWaysSave',{record:fullRecord(type,title,input.machine,'', '', 'Tersimpan',{version:1,inputs:input,result:result})});
     STATE.loaded=false;
     await loadRecords();
     announce('Perhitungan '+(oee?'OEE':'TEEP')+' berhasil disimpan ke database.','success');
   }catch(err){announce('Belum berhasil menyimpan perhitungan: '+String(err.message||err),'error');}
+  finally{
+    STATE.saving=false;
+    if(button){button.disabled=false;button.innerHTML=oldLabel;}
+  }
 }
 async function saveBehavior(){
   if(!isSuperadmin()) return;
