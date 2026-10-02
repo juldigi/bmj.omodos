@@ -270,6 +270,7 @@ function calculateOee(input){
   if(!Number.isFinite(p.good) || p.good < 0 || p.good > p.total) errors.push('Produk baik harus berada di antara 0 dan total produksi.');
   var op=Math.max(0,ppt-p.downtime);
   var theoretical=op*p.speed;
+  if(op<=0 && Number.isFinite(p.total) && p.total>0) errors.push('Total produksi tidak boleh lebih dari 0 bila tidak ada waktu operasi. Periksa downtime.');
   if(Number.isFinite(p.total) && theoretical>0 && p.total>theoretical+1e-6) errors.push('Total produksi melebihi output ideal berdasarkan waktu operasi. Periksa jam operasi dan kecepatan ideal.');
   var availability=ppt>0 ? op/ppt : 0;
   var performance=theoretical>0 ? p.total/theoretical : 0;
