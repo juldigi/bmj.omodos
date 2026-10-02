@@ -56,8 +56,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT_URL="https://omodos.juldigi.workers.dev/"
-          API_URL="https://omodos.juldigi.workers.dev/api"
+          BASE_URL="https://omodos.juldigi.workers.dev"
+          ROOT_URL="$BASE_URL/"
+          API_URL="$BASE_URL/api"
           JS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.js"
           CSS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.css"
           OW_JS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.js"
@@ -96,7 +97,7 @@ jobs:
             HEADERS="$(curl --max-time 10 -fsSI "$ROOT_URL" 2>/dev/null | tr -d '\r' || true)"
             BUILD="$(awk -F': *' 'tolower($1)=="x-omodos-build"{print $2}' <<< "$HEADERS" | tail -1)"
             STATUS="$(curl --max-time 10 -sS -o /tmp/login.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"action":"login","username":"__omodos_smoke_invalid__","password":"__omodos_smoke_invalid__"}' "$API_URL" || true)"
-            FILE_STATUS="$(curl --max-time 10 -sS -o /tmp/file-guard.json -w '%{http_code}' "$ROOT_URL/files/__omodos_smoke_missing__" || true)"
+            FILE_STATUS="$(curl --max-time 10 -sS -o /tmp/file-guard.json -w '%{http_code}' "$BASE_URL/files/__omodos_smoke_missing__" || true)"
             LOGIN_JSON_OK="no"
             LOGIN_OK_VALUE="missing"
             if node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/login.json','utf8'));if(!x||typeof x!=='object'||x.ok!==false)process.exit(1)" 2>/dev/null; then
