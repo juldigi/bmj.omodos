@@ -49,16 +49,44 @@ near(oee.qualityLoss * 60, 8, 'Quality loss in minutes');
 const teep = api.calculateTeep({ shifts: 3, hours: 8, psd: 1, oee: oee.oee });
 assert.equal(teep.valid, true, 'poster TEEP example should be valid');
 near(teep.calendar, 24, 'Calendar time');
+near(teep.scheduled, 24, 'Scheduled hours for three 8-hour shifts');
+near(teep.offSchedule, 0, 'Off-schedule hours for three 8-hour shifts');
 near(teep.planned, 21, 'Planned production time over three shifts');
 near(teep.shutdown, 3, 'Planned shutdown over three shifts');
 near(teep.utilization, 0.875, 'Utilization');
 near(teep.teep, 7/12, 'TEEP');
 near(teep.productive, 14, 'Calendar fully productive equivalent time');
 
+const twoShiftTeep = api.calculateTeep({ shifts: 2, hours: 8, psd: 1, oee: oee.oee });
+assert.equal(twoShiftTeep.valid, true, 'two shifts of 8 hours should be valid');
+near(twoShiftTeep.calendar, 24, 'Two-shift calendar denominator');
+near(twoShiftTeep.scheduled, 16, 'Two-shift scheduled hours');
+near(twoShiftTeep.offSchedule, 8, 'Two-shift off-schedule hours');
+near(twoShiftTeep.planned, 14, 'Two-shift planned production hours');
+near(twoShiftTeep.utilization, 14/24, 'Two-shift calendar utilization');
+near(twoShiftTeep.teep, (2/3)*(14/24), 'Two-shift TEEP');
+near(twoShiftTeep.productive, 28/3, 'Two-shift productive equivalent hours');
+
+const oneShiftTeep = api.calculateTeep({ shifts: 1, hours: 8, psd: 1, oee: oee.oee });
+assert.equal(oneShiftTeep.valid, true, 'one 8-hour shift should be valid');
+near(oneShiftTeep.utilization, 7/24, 'One-shift calendar utilization');
+near(oneShiftTeep.teep, (2/3)*(7/24), 'One-shift TEEP');
+near(oneShiftTeep.productive, 14/3, 'One-shift productive equivalent hours');
+const overbookedShifts = api.calculateTeep({ shifts: 4, hours: 8, psd: 1, oee: oee.oee });
+assert.equal(overbookedShifts.valid, false, 'scheduled shift hours must not exceed 24 calendar hours');
+
 const invalidOee = api.calculateOee({
   pot: 8, psd: 1, downtime: 8, speed: 15000, total: 72000, good: 70000
 });
 assert.equal(invalidOee.valid, false, 'downtime longer than PPT must be rejected');
+const overIdealOee = api.calculateOee({
+  pot: 8, psd: 1, downtime: 1, speed: 15000, total: 90001, good: 90000
+});
+assert.equal(overIdealOee.valid, false, 'production above ideal output should not be saved with OEE over 100%');
+const noOperatingTimeOee = api.calculateOee({
+  pot: 8, psd: 1, downtime: 7, speed: 15000, total: 100, good: 100
+});
+assert.equal(noOperatingTimeOee.valid, false, 'positive production with zero operating time must be rejected');
 const blankOee = api.calculateOee({
   pot: 8, psd: NaN, downtime: 1, speed: 15000, total: 72000, good: 70000
 });
@@ -85,7 +113,6 @@ assert.ok(moduleSource.includes("String(view||'').trim()==='offset-ways' && !isS
 assert.ok(/THEME_REGISTRY\.push\s*\(/.test(moduleSource), 'OMODOS 2.0 must be registered in the native Theme Manager');
 assert.ok(moduleSource.includes("document.documentElement.setAttribute('data-theme',THEME_KEY)"), 'OMODOS 2.0 must use the native theme attribute');
 assert.ok(css.includes('html[data-theme="omodos-2.0"]'), 'theme should render from saved app_theme on first page paint');
-assert.ok(css.includes('.ow-hero') && css.includes('.ow-motto-grid') && css.includes('.ow-role-grid'), 'poster-inspired graphics/styles should exist');
 assert.ok(css.includes('.ow-hero') && css.includes('.ow-motto-grid') && css.includes('.ow-role-grid'), 'poster-inspired graphics/styles should exist');
 assert.ok(!css.includes('font:600 12px/1.4 inherit'), 'invalid form font shorthand must not return');
 
