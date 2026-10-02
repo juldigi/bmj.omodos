@@ -355,3 +355,57 @@
   .ow-brandline>span:last-child{font-size:10px}
   .ow-hero-title{font-size:35px}
 }
+
+
+/* OMODOS 2.0 — application-wide high-contrast icon system.
+   Scoped only to this theme so other themes keep their current appearance. */
+:is(html.omodos-theme-20, html[data-theme="omodos-2.0"]) body
+  :is(i[class*="ph-"], i.ph, .ph, [data-lucide], svg.icon, svg.lucide, .icon > svg, .ico, .icon, [class^="icon-"], [class*=" icon-"]) {
+  color: #064b96 !important;
+  opacity: 1 !important;
+  filter: none !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: currentColor;
+}
+
+/* Icons on the dark sidebar follow each item's foreground color:
+   pale white for normal items, navy for the active item. */
+:is(html.omodos-theme-20, html[data-theme="omodos-2.0"]) body .sidebar
+  :is(i[class*="ph-"], i.ph, .ph, [data-lucide], svg.icon, svg.lucide, .ico, .icon) {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+/* Icons on filled controls must follow the high-contrast label, not the
+   global navy icon color. This covers navigation tabs and common actions. */
+:is(html.omodos-theme-20, html[data-theme="omodos-2.0"]) body
+  :is(.btn-primary, .btn.primary, .btn-success, .btn-danger, .btn-warning,
+      .primary-btn, .ow-btn.primary, .ow-tab.active, [data-variant="primary"],
+      .copilot-fab, .copilot-button, .fab-button)
+  :is(i[class*="ph-"], i.ph, .ph, [data-lucide], svg.icon, svg.lucide, .ico, .icon) {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+/* Preserve the deliberately light foregrounds in poster-inspired dark panels. */
+:is(html.omodos-theme-20, html[data-theme="omodos-2.0"]) body
+  :is(.ow-column-head, .ow-role-head, .ow-footer, .ow-formula-band, .ow-metric.primary)
+  :is(i[class*="ph-"], i.ph, .ph, [data-lucide], svg.icon, svg.lucide, .ico, .icon) {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+/* Semantic badges/statuses use the same foreground as their label, keeping
+   icons legible for success, warning, error and information states. */
+:is(html.omodos-theme-20, html[data-theme="omodos-2.0"]) body
+  :is(.badge, [class*="badge-"], .status-badge, .status-pill, .ow-status, .ow-record-icon)
+  :is(i[class*="ph-"], i.ph, .ph, [data-lucide], svg.icon, svg.lucide, .ico, .icon) {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+/* Keep the poster's mint compass accent on the dark footer. */
+:is(html.omodos-theme-20, html[data-theme="omodos-2.0"]) body .ow-footer > i {
+  color: #b7f5c9 !important;
+  opacity: 1 !important;
+}
