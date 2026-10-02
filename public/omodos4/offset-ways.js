@@ -750,7 +750,7 @@ function boot(){
     var nav=ev.target.closest && ev.target.closest('#'+NAV_ID+' [data-view="offset-ways"]');
     if(nav && !isSuperadmin()){ev.preventDefault();ev.stopPropagation();syncAuth();}
   },true);
-  if(isSuperadmin()) loadRecords();
+  // Database reads run only when Superadmin opens Offset Ways, not on every app login.
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
 else boot();
