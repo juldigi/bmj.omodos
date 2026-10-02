@@ -4166,6 +4166,13 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 (function(){
 'use strict';
 function loadOffsetWaysModule(){
+  if(!document.getElementById('omodos-offset-ways-style')){
+    var style=document.createElement('link');
+    style.id='omodos-offset-ways-style';
+    style.rel='stylesheet';
+    style.href='/omodos4/offset-ways.css';
+    document.head.appendChild(style);
+  }
   if(document.getElementById('omodos-offset-ways-script')) return;
   var script=document.createElement('script');
   script.id='omodos-offset-ways-script';
