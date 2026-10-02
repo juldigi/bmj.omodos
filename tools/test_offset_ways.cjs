@@ -111,6 +111,14 @@ for (const [action, handler] of actions) {
 }
 assert.ok(worker.includes('"OMODOS_OffsetWays"'), 'new records should use the existing database-backed storage abstraction');
 assert.ok(worker.includes('case "offsetWaysSave":') && worker.includes('case "offsetWaysDelete":'), 'write actions must validate payloads');
+const validateStart = worker.indexOf('function validatePayload_(action, body)');
+const fileFieldsAt = worker.indexOf('var fileFields =', validateStart);
+const validateBlock = worker.slice(validateStart, fileFieldsAt);
+const defaultCaseAt = validateBlock.indexOf('      default:');
+for (const action of ['offsetWaysSave', 'offsetWaysDelete', 'offsetWaysRead']) {
+  const caseAt = validateBlock.indexOf('case "' + action + '":');
+  assert.ok(caseAt >= 0 && caseAt < defaultCaseAt, action + ' validation case must be inside the action switch before default');
+}
 
 console.log('Offset Ways static and calculation tests: PASS');
 console.log('Poster arithmetic verified: OEE 66.67%, Utilization 87.5%, TEEP 58.33%, productive equivalent 14 h/day.');
