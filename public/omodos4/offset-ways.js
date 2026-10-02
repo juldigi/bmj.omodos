@@ -58,9 +58,9 @@ function num(id, fallback){
   var el = $(id);
   if(!el) return fallback;
   var value = String(el.value == null ? '' : el.value).trim();
-  if(value === '') return fallback;
+  if(value === '') return NaN;
   var n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+  return Number.isFinite(n) ? n : NaN;
 }
 function fmt(value, decimals){
   if(!Number.isFinite(Number(value))) return '—';
@@ -261,13 +261,13 @@ function oeeInputs(){
 function calculateOee(input){
   var p=input||oeeInputs();
   var errors=[];
-  if(!(p.pot > 0)) errors.push('Plant Operating Time harus lebih dari 0.');
-  if(p.psd < 0 || p.psd >= p.pot) errors.push('Planned Shutdown harus 0 atau lebih, dan lebih kecil daripada Plant Operating Time.');
+  if(!Number.isFinite(p.pot) || !(p.pot > 0)) errors.push('Plant Operating Time harus lebih dari 0.');
+  if(!Number.isFinite(p.psd) || p.psd < 0 || p.psd >= p.pot) errors.push('Planned Shutdown harus 0 atau lebih, dan lebih kecil daripada Plant Operating Time.');
   var ppt=Math.max(0,p.pot-p.psd);
-  if(p.downtime < 0 || p.downtime > ppt) errors.push('Downtime tidak boleh melebihi Planned Production Time.');
-  if(!(p.speed > 0)) errors.push('Kecepatan ideal harus lebih dari 0.');
-  if(!(p.total > 0)) errors.push('Total produksi harus lebih dari 0.');
-  if(p.good < 0 || p.good > p.total) errors.push('Produk baik harus berada di antara 0 dan total produksi.');
+  if(!Number.isFinite(p.downtime) || p.downtime < 0 || p.downtime > ppt) errors.push('Downtime tidak boleh melebihi Planned Production Time.');
+  if(!Number.isFinite(p.speed) || !(p.speed > 0)) errors.push('Kecepatan ideal harus lebih dari 0.');
+  if(!Number.isFinite(p.total) || !(p.total > 0)) errors.push('Total produksi harus lebih dari 0.');
+  if(!Number.isFinite(p.good) || p.good < 0 || p.good > p.total) errors.push('Produk baik harus berada di antara 0 dan total produksi.');
   var op=Math.max(0,ppt-p.downtime);
   var theoretical=op*p.speed;
   var availability=ppt>0 ? op/ppt : 0;
@@ -330,9 +330,9 @@ function calculateTeep(input){
   var p=input||teepInputs(), errors=[], warnings=[];
   if(!(p.shifts>=1 && p.shifts<=4 && Math.floor(p.shifts)===p.shifts)) errors.push('Jumlah shift harus bilangan bulat antara 1 dan 4.');
   if(!(p.hours>0)) errors.push('Jam per shift harus lebih dari 0.');
-  if(p.psd<0 || p.psd>=p.hours) errors.push('Planned Shutdown harus 0 atau lebih dan lebih kecil daripada jam per shift.');
+  if(!Number.isFinite(p.psd) || p.psd<0 || p.psd>=p.hours) errors.push('Planned Shutdown harus 0 atau lebih dan lebih kecil daripada jam per shift.');
   if(p.oee==null || !Number.isFinite(p.oee)) errors.push('Hasil OEE belum valid. Periksa kalkulator OEE atau masukkan OEE manual.');
-  else if(p.oee<0 || p.oee>1) warnings.push('OEE berada di luar rentang 0–100%. Periksa kembali data sumber.');
+  else if(p.oee<0 || p.oee>1) errors.push('OEE harus berada pada rentang 0–100%. Periksa kembali data sumber.');
   var calendar=p.shifts*p.hours;
   var pptPer=Math.max(0,p.hours-p.psd);
   var planned=p.shifts*pptPer;
@@ -512,6 +512,11 @@ async function saveCalculation(kind){
   if(!isSuperadmin()) return;
   var oee=kind==='oee';
   var input=oee?oeeInputs():teepInputs();
+  if(!input.date){
+    announce('Pilih tanggal pengukuran terlebih dahulu.','error');
+    if(oee) activateTab('oee'); else activateTab('teep');
+    return;
+  }
   var result=oee?calculateOee(input):calculateTeep(input);
   if(!result.valid){
     announce('Periksa input terlebih dahulu. Perhitungan belum disimpan.','error');
