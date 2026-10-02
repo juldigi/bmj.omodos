@@ -82,7 +82,10 @@ assert.ok(hotfix.includes("script.src='/omodos4/offset-ways.js'"), 'hotfix shoul
 assert.ok(hotfix.includes("style.href='/omodos4/offset-ways.css'"), 'hotfix should load the OMODOS 2.0 theme');
 assert.ok(moduleSource.includes('window.goToView.__offsetWaysAdminGuard'), 'frontend route guard must exist');
 assert.ok(moduleSource.includes("String(view||'').trim()==='offset-ways' && !isSuperadmin()"), 'Offset Ways route must be superadmin-only');
-assert.ok(css.includes('html.omodos-theme-20'), 'theme class should be defined');
+assert.ok(/THEME_REGISTRY\.push\s*\(/.test(moduleSource), 'OMODOS 2.0 must be registered in the native Theme Manager');
+assert.ok(moduleSource.includes("document.documentElement.setAttribute('data-theme',THEME_KEY)"), 'OMODOS 2.0 must use the native theme attribute');
+assert.ok(css.includes('html[data-theme="omodos-2.0"]'), 'theme should render from saved app_theme on first page paint');
+assert.ok(css.includes('.ow-hero') && css.includes('.ow-motto-grid') && css.includes('.ow-role-grid'), 'poster-inspired graphics/styles should exist');
 assert.ok(css.includes('.ow-hero') && css.includes('.ow-motto-grid') && css.includes('.ow-role-grid'), 'poster-inspired graphics/styles should exist');
 assert.ok(!css.includes('font:600 12px/1.4 inherit'), 'invalid form font shorthand must not return');
 
