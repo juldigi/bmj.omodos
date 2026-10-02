@@ -684,15 +684,40 @@ function bindThemePreference(){
   applySavedThemePreference();
   var view=$('view-tema');
   if(view && !view.__owThemeObserver){
-    view.__owThemeObserver=new MutationObserver(function(){ensureThemeOption();updateThemeCardStatus();});
+    view.__owThemeObserver=new MutationObserver(function(){ensureThemeOption();});
     view.__owThemeObserver.observe(view,{childList:true,subtree:true});
   }
 }
+function installRouteGuard(){
+  try{
+    if(typeof window.goToView==='function' && !window.goToView.__offsetWaysAdminGuard){
+      var original=window.goToView;
+      var guarded=function(view){
+        if(String(view||'').trim()==='offset-ways' && !isSuperadmin()){
+          syncAuth();
+          try{if(typeof toast==='function')toast('Menu Offset Ways hanya tersedia untuk Superadmin.',true);}catch(e){}
+          return false;
+        }
+        return original.apply(this,arguments);
+      };
+      guarded.__offsetWaysAdminGuard=true;
+      window.goToView=guarded;
+    }
+  }catch(e){}
+}
 function boot(){
+  installRouteGuard();
   ensureNav();
   ensurePage();
   bindThemePreference();
   syncAuth();
+  var pageForGuard=$(PAGE_ID);
+  if(pageForGuard && !pageForGuard.__owAccessObserver){
+    pageForGuard.__owAccessObserver=new MutationObserver(function(){
+      if(!isSuperadmin() && pageForGuard.classList.contains('active')) syncAuth();
+    });
+    pageForGuard.__owAccessObserver.observe(pageForGuard,{attributes:true,attributeFilter:['class','style']});
+  }
   var badge=$('rbac-user-badge');
   if(badge && !badge.__owAuthObserver){
     badge.__owAuthObserver=new MutationObserver(function(){syncAuth();});
