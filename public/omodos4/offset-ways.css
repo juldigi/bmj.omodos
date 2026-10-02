@@ -220,7 +220,7 @@ html.omodos-theme-20 .view table tr:hover td{background:#f4f9ff}
 .ow-form-heading span,.ow-result-heading span{margin-top:3px;color:#68809d;font-size:10px;line-height:1.4}
 .ow-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
 .ow-field{display:grid;align-content:start;gap:6px;min-width:0;color:#264c7c;font-size:10px;font-weight:850;line-height:1.4}
-.ow-field input,.ow-field select,.ow-field textarea{width:100%;min-width:0;min-height:38px;padding:9px 10px;border:1px solid #c8ddf4;border-radius:10px;background:#fbfdff;color:#123e7c;font:600 12px/1.4 inherit}
+.ow-field input,.ow-field select,.ow-field textarea{width:100%;min-width:0;min-height:38px;padding:9px 10px;border:1px solid #c8ddf4;border-radius:10px;background:#fbfdff;color:#123e7c;font-family:inherit;font-size:12px;font-weight:600;line-height:1.4}
 .ow-field input:disabled{background:#edf3fa;color:#8293aa;cursor:not-allowed}
 .ow-field small{color:#7388a3;font-size:9px;font-weight:500;line-height:1.45}
 .ow-field-wide{grid-column:1/-1}
