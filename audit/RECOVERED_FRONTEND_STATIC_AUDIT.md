@@ -1,9 +1,9 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-07T11:36:29.936862+00:00
-- File bytes: 1650675
-- Lines: 28743
-- SHA-256: 753ec434c5dfd6d87ea7b98d1c679bcb16cb9e7188eb6490feed494c1a425c78
+- Audited UTC: 2026-10-07T11:42:36.397270+00:00
+- File bytes: 1650967
+- Lines: 28749
+- SHA-256: dfd4fcf5f2c32b8f222fa9088be214d3d542f52c9a8b8783258a83acb7626ce5
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
@@ -215,11 +215,12 @@
 - L6474: if(!discovered.some(f=>f.PermissionKey==='omodos4.view')){
 - L6475: discovered.push({PermissionKey:'omodos4.view',Label:'OMODOS 4.0 (Superadmin Root)',Group:'OMODOS 4.0'});
 - L28589: const V4_PERMISSION_ROOT = 'omodos4.view';
-### OMODOS 4.0 — 5 match(es)
+### OMODOS 4.0 — 6 match(es)
 - L3415: <button class="nav-parent-btn" data-group="omodos4"><span class="ico"><i class="ph-bold ph-cpu"></i></span> OMODOS 4.0 <span class="v4-badge">SUPERADMIN</span> <span class="chev"><i class="ph-bold ph-caret-down"></i></span></button>
 - L4205: <h1 style="margin-top:4px;">OMODOS 4.0</h1>
 - L8422: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L23127: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
+- L28744: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
 ### Superadmin — 45 match(es)
 - L4206: <div class="sub">Command Center Superadmin yang membaca data existing tanpa membuat duplikasi sumber data.</div>
 - L5427: <div class="setting-tab-empty" id="rbac-empty-hint" style="display:none;">Memuat data user... Jika tetap kosong, pastikan kamu login sebagai Superadmin.</div>
