@@ -1813,7 +1813,6 @@ input[type="number"]{-moz-appearance:textfield;}
    inline-size;container-name:dashcard) — jadi treshold-nya mengikuti
    lebar card actual, bukan lebar viewport. */
 @container dashcard (max-width: 150px){
-  .dash-card .dc-name,
   .dash-card .dc-desc,
   .dash-card .dc-recap{ display:none; }
   /* Kode & status jadi info utama saat card sempit -> naikkan sedikit
@@ -1840,7 +1839,7 @@ input[type="number"]{-moz-appearance:textfield;}
   .dash-card .dc-top{ margin-bottom:4px; }
 }
 @container dashcard (max-height: 60px){
-  .dash-card .dc-name{ display:none; }
+  .dash-card .dc-name{ display:block; }
   .dash-card{ padding:8px; justify-content:center; }
   .dash-card .dc-status{ margin-bottom:0; }
 }
@@ -3272,7 +3271,13 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
 </style>
 
 <link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="3">
-</head>
+<style id="training-mobile-fix">
+@media(max-width:900px){
+ #dash-grid .dash-card{min-height:112px!important;height:auto!important;container-type:inline-size;}
+ #dash-grid .dc-name,#dash-grid .dc-status{display:block!important;visibility:visible!important;font-size:12px!important;}
+ #dash-grid{grid-auto-rows:minmax(112px,auto)!important;overflow-y:auto!important;}
+}
+</style></head>
 <body>
 <div class="scanline-overlay"></div>
 <div class="scanline-sweep"></div>
@@ -3472,7 +3477,8 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
       </div>
 
       <div class="card">
-        <form id="form-entry" novalidate>
+        <div class="sub" role="note">Jika data pada field teks tidak tersedia, isi dengan simbol <b>-</b>. Jumlah sparepart wajib diisi jika menggunakan sparepart.</div>
+<form id="form-entry" novalidate>
           <div class="section-title"><i class="ph-bold ph-info"></i> Informasi Umum</div>
           <div class="grid2">
             <div class="field"><label>Tanggal</label><input type="date" name="tanggal" required></div>
@@ -7879,7 +7885,7 @@ async function apiPost(payload){
     const res = await fetchWithTimeout_(WEB_APP_URL, {
       method: 'POST',
       mode: 'cors',
-      credentials: 'omit',
+      credentials: 'same-origin',
       redirect: 'follow',
       cache: 'no-store',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -8629,7 +8635,7 @@ async function prepareAllData_(){
   // Keep prefetched responses fresh throughout hydration, even on slow connections.
   READY_READS.forEach(value=>{value.time=Date.now();});
   ENTRIES = entriesSource.slice().sort((a,b)=>new Date(b['Timestamp Input'])-new Date(a['Timestamp Input']));
-  MACHINES = machineSource;
+  MACHINES = machineSource.map(m=>({...m,'Kode Mesin':norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : '', 'Nama Mesin':norm_(m['Nama Mesin']) ? String(m['Nama Mesin']).trim() : (norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : 'Mesin tanpa nama')}));
   PERSONIL = personSource;
   PATROL_TEMPLATE = patrolTemplateSource;
   HOME_PATROL_STATUS = Array.isArray(bootstrap.homePatrolLatest) ? bootstrap.homePatrolLatest.slice() : [];
@@ -8667,7 +8673,7 @@ async function prepareAllData_(){
    Fungsi ini memecahnya menjadi array nama individu yang sudah di-trim. */
 function splitPelaporNames(str){
   if(!str) return ['Tanpa Nama'];
-  return String(str).split(/[\/\-&]+/,).map(s=>s.trim()).filter(Boolean);
+  return String(str).split(/[\/\-&]+/,).map(s=>s.trim()).filter(Boolean).map(n=>/^(Fatkhurrohman|Fatkhurrosidi)$/i.test(n)?'Fatkhurosidi':n);
 }
 
 function populatePelaporSelect(){
@@ -8693,7 +8699,7 @@ function populateMachineSelects(){
   const selNama = $('#select-namaMesin');
   if(!selKode || !selNama) return;
   const curKode = selKode.value, curNama = selNama.value;
-  const optionsKode = MACHINES.map(m=>`<option value="${escapeHtml(m['Kode Mesin']||'')}">${escapeHtml(m['Kode Mesin']||'(tanpa kode)')} — ${escapeHtml(m['Nama Mesin']||'')}</option>`).join('');
+  const optionsKode = MACHINES.filter(m=>norm_(m['Kode Mesin'])).map(m=>`<option value="${escapeHtml(m['Kode Mesin']||'')}">${escapeHtml(m['Kode Mesin']||'(tanpa kode)')} — ${escapeHtml(m['Nama Mesin']||'')}</option>`).join('');
   const optionsNama = MACHINES.map(m=>`<option value="${escapeHtml(m['Nama Mesin']||'')}">${escapeHtml(m['Nama Mesin']||'')}</option>`).join('');
   selKode.innerHTML = `<option value="">Pilih kode mesin...</option>${optionsKode}<option value="${MACHINE_LAINNYA_VALUE}">Lainnya (tidak ada di database)</option>`;
   selNama.innerHTML = `<option value="">Pilih nama mesin...</option>${optionsNama}<option value="${MACHINE_LAINNYA_VALUE}">Lainnya (tidak ada di database)</option>`;
@@ -8716,11 +8722,11 @@ function bindPmMachineSync(){
   const selPmNama = $('#select-pmNamaMesin');
   if(!selPmKode || !selPmNama) return;
   selPmKode.addEventListener('change', ()=>{
-    const m = MACHINES.find(x=> x['Kode Mesin'] === selPmKode.value);
+    const m = MACHINES.find(x=> norm_(x['Kode Mesin']) && x['Kode Mesin'] === selPmKode.value);
     if(m && [...selPmNama.options].some(o=>o.value===m['Nama Mesin'])) selPmNama.value = m['Nama Mesin'];
   });
   selPmNama.addEventListener('change', ()=>{
-    const m = MACHINES.find(x=> x['Nama Mesin'] === selPmNama.value);
+    const m = MACHINES.find(x=> norm_(x['Nama Mesin']) && x['Nama Mesin'] === selPmNama.value);
     if(m && [...selPmKode.options].some(o=>o.value===m['Kode Mesin'])) selPmKode.value = m['Kode Mesin'];
   });
 }
@@ -8740,7 +8746,7 @@ if(selectKodeMesin){
     // Pilih Kode Mesin otomatis mengikutkan Nama Mesin yang berpasangan
     // di Database Mesin, supaya data tetap konsisten satu sama lain.
     if(selectKodeMesin.value && selectKodeMesin.value !== MACHINE_LAINNYA_VALUE){
-      const m = MACHINES.find(x=> x['Kode Mesin'] === selectKodeMesin.value);
+      const m = MACHINES.find(x=> norm_(x['Kode Mesin']) && x['Kode Mesin'] === selectKodeMesin.value);
       const selNama = $('#select-namaMesin');
       if(m && selNama && [...selNama.options].some(o=>o.value===m['Nama Mesin'])) selNama.value = m['Nama Mesin'];
     }
@@ -8751,9 +8757,9 @@ const selectNamaMesin = $('#select-namaMesin');
 if(selectNamaMesin){
   selectNamaMesin.addEventListener('change', ()=>{
     if(selectNamaMesin.value && selectNamaMesin.value !== MACHINE_LAINNYA_VALUE){
-      const m = MACHINES.find(x=> x['Nama Mesin'] === selectNamaMesin.value);
+      const m = MACHINES.find(x=> norm_(x['Nama Mesin']) && x['Nama Mesin'] === selectNamaMesin.value);
       const selKode = $('#select-kodeMesin');
-      if(m && selKode && [...selKode.options].some(o=>o.value===m['Kode Mesin'])) selKode.value = m['Kode Mesin'];
+      if(selKode) selKode.value = m && norm_(m['Kode Mesin']) ? m['Kode Mesin'] : '';
     }
     toggleMachineLainnyaRow();
   });
@@ -8890,6 +8896,7 @@ function parseAttachments(raw) {
   
   return list.map(item => {
     if (item && typeof item === 'object' && item.viewUrl) {
+      if(/\/files\//.test(String(item.viewUrl||''))){ const filePath=String(item.viewUrl).match(/\/files\/[^?#]+/)[0]; item={...item,viewUrl:filePath,previewUrl:filePath,thumbUrl:filePath}; }
       if(String(item.viewUrl||'').startsWith('blob:')) item = { ...item, _persistedBlob:true };
       // Data lama yang tersimpan di Sheets kadang masih memakai
       // uc?export=download (gagal tampil sebagai gambar/video karena browser
@@ -9275,11 +9282,11 @@ $('#btn-refresh-utama').addEventListener('click', async ()=>{ await loadAll(); r
 // kosong/tidak cocok. Ini supaya entri lama yang penulisan namanya sedikit
 // beda (kapital/spasi) tetap terhubung ke mesin yang benar di database,
 // bukan otomatis nyasar ke "Lainnya".
-function norm_(s){ return String(s||'').trim().toLowerCase(); }
+function norm_(s){ const v=String(s??'').trim().toLowerCase(); return /^[—–-]+$/.test(v)?'':v; }
 
 function buildMachineIndex_(){
   const list = MACHINES.map(m=>{
-    const kode = String(m['Kode Mesin']||'').trim();
+    const kode = norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : '';
     const nama = String(m['Nama Mesin']||'').trim();
     const key = kode || nama; // kunci filter unik per mesin
     const label = nama || kode;
@@ -10367,7 +10374,10 @@ async function renderDiagnosticView(){
 function findMachineByIdentity_(kodeOrNama){
   const q=norm_(kodeOrNama);
   if(!q || !Array.isArray(MACHINES)) return null;
-  return MACHINES.find(m=> norm_(m && m['Kode Mesin'])===q || norm_(m && m['Nama Mesin'])===q) || null;
+  const byName=MACHINES.find(m=>norm_(m && m['Nama Mesin'])===q);
+  if(byName) return byName;
+  const byCode=MACHINES.filter(m=>norm_(m && m['Kode Mesin'])===q);
+  return byCode.length===1 ? byCode[0] : null;
 }
 function machineRecordMatchesIdentity_(record,kodeOrNama){
   if(!record || !kodeOrNama) return false;
@@ -12665,6 +12675,7 @@ async function syncSparepartStatusFromBackend(){
    master ini sekali jalan, jadi tidak ada data yang hilang. */
 let SPAREPART_LOKASI = [];
 let SPAREPART_LOKASI_EDIT_SAP = null;
+let SPAREPART_LOKASI_EDIT_NAME = null;
 
 function loadSparepartLokasiLocal(){ try{ return JSON.parse(localStorage.getItem(LS_SPAREPART_LOKASI_KEY)||'[]'); }catch(e){ return []; } }
 function saveSparepartLokasiLocal(list){ localStorage.setItem(LS_SPAREPART_LOKASI_KEY, JSON.stringify(list)); SPAREPART_LOKASI = list; }
@@ -12680,7 +12691,9 @@ async function syncSparepartLokasiFromBackend(){
         lokasiGudang: r['Lokasi Gudang']||'',
         harga: Number(r['Harga Satuan']) || 0,
         stockQty: (r['Stock Qty']===''||r['Stock Qty']==null) ? null : Number(r['Stock Qty']),
-        satuan: r['Satuan']||''
+        satuan: r['Satuan']||'',
+        needsReview: r['Perlu Verifikasi']===true || String(r['Perlu Verifikasi']).toLowerCase()==='true',
+        sourceLogbook: r['Sumber Logbook']||''
       }));
       saveSparepartLokasiLocal(normalized);
     }
@@ -12703,6 +12716,7 @@ function findStockSistemBySap(sap){
 }
 function resetSparepartLokasiForm(){
   SPAREPART_LOKASI_EDIT_SAP = null;
+  SPAREPART_LOKASI_EDIT_NAME = null;
   $('#sl-sap').value=''; $('#sl-nama').value=''; $('#sl-lokasi').value=''; $('#sl-harga').value='';
   const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
   if(stockEl) stockEl.value=''; if(satuanEl) satuanEl.value='';
@@ -12730,14 +12744,15 @@ function renderSparepartLokasiTable(){
         <div class="sp-master-price" data-label="Harga">Rp${Number(r.harga||0).toLocaleString('id-ID')}</div>
         <div class="sp-master-stock" data-label="Stock">${r.stockQty!=null ? r.stockQty : '-'} ${escapeHtml(r.satuan||'')}</div>
         <div class="sp-master-actions" data-label="Aksi">
-          <button type="button" class="btn btn-sm sl-edit" data-sap="${escapeHtml(r.sap)}" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
-          <button type="button" class="btn btn-sm btn-danger sl-delete" data-sap="${escapeHtml(r.sap)}" title="Hapus"><i class="ph-bold ph-trash"></i></button>
+          <button type="button" class="btn btn-sm sl-edit" data-sap="${escapeHtml(r.sap)}" data-name="${escapeHtml(r.nama)}" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
+          <button type="button" class="btn btn-sm btn-danger sl-delete" data-sap="${escapeHtml(r.sap)}" ${r.sap?'':'disabled'} title="${r.sap?'Hapus':'Lengkapi nomor SAP sebelum menghapus'}"><i class="ph-bold ph-trash"></i></button>
         </div>
       </div>`).join('')}
   </div>`;
   $$('.sl-edit', holder).forEach(btn=> btn.addEventListener('click', ()=>{
-    const r = SPAREPART_LOKASI.find(x=>x.sap===btn.dataset.sap); if(!r) return;
+    const r = SPAREPART_LOKASI.find(x=>btn.dataset.sap ? x.sap===btn.dataset.sap : x.nama===btn.dataset.name); if(!r) return;
     SPAREPART_LOKASI_EDIT_SAP = r.sap;
+    SPAREPART_LOKASI_EDIT_NAME = r.nama;
     $('#sl-sap').value = r.sap; $('#sl-nama').value = r.nama||''; $('#sl-lokasi').value = r.lokasiGudang||''; $('#sl-harga').value = r.harga||'';
     const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
     if(stockEl) stockEl.value = r.stockQty!=null ? r.stockQty : '';
@@ -12760,12 +12775,12 @@ if(btnSaveSparepartLokasi) btnSaveSparepartLokasi.addEventListener('click', asyn
   if(!sap){ toast('Material Number SAP wajib diisi.', true); return; }
   const stockVal = $('#sl-stock') ? $('#sl-stock').value : '';
   const data = {
-    sap, nama: $('#sl-nama').value.trim(), lokasiGudang: $('#sl-lokasi').value.trim(),
+    sap, originalName: SPAREPART_LOKASI_EDIT_NAME, nama: $('#sl-nama').value.trim(), lokasiGudang: $('#sl-lokasi').value.trim(),
     harga: Number($('#sl-harga').value)||0,
     stockQty: stockVal==='' ? null : Number(stockVal)||0,
     satuan: $('#sl-satuan') ? $('#sl-satuan').value.trim() : ''
   };
-  const list = SPAREPART_LOKASI.filter(x=>x.sap!==sap && x.sap!==SPAREPART_LOKASI_EDIT_SAP);
+  const list = SPAREPART_LOKASI.filter(x=>x.sap!==sap && (SPAREPART_LOKASI_EDIT_SAP ? x.sap!==SPAREPART_LOKASI_EDIT_SAP : x.nama!==SPAREPART_LOKASI_EDIT_NAME));
   list.push(data);
   saveSparepartLokasiLocal(list);
   resetSparepartLokasiForm();
@@ -14697,13 +14712,15 @@ if(btnSaveAnalitikConfig) btnSaveAnalitikConfig.addEventListener('click', async 
    Fungsi ini memecahnya kembali menjadi array {nama, sap, qty} per material,
    supaya bisa dicocokkan satu-satu dengan master Lokasi Sparepart. */
 function parseSparepartDetail(entry){
+  const saved=safeJsonParseClient_(entry['Sparepart Detail (JSON)'],null);
+  if(Array.isArray(saved)) return saved.map(r=>({nama:r.nama||'',sap:r.sap||'',qty:Number(r.jumlah??r.qty)||0}));
   const namaList = String(entry['Nama Material']||'').split(';').map(s=>s.trim()).filter(Boolean);
   const sapList = String(entry['Material Number SAP']||'').split(';').map(s=>s.trim()).filter(Boolean);
   const len = Math.max(namaList.length, sapList.length) || (namaList.length || sapList.length ? 1 : 0);
   const out = [];
   for(let i=0;i<len;i++){
     const namaRaw = namaList[i] || '';
-    const m = namaRaw.match(/^(.*?)\s*\((\d+)\s*pcs\)\s*$/i);
+    const m = namaRaw.match(/^(.*?)\s*\((\d+(?:\.\d+)?)\s*pcs\)\s*$/i);
     out.push({ nama: m ? m[1].trim() : namaRaw, qty: m ? Number(m[2]) : 1, sap: sapList[i] || '' });
   }
   return out;
@@ -14724,8 +14741,8 @@ function sparepartEntryTotalQty(e){
 function sparepartRows(){
   return sotEntries(ENTRIES)
     .filter(e => {
-      const nama = String(e['Nama Material'] ?? '').trim();
-      const sap = String(e['Material Number SAP'] ?? '').trim();
+      const nama = norm_(e['Nama Material']);
+      const sap = norm_(e['Material Number SAP']);
       return nama !== '' || sap !== '';
     })
     .map(e=>({ entry:e, sap: getSparepartSapEntry(e['ID']) }))
@@ -14754,7 +14771,18 @@ function isSameLocalDate(dateLike, ref){
 let SP_COLLECT_PAGE = 1;
 let SP_COLLECT_PAGE_SIZE = 10;
 
+function renderTrainingSparepartNotice_(){
+  const pending=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview);
+  [['view-sparepart','training-sparepart-notice'],['home-smart-resume','training-sparepart-resume']].forEach(([target,id])=>{
+    const host=document.getElementById(target),old=document.getElementById(id);
+    if(old) old.remove(); if(!host || !pending.length) return;
+    const n=document.createElement('div');n.id=id;n.className='card';n.setAttribute('role','status');
+    n.textContent=pending.length+' sparepart baru dari Logbook perlu dilengkapi di Master Sparepart: '+pending.map(r=>r.nama||r.sap).join(', ');
+    if(target==='home-smart-resume') host.before(n); else host.prepend(n);
+  });
+}
 function renderSparepartView(){
+  renderTrainingSparepartNotice_();
   loadSparepartStatusLocal();
   renderSparepartCollectDash();
   applySparepartFilters();
@@ -15993,14 +16021,13 @@ document.addEventListener('click', (ev)=>{
 });
 
 $('#btn-wiki-back').addEventListener('click', ()=>{
-  if(!WIKI_STACK.length) return;
-  WIKI_CURRENT = WIKI_STACK.pop();
+  WIKI_CURRENT = WIKI_STACK.length ? WIKI_STACK.pop() : null;
   renderWikiView();
 });
 $('#search-wiki').addEventListener('input', ()=>{ if(!WIKI_CURRENT) renderWikiLanding(); });
 
 function renderWikiView(){
-  $('#btn-wiki-back').disabled = WIKI_STACK.length===0;
+  $('#btn-wiki-back').disabled = !WIKI_CURRENT && WIKI_STACK.length===0;
   if(!WIKI_CURRENT){ renderWikiLanding(); return; }
   const { type, key } = WIKI_CURRENT;
   $('#wiki-breadcrumb').innerHTML = WIKI_STACK.length
@@ -16355,7 +16382,7 @@ function machineMatchRecord_(record,machine){
   const rn=norm_(record && (record['Nama Mesin']||record.namaMesin));
   const mk=norm_(machine && (machine.kode||machine['Kode Mesin']));
   const mn=norm_(machine && (machine.nama||machine['Nama Mesin']));
-  if(rk && mk) return rk===mk;
+  if(rk && mk && rk===mk) return true;
   return !!(rn && mn && rn===mn);
 }
 function latestEntryPerMachine(){
@@ -16467,7 +16494,7 @@ function renderDashboardView(){
       <div class="dash-card status-${snap.key}" data-mesin="${escapeHtml(m.nama)}" data-kode="${escapeHtml(m.kode || m.nama)}" role="button" tabindex="0" aria-label="Lihat status terkini ${escapeHtml(m.nama)}">
         <div class="dc-top">
           <div class="dc-top-text">
-            <div class="dc-name">${escapeHtml(m.nama)}</div>
+            <div class="dc-name">${escapeHtml(m.nama||m.kode||'-')}</div>
             ${m.kode ? `<div class="dc-kode">${escapeHtml(m.kode)}</div>` : ''}
           </div>
         </div>
@@ -17174,7 +17201,7 @@ function renderSparepartRows(){
           <div class="sp-suggest-box sp-sap-suggest"></div>
         </div>
       </div>
-      <div class="field"><label>Jumlah (opsional)</label>
+      <div class="field"><label>Jumlah (wajib jika menggunakan sparepart)</label>
         <input type="number" class="sp-jumlah" min="1" step="1" inputmode="numeric" placeholder="Masukkan jumlah pemakaian jika menggunakan sparepart" value="${escapeHtml(r.jumlah)}">
       </div>
       ${SPAREPART_ROWS.length>1 ? `<button type="button" class="sparepart-row-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>` : `<span></span>`}
@@ -17440,11 +17467,13 @@ function buildMaterialFieldsFromRows(){
   // Seluruh field sparepart bersifat opsional. Simpan setiap nilai yang
   // memang diisi tanpa memaksa kelengkapan field lain pada baris yang sama.
   const rows = SPAREPART_ROWS
+    .map(r=>({...r,nama:norm_(r.nama)?String(r.nama).trim():'',sap:norm_(r.sap)?String(r.sap).trim():'',jumlah:norm_(r.jumlah)?r.jumlah:''}))
     .filter(r=>r.nama.trim() || r.sap.trim() || String(r.jumlah).trim())
     .map(r=>{
       const master = r.sap.trim() ? findSparepartLokasiBySap(r.sap.trim()) : null;
       return { ...r, lokasiSparepart: master ? String(master.lokasiGudang||'').trim() : '' };
     });
+  rows.forEach((r,i)=>{ if(!(Number(r.jumlah)>0) || !Number.isFinite(Number(r.jumlah))) throw new Error('Jumlah sparepart baris '+(i+1)+' wajib diisi dengan angka lebih dari 0.'); if(!r.nama.trim() && !r.sap.trim()) throw new Error('Isi nama atau nomor SAP sparepart baris '+(i+1)+'.'); });
   const namaMaterial = rows.map(r=> r.jumlah ? `${r.nama.trim()} (${r.jumlah} pcs)` : r.nama.trim()).filter(Boolean).join('; ');
   const materialNumberSAP = rows.map(r=> r.sap.trim()).filter(Boolean).join('; ');
   // Backend lama mewajibkan kolom Lokasi Sparepart. Nilai fallback ini
@@ -17717,8 +17746,10 @@ $('#form-entry').addEventListener('submit', async (ev)=>{
     btn.innerHTML = '<span class="ai-spinner" style="width:12px;height:12px;"></span> Memeriksa ejaan (AI)...';
     const groqChangedCount = await groqAutoFixEntryFields(entry);
     btn.disabled = true; btn.textContent = 'Menyimpan...';
+    ['namaUnit','tindakanPerbaikan','catatan','nomorNotifikasi'].forEach(k=>{ if(!String(entry[k]||'').trim()) entry[k]='-'; });
     const files = PENDING_FILES.map(f=>({name:f.name, mimeType:f.mimeType, base64:f.base64}));
-    await apiPost({action:'addEntry', entry, files});
+    const saved = await apiPost({action:'addEntry', entry, files});
+    if(saved.newSpareparts && saved.newSpareparts.length) toast(saved.newSpareparts.length+' sparepart baru ditambahkan. Lengkapi datanya di menu Sparepart.');
     toast(groqChangedCount ? `Logbook berhasil disimpan ✓ (${groqChangedCount} field ejaan diperbaiki otomatis)` : 'Logbook berhasil disimpan ✓');
     clearFormEntryDraft();
     ev.target.reset();
@@ -19075,7 +19106,8 @@ function hydratePatrolFindingFiles_(findings, stableFiles){
   out.forEach(f=>{
     if(!Array.isArray(f.files)) return;
     f.files = f.files.map(old=>{
-      const candidate = stable[cursor++];
+      const candidate = stable.find(x=>old && old.id && x.id===old.id) || stable.find(x=>old && old.name && x.name===old.name) || stable[cursor++];
+      if(old && old.viewUrl && !/^(blob:|data:)/.test(String(old.viewUrl))) return parseAttachments([old])[0];
       if(candidate && candidate.viewUrl && !String(candidate.viewUrl).startsWith('blob:')) return candidate;
       if(old && old.viewUrl && !String(old.viewUrl).startsWith('blob:')) return old;
       return { name:(old&&old.name)||'lampiran', mimeType:(old&&old.mimeType)||'', type:(old&&old.type)||'' };
@@ -19143,7 +19175,7 @@ async function syncPmReportsFromBackend(){
       const localList = loadPmReportsLocal();
       const merged = normalized.map(r=>{
         const local = localList.find(x=>x.id===r.id);
-        const backendHasRealMedia = r.files.some(a=> a.viewUrl && a.viewUrl.startsWith('http'));
+        const backendHasRealMedia = r.files.some(a=> a.viewUrl && (/^https?:/.test(a.viewUrl) || a.viewUrl.startsWith('/files/')));
         if(!local) return r;
         return {
           ...r,
@@ -19824,7 +19856,7 @@ $('#btn-patrol-save').addEventListener('click', async ()=>{
     score,
     findings: PATROL_STATE.findings
   };
-  const filesForBackend = PATROL_STATE.findings.flatMap(f=> (f.files||[]).map(x=>({ name:x.name, mimeType:x.mimeType, base64:x.base64 })));
+  const filesForBackend = PATROL_STATE.findings.flatMap(f=> (f.files||[]).filter(x=>x.base64).map(x=>({ name:x.name, mimeType:x.mimeType, base64:x.base64 })));
   const btn = $('#btn-patrol-save');
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
@@ -19870,8 +19902,8 @@ $$('#patrol-temuan-filter .machine-chip').forEach(btn=>{
 });
 function patrolAllFindings(){
   const out = [];
-  (PM_REPORTS||[]).filter(r=>r.patrolMode && Array.isArray(r.findings)).forEach(r=>{
-    r.findings.forEach(f=> out.push({ ...f, reportId:r.id, mesin:r.namaMesin, kodeMesin:r.kodeMesin, tanggal:r.tanggal }));
+  (PM_REPORTS||[]).filter(r=>Array.isArray(r.findings) && r.findings.length).forEach(r=>{
+    r.findings.forEach(f=> out.push({ ...f, status:f.status||'Open', reportId:r.id, mesin:r.namaMesin, kodeMesin:r.kodeMesin, tanggal:r.tanggal }));
   });
   return out.sort((a,b)=> String(b.tanggal).localeCompare(String(a.tanggal)));
 }
@@ -24114,7 +24146,7 @@ function renderPiPersonnelView(){
 // TERPISAH dari Master Personil umum (menu Master Koneksi) supaya
 // linkage-nya hanya berlaku di menu People Intelligent.
 const PI_PERSONNEL_SEED = [
-  { idKaryawan:'83101002', nama:'Fatkhurrosidi', jobTitle:'Packaging Offset Technical Mechanic Workshop Senior Technician', tanggalLahir:'1983-10-10' },
+  { idKaryawan:'83101002', nama:'Fatkhurosidi', jobTitle:'Packaging Offset Technical Mechanic Workshop Senior Technician', tanggalLahir:'1983-10-10' },
   { idKaryawan:'98010900', nama:'Dicky Wibowo', jobTitle:'Packaging Offset Technical Electric Senior Technician', tanggalLahir:'1998-01-09' },
   { idKaryawan:'10090801', nama:'Dede Jumadi', jobTitle:'Packaging Offset Technical Mechanic Senior Technician', tanggalLahir:'2000-09-08' },
   { idKaryawan:'87081601', nama:'Dwi Kurniawan', jobTitle:'Packaging Offset Technical Electric Senior Technician', tanggalLahir:'1987-08-16' },
@@ -25779,6 +25811,7 @@ function renderDashboardCriticalSummary(){
    sudah ada. Tidak ada data/API baru; murni membaca ulang data yang sudah
    dimuat, sama seperti ringkasan kritikal di atasnya. */
 function renderHomeSmartResume(){
+  renderTrainingSparepartNotice_();
   const holder = document.getElementById('home-smart-resume');
   if(!holder) return;
   if(typeof ENTRIES === 'undefined' || !Array.isArray(ENTRIES) || !ENTRIES.length){
@@ -28429,7 +28462,7 @@ table.omodos-responsive-table>tbody>tr>td::before,#sparepart-lokasi-table td::be
     'Auto-detect':'Cari Otomatis','Auto-detect (default: NOTE)':'Cari Otomatis (biasanya kolom NOTE)',
     'Smart Recognition':'Pengenalan Otomatis','Resume Psikologis (Indikatif — dari Soft Skill Assessment)':'Ringkasan Perilaku dari Penilaian',
     'Update Progress':'Perbarui Perkembangan','Daftar Project':'Daftar Proyek',
-    'Timeline Gantt':'Jadwal Proyek','Progress':'Perkembangan',
+    'Timeline Gantt':'Jadwal Proyek','Progress':'Progress',
     'Factory Project, Kaizen & SGA dalam satu tempat.':'Proyek pabrik, Kaizen, dan SGA dalam satu tempat.',
     'Card View':'Tampilan Kartu','Table View':'Tampilan Tabel'
   });
