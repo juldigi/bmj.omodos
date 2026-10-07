@@ -1232,6 +1232,35 @@ jobs:
             }
             result.phases.push('pagination');
 
+            console.log('[QA] training findings mobile + navigation');
+            await page.setViewportSize({width:390,height:844});
+            const training = await page.evaluate(() => {
+              document.getElementById('app-root').classList.add('unlocked');
+              document.getElementById('login-gate').style.display='none';
+              document.getElementById('app-splash').classList.remove('show','visible');
+              MACHINES=[{'Kode Mesin':'AHU-1','Nama Mesin':'AHU 1'},{'Kode Mesin':'','Nama Mesin':'Compressor 2'}];
+              ENTRIES=[];HOME_MACHINE_FILTER='all';
+              document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+              document.getElementById('view-dashboard').classList.add('active');
+              renderDashboardView();
+              const names=[...document.querySelectorAll('#dash-grid .dc-name')];
+              const mobile=names.length===2 && names.every(n=>getComputedStyle(n).display!=='none' && n.getBoundingClientRect().height>0);
+              WIKI_STACK=[];WIKI_CURRENT={type:'unsupported',key:'QA'};renderWikiView();
+              const backEnabled=!document.getElementById('btn-wiki-back').disabled;
+              document.getElementById('btn-wiki-back').click();
+              const wikiBack=backEnabled && WIKI_CURRENT===null;
+              PM_REPORTS=[{id:'qa-patrol',patrolMode:false,tanggal:'2026-10-07',findings:[{id:'qa-finding',deskripsi:'Simulasi'}]}];
+              const findings=patrolAllFindings().length===1;
+              SPAREPART_ROWS=[{id:1,nama:'Seal',sap:'',jumlah:''}];renderSparepartRows();
+              let qtyRejected=false;try{buildMaterialFieldsFromRows();}catch(e){qtyRejected=/Jumlah/.test(e.message);}
+              document.querySelector('#sparepart-rows .sp-jumlah').value='2';
+              const qtyAccepted=buildMaterialFieldsFromRows().detail[0].jumlah==='2';
+              return {mobile,wikiBack,findings,qtyRejected,qtyAccepted};
+            });
+            result.training=training;
+            if(!Object.values(training).every(Boolean)) throw new Error('Training findings regression: '+JSON.stringify(training));
+            result.phases.push('training-findings');
+
             const relevantErrors = errors.filter(x =>
               !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError/i.test(x)
             );

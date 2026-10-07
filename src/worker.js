@@ -4715,7 +4715,73 @@ function createBackend(services, env = {}) {
     return null;
   }
   __name(findRowByColumnValue_, "findRowByColumnValue_");
+  function trainingValue_(v) { const s = String(v == null ? "" : v).trim(); return /^[—–-]+$/.test(s) ? "" : s; }
+  function validateTrainingMaterials_(data) {
+    var details = data.sparepartDetail;
+    if (!Array.isArray(details)) {
+      var names = trainingValue_(data.namaMaterial || data["Nama Material"]).split(";");
+      var codes = trainingValue_(data.materialNumberSAP || data["Material Number SAP"]).split(";");
+      details = Array.from({length:Math.max(names.length,codes.length)}, function(_,i) {
+        var name=trainingValue_(names[i]), match=name.match(/^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*pcs\)\s*$/i);
+        return {nama:match ? match[1].trim() : name,sap:trainingValue_(codes[i]),jumlah:match ? match[2].replace(",",".") : data.jumlahMaterial};
+      });
+    }
+    return details.filter(function(r){ return trainingValue_(r.nama)||trainingValue_(r.sap)||trainingValue_(r.jumlah); }).map(function(r,i){
+      var qty=Number(r.jumlah ?? r.qty);
+      if (!Number.isFinite(qty) || qty<=0) throw {code:"VALIDATION_ERROR",message:"Jumlah sparepart baris "+(i+1)+" wajib diisi dengan angka lebih dari 0."};
+      if (!trainingValue_(r.nama) && !trainingValue_(r.sap)) throw {code:"VALIDATION_ERROR",message:"Nama atau SAP sparepart wajib diisi."};
+      return {nama:trainingValue_(r.nama),sap:trainingValue_(r.sap),jumlah:qty};
+    });
+  }
+  function registerTrainingMaterials_(details, logbookId) {
+    if (!details.length) return [];
+    var sh=getOrCreateSheet_(SHEET_SPAREPART_LOKASI,SPAREPART_LOKASI_HEADERS);
+    ensureHeaderColumns_(sh,["Perlu Verifikasi","Sumber Logbook"]);
+    var rows=getSparepartLokasiMerged_(), headers=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0], added=[];
+    details.forEach(function(d){
+      if (rows.some(function(r){return d.sap ? trainingValue_(r["Material Number SAP"])===d.sap : trainingValue_(r["Nama Material"]).toLowerCase()===d.nama.toLowerCase();})) return;
+      var record={"Material Number SAP":d.sap,"Nama Material":d.nama,"Lokasi Gudang":"-","Satuan":"-","Perlu Verifikasi":true,"Sumber Logbook":logbookId};
+      sh.appendRow(headers.map(function(h){return record[h] ?? "";})); rows.push(record); added.push(d.nama||d.sap);
+    });
+    invalidateCacheForSheet_(SHEET_SPAREPART_LOKASI); return added;
+  }
+  function applyTrainingMasterCorrections_() {
+    const props=PropertiesService.getScriptProperties(), key="TRAINING_FIX_20261007_V1";
+    if(props.getProperty(key)==="1") return;
+    const sh=getOrCreateSheet_(SHEET_MESIN,MESIN_HEADERS), values=sh.getDataRange().getValues(), headers=values[0];
+    const ci=headers.indexOf("Kode Mesin"),ni=headers.indexOf("Nama Mesin");
+    const clean=function(v){return trainingValue_(v).toLowerCase().replace(/[^a-z0-9]+/g,"");};
+    const used=new Set(values.slice(1).map(function(r){return trainingValue_(r[ci]);}).filter(Boolean));
+    const counts={}; values.slice(1).forEach(function(r){const c=trainingValue_(r[ci]);if(c)counts[c]=(counts[c]||0)+1;});
+    for(let i=1;i<values.length;i++){
+      const row=values[i], code=trainingValue_(row[ci]), name=String(row[ni]||"").trim();
+      if(/^plt[-\s]*1$/i.test(code) && /pile\s*turner\s*2/i.test(name)) row[ni]=name.replace(/(pile\s*turner\s*)2/i,function(_,prefix){return prefix+"1";});
+      const utility=name.match(/^(AHU|Compressor)\s*[-#.]?\s*(\d+)\b/i);
+      if(utility && (!code || counts[code]>1)){
+        let desired=utility[1].toUpperCase()+"-"+utility[2];
+        if(used.has(desired)) desired="UTILITY-"+desired;
+        if(!used.has(desired)){row[ci]=desired;used.add(desired);}
+      }
+    }
+    if(values.length>1) sh.getRange(2,1,values.length-1,headers.length).setValues(values.slice(1));
+    [{name:"AHU 9",code:"AHU-9",category:"Utility"},{name:"AHU 10",code:"AHU-10",category:"Utility"},{name:"OFFSET 10",code:"OFFSET-10",category:"Printing"}].forEach(function(m){
+      const exists=values.slice(1).some(function(r){const n=clean(r[ni]),c=clean(r[ci]);return n===clean(m.name) || c===clean(m.code) || (m.name==="OFFSET 10" && /offset.*10(?:machine)?$/.test(n));});
+      if(exists) return;
+      let code=m.code; if(used.has(code)) return;
+      const record={"Kode Mesin":code,"Nama Mesin":m.name,"Kategori":m.category,"Lokasi/Area":"-","Keterangan Sumber":"Tambahan sesuai catatan training 7 Oktober 2026"};
+      sh.appendRow(headers.map(function(h){return record[h]??"";}));used.add(code);
+    });
+    invalidateCacheForSheet_(SHEET_MESIN);
+    [SHEET_PERSONIL,SHEET_PI_PERSONNEL].forEach(function(sheet){
+      const ps=getSS_().getSheetByName(sheet);if(!ps || ps.getLastRow()<2)return;
+      const rows=ps.getDataRange().getValues(),hs=rows[0];
+      rows.slice(1).forEach(function(r,i){hs.forEach(function(h,c){if(/nama/i.test(h) && /^(fatkhurrohman|fatkhurrosidi)$/i.test(String(r[c]||"").trim()))ps.getRange(i+2,c+1).setValue("Fatkhurosidi");});});
+      invalidateCacheForSheet_(sheet);
+    });
+    props.setProperty(key,"1");
+  }
   function getMachinesList_() {
+    applyTrainingMasterCorrections_();
     return getGenericRows_(SHEET_MESIN, MESIN_HEADERS);
   }
   __name(getMachinesList_, "getMachinesList_");
@@ -4740,13 +4806,14 @@ function createBackend(services, env = {}) {
   }
   __name(getStockSparepart_, "getStockSparepart_");
   function findMachineRow_(sh, kodeOrNama) {
+    if (!String(kodeOrNama || "").trim() || /^[—–-]+$/.test(String(kodeOrNama).trim())) return null;
     const data = sh.getDataRange().getValues();
     const headers = data[0];
     const kodeCol = headers.indexOf("Kode Mesin");
     const namaCol = headers.indexOf("Nama Mesin");
     for (var i = 1; i < data.length; i++) {
       const key = data[i][kodeCol] || data[i][namaCol];
-      if (String(key) === String(kodeOrNama)) {
+      if (String(key) === String(kodeOrNama) || String(data[i][namaCol]) === String(kodeOrNama)) {
         return { rowIndex: i + 1, headers, row: data[i] };
       }
     }
@@ -5099,6 +5166,7 @@ function createBackend(services, env = {}) {
   function saveSparepartLokasi_(body) {
     const sh = getOrCreateSheet_(SHEET_SPAREPART_LOKASI, SPAREPART_LOKASI_HEADERS);
     const d = body.lokasi || {};
+    ensureHeaderColumns_(sh,["Perlu Verifikasi","Sumber Logbook"]);
     if (!d.sap) return jsonOut_({ ok: false, error: "Material Number SAP wajib diisi." });
     const rowMap = {
       "Material Number SAP": d.sap || "",
@@ -5106,9 +5174,10 @@ function createBackend(services, env = {}) {
       "Lokasi Gudang": d.lokasiGudang || "",
       "Harga Satuan": d.harga || 0,
       "Stock Qty": d.stockQty === "" || d.stockQty == null ? "" : Number(d.stockQty) || 0,
-      "Satuan": d.satuan || ""
+      "Satuan": d.satuan || "",
+      "Perlu Verifikasi": false
     };
-    const found = findRowByColumnValue_(sh, "Material Number SAP", d.sap);
+    const found = findRowByColumnValue_(sh, "Material Number SAP", d.sap) || (d.originalName ? (function(){ const candidate=findRowByColumnValue_(sh,"Nama Material",d.originalName); if(!candidate)return null; const ci=candidate.headers.indexOf("Material Number SAP"); return ci<0 || !trainingValue_(candidate.row[ci]) ? candidate : null; })() : null);
     const actualHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     const row = actualHeaders.map(function(h) {
       return rowMap.hasOwnProperty(h) ? rowMap[h] : "";
@@ -6123,6 +6192,7 @@ function createBackend(services, env = {}) {
   }
   __name(getSparepartStatusMap_, "getSparepartStatusMap_");
   function getBootstrap_(role) {
+    applyTrainingMasterCorrections_();
     try {
       ensureKpiDepartmentActualData_();
     } catch (e) {
@@ -6506,6 +6576,7 @@ function createBackend(services, env = {}) {
       }
     }
     let attachments = [];
+    let uploadedAttachments = [];
     if (Array.isArray(files) && files.length) {
       const folder = getOrCreateDriveFolder_();
       attachments = files.map(function(f) {
@@ -6520,6 +6591,13 @@ function createBackend(services, env = {}) {
           previewUrl: up.previewUrl
         };
       });
+      uploadedAttachments = attachments.slice();
+      if (targetRow > 0) {
+        const oldCol=data[0].indexOf("Files");
+        const old=oldCol<0?[]:safeJsonParse_(data[targetRow-1][oldCol]||"[]",[]);
+        const references=(report.findings||[]).flatMap(function(f){return f.files||[];});
+        attachments=old.filter(function(a){return references.some(function(f){return (f.id && f.id===a.id) || (f.viewUrl && f.viewUrl===a.viewUrl);});}).concat(uploadedAttachments);
+      }
     } else if (targetRow > 0) {
       const headers = data[0];
       const filesCol = headers.indexOf("Files");
@@ -6546,7 +6624,7 @@ function createBackend(services, env = {}) {
       "Files": JSON.stringify(attachments),
       "Grouping Team": report.groupingTeam || "",
       "Waktu Patrol": report.waktuPatrol || "",
-      "Patrol Mode": report.patrolMode === true,
+      "Patrol Mode": report.patrolMode === true || String(report.patrolMode).toLowerCase() === "true" || (Array.isArray(report.findings) && report.findings.length > 0),
       "Checklist (JSON)": JSON.stringify(report.checklist || {}),
       "Counts (JSON)": JSON.stringify(report.counts || {}),
       "Score": report.score === void 0 || report.score === null ? "" : report.score,
@@ -6560,7 +6638,8 @@ function createBackend(services, env = {}) {
         findings.forEach(function(finding) {
           if (!Array.isArray(finding.files)) return;
           finding.files = finding.files.map(function(oldFile) {
-            var stable = attachments[cursor++];
+            if (oldFile && oldFile.viewUrl && !/^(blob:|data:)/.test(String(oldFile.viewUrl))) return oldFile;
+            var stable = uploadedAttachments[cursor++] || attachments.find(function(a) { return oldFile && oldFile.name && a.name === oldFile.name; });
             if (stable) return stable;
             if (oldFile && oldFile.viewUrl && String(oldFile.viewUrl).indexOf("blob:") !== 0) {
               return { name: oldFile.name || "lampiran", mimeType: oldFile.mimeType || "", type: oldFile.type || "", viewUrl: oldFile.viewUrl, previewUrl: oldFile.previewUrl || oldFile.viewUrl, thumbUrl: oldFile.thumbUrl || oldFile.viewUrl };
@@ -7921,10 +8000,11 @@ function createBackend(services, env = {}) {
         return !data[f] || String(data[f]).trim() === "";
       });
       if (missing.length) throw { code: "VALIDATION_ERROR", message: "Field wajib belum diisi: " + missing.join(", ") };
-      var usesSparepart = !!String(data.namaMaterial || data.materialNumberSAP || "").trim();
+      var materialDetails = validateTrainingMaterials_(data);
+      var usesSparepart = materialDetails.length > 0;
       var sh = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
       try {
-        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive"]);
+        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive", "Sparepart Detail (JSON)"]);
       } catch (e) {
       }
       try {
@@ -7959,6 +8039,7 @@ function createBackend(services, env = {}) {
       rowMap["Tindakan Perbaikan"] = data.tindakanPerbaikan || "";
       rowMap["Spare Part Digunakan"] = data.sparePart || "";
       rowMap["Nama Material"] = data.namaMaterial || data["Nama Material"] || "";
+      rowMap["Sparepart Detail (JSON)"] = JSON.stringify(materialDetails);
       rowMap["Material Number SAP"] = data.materialNumberSAP || data.materialNumber || data["Material Number SAP"] || "";
       rowMap["Nama Pelapor"] = data.namaPelapor || data.pelapor || data["Nama Pelapor"] || body.actor || "";
       var tambahanArr = data.personilTambahan || [];
@@ -7974,11 +8055,11 @@ function createBackend(services, env = {}) {
       rowMap["Jam Selesai"] = data.jamSelesai || "";
       rowMap["Downtime (menit)"] = data.downtime !== void 0 ? data.downtime : "";
       rowMap["Lampiran (JSON)"] = JSON.stringify(attachments);
-      rowMap["Catatan Tambahan"] = data.catatan || "";
+      rowMap["Catatan Tambahan"] = trainingValue_(data.catatan) || "-";
       rowMap["Grouping Pekerjaan"] = data.groupingPekerjaan || "";
       rowMap["Grouping Team"] = data.groupingTeam || "";
-      rowMap["Nomor Notifikasi Pekerjaan"] = data.nomorNotifikasi || "";
-      rowMap["Nama Unit"] = data.namaUnit || "";
+      rowMap["Nomor Notifikasi Pekerjaan"] = trainingValue_(data.nomorNotifikasi) || "-";
+      rowMap["Nama Unit"] = trainingValue_(data.namaUnit) || "-";
       rowMap["Status Sparepart"] = usesSparepart ? "PENDING" : "";
       rowMap["TransactionID"] = txId;
       rowMap["CreatedBy"] = body.actor || "";
@@ -7988,7 +8069,8 @@ function createBackend(services, env = {}) {
       });
       sh.appendRow(rowArr);
       invalidateCacheForSheet_(SHEET_LOGBOOK);
-      var res = { ok: true, id, transactionId: txId, attachments };
+      var newSpareparts = registerTrainingMaterials_(materialDetails, id);
+      var res = { ok: true, id, transactionId: txId, attachments, newSpareparts };
       return jsonOut_(res);
     } catch (e) {
       return handleError_(e);
@@ -8002,7 +8084,7 @@ function createBackend(services, env = {}) {
       if (!id) throw { code: "VALIDATION_ERROR", message: "ID wajib diisi untuk update" };
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
-      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy"]);
+      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)"]);
       var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
       var values = sh.getDataRange().getValues();
       var idCol = headers.indexOf("ID");
@@ -8023,7 +8105,8 @@ function createBackend(services, env = {}) {
         var c = headers.indexOf(h);
         return c === -1 ? "" : existingRow[c];
       }, "getExisting");
-      var usesSparepart = !!String(data.namaMaterial || data.materialNumberSAP || "").trim();
+      var materialDetails = validateTrainingMaterials_(data);
+      var usesSparepart = materialDetails.length > 0;
       var tambahanArr = data.personilTambahan || [];
       if (typeof tambahanArr === "string") tambahanArr = tambahanArr.split(",").map(function(s) {
         return s.trim();
@@ -8041,6 +8124,7 @@ function createBackend(services, env = {}) {
       rowMap["Tindakan Perbaikan"] = data.tindakanPerbaikan !== void 0 ? data.tindakanPerbaikan : getExisting("Tindakan Perbaikan");
       rowMap["Spare Part Digunakan"] = data.sparePart !== void 0 ? data.sparePart : getExisting("Spare Part Digunakan");
       rowMap["Nama Material"] = data.namaMaterial || data["Nama Material"] || getExisting("Nama Material");
+      rowMap["Sparepart Detail (JSON)"] = JSON.stringify(materialDetails);
       rowMap["Material Number SAP"] = data.materialNumberSAP || data.materialNumber || data["Material Number SAP"] || getExisting("Material Number SAP");
       rowMap["Nama Pelapor"] = namaPelapor;
       rowMap["Personil Tambahan"] = data.personilTambahanStr || (tambahanArr.length ? tambahanArr.join(", ") : void 0) || getExisting("Personil Tambahan");
@@ -8064,7 +8148,8 @@ function createBackend(services, env = {}) {
       });
       sh.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
       invalidateCacheForSheet_(SHEET_LOGBOOK);
-      return jsonOut_({ ok: true, id });
+      var newSpareparts=registerTrainingMaterials_(materialDetails,id);
+      return jsonOut_({ ok: true, id, newSpareparts });
     } catch (e) {
       return handleError_(e);
     }
@@ -10022,6 +10107,10 @@ var Application = class {
         response.headers.append("Set-Cookie", buildFileSessionCookie(request, backend, parsed.sessionToken));
       } else if (request.method === "POST" && parsed.ok && requestedAction === "logout") {
         response.headers.append("Set-Cookie", buildFileSessionCookie(request, backend, ""));
+      }
+      if (parsed.ok && requestedAction !== "logout" && requestedAction !== "login") {
+        const mediaToken = token || (parsedBody && parsedBody.sessionToken) || url.searchParams.get("sessionToken");
+        if (mediaToken) response.headers.append("Set-Cookie", buildFileSessionCookie(request, backend, mediaToken));
       }
       return response;
     } catch (e) {
