@@ -26095,7 +26095,9 @@ if(typeof window.goToView === 'function' && !window.goToView.__sidebarWrapped){
   window.goToView = wrappedGoToView;
 } else {
   const navObserver = new MutationObserver(()=> collapseInactiveNavGroups());
-  document.querySelectorAll('.nav-btn[data-view], .nav-parent-btn').forEach(el=>{
+  // Parent class changes are manual submenu toggles, not page navigation.
+  // Observing them immediately collapses every inactive group again.
+  document.querySelectorAll('.nav-btn[data-view]').forEach(el=>{
     navObserver.observe(el, { attributes:true, attributeFilter:['class'] });
   });
 }

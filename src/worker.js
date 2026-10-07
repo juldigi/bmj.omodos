@@ -4747,7 +4747,7 @@ function createBackend(services, env = {}) {
     invalidateCacheForSheet_(SHEET_SPAREPART_LOKASI); return added;
   }
   function applyTrainingMasterCorrections_() {
-    const props=PropertiesService.getScriptProperties(), key="TRAINING_FIX_20261007_V1";
+    const props=PropertiesService.getScriptProperties(), key="TRAINING_FIX_20261007_V2";
     if(props.getProperty(key)==="1") return;
     const sh=getOrCreateSheet_(SHEET_MESIN,MESIN_HEADERS), values=sh.getDataRange().getValues(), headers=values[0];
     const ci=headers.indexOf("Kode Mesin"),ni=headers.indexOf("Nama Mesin");
@@ -4756,7 +4756,13 @@ function createBackend(services, env = {}) {
     const counts={}; values.slice(1).forEach(function(r){const c=trainingValue_(r[ci]);if(c)counts[c]=(counts[c]||0)+1;});
     for(let i=1;i<values.length;i++){
       const row=values[i], code=trainingValue_(row[ci]), name=String(row[ni]||"").trim();
-      if(/^plt[-\s]*1$/i.test(code) && /pile\s*turner\s*2/i.test(name)) row[ni]=name.replace(/(pile\s*turner\s*)2/i,function(_,prefix){return prefix+"1";});
+      if(/^plt[-\s]*1$/i.test(code) && /pile\s*turner\s*[-#.]?\s*2\b/i.test(name)){
+        const hasTurner1=values.slice(1).some(function(r){return r!==row && /pile\s*turner\s*[-#.]?\s*1\b/i.test(String(r[ni]||""));});
+        // Production has distinct Turner #1 and #2 sharing PLT-1.
+        // Keep both machines; correct #2's code rather than renaming it to #1.
+        if(hasTurner1 && !used.has("PLT-2")){row[ci]="PLT-2";used.add("PLT-2");}
+        else if(!hasTurner1) row[ni]=name.replace(/(pile\s*turner\s*[-#.]?\s*)2\b/i,function(_,prefix){return prefix+"1";});
+      }
       const utility=name.match(/^(AHU|Compressor)\s*[-#.]?\s*(\d+)\b/i);
       if(utility && (!code || counts[code]>1)){
         let desired=utility[1].toUpperCase()+"-"+utility[2];
