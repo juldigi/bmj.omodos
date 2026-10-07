@@ -19792,7 +19792,7 @@ function renderPatrolFindingsInputList(){
       <button type="button" class="btn btn-sm patrol-temuan-append-files" data-i="${i}" style="margin-top:8px;">Tambahkan Foto Pilihan ke Temuan Ini</button>
     </div>`).join('');
   bindAttachGridClicks(holder);
-  $('.patrol-temuan-append-files', holder).forEach(btn=>{
+  $$('.patrol-temuan-append-files', holder).forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!PATROL_FINDING_FILES.length){ toast('Pilih foto/video pada bagian Foto / Video terlebih dahulu.', true); return; }
       const finding = PATROL_STATE.findings[Number(btn.dataset.i)];
