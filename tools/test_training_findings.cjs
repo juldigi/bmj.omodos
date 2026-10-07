@@ -39,6 +39,12 @@ assert(rows.some(r=>r[1]==='AHU 9'));assert(rows.some(r=>r[1]==='AHU 10'));
 assert.equal(rows.filter(r=>/offset.*10/i.test(r[1])).length,1);
 assert.equal(sheets.get('personil').rows[1][0],'Fatkhurosidi');assert.equal(sheets.get('personil').rows[2][0],'Other Technician');
 const count=rows.length;ctx.applyTrainingMasterCorrections_();assert.equal(sheets.get('machines').rows.length,count);
+// Reproduce production's duplicate code and hash-formatted names, even after V1.
+props.delete('TRAINING_FIX_20261007_V2');props.set('TRAINING_FIX_20261007_V1','1');
+sheets.set('machines',new Sheet([headers,['PLT-1','Pile Turner #1'],['PLT-1','Pile Turner #2'],['PLT-3','Pile Turner #3']]));
+ctx.applyTrainingMasterCorrections_();
+assert.equal(sheets.get('machines').rows.find(r=>r[1]==='Pile Turner #1')[0],'PLT-1');
+assert.equal(sheets.get('machines').rows.find(r=>r[1]==='Pile Turner #2')[0],'PLT-2');
 const front={console,Number,JSON,Array,SPAREPART_ROWS:[{nama:'Seal',sap:'',jumlah:''}],syncSparepartRowsFromDom:()=>{},findSparepartLokasiBySap:()=>null,PM_REPORTS:[{id:'PM-1',patrolMode:false,tanggal:'2026-10-07',findings:[{id:'F-1',deskripsi:'Simulasi'}]}],parseAttachments:x=>x};
 vm.createContext(front);
 vm.runInContext(block(html,'function norm_(s){','function buildMachineIndex_'),front);

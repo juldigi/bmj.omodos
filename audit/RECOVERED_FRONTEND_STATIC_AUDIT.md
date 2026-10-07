@@ -1,9 +1,9 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-07T11:44:39.630736+00:00
-- File bytes: 1650967
-- Lines: 28749
-- SHA-256: dfd4fcf5f2c32b8f222fa9088be214d3d542f52c9a8b8783258a83acb7626ce5
+- Audited UTC: 2026-10-07T12:15:52.376981+00:00
+- File bytes: 1651095
+- Lines: 28751
+- SHA-256: 38f3d4eba6d43eb9e8a0e011ea5cd383c49c66b6698e5775ca659df6e6a1e75f
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
@@ -75,8 +75,8 @@
 - L20371: const rep = loadRcaReportsLocal().find(r=>r.id===card.dataset.id);
 - L23951: return (list||[]).find(item=> piNamesMatch(getter(item), nama)) || null;
 - L24229: const ef = expertFinderStats(ENTRIES).find(r=>r.nama===nama) || { total:0, selesai:0, breakdown:0, mesinCount:0, successRate:0, tahunPengalaman:0, score:0 };
-- L26857: const item = id ? (PMC_STATE.data[type]||[]).find(x=>x.ID===id) : null;
-- L27042: return (PMC_STATE.data[PMC_DETAIL.type]||[]).find(x=>x.ID===PMC_DETAIL.id);
+- L26859: const item = id ? (PMC_STATE.data[type]||[]).find(x=>x.ID===id) : null;
+- L27044: return (PMC_STATE.data[PMC_DETAIL.type]||[]).find(x=>x.ID===PMC_DETAIL.id);
 ### ).map( — 151 match(es)
 - L6898: const dateRows = (res.dateFixSample||[]).map(x=> `<tr><td>${escapeHtml(String(x.id))}</td><td>${escapeHtml(x.oldValue)}</td><td>→ ${escapeHtml(x.newValue)}</td></tr>`).join('');
 - L6899: const jenisRows = (res.jenisFixSample||[]).map(x=> `<tr><td>${escapeHtml(String(x.id))}</td><td>${escapeHtml(x.oldDeskripsi)}</td><td>→ Jenis Pekerjaan: ${escapeHtml(x.newJenis)}</td></tr>`).join('');
@@ -206,21 +206,21 @@
 - L25458: if(typeof _origSwitchToView === 'function'){
 - L25459: window.switchToView = function(enteringView){
 - L25460: const result = _origSwitchToView.apply(this, arguments);
-- L28196: const origSwitchToView = window.switchToView;
-- L28197: window.switchToView = function(view){
-- L28198: const result = typeof origSwitchToView==='function' ? origSwitchToView(view) : false;
+- L28198: const origSwitchToView = window.switchToView;
+- L28199: window.switchToView = function(view){
+- L28200: const result = typeof origSwitchToView==='function' ? origSwitchToView(view) : false;
 
 ## OMODOS 4 RBAC
 ### omodos4.view — 3 match(es)
 - L6474: if(!discovered.some(f=>f.PermissionKey==='omodos4.view')){
 - L6475: discovered.push({PermissionKey:'omodos4.view',Label:'OMODOS 4.0 (Superadmin Root)',Group:'OMODOS 4.0'});
-- L28589: const V4_PERMISSION_ROOT = 'omodos4.view';
+- L28591: const V4_PERMISSION_ROOT = 'omodos4.view';
 ### OMODOS 4.0 — 6 match(es)
 - L3415: <button class="nav-parent-btn" data-group="omodos4"><span class="ico"><i class="ph-bold ph-cpu"></i></span> OMODOS 4.0 <span class="v4-badge">SUPERADMIN</span> <span class="chev"><i class="ph-bold ph-caret-down"></i></span></button>
 - L4205: <h1 style="margin-top:4px;">OMODOS 4.0</h1>
 - L8422: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L23127: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
-- L28744: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
+- L28746: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
 ### Superadmin — 45 match(es)
 - L4206: <div class="sub">Command Center Superadmin yang membaca data existing tanpa membuat duplikasi sumber data.</div>
 - L5427: <div class="setting-tab-empty" id="rbac-empty-hint" style="display:none;">Memuat data user... Jika tetap kosong, pastikan kamu login sebagai Superadmin.</div>
@@ -255,16 +255,16 @@
 - L25596: dengan RBAC yang sudah ada, jadi Superadmin bisa mengatur DUA hal
 - L25619: if(CURRENT_USER.role === 'Superadmin') return false; // Superadmin selalu full, sama seperti RBAC akses biasa
 - L25746: // diatur Superadmin) gagal tersimpan. Kegagalan utama di atas sudah
-- L26358: sampai Superadmin menyimpannya secara eksplisit. Mapping role yang
-- L26393: // sekali), beri penanda visual kecil "Baru" supaya Superadmin sadar ini
-- L28090: // ternyata tidak diizinkan (mis. baru diubah Superadmin), otomatis
-- L28129: // restore sesi, dan setiap kali Superadmin menyimpan perubahan Role
-- L28591: function v4IsSuperadmin(){
-- L28593: return typeof isSuperadmin === 'function'
-- L28594: ? isSuperadmin()
-- L28595: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
-- L28693: if(!v4IsSuperadmin()){
-- L28738: isAllowed:v4IsSuperadmin,
+- L26360: sampai Superadmin menyimpannya secara eksplisit. Mapping role yang
+- L26395: // sekali), beri penanda visual kecil "Baru" supaya Superadmin sadar ini
+- L28092: // ternyata tidak diizinkan (mis. baru diubah Superadmin), otomatis
+- L28131: // restore sesi, dan setiap kali Superadmin menyimpan perubahan Role
+- L28593: function v4IsSuperadmin(){
+- L28595: return typeof isSuperadmin === 'function'
+- L28596: ? isSuperadmin()
+- L28597: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
+- L28695: if(!v4IsSuperadmin()){
+- L28740: isAllowed:v4IsSuperadmin,
 
 ## Copilot & Bantuan
 ### Copilot — 367 match(es)
@@ -324,8 +324,8 @@
 - L23132: return helpMap[view] || {title:'Bantuan Halaman',steps:[
 - L23152: <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
 - L24357: <div class="sub" style="margin-top:10px;">Rekomendasi dihasilkan 100% lokal dari data Logbook, Hard Skill/Soft Skill Assessment, Kaizen/Project Improvement, dan Meeting Action Item yang sudah tersimpan di aplikasi ini (tanpa API/LLM eksternal) — gunakan sebagai bantuan pengambilan keputusan, tetap verifikasi di lapangan.</div>
-- L28353: /* BANTUAN_PAGE_CARD_REMOVAL_V1 */
-- L28394: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
+- L28355: /* BANTUAN_PAGE_CARD_REMOVAL_V1 */
+- L28396: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
 
 ## Machine status
 ### machineStatus — 7 match(es)
@@ -351,7 +351,7 @@
 - L23099: dashboard:{title:'Home & Status Mesin',steps:[
 - L23100: 'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
 - L25327: dashboard:'Semua staf shift, untuk memantau status mesin secara real-time',
-- L28616: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
+- L28618: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
 ### latestLogbook — 2 match(es)
 - L16398: function latestLogbookForMachine_(machine){
 - L19307: const log=latestLogbookForMachine_(machine), patrol=latestPatrolForMachine_(machine);
