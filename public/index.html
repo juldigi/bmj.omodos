@@ -9079,6 +9079,9 @@ function handleAttachImgError(img){
 }
 function renderAttachGrid(atts, label){
   if(!atts || !atts.length) return '';
+  // Prefer an authenticated recovered copy while retaining the original Drive reference in storage.
+  atts = atts.filter(a=> !(/drive\.google\.com/.test(String(a.viewUrl||a.thumbUrl||'')) && atts.some(b=>b!==a && b.name===a.name && /^\/files\//.test(String(b.viewUrl||'')))));
+
   return `<div class="section-title" style="margin-top:16px;"><i class="ph-bold ph-paperclip"></i> ${label || 'Lampiran'} (${atts.length}) <span style="font-size:11px;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">— klik untuk memperbesar</span></div>
     <div class="attach-grid">${atts.map(renderAttachThumb).join('')}</div>`;
 }
