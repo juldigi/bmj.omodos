@@ -19789,8 +19789,21 @@ function renderPatrolFindingsInputList(){
       </div>
       <div style="font-size:13px;margin-top:4px;">${escapeHtml(f.deskripsi||'-')}</div>
       ${renderAttachGrid(f.files||[], 'Lampiran')}
+      <button type="button" class="btn btn-sm patrol-temuan-append-files" data-i="${i}" style="margin-top:8px;">Tambahkan Foto Pilihan ke Temuan Ini</button>
     </div>`).join('');
   bindAttachGridClicks(holder);
+  $('.patrol-temuan-append-files', holder).forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!PATROL_FINDING_FILES.length){ toast('Pilih foto/video pada bagian Foto / Video terlebih dahulu.', true); return; }
+      const finding = PATROL_STATE.findings[Number(btn.dataset.i)];
+      if(!finding) return;
+      finding.files = (finding.files||[]).concat(PATROL_FINDING_FILES.map(f=>({ name:f.name, type:f._isVideo?'video':'image', viewUrl:f._localUrl, base64:f.base64, mimeType:f.mimeType })));
+      PATROL_FINDING_FILES = [];
+      $('#patrol-temuan-file-preview').innerHTML = '';
+      renderPatrolFindingsInputList();
+      toast('Foto ditambahkan ke temuan yang sama. Tekan Simpan Patrol.');
+    });
+  });
   $$('.patrol-temuan-remove', holder).forEach(btn=>{
     btn.addEventListener('click', ()=>{ PATROL_STATE.findings.splice(Number(btn.dataset.i),1); renderPatrolFindingsInputList(); });
   });
@@ -19979,7 +19992,7 @@ function renderPatrolRiwayatList(){
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;">
         <div>
           <b>${escapeHtml(r.namaMesin||'-')}</b> <span style="color:var(--text-dim);">(${escapeHtml(r.kodeMesin||'-')})</span>
-          <div class="sub" style="margin-top:2px;">${escapeHtml(r.tanggal||'-')} · Petugas: ${escapeHtml(r.petugas||'-')}</div>
+          <div class="sub" style="margin-top:2px;">${escapeHtml(r.tanggal||'-')} · Petugas: ${escapeHtml(splitPelaporNames(r.petugas).join(', ')||'-')}</div>
         </div>
         <div style="text-align:right;display:flex;align-items:center;gap:10px;">
           <div>
@@ -20073,7 +20086,7 @@ function openPatrolSessionDetail(reportId){
     </div>
     <div class="detail-row"><div class="k">Tanggal</div><div class="v">${escapeHtml(r.tanggal||'-')} · ${escapeHtml(r.waktuPatrol||'-')}</div></div>
     <div class="detail-row"><div class="k">Shift</div><div class="v">${escapeHtml(r.shift||'-')}</div></div>
-    <div class="detail-row"><div class="k">Petugas</div><div class="v">${escapeHtml(r.petugas||'-')}</div></div>
+    <div class="detail-row"><div class="k">Petugas</div><div class="v">${escapeHtml(splitPelaporNames(r.petugas).join(', ')||'-')}</div></div>
     ${r.groupingTeam ? `<div class="detail-row"><div class="k">Grouping Team</div><div class="v">${escapeHtml(r.groupingTeam)}</div></div>` : ''}
     <div class="detail-row"><div class="k">Machine Condition Score</div><div class="v" style="color:${scoreColor};font-weight:700;">${score}/100 (${escapeHtml(r.severity||'-')})</div></div>
     <div class="section-title" style="margin-top:16px;"><i class="ph-bold ph-list-checks"></i> Hasil Checklist</div>
