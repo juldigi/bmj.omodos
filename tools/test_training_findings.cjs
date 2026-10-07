@@ -51,6 +51,10 @@ const findings=[{files:[{name:'old.jpg',viewUrl:'/files/old'},{name:'new.jpg',vi
 const hydrated=front.hydratePatrolFindingFiles_(findings,[{name:'new.jpg',viewUrl:'/files/new'}]);
 assert.equal(hydrated[0].files[0].viewUrl,'/files/old');assert.equal(hydrated[0].files[1].viewUrl,'/files/new');
 assert(html.includes("credentials: 'same-origin'"));
+assert(html.trimEnd().endsWith('</html>'));
+for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) new vm.Script(match[1]);
+assert(html.includes('/omodos4/hotfix.js'));
+assert(worker.includes('sheetName === SHEET_SPAREPART_LOKASI && !!trainingValue_'));
 assert(!html.includes("'Progress':'Perkembangan'"));
 assert(html.includes("$('#btn-wiki-back').disabled = !WIKI_CURRENT"));
 assert(html.includes('#dash-grid .dc-name,#dash-grid .dc-status{display:block!important'));

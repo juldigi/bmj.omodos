@@ -4687,7 +4687,7 @@ function createBackend(services, env = {}) {
     if (!data.length) return [];
     const hdr = data.shift();
     const rows = data.filter(function(r) {
-      return r[0] !== "";
+      return r[0] !== "" || (sheetName === SHEET_SPAREPART_LOKASI && !!trainingValue_(r[hdr.indexOf("Nama Material")]));
     }).map(function(r) {
       return rowToObj_(hdr, r);
     }).filter(function(o) {
@@ -4726,6 +4726,7 @@ function createBackend(services, env = {}) {
         return {nama:match ? match[1].trim() : name,sap:trainingValue_(codes[i]),jumlah:match ? match[2].replace(",",".") : data.jumlahMaterial};
       });
     }
+    if (Array.isArray(data.sparepartDetail) && !details.length && trainingValue_(data.namaMaterial || data.materialNumberSAP)) throw {code:"VALIDATION_ERROR",message:"Detail dan jumlah sparepart wajib diisi."};
     return details.filter(function(r){ return trainingValue_(r.nama)||trainingValue_(r.sap)||trainingValue_(r.jumlah); }).map(function(r,i){
       var qty=Number(r.jumlah ?? r.qty);
       if (!Number.isFinite(qty) || qty<=0) throw {code:"VALIDATION_ERROR",message:"Jumlah sparepart baris "+(i+1)+" wajib diisi dengan angka lebih dari 0."};
@@ -8105,7 +8106,13 @@ function createBackend(services, env = {}) {
         var c = headers.indexOf(h);
         return c === -1 ? "" : existingRow[c];
       }, "getExisting");
-      var materialDetails = validateTrainingMaterials_(data);
+      var materialInput = data;
+      if (data.sparepartDetail === void 0 && data.namaMaterial === void 0 && data.materialNumberSAP === void 0 && data["Nama Material"] === void 0 && data["Material Number SAP"] === void 0) {
+        var persistedDetails = safeJsonParse_(getExisting("Sparepart Detail (JSON)"),null);
+        materialInput = {namaMaterial:getExisting("Nama Material"),materialNumberSAP:getExisting("Material Number SAP")};
+        if(Array.isArray(persistedDetails)) materialInput.sparepartDetail=persistedDetails;
+      }
+      var materialDetails = validateTrainingMaterials_(materialInput);
       var usesSparepart = materialDetails.length > 0;
       var tambahanArr = data.personilTambahan || [];
       if (typeof tambahanArr === "string") tambahanArr = tambahanArr.split(",").map(function(s) {

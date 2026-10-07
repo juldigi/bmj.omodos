@@ -14,4 +14,5 @@ jobs:
           node-version: '22'
       - run: node --check src/worker.js
       - run: node tools/test_training_findings.cjs
+      - run: node tools/test_training_storage.cjs
       - run: node tools/test_offset_ways.cjs
