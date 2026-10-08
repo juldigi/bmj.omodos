@@ -25953,7 +25953,7 @@ function homeSmartResumeDetailData(kind,recent){
   rows=recent.filter(anIsBreakdown).map(e=>{const m=parseDurationMinutes(e)||0;return [e['Tanggal'],e['Nama Mesin']||e['Kode Mesin'],m,'Rp '+Math.round(m/60*rate).toLocaleString('id-ID')];});
  }else if(kind==='new'){
   period='Seluruh sparepart baru yang perlu dilengkapi di Master Sparepart';
-  headers=['Nama Sparepart','SAP','Lokasi'];rows=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview).map(r=>[r.nama,r.sap,r.lokasi]);
+  headers=['Nama Sparepart','SAP','Lokasi'];rows=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview).map(r=>[r.nama,r.sap,r.lokasiGudang]);
  }else if(kind==='usage'){
   headers=['Tanggal','Mesin','Material','Jumlah'];rows=recent.filter(e=>parseSparepartDetail(e).length>0).map(e=>[e['Tanggal'],e['Nama Mesin']||e['Kode Mesin'],e['Nama Material'],sparepartEntryTotalQty(e)]);
  }else if(kind==='po'){
