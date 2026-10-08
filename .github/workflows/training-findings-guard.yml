@@ -16,5 +16,6 @@ jobs:
       - run: node tools/test_training_findings.cjs
       - run: node tools/test_smart_resume.cjs
       - run: node tools/test_training_storage.cjs
+      - run: node tools/test_patrol_revisions.cjs
       - run: node tools/test_work_areas.cjs
       - run: node tools/test_offset_ways.cjs
