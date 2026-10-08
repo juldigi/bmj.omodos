@@ -2084,6 +2084,13 @@ input[type="number"]{-moz-appearance:textfield;}
 [hidden]{display:none!important;}
 /* Keep conditional work-location fields hidden in simple and single-column layouts. */
 #entry-machine-fields[hidden],#entry-area-fields[hidden],#edit-area-category-wrap[hidden],#edit-area-name-wrap[hidden],#entry-view-mode [data-edit-wrap][hidden]{display:none!important;}
+
+.patrol-personil-row{display:flex;align-items:flex-end;gap:10px;margin:8px 0;}
+.patrol-personil-row .field{flex:1;min-width:0;margin:0;}
+#patrol-checklist-groups .patrol-checklist-category{margin:24px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);}
+#patrol-checklist-groups .patrol-category-heading{margin:0 0 14px;padding:10px 12px;font-family:var(--font-display);font-size:18px;font-weight:800;line-height:1.4;color:var(--text);background:var(--panel-2);border-left:4px solid var(--red);border-radius:6px;}
+@media(max-width:600px){#patrol-checklist-groups .patrol-checklist-category{padding:10px;margin:20px 0;}#patrol-checklist-groups .patrol-category-heading{font-size:17px;}}
+
 .hsr-stats{display:flex;flex-wrap:wrap;gap:6px;}
 .hsr-stat{
   display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;
@@ -3895,13 +3902,15 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
                 <option>A</option><option>B</option><option>C</option><option>D</option><option>Non-Shift</option>
               </select>
             </div>
-            <div class="field"><label>Nama Pelapor / Petugas Patrol</label>
+            <div class="field"><label>Personil Patrol Utama</label>
               <select id="patrol-nama-pelapor" required>
                 <option value="">Pilih personil...</option>
               </select>
             </div>
           </div>
 
+          <div id="patrol-additional-personil"></div>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-patrol-add-personil" style="margin-bottom:18px;"><i class="ph-bold ph-user-plus"></i> Tambah Personil Patrol</button>
           <div class="sub" style="margin-bottom:6px;">Pilih status tiap poin: Normal / Warning / Abnormal / N/A.</div>
           <div id="patrol-checklist-groups"></div>
           <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
@@ -3943,7 +3952,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
               </div>
               <div class="file-preview-row" id="patrol-temuan-file-preview"></div>
               <div class="field"><label>Deskripsi Temuan</label><textarea id="patrol-temuan-deskripsi" rows="2" placeholder="Jelaskan temuan secara singkat..."></textarea></div>
-              <button type="button" class="btn btn-sm" id="btn-patrol-add-temuan"><i class="ph-bold ph-plus"></i> Tambahkan ke Daftar Temuan</button>
+              <button type="button" class="btn btn-sm btn-primary" id="btn-patrol-add-temuan"><i class="ph-bold ph-plus"></i> Tambahkan ke Daftar Temuan</button>
             </div>
           </div>
 
@@ -7752,6 +7761,7 @@ function restoreFormEntryDraft(){
         ADDITIONAL_PERSONIL_ID = Math.max(0, ...ADDITIONAL_PERSONIL_ROWS.map(r=>r.id||0));
       }
       if(typeof renderAdditionalPersonil==='function') renderAdditionalPersonil();
+  if(typeof renderPatrolAdditionalPersonil_==='function') renderPatrolAdditionalPersonil_();
     }
     if(typeof computeEstimasi === 'function') computeEstimasi();
   }finally{
@@ -19588,6 +19598,47 @@ let PATROL_ACTIVE_TAB = 'mulai';
 let PATROL_STATE = { id:null, kodeMesin:'', namaMesin:'', checklist:{}, findings:[] };
 let PATROL_FINDING_FILES = []; // {name, mimeType, base64, _localUrl, _isVideo} — sama seperti PENDING_FILES di Input Logbook
 
+
+let PATROL_ADDITIONAL_PERSONIL = [];
+function renderPatrolAdditionalPersonil_(){
+ const holder=$('#patrol-additional-personil');if(!holder)return;
+ const primary=$('#patrol-nama-pelapor');
+ holder.innerHTML=PATROL_ADDITIONAL_PERSONIL.map((name,i)=>{
+  const names=[...primary.options].map(o=>o.value).filter(Boolean);
+  if(name&&!names.includes(name))names.push(name);
+  return `<div class="patrol-personil-row"><div class="field"><label for="patrol-personil-${i}">Personil Tambahan ${i+1}</label><select id="patrol-personil-${i}" data-patrol-personil="${i}"><option value="">Pilih personil...</option>${names.map(n=>'<option value="'+escapeHtml(n)+'" '+(n===name?'selected':'')+'>'+escapeHtml(n)+'</option>').join('')}</select></div><button type="button" class="btn btn-sm btn-ghost" data-remove-patrol-personil="${i}" aria-label="Hapus personil tambahan ${i+1}">Hapus</button></div>`;
+ }).join('');
+ holder.querySelectorAll('[data-patrol-personil]').forEach(el=>el.addEventListener('change',()=>{PATROL_ADDITIONAL_PERSONIL[Number(el.dataset.patrolPersonil)]=el.value;}));
+ holder.querySelectorAll('[data-remove-patrol-personil]').forEach(el=>el.addEventListener('click',()=>{PATROL_ADDITIONAL_PERSONIL.splice(Number(el.dataset.removePatrolPersonil),1);renderPatrolAdditionalPersonil_();}));
+}
+function patrolPersonilNames_(){
+ const names=[$('#patrol-nama-pelapor').value,...PATROL_ADDITIONAL_PERSONIL].map(n=>String(n||'').trim());
+ if(names.some(n=>!n))throw new Error('Pilih seluruh personil patrol atau hapus baris personil tambahan yang kosong.');
+ if(new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw new Error('Personil patrol yang sama tidak boleh dipilih lebih dari sekali.');
+ return names;
+}
+function patrolSetPersonil_(value){
+ const names=splitPelaporNames(value).filter(n=>n!=='Tanpa Nama'),primary=$('#patrol-nama-pelapor');
+ if(names[0]&&![...primary.options].some(o=>o.value===names[0])){
+  const o=document.createElement('option');o.value=names[0];o.textContent=names[0];primary.appendChild(o);
+ }
+ primary.value=names[0]||'';PATROL_ADDITIONAL_PERSONIL=names.slice(1);renderPatrolAdditionalPersonil_();
+}
+function patrolHasUnaddedFinding_(){
+ return !!$('#patrol-temuan-deskripsi').value.trim() || PATROL_FINDING_FILES.length>0;
+}
+function patrolRequireAddedFindings_(){
+ const yes=document.querySelector('[data-ada-temuan="ya"].active');
+ if(patrolHasUnaddedFinding_() || (yes&&!PATROL_STATE.findings.length)){
+  document.querySelector('[data-ada-temuan="ya"]').click();
+  toast(patrolHasUnaddedFinding_()?'Temuan belum masuk ke daftar. Klik “Tambahkan ke Daftar Temuan” sebelum menyimpan Patrol.':'Isi dan tambahkan temuan ke daftar sebelum menyimpan Patrol.',true);
+  const target=patrolHasUnaddedFinding_()?$('#btn-patrol-add-temuan'):$('#patrol-temuan-deskripsi');
+  target.scrollIntoView({behavior:'smooth',block:'center'});target.focus();return false;
+ }
+ return true;
+}
+$('#btn-patrol-add-personil').addEventListener('click',()=>{PATROL_ADDITIONAL_PERSONIL.push('');renderPatrolAdditionalPersonil_();});
+
 function Utilities_todayStr(){
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -19613,6 +19664,10 @@ function patrolResetWizard(){
   $('#patrol-shift').selectedIndex = 0;
   $('#patrol-grouping-team').selectedIndex = 0;
   $('#patrol-nama-pelapor').value = '';
+  PATROL_ADDITIONAL_PERSONIL=[];renderPatrolAdditionalPersonil_();
+  $('#patrol-temuan-deskripsi').value='';
+  $('#patrol-temuan-file-preview').innerHTML='';
+  renderPatrolFindingsInputList();
   renderPatrolMachineGrid();
 }
 
@@ -19682,7 +19737,8 @@ function renderPatrolChecklist(){
 
   function renderGroup(kategori, items){
     return `
-    <div class="section-title" style="margin-top:14px;">${escapeHtml(kategori)}</div>
+    <section class="patrol-checklist-category" aria-label="${escapeHtml(kategori)}">
+    <h3 class="patrol-category-heading">${escapeHtml(kategori)}</h3>
     <div>
       ${items.map((item,i)=>{
         const cur = (PATROL_STATE.checklist[kategori] && PATROL_STATE.checklist[kategori][i]) || '';
@@ -19694,7 +19750,7 @@ function renderPatrolChecklist(){
           </div>
         </div>`;
       }).join('')}
-    </div>`;
+    </div></section>`;
   }
 
   const specificKeys = Object.keys(specificDef);
@@ -19917,10 +19973,13 @@ $('#btn-patrol-save').addEventListener('click', async ()=>{
   const waktu = $('#patrol-waktu').value;
   const shift = $('#patrol-shift').value;
   const groupingTeam = $('#patrol-grouping-team').value;
-  const namaPelapor = $('#patrol-nama-pelapor').value;
+  let personil;
+  try{personil=patrolPersonilNames_();}catch(err){toast(err.message,true);return;}
+  const namaPelapor = personil.join(' / ');
   if(!tanggal){ toast('Tanggal patrol wajib diisi.', true); return; }
   if(!waktu){ toast('Waktu patrol wajib diisi.', true); return; }
   if(!namaPelapor){ toast('Pilih Nama Pelapor / Petugas Patrol terlebih dahulu.', true); return; }
+  if(!patrolRequireAddedFindings_())return;
   const c = patrolCounts();
   const score = patrolScore(c);
   const severity = patrolOverallSeverity(c);
@@ -20211,7 +20270,8 @@ function patrolLoadSessionForEdit(reportId){
   $('#patrol-waktu').value = r.waktuPatrol || Utilities_nowTimeStr();
   if($('#patrol-shift')) $('#patrol-shift').value = r.shift || '';
   if($('#patrol-grouping-team')) $('#patrol-grouping-team').value = r.groupingTeam || '';
-  if($('#patrol-nama-pelapor')) $('#patrol-nama-pelapor').value = r.petugas || '';
+  patrolSetPersonil_(r.petugas||'');
+  $('#patrol-temuan-deskripsi').value='';PATROL_FINDING_FILES=[];renderPatrolFindingFilePreviews();
   // Langsung ke Langkah 2 (checklist), mesin sudah terkunci sesuai sesi lama
   $('#patrol-step-1').style.display = 'none';
   $('#patrol-step-2').style.display = '';

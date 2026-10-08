@@ -1370,6 +1370,43 @@ jobs:
             result.areaFormQA=areaFormQA;
             result.phases.push('area-work-logbook-mobile');
 
+
+            console.log('[QA] patrol team and unadded finding protection');
+            const patrolRevisions=await page.evaluate(async()=>{
+              const oldPersist=persistPmReport,calls=[];
+              try{
+                const primary=document.getElementById('patrol-nama-pelapor');
+                for(const name of ['QA Person A','QA Person B','QA Person C'])if(![...primary.options].some(o=>o.value===name)){const o=document.createElement('option');o.value=name;o.textContent=name;primary.appendChild(o);}
+                patrolSetPersonil_('QA Person A / QA Person B / QA Person C');
+                if(document.querySelectorAll('[data-patrol-personil]').length!==2)throw new Error('Additional personnel missing');
+                PATROL_STATE={id:null,kodeMesin:'AHU-1',namaMesin:'AHU 1',checklist:{Mekanikal:{0:'normal'}},findings:[]};
+                document.getElementById('patrol-tanggal').value='2026-10-08';document.getElementById('patrol-waktu').value='13:00';
+                document.getElementById('patrol-shift').value='Shift 2';
+                document.querySelector('[data-ada-temuan="ya"]').click();
+                document.getElementById('patrol-temuan-deskripsi').value='QA unfinished finding';
+                PATROL_FINDING_FILES=[{name:'qa-team.jpg',mimeType:'image/jpeg',base64:'AQID',_localUrl:'blob:qa-team'}];
+                persistPmReport=async(report,files)=>{calls.push(JSON.parse(JSON.stringify({report,files})));return {synced:true};};
+                document.getElementById('btn-patrol-save').click();
+                await new Promise(r=>setTimeout(r,20));
+                if(calls.length||PATROL_STATE.findings.length)throw new Error('Unadded finding was silently saved');
+                if(!document.getElementById('patrol-temuan-deskripsi').value||PATROL_FINDING_FILES.length!==1)throw new Error('Draft finding lost');
+                document.getElementById('btn-patrol-add-temuan').click();
+                if(PATROL_STATE.findings.length!==1)throw new Error('Add finding failed');
+                document.getElementById('btn-patrol-save').click();
+                for(let i=0;i<50&&!calls.length;i++)await new Promise(r=>setTimeout(r,10));
+                if(calls.length!==1||calls[0].report.petugas!=='QA Person A / QA Person B / QA Person C'||calls[0].report.findings.length!==1||calls[0].files.length!==1)throw new Error('Team Patrol save lost personnel/finding/photo');
+                patrolSetPersonil_(calls[0].report.petugas);
+                if(patrolPersonilNames_().length!==3)throw new Error('Edit team restoration failed');
+                renderPatrolChecklist();
+                const headings=[...document.querySelectorAll('.patrol-category-heading')];
+                const clearCategories=headings.length>1&&headings.every(h=>parseFloat(getComputedStyle(h).fontSize)>=17&&parseFloat(getComputedStyle(h.parentElement).marginTop)>=20);
+                if(!clearCategories)throw new Error('Patrol category headings too small or crowded');
+                return {team:3,unaddedBlocked:true,findingSaved:true,photoSaved:true,editTeam:true,clearCategories};
+              }finally{persistPmReport=oldPersist;patrolResetWizard();}
+            });
+            result.patrolRevisions=patrolRevisions;
+            result.phases.push('patrol-team-pending-finding');
+
             const relevantErrors = errors.filter(x =>
               !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError/i.test(x)
             );

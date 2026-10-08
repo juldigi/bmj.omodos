@@ -47,6 +47,8 @@ const {DatabaseSync}=require('node:sqlite');
   delete updateArea.lokasiPekerjaan;delete updateArea.kategoriArea;delete updateArea.namaArea;
   assert.equal(result(b.updateEntry_({entry:updateArea})).ok,true);
 
+  const teamReport={id:'PM-multi-personil',tanggal:'2026-10-08',shift:'Shift 2',petugas:'Person A / Person B / Person C',patrolMode:true,checklist:{Mekanikal:{0:'normal'}},findings:[{id:'F-multi',deskripsi:'Team finding',status:'Open'}]};
+  assert.equal(result(b.savePredictiveReport_(teamReport,[])).ok,true);
   store.commit();
   const second=createStorage(sql,{},'https://omodos.juldigi.workers.dev');const b2=createBackend(second.services).trainingTest;
   assert.equal(b2.getMachinesList_().length,ms.length);assert.equal(b2.getSparepartLokasiMerged_().length,1);
@@ -54,6 +56,11 @@ const {DatabaseSync}=require('node:sqlite');
   const h=restored[0], records=restored.slice(1).map(row=>Object.fromEntries(h.map((name,i)=>[name,row[i]])));
   for(const id of areaIds){const r=records.find(r=>r.ID===id);assert.equal(r['Lokasi Pekerjaan'],'Area');assert.equal(r['Kode Mesin'],'-');assert.equal(r['Nama Mesin'],'-');assert.equal(r['Nama Unit'],'-');assert(r['Lokasi/Area'].includes(r['Kategori Area']));}
   assert.equal(records.find(r=>r.ID===areaIds[0])['Deskripsi Masalah'],'Updated area work');
+  const patrolRows=second.spreadsheet.getSheetByName('Predictive_Maintenance').getDataRange().getValues();
+  const patrol=patrolRows.slice(1).find(r=>r[patrolRows[0].indexOf('ID')]==='PM-multi-personil');
+  assert.equal(patrol[patrolRows[0].indexOf('Petugas')],'Person A / Person B / Person C');
+  assert.equal(JSON.parse(patrol[patrolRows[0].indexOf('Findings (JSON)')])[0].id,'F-multi');
+  console.log('Multi-personil Patrol SQLite: PASS (team and finding survive reload).');
   console.log('Area work SQLite: PASS ('+areaIds.length+' locations, category validation, canonical fields, partial edit and reload).');
   console.log('SQLite integration: PASS (migration, save/reload, quantity, partial edit, name-only material completion, mixed Patrol attachments).');
  }finally{db.close();fs.rmSync(tmp,{recursive:true,force:true});}
