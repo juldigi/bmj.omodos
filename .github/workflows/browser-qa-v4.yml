@@ -1309,6 +1309,24 @@ jobs:
               toggle.checked=false;toggle.dispatchEvent(new Event('change'));
               resetSparepartRows();
             });
+            const locationVisibility=await page.evaluate(()=>{
+              const body=document.body,form=document.getElementById('form-entry'),kind=document.getElementById('select-lokasiPekerjaan');
+              const wasSimple=body.classList.contains('low-cognitive'),wasSingle=form.classList.contains('single-col-form');
+              let ok=true;
+              try{
+                for(const simple of [false,true])for(const single of [false,true]){
+                  body.classList.toggle('low-cognitive',simple);form.classList.toggle('single-col-form',single);
+                  for(const value of ['Mesin','Area','Mesin']){
+                    kind.value=value;kind.dispatchEvent(new Event('change'));
+                    const machine=document.getElementById('entry-machine-fields'),area=document.getElementById('entry-area-fields');
+                    const hidden=value==='Mesin'?area:machine,visible=value==='Mesin'?machine:area;
+                    ok=ok&&getComputedStyle(hidden).display==='none'&&getComputedStyle(visible).display!=='none';
+                  }
+                }
+              }finally{body.classList.toggle('low-cognitive',wasSimple);form.classList.toggle('single-col-form',wasSingle);}
+              return ok;
+            });
+            if(!locationVisibility)throw new Error('Conditional location fields visible in simple layout');
             await page.locator('#select-lokasiPekerjaan').selectOption('Area');
             await page.locator('#select-kategoriArea').selectOption('Office');
             await page.locator('#select-namaArea').selectOption('RMS');

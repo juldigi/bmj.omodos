@@ -2082,6 +2082,8 @@ input[type="number"]{-moz-appearance:textfield;}
 .hsr-narrative{font-size:clamp(11px,1.35vh,12.5px);color:var(--text-dim);line-height:1.45;overflow-wrap:anywhere;}
 .hsr-narrative b{color:var(--text);font-weight:700;}
 [hidden]{display:none!important;}
+/* Keep conditional work-location fields hidden in simple and single-column layouts. */
+#entry-machine-fields[hidden],#entry-area-fields[hidden],#edit-area-category-wrap[hidden],#edit-area-name-wrap[hidden],#entry-view-mode [data-edit-wrap][hidden]{display:none!important;}
 .hsr-stats{display:flex;flex-wrap:wrap;gap:6px;}
 .hsr-stat{
   display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;
