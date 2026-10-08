@@ -1,9 +1,9 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-08T07:06:52.752857+00:00
-- File bytes: 1658195
+- Audited UTC: 2026-10-08T07:08:54.710073+00:00
+- File bytes: 1658201
 - Lines: 28832
-- SHA-256: f0dbf0771b77faf5ebd78a8d456c067f7a4f004832e8f8bd5507fda0df7c0163
+- SHA-256: e43a9d2819b5cc9edad78b6308003e33312aaeb01c40b621645f84cf32396cba
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
