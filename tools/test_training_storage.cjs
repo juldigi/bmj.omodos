@@ -5,7 +5,7 @@ const {DatabaseSync}=require('node:sqlite');
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'omodos-training-'));
  const db=new DatabaseSync(':memory:');
  try{
-  const source=fs.readFileSync('src/worker.js','utf8').replace('import "../public/work-areas.js";',fs.readFileSync('public/work-areas.js','utf8')).replace('import { DurableObject } from "cloudflare:workers";','class DurableObject {}').replace('  return { doGet, doPost, registry:', '  return { trainingTest: {addEntry_,updateEntry_,savePredictiveReport_,getMachinesList_,getSparepartLokasiMerged_,saveSparepartLokasi_}, doGet, doPost, registry:')+'\nexport {createStorage,createBackend};\n';
+  const source=fs.readFileSync('src/worker.js','utf8').replace('import { DurableObject } from "cloudflare:workers";','class DurableObject {}').replace('  return { doGet, doPost, registry:', '  return { trainingTest: {addEntry_,updateEntry_,savePredictiveReport_,getMachinesList_,getSparepartLokasiMerged_,saveSparepartLokasi_}, doGet, doPost, registry:')+'\nexport {createStorage,createBackend};\n';
   const mod=path.join(tmp,'worker.mjs');fs.writeFileSync(mod,source);
   const {createStorage,createBackend}=await import(pathToFileURL(mod).href);
   const sql={exec(q,...args){const stmt=db.prepare(q);if(stmt.columns().length)return stmt.all(...args);stmt.run(...args);return [];}};
