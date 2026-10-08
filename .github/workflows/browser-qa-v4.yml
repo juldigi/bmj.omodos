@@ -1261,6 +1261,45 @@ jobs:
             if(!Object.values(training).every(Boolean)) throw new Error('Training findings regression: '+JSON.stringify(training));
             result.phases.push('training-findings');
 
+
+            console.log('[QA] Smart Resume mobile metric details');
+            await page.evaluate(() => {
+              document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+              document.getElementById('view-dashboard').classList.add('active');
+              const now=new Date();
+              ENTRIES=['Emergency','Proses','Selesai'].map((status,i)=>({
+                ID:'resume-qa-'+i,'Timestamp Input':now.toISOString(),'Tanggal':now.toISOString().slice(0,10),
+                'Kode Mesin':'AHU-1','Nama Mesin':'AHU 1','Status':status,'Jenis Pekerjaan':'Breakdown',
+                'Deskripsi Masalah':'QA detail <unsafe>','Tindakan Perbaikan':'QA check','Downtime (menit)':30,
+                'Nama Material':'QA Seal (1 pcs)','Material Number SAP':'QA-1','Spare Part Digunakan':1
+              }));
+              SPAREPART_LOKASI=[{nama:'QA New Seal',sap:'',needsReview:true}];
+              SPAREPART_ETA=[{noPO:'QA-PO',namaMaterial:'QA Motor',estimasiEta:'2020-01-01',status:'WAITING'}];
+              KPI_DEPARTMENT_META={year:now.getFullYear(),latestActualMonth:'Jan'};
+              KPI_DEPARTMENT_MTD=[{Tahun:String(now.getFullYear()),KPI:'QA KPI',Polaritas:'Positif','Target Jan':1,'Realisasi Jan':2}];
+              renderDashboardView();
+            });
+            const resumeButtons=page.locator('#home-smart-resume [data-resume-detail]');
+            if(await resumeButtons.count()!==9) throw new Error('Missing Smart Resume metrics');
+            for(const kind of ['emergency','followup','finished','machines','loss','kpi','usage','po','new']){
+              await page.locator('#home-smart-resume [data-resume-detail="'+kind+'"]').click();
+              await page.locator('#modal-bg.active #resume-detail-close').waitFor({state:'visible'});
+              if(await page.locator('#modal-content tbody tr').count()<1) throw new Error('Empty detail: '+kind);
+              if(await page.locator('#modal-content unsafe').count()) throw new Error('Unescaped detail text');
+              await page.locator('#resume-detail-close').click();
+            }
+            const resumeLayout=await page.evaluate(()=>{
+              const h=document.getElementById('home-smart-resume'),newButton=h.querySelector('[data-resume-detail="new"]'),follow=h.querySelector('[data-resume-detail="followup"]');
+              const a=getComputedStyle(newButton),b=getComputedStyle(follow),r=newButton.getBoundingClientRect(),host=h.getBoundingClientRect();
+              return !document.getElementById('training-sparepart-resume') && a.fontSize===b.fontSize && a.padding===b.padding && r.right<=host.right+1 && r.left>=host.left;
+            });
+            if(!resumeLayout) throw new Error('Smart Resume mobile chip layout failed');
+            await page.evaluate(()=>{ENTRIES=[];renderDashboardView();});
+            await page.locator('#home-smart-resume [data-resume-detail="new"]').click();
+            if(!(await page.locator('#modal-content').innerText()).includes('QA New Seal')) throw new Error('Pending sparepart missing with empty logbook');
+            await page.locator('#resume-detail-close').click();
+            result.phases.push('smart-resume-mobile-details');
+
             const relevantErrors = errors.filter(x =>
               !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError/i.test(x)
             );
