@@ -17,6 +17,7 @@
 <meta name="apple-mobile-web-app-title" content="OMODOS">
 <meta name="theme-color" content="#111318">
 <link rel="manifest" id="pwa-manifest-link" href="">
+<script src="/work-areas.js"></script>
 <script>
   // Manifest dibuat dinamis (bukan file statis) supaya start_url-nya selalu
   // mengikuti URL deployment /exec yang sedang dipakai (Cloudflare tidak
@@ -2080,6 +2081,7 @@ input[type="number"]{-moz-appearance:textfield;}
 .hsr-period{font-size:10px;color:var(--text-dim);font-family:var(--font-mono);white-space:nowrap;}
 .hsr-narrative{font-size:clamp(11px,1.35vh,12.5px);color:var(--text-dim);line-height:1.45;overflow-wrap:anywhere;}
 .hsr-narrative b{color:var(--text);font-weight:700;}
+[hidden]{display:none!important;}
 .hsr-stats{display:flex;flex-wrap:wrap;gap:6px;}
 .hsr-stat{
   display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;
@@ -3526,6 +3528,13 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
             <button type="button" class="btn btn-ghost btn-sm" id="btn-add-personil-tambahan" style="margin-top:8px;"><i class="ph-bold ph-users-three"></i> Tambah Personil Lain</button>
           </div>
 
+          <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-map-pin"></i> Lokasi Pekerjaan</div>
+          <div class="field"><label for="select-lokasiPekerjaan">Pekerjaan di</label><select name="lokasiPekerjaan" id="select-lokasiPekerjaan"><option value="Mesin">Mesin / Peralatan</option><option value="Area">Area</option></select></div>
+          <div id="entry-area-fields" class="grid2" hidden>
+            <div class="field"><label for="select-kategoriArea">Kategori Area</label><select name="kategoriArea" id="select-kategoriArea" disabled><option value="">Pilih kategori...</option></select></div>
+            <div class="field"><label for="select-namaArea">Area</label><select name="namaArea" id="select-namaArea" disabled><option value="">Pilih area...</option></select></div>
+          </div>
+          <div id="entry-machine-fields">
           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-gear-six"></i> Mesin / Peralatan</div>
           <div class="grid3">
             <div class="field"><label>Kode Mesin</label>
@@ -3551,6 +3560,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
             <div class="field"><label>Nama Mesin (Lainnya)</label><input type="text" id="input-namaMesin-lainnya" placeholder="Isi nama mesin yang tidak ada di daftar"></div>
           </div>
 
+          </div>
           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-clipboard-text"></i> Detail Pekerjaan</div>
           <div class="field"><label>Jenis Pekerjaan</label>
             <select name="jenisPekerjaan" required>
@@ -3558,12 +3568,13 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
               <option>Corrective Maintenance</option>
               <option>Predictive Maintenance</option>
               <option>Emergency Repair</option>
+              <option>Instalasi</option><option>Modifikasi</option><option>Pemindahan</option><option>Pelepasan / Dismantle / Uninstall</option>
               <option>Lainnya</option>
             </select>
           </div>
-          <div class="field"><label>Deskripsi Masalah / Kerusakan
+          <div class="field"><label>Deskripsi Pekerjaan / Masalah
             <button type="button" class="btn-ai-fix" id="btn-ai-fix-deskripsiMasalah" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
-          </label><textarea name="deskripsiMasalah" id="ta-deskripsiMasalah" rows="3" placeholder="Jelaskan gejala atau kerusakan yang ditemukan..." required></textarea></div>
+          </label><textarea name="deskripsiMasalah" id="ta-deskripsiMasalah" rows="3" placeholder="Jelaskan pekerjaan, kebutuhan, atau masalah yang ditemukan..." required></textarea></div>
           <div class="field"><label>Tindakan Perbaikan yang Dilakukan
             <button type="button" class="btn-ai-fix" id="btn-ai-fix-tindakanPerbaikan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
           </label><textarea name="tindakanPerbaikan" id="ta-tindakanPerbaikan" rows="3" placeholder="Jelaskan tindakan yang sudah/sedang dilakukan..." required></textarea></div>
@@ -4130,7 +4141,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
       <div class="lb-tabbar" data-lb-tabbar></div>
       <div class="filter-bar">
         <input class="grow" type="text" id="search-utama" placeholder="Cari mesin, pelapor, deskripsi...">
-        <select id="filter-machine" aria-label="Filter mesin"><option value="">Semua Mesin</option></select>
+        <select id="filter-machine" aria-label="Filter mesin atau area"><option value="">Semua Mesin</option></select>
         <select id="filter-status"><option value="">Semua Status</option><option>Selesai</option><option>Proses</option><option>Pending</option><option>Emergency</option></select>
         <select id="filter-jenis"><option value="">Semua Jenis</option></select>
         <select id="filter-group"><option value="">Semua Group</option><option>Electrical</option><option>Mechanical</option><option>Workshop</option><option>Project</option><option>Warehouse</option><option>Planning</option><option>IPAL</option></select>
@@ -4143,7 +4154,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
       <div class="topbar"><div><h1>Logbook per Mesin</h1><div class="sub">Riwayat pekerjaan dikelompokkan per unit mesin.</div></div></div>
       <div class="lb-tabbar" data-lb-tabbar></div>
       <div class="filter-bar" style="margin-bottom:12px;">
-        <label for="machine-select" style="font-size:12px;font-weight:700;color:var(--text-dim);">Pilih Mesin</label>
+        <label for="machine-select" style="font-size:12px;font-weight:700;color:var(--text-dim);">Pilih Mesin / Area</label>
         <select id="machine-select" class="grow"><option value="">Pilih mesin...</option></select>
       </div>
       <div id="list-mesin"></div>
@@ -7712,6 +7723,9 @@ function restoreFormEntryDraft(){
 
   FORM_ENTRY_DRAFT_RESTORING = true;
   try{
+    if(draft.fields.lokasiPekerjaan) $('#select-lokasiPekerjaan').value=draft.fields.lokasiPekerjaan;
+    $('#select-kategoriArea').value=draft.fields.kategoriArea||'';
+    populateWorkAreaOptions_($('#select-kategoriArea').value,$('#select-namaArea'),draft.fields.namaArea);
     Object.entries(draft.fields).forEach(([name, value])=>{
       const el = form.elements.namedItem(name);
       if(!el || value === undefined) return;
@@ -7723,7 +7737,7 @@ function restoreFormEntryDraft(){
     });
     if(draft.kodeMesinLainnya && $('#input-kodeMesin-lainnya')) $('#input-kodeMesin-lainnya').value = draft.kodeMesinLainnya;
     if(draft.namaMesinLainnya && $('#input-namaMesin-lainnya')) $('#input-namaMesin-lainnya').value = draft.namaMesinLainnya;
-    if(typeof toggleMachineLainnyaRow === 'function') toggleMachineLainnyaRow();
+    syncLogbookLocationForm_();
 
     if(Array.isArray(draft.spareparts) && draft.spareparts.length && typeof renderSparepartRows === 'function'){
       SPAREPART_ROWS = draft.spareparts;
@@ -8738,7 +8752,7 @@ function toggleMachineLainnyaRow(){
   const selKode = $('#select-kodeMesin'), selNama = $('#select-namaMesin');
   const row = $('#row-mesin-lainnya');
   if(!selKode || !selNama || !row) return;
-  const isLainnya = selKode.value === MACHINE_LAINNYA_VALUE || selNama.value === MACHINE_LAINNYA_VALUE;
+  const isLainnya = $('#select-lokasiPekerjaan')?.value!=='Area' && (selKode.value === MACHINE_LAINNYA_VALUE || selNama.value === MACHINE_LAINNYA_VALUE);
   row.style.display = isLainnya ? 'grid' : 'none';
   $('#input-kodeMesin-lainnya').required = isLainnya;
   $('#input-namaMesin-lainnya').required = isLainnya;
@@ -8767,6 +8781,43 @@ if(selectNamaMesin){
     toggleMachineLainnyaRow();
   });
 }
+
+
+function isAreaEntry_(e){return String(e&&e['Lokasi Pekerjaan']||'').toLowerCase()==='area';}
+function logbookLocationLabel_(e){return isAreaEntry_(e)?(e['Lokasi/Area']||[e['Kategori Area'],e['Nama Area']].filter(Boolean).join(' · ')):(e['Nama Mesin']||e['Kode Mesin']||'-');}
+function populateWorkAreaOptions_(category,select,value){
+ const areas=OMODOS_WORK_AREAS[category]||[];
+ select.innerHTML='<option value="">Pilih area...</option>'+areas.map(a=>'<option value="'+escapeHtml(a)+'">'+escapeHtml(a)+'</option>').join('');
+ select.value=areas.includes(value)?value:(areas.length===1?areas[0]:'');
+}
+function syncLogbookLocationForm_(){
+ const area=$('#select-lokasiPekerjaan').value==='Area',category=$('#select-kategoriArea'),name=$('#select-namaArea');
+ $('#entry-machine-fields').hidden=area;$('#entry-area-fields').hidden=!area;
+ ['select-kodeMesin','select-namaMesin','input-namaUnit','input-kodeMesin-lainnya','input-namaMesin-lainnya'].forEach(id=>{const e=$('#'+id);e.disabled=area;e.required=!area&&!id.includes('lainnya');});
+ category.disabled=!area;name.disabled=!area;category.required=area;name.required=area;
+ populateWorkAreaOptions_(category.value,name,name.value);
+ toggleMachineLainnyaRow();
+}
+function applyLogbookLocationPayload_(entry){
+ if(entry.lokasiPekerjaan==='Area'){
+  if(!(OMODOS_WORK_AREAS[entry.kategoriArea]||[]).includes(entry.namaArea))throw new Error('Pilih kategori dan area pekerjaan.');
+  entry.kodeMesin='-';entry.namaMesin='-';entry.namaUnit='-';
+  entry.lokasi=entry.kategoriArea===entry.namaArea?entry.kategoriArea:entry.kategoriArea+' · '+entry.namaArea;
+ }else{
+  entry.lokasiPekerjaan='Mesin';entry.kategoriArea='-';entry.namaArea='-';
+  if(entry.kodeMesin===MACHINE_LAINNYA_VALUE)entry.kodeMesin=$('#input-kodeMesin-lainnya').value.trim();
+  if(entry.namaMesin===MACHINE_LAINNYA_VALUE)entry.namaMesin=$('#input-namaMesin-lainnya').value.trim();
+  if(!entry.kodeMesin||!entry.namaMesin)throw new Error('Kode Mesin dan Nama Mesin wajib diisi.');
+  const machine=MACHINES.find(m=>String(m['Kode Mesin']||'').trim()===entry.kodeMesin||String(m['Nama Mesin']||'').trim()===entry.namaMesin);
+  entry.lokasi=machine?String(machine['Lokasi/Area']||'').trim():'-';
+ }
+ return entry;
+}
+$('#select-kategoriArea').innerHTML='<option value="">Pilih kategori...</option>'+Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('');
+$('#select-lokasiPekerjaan').addEventListener('change',syncLogbookLocationForm_);
+$('#select-kategoriArea').addEventListener('change',()=>populateWorkAreaOptions_($('#select-kategoriArea').value,$('#select-namaArea'),''));
+$('#form-entry').addEventListener('reset',()=>setTimeout(syncLogbookLocationForm_,0));
+syncLogbookLocationForm_();
 
 function updateSidebarCounts(){
   $('#cnt-utama').textContent = ENTRIES.length;
@@ -9138,7 +9189,7 @@ function entryCardHtml(e, idx){
   const st = statusClass(e['Status']);
   const attCount = parseAttachments(e['Lampiran (JSON)']).length;
   const groupBits = [e['Grouping Pekerjaan'], e['Grouping Team'] ? ('Team '+e['Grouping Team']) : null].filter(Boolean).join(' · ');
-  const mesinKey = e['Kode Mesin'] || e['Nama Mesin'];
+  const mesinKey = isAreaEntry_(e) ? '' : (e['Kode Mesin'] || e['Nama Mesin']);
   const pelaporNames = splitPelaporNames(e['Nama Pelapor']);
   const pelaporHtml = pelaporNames.length ? pelaporNames.map(n=> wikiLinkHtml('personil', n, n)).join(', ') : '-';
   return `
@@ -9146,7 +9197,7 @@ function entryCardHtml(e, idx){
       <div class="idx">${String(idx).padStart(3,'0')}</div>
       <div class="body">
         <div class="row1">
-          <div class="mesin">${mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin'] || '(Tanpa nama mesin)') : escapeHtml(e['Nama Mesin'] || '(Tanpa nama mesin)')} ${e['Kode Mesin'] ? '· <span style=\"color:var(--text-dim);font-weight:400;font-size:12px;\">'+escapeHtml(e['Kode Mesin'])+'</span>' : ''} ${e['Nama Unit'] ? '· <span style=\"color:var(--text-dim);font-weight:400;font-size:12px;\">'+escapeHtml(e['Nama Unit'])+'</span>' : ''}</div>
+          <div class="mesin">${mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin'] || '(Tanpa nama mesin)') : escapeHtml(logbookLocationLabel_(e))} ${!isAreaEntry_(e) && e['Kode Mesin'] ? '· <span style=\"color:var(--text-dim);font-weight:400;font-size:12px;\">'+escapeHtml(e['Kode Mesin'])+'</span>' : ''} ${!isAreaEntry_(e) && e['Nama Unit'] ? '· <span style=\"color:var(--text-dim);font-weight:400;font-size:12px;\">'+escapeHtml(e['Nama Unit'])+'</span>' : ''}</div>
           <span class="badge badge-${st}"><span class="led led-${st}" style="margin-right:4px;vertical-align:middle;"></span>${escapeHtml(e['Status']||'-')}</span>
         </div>
         <div class="meta">${fmtDate(e['Tanggal'])} · ${escapeHtml(fmtTime(e['Waktu'])||'-')} · ${pelaporHtml} · ${escapeHtml(e['Jenis Pekerjaan']||'-')}${groupBits ? ' · '+escapeHtml(groupBits) : ''}</div>
@@ -9211,7 +9262,7 @@ function renderUtama(){
     });
     const hasOther = ENTRIES.some(e=>matchEntryMachineKey_(e,machineIdx)==='Lainnya');
     if(hasOther) machineOptions.push('<option value="Lainnya">Lainnya / Belum Terpetakan</option>');
-    machineFilter.innerHTML = '<option value="">Semua Mesin</option>' + machineOptions.join('');
+    machineFilter.innerHTML = '<option value="">Semua Mesin / Area</option>' + machineOptions.join('');
     if(Array.from(machineFilter.options).some(o=>o.value===previousMachine)) machineFilter.value=previousMachine;
   }
 
@@ -9303,10 +9354,12 @@ function buildMachineIndex_(){
     if(m.kode) byKode[norm_(m.kode)] = m.key;
     if(m.nama) byNama[norm_(m.nama)] = m.key;
   });
-  return { list, byKode, byNama };
+  const areaList=[...new Set(ENTRIES.filter(isAreaEntry_).map(e=>e['Lokasi/Area']))].filter(Boolean).map(area=>({key:'area:'+area,label:'Area · '+area,kode:'',nama:'Area · '+area}));
+  return { list:[...list,...areaList], byKode, byNama };
 }
 function matchEntryMachineKey_(e, idx){
   const kode = norm_(e['Kode Mesin']);
+  if(isAreaEntry_(e)) return 'area:'+e['Lokasi/Area'];
   if(kode && idx.byKode[kode]) return idx.byKode[kode];
   const nama = norm_(e['Nama Mesin']);
   if(nama && idx.byNama[nama]) return idx.byNama[nama];
@@ -9563,6 +9616,7 @@ if(btnRefreshDurasi) btnRefreshDurasi.addEventListener('click', async ()=>{ awai
    ========================================================= */
 
 function anIsBreakdown(e){
+  if(isAreaEntry_(e)) return false;
   const jp = String(e['Jenis Pekerjaan']||'').toLowerCase();
   if(jp.includes('preventive')) return false;
   if(jp.includes('corrective') || jp.includes('perbaikan') || jp.includes('breakdown') || jp.includes('repair') || jp.includes('emergency')) return true;
@@ -10386,6 +10440,7 @@ function findMachineByIdentity_(kodeOrNama){
   return byCode.length===1 ? byCode[0] : null;
 }
 function machineRecordMatchesIdentity_(record,kodeOrNama){
+  if(isAreaEntry_(record)) return false;
   if(!record || !kodeOrNama) return false;
   const machine=findMachineByIdentity_(kodeOrNama);
   if(machine) return machineMatchRecord_(record,machine);
@@ -14957,8 +15012,8 @@ function renderSparepartCollectTable(){
     const materialHtml = detail.length
       ? detail.filter(d=>d.nama).map(d=> wikiLinkHtml('sparepart', d.nama, d.nama)).join(', ')
       : escapeHtml(e['Nama Material']||'(Tanpa nama material)');
-    const mesinKey = e['Kode Mesin'] || e['Nama Mesin'];
-    const mesinHtml = mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin']||'-') : escapeHtml(e['Nama Mesin']||'-');
+    const mesinKey = isAreaEntry_(e) ? '' : (e['Kode Mesin'] || e['Nama Mesin']);
+    const mesinHtml = mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin']||'-') : escapeHtml(logbookLocationLabel_(e));
     const teknisiHtml = e['Nama Pelapor'] ? splitPelaporNames(e['Nama Pelapor']).map(n=>wikiLinkHtml('personil', n, n)).join(', ') : '-';
     const wo = e['Nomor WO'] || e['No WO'] || e['WO'] || '-';
     const qty = sparepartEntryTotalQty(e);
@@ -15956,7 +16011,7 @@ function kgShowNodeDetail(nodeId){
     // [FIX SOT] Konsisten dengan buildKnowledgeGraphData() -- relasi hanya dari data source-of-truth.
     sotEntries().forEach(e=>{
       if(!parseSparepartDetail(e).some(d=>d.nama.toLowerCase()===label.toLowerCase())) return;
-      if(!(e['Kode Mesin']||e['Nama Mesin'])) return;
+      if(isAreaEntry_(e) || !(e['Kode Mesin']||e['Nama Mesin'])) return;
       const bucket=analyticsMachineBucket_(e);
       relatedMesin.set(bucket.key,bucket.nama);
     });
@@ -16384,6 +16439,7 @@ function isSotPatrolRecord_(r){
   return patrolEventTs_(r)>=SOT_CUTOFF_DATE.getTime();
 }
 function machineMatchRecord_(record,machine){
+  if(isAreaEntry_(record)) return false;
   const rk=norm_(record && (record['Kode Mesin']||record.kodeMesin));
   const rn=norm_(record && (record['Nama Mesin']||record.namaMesin));
   const mk=norm_(machine && (machine.kode||machine['Kode Mesin']));
@@ -16650,7 +16706,7 @@ function openDetail(id){
   const e = ENTRIES.find(x=>x['ID']===id);
   if(!e) return;
   const atts = parseAttachments(e['Lampiran (JSON)']);
-  const mesinKey = e['Kode Mesin'] || e['Nama Mesin'];
+  const mesinKey = isAreaEntry_(e) ? '' : (e['Kode Mesin'] || e['Nama Mesin']);
   const mesinLabel = [e['Kode Mesin'], e['Nama Mesin']].filter(Boolean).join(' — ');
   const pelaporHtml = splitPelaporNames(e['Nama Pelapor']).map(n=> wikiLinkHtml('personil', n, n)).join(', ');
   const personilTambahanHtml = String(e['Personil Tambahan']||'').split(',').map(s=>s.trim()).filter(Boolean).map(n=> wikiLinkHtml('personil', n, n)).join(', ');
@@ -16674,8 +16730,11 @@ function openDetail(id){
     ['Nama Pelapor', e['Nama Pelapor']],
     ['Personil Tambahan', e['Personil Tambahan']],
     ['Nomor Notifikasi Pekerjaan', e['Nomor Notifikasi Pekerjaan']],
-    ['Kode / Nama Mesin', mesinLabel],
-    ['Nama Unit (Sub-Mesin)', e['Nama Unit']],
+    ['Lokasi Pekerjaan', e['Lokasi Pekerjaan']||'Mesin'],
+    ['Kategori Area', isAreaEntry_(e)?e['Kategori Area']:''],
+    ['Area', isAreaEntry_(e)?e['Nama Area']:''],
+    ['Kode / Nama Mesin', isAreaEntry_(e)?'':mesinLabel],
+    ['Nama Unit (Sub-Mesin)', isAreaEntry_(e)?'':e['Nama Unit']],
     ['Lokasi / Area', e['Lokasi/Area']],
     ['Jenis Pekerjaan', e['Jenis Pekerjaan']],
     ['Prioritas', e['Prioritas']],
@@ -16695,7 +16754,7 @@ function openDetail(id){
     <div class="modal-head">
       <div>
         <span class="badge badge-${st}"><span class="led led-${st}" style="margin-right:4px;vertical-align:middle;"></span>${escapeHtml(e['Status']||'-')}</span>
-        <h2 style="font-family:var(--font-display);margin:8px 0 0 0;">${mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin']||'-') : escapeHtml(e['Nama Mesin']||'-')}</h2>
+        <h2 style="font-family:var(--font-display);margin:8px 0 0 0;">${mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin']||'-') : escapeHtml(logbookLocationLabel_(e))}</h2>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-sm" id="btn-edit-entry"><i class="ph-bold ph-pencil-simple"></i> Edit</button>
@@ -16757,21 +16816,34 @@ function renderEntryEditForm(e){
     const raw = e[f.key] || '';
     const val = f.toInput ? f.toInput(raw) : raw;
     if(f.type === 'textarea'){
-      return `<div class="field"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+      return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
     }
     if(f.type === 'select'){
       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
-      return `<div class="field"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+      return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
     }
-    return `<div class="field"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+    return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
   }).join('');
   holder.innerHTML = `
+    <div class="grid3">
+      <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+      <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+      <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+    </div>
     <div class="grid2">${fieldHtml}</div>
     <div style="margin-top:16px;display:flex;gap:10px;">
       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
     </div>
   `;
+  const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+  kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+  populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+  const sync=()=>{const area=kind.value==='Area';
+    $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+    ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+  };
+  kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
 }
@@ -16780,6 +16852,7 @@ async function saveEntryEdit(id){
   const fieldEls = $$('[data-edit-field]', holder);
   const entry = { ID: id };
   const keyToPayload = {
+    'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
@@ -16799,6 +16872,7 @@ async function saveEntryEdit(id){
     const payloadKey = keyToPayload[key];
     if(payloadKey) entry[payloadKey] = val;
   });
+  try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
     return;
@@ -17714,22 +17788,7 @@ $('#form-entry').addEventListener('submit', async (ev)=>{
   try{
     const fd = new FormData(ev.target);
     const entry = Object.fromEntries(fd.entries());
-    if(entry.kodeMesin === MACHINE_LAINNYA_VALUE){
-      entry.kodeMesin = $('#input-kodeMesin-lainnya').value.trim();
-    }
-    if(entry.namaMesin === MACHINE_LAINNYA_VALUE){
-      entry.namaMesin = $('#input-namaMesin-lainnya').value.trim();
-    }
-    if(!entry.kodeMesin || !entry.namaMesin){
-      throw new Error('Kode Mesin dan Nama Mesin wajib diisi (pilih dari daftar atau isi manual jika "Lainnya").');
-    }
-    // Lokasi/Area bukan field manual pada form. Ambil otomatis dari Master
-    // Mesin agar kontrak data dengan backend tetap lengkap.
-    const selectedMachine = MACHINES.find(m=>
-      String(m['Kode Mesin']||'').trim() === entry.kodeMesin ||
-      String(m['Nama Mesin']||'').trim() === entry.namaMesin
-    );
-    entry.lokasi = selectedMachine ? String(selectedMachine['Lokasi/Area']||'').trim() : '';
+    applyLogbookLocationPayload_(entry);
     const additionalNames = (typeof getAdditionalPersonilNames === 'function') ? getAdditionalPersonilNames() : [];
     entry.personilTambahan = additionalNames;
     entry.personilTambahanStr = additionalNames.join(', ');
@@ -17766,7 +17825,7 @@ $('#form-entry').addEventListener('submit', async (ev)=>{
     // Penyimpanan sudah sukses; refresh seluruh modul berjalan di background
     // agar satu endpoint lambat tidak mengunci tombol/form tanpa batas.
     loadAll().catch(()=>{});
-    toggleMachineLainnyaRow();
+    syncLogbookLocationForm_();
   }catch(err){
     toast('Gagal menyimpan: ' + err.message, true);
   }finally{
@@ -25884,13 +25943,15 @@ function renderHomeSmartResume(){
   const nSelesai = recent.filter(e=> dashStatusKey(e['Status'])==='normal').length;
   const mesinTerdampakMap = new Map();
   recent.forEach(e=>{
-    if(!(e['Kode Mesin']||e['Nama Mesin'])) return;
+    if(isAreaEntry_(e)||!(e['Kode Mesin']||e['Nama Mesin'])) return;
     const bucket=analyticsMachineBucket_(e);
     mesinTerdampakMap.set(bucket.key,bucket.nama);
   });
   const mesinTerdampak = [...mesinTerdampakMap.values()];
   const latestCritical = recent.find(e=> dashStatusKey(e['Status'])==='kritikal');
-  const latestCriticalMachine = latestCritical && (latestCritical['Kode Mesin']||latestCritical['Nama Mesin'])
+  const areaLocations=[...new Set(recent.filter(isAreaEntry_).map(logbookLocationLabel_))];
+  const locationSummary=[mesinTerdampak.length?mesinTerdampak.length+' mesin':'',areaLocations.length?areaLocations.length+' area':''].filter(Boolean).join(' dan ')||'-';
+  const latestCriticalMachine = latestCritical && isAreaEntry_(latestCritical) ? logbookLocationLabel_(latestCritical) : latestCritical && (latestCritical['Kode Mesin']||latestCritical['Nama Mesin'])
     ? analyticsMachineBucket_(latestCritical).nama
     : '';
   // [EDIT] Total Lost Time (menit) dari seluruh entri breakdown 24 jam
@@ -25903,14 +25964,14 @@ function renderHomeSmartResume(){
   const kerugianTxt = 'Rp ' + Math.round(kerugianRp).toLocaleString('id-ID');
   let narrative;
   if(nEmergency > 0){
-    narrative = `Dalam 24 jam terakhir tercatat <b>${nEmergency} emergency</b>${nPerhatian? ' dan '+nPerhatian+' pekerjaan perlu perhatian' : ''} dari total <b>${recent.length} entri logbook</b> di <b>${mesinTerdampak.length} mesin</b>. `
+    narrative = `Dalam 24 jam terakhir tercatat <b>${nEmergency} emergency</b>${nPerhatian? ' dan '+nPerhatian+' pekerjaan perlu perhatian' : ''} dari total <b>${recent.length} entri logbook</b> di <b>${escapeHtml(locationSummary)}</b>. `
       + (latestCritical ? `Emergency terbaru: <b>${escapeHtml(latestCriticalMachine||'-')}</b> — ${escapeHtml(latestCritical['Deskripsi Masalah']||'-')}. ` : '')
       + (lostTimeMenitTotal>0 ? `Total Lost Time 24 jam terakhir: <b>${lostTimeTxt}</b>, estimasi kerugian finansial pabrik sekitar <b>${kerugianTxt}</b>.` : '');
   } else if(nPerhatian > 0){
-    narrative = `Tidak ada emergency dalam 24 jam terakhir. Ada <b>${nPerhatian} pekerjaan berstatus proses/pending</b> dari total <b>${recent.length} entri logbook</b> di <b>${mesinTerdampak.length} mesin</b> yang perlu ditindaklanjuti.`
+    narrative = `Tidak ada emergency dalam 24 jam terakhir. Ada <b>${nPerhatian} pekerjaan berstatus proses/pending</b> dari total <b>${recent.length} entri logbook</b> di <b>${escapeHtml(locationSummary)}</b> yang perlu ditindaklanjuti.`
       + (lostTimeMenitTotal>0 ? ` Total Lost Time 24 jam terakhir: <b>${lostTimeTxt}</b>, estimasi kerugian finansial pabrik sekitar <b>${kerugianTxt}</b>.` : '');
   } else {
-    narrative = `Kondisi pabrik stabil. Seluruh <b>${recent.length} entri logbook</b> dalam 24 jam terakhir (di <b>${mesinTerdampak.length} mesin</b>) berstatus selesai/normal.`;
+    narrative = `Kondisi pabrik stabil. Seluruh <b>${recent.length} entri logbook</b> dalam 24 jam terakhir (di <b>${escapeHtml(locationSummary)}</b>) berstatus selesai/normal.`;
   }
   // [EDIT] Tambahan ringkasan cepat: KPI bulan berjalan, pemakaian sparepart
   // 24 jam terakhir (dari Logbook), dan PO sparepart yang overdue — memakai
@@ -25925,6 +25986,7 @@ function renderHomeSmartResume(){
     `<button type="button" data-resume-detail="finished" class="hsr-stat lv-aman"><i class="ph-bold ph-check-circle"></i> ${nSelesai} Selesai</button>`,
     `<button type="button" data-resume-detail="machines" class="hsr-stat"><i class="ph-bold ph-gear"></i> ${mesinTerdampak.length} Mesin</button>`,
     lostTimeMenitTotal>0 ? `<button type="button" data-resume-detail="loss" class="hsr-stat lv-kritikal"><i class="ph-bold ph-currency-circle-dollar"></i> ${kerugianTxt} Kerugian</button>` : '',
+    areaLocations.length ? `<button type="button" class="hsr-stat" data-resume-detail="areas"><i class="ph-bold ph-map-pin"></i> ${areaLocations.length} Area</button>` : '',
     kpiChip, sparepartUsageChip, poOverdueChip, homeSmartResumeNewSparepartChip()
   ].filter(Boolean).join('');
   holder.innerHTML = head + `<div class="hsr-narrative">${narrative}</div><div class="hsr-stats">${stats}</div>`;
@@ -25939,23 +26001,24 @@ function homeSmartResumeNewSparepartChip(){
  return rows.length ? `<button type="button" class="hsr-stat lv-perhatian" data-resume-detail="new"><i class="ph-bold ph-package"></i> ${rows.length} Sparepart Baru</button>` : '';
 }
 function homeSmartResumeDetailData(kind,recent){
+ if(kind==='areas')return {title:'Pekerjaan Area',period:'24 jam terakhir',headers:['Area','Jenis Pekerjaan','Status','Deskripsi'],rows:recent.filter(isAreaEntry_).map(e=>[logbookLocationLabel_(e),e['Jenis Pekerjaan'],e['Status'],e['Deskripsi Masalah']].map(v=>escapeHtml(String(v||'-'))))};
  const cell=v=>escapeHtml(String(v==null||v===''?'-':v));
  const status={emergency:'kritikal',followup:'perhatian',finished:'normal'};
  const titles={emergency:'Emergency',followup:'Perlu Tindak Lanjut',finished:'Selesai',machines:'Mesin',loss:'Estimasi Kerugian',usage:'Sparepart Terpakai',new:'Sparepart Baru',po:'PO Terlambat',kpi:'KPI Department'};
  let headers=['Tanggal','Mesin','Status','Masalah','Tindakan'], rows=recent, period='24 jam terakhir';
  if(status[kind]) rows=rows.filter(e=>dashStatusKey(e['Status'])===status[kind]);
  if(kind==='machines'){
-  const map=new Map();recent.forEach(e=>{if(e['Kode Mesin']||e['Nama Mesin']){const b=analyticsMachineBucket_(e);const r=map.get(b.key)||[b.nama,0];r[1]++;map.set(b.key,r);}});
+  const map=new Map();recent.forEach(e=>{if(!isAreaEntry_(e)&&(e['Kode Mesin']||e['Nama Mesin'])){const b=analyticsMachineBucket_(e);const r=map.get(b.key)||[b.nama,0];r[1]++;map.set(b.key,r);}});
   headers=['Mesin','Jumlah Logbook'];rows=[...map.values()];
  }else if(kind==='loss'){
   const rate=getHomeKerugianPerJamRp();period+=' · Rp '+Math.round(rate).toLocaleString('id-ID')+'/jam downtime';
   headers=['Tanggal','Mesin','Downtime (menit)','Estimasi Kerugian'];
-  rows=recent.filter(anIsBreakdown).map(e=>{const m=parseDurationMinutes(e)||0;return [e['Tanggal'],e['Nama Mesin']||e['Kode Mesin'],m,'Rp '+Math.round(m/60*rate).toLocaleString('id-ID')];});
+  rows=recent.filter(anIsBreakdown).map(e=>{const m=parseDurationMinutes(e)||0;return [e['Tanggal'],logbookLocationLabel_(e),m,'Rp '+Math.round(m/60*rate).toLocaleString('id-ID')];});
  }else if(kind==='new'){
   period='Seluruh sparepart baru yang perlu dilengkapi di Master Sparepart';
   headers=['Nama Sparepart','SAP','Lokasi'];rows=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview).map(r=>[r.nama,r.sap,r.lokasiGudang]);
  }else if(kind==='usage'){
-  headers=['Tanggal','Mesin','Material','Jumlah'];rows=recent.filter(e=>parseSparepartDetail(e).length>0).map(e=>[e['Tanggal'],e['Nama Mesin']||e['Kode Mesin'],e['Nama Material'],sparepartEntryTotalQty(e)]);
+  headers=['Tanggal','Mesin','Material','Jumlah'];rows=recent.filter(e=>parseSparepartDetail(e).length>0).map(e=>[e['Tanggal'],logbookLocationLabel_(e),e['Nama Material'],sparepartEntryTotalQty(e)]);
  }else if(kind==='po'){
   period='Seluruh PO yang melewati ETA';headers=['PO','Sparepart','Estimasi ETA'];
   rows=(SPAREPART_ETA||[]).filter(r=>poStatusKey(r)==='overdue').map(r=>[r.noPO,r.namaMaterial,r.estimasiEta]);
@@ -25964,7 +26027,7 @@ function homeSmartResumeDetailData(kind,recent){
   const year=String(KPI_DEPARTMENT_META.year||new Date().getFullYear()),month=String(KPI_DEPARTMENT_META.latestActualMonth||KK_BULAN[new Date().getMonth()]);
   period=month+' '+year;headers=['KPI','Target','Realisasi','Status'];
   rows=(data||[]).filter(r=>String(r['Tahun'])===year).map(r=>{const ok=kkPolaritasOk(r['Polaritas'],r['Target '+month],r['Realisasi '+month]);return [r['Nama KPI']||r['KPI'],r['Target '+month],r['Realisasi '+month],ok===true?'Tercapai':ok===false?'Tidak Tercapai':'Belum ada realisasi'];});
- }else rows=rows.map(e=>[e['Tanggal'],e['Nama Mesin']||e['Kode Mesin'],e['Status'],e['Deskripsi Masalah'],e['Tindakan Perbaikan']]);
+ }else rows=rows.map(e=>[e['Tanggal'],logbookLocationLabel_(e),e['Status'],e['Deskripsi Masalah'],e['Tindakan Perbaikan']]);
  return {title:titles[kind]||'Detail',period,headers,rows:rows.map(r=>r.map(cell))};
 }
 function bindHomeSmartResumeDetails(holder,recent){
@@ -26057,7 +26120,7 @@ document.addEventListener('DOMContentLoaded', function(){
    --------------------------------------------------------------------- */
 const LB_TABS = [
   { view:'utama',   label:'Semua',       icon:'ph-list-bullets' },
-  { view:'mesin',   label:'Per Mesin',   icon:'ph-gear' },
+  { view:'mesin',   label:'Per Mesin / Area',   icon:'ph-gear' },
   { view:'tanggal', label:'Per Tanggal', icon:'ph-calendar-blank' },
   { view:'pelapor', label:'Per Pelapor', icon:'ph-user-check' },
   { view:'group',   label:'Per Group',   icon:'ph-squares-four' },

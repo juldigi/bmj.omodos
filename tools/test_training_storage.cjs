@@ -5,7 +5,7 @@ const {DatabaseSync}=require('node:sqlite');
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'omodos-training-'));
  const db=new DatabaseSync(':memory:');
  try{
-  const source=fs.readFileSync('src/worker.js','utf8').replace('import { DurableObject } from "cloudflare:workers";','class DurableObject {}').replace('  return { doGet, doPost, registry:', '  return { trainingTest: {addEntry_,updateEntry_,savePredictiveReport_,getMachinesList_,getSparepartLokasiMerged_,saveSparepartLokasi_}, doGet, doPost, registry:')+'\nexport {createStorage,createBackend};\n';
+  const source=fs.readFileSync('src/worker.js','utf8').replace('import "../public/work-areas.js";',fs.readFileSync('public/work-areas.js','utf8')).replace('import { DurableObject } from "cloudflare:workers";','class DurableObject {}').replace('  return { doGet, doPost, registry:', '  return { trainingTest: {addEntry_,updateEntry_,savePredictiveReport_,getMachinesList_,getSparepartLokasiMerged_,saveSparepartLokasi_}, doGet, doPost, registry:')+'\nexport {createStorage,createBackend};\n';
   const mod=path.join(tmp,'worker.mjs');fs.writeFileSync(mod,source);
   const {createStorage,createBackend}=await import(pathToFileURL(mod).href);
   const sql={exec(q,...args){const stmt=db.prepare(q);if(stmt.columns().length)return stmt.all(...args);stmt.run(...args);return [];}};
@@ -30,9 +30,32 @@ const {DatabaseSync}=require('node:sqlite');
   assert(first.ok);const oldFile=first.attachments[0];assert(oldFile.viewUrl.includes('/files/'));
   const edited=result(b.savePredictiveReport_({id:'PM-qa',tanggal:'2026-10-07',findings:[{id:'F1',files:[oldFile,{name:'new.jpg',viewUrl:'blob:new'}]}]},[{name:'new.jpg',mimeType:'image/jpeg',base64:Buffer.from('new photo').toString('base64')}]));
   assert(edited.ok);assert.equal(edited.attachments.length,2);
+
+  // Every configured area saves without machine data and survives reload/edit.
+  const areaIds=[];
+  for(const [category,areas] of Object.entries(globalThis.OMODOS_WORK_AREAS)){
+    for(const area of areas){
+      const data={...entry,lokasiPekerjaan:'Area',kategoriArea:category,namaArea:area,kodeMesin:'',namaMesin:'',namaUnit:'stale machine unit',jenisPekerjaan:'Instalasi',sparepartDetail:[],namaMaterial:'',materialNumberSAP:''};
+      const added=result(b.addEntry_({entry:data}));assert.equal(added.ok,true,category+' / '+area);areaIds.push(added.id);
+      assert.equal(data.kodeMesin,'-');assert.equal(data.namaMesin,'-');
+    }
+  }
+  const badArea=result(b.addEntry_({entry:{...entry,lokasiPekerjaan:'Area',kategoriArea:'Office',namaArea:'Warehouse #1'}}));
+  assert.equal(badArea.ok,false);assert.match(badArea.error,/area/);
+  const missingArea=result(b.addEntry_({entry:{...entry,lokasiPekerjaan:'Area',kategoriArea:'Office',namaArea:''}}));assert.equal(missingArea.ok,false);
+  const updateArea={...entry,id:areaIds[0],kodeMesin:'-',namaMesin:'-',namaMaterial:'',materialNumberSAP:'',sparepartDetail:[],deskripsiMasalah:'Updated area work'};
+  delete updateArea.lokasiPekerjaan;delete updateArea.kategoriArea;delete updateArea.namaArea;
+  assert.equal(result(b.updateEntry_({entry:updateArea})).ok,true);
+
   store.commit();
   const second=createStorage(sql,{},'https://omodos.juldigi.workers.dev');const b2=createBackend(second.services).trainingTest;
   assert.equal(b2.getMachinesList_().length,ms.length);assert.equal(b2.getSparepartLokasiMerged_().length,1);
+  const restored=second.spreadsheet.getSheetByName('Logbook').getDataRange().getValues();
+  const h=restored[0], records=restored.slice(1).map(row=>Object.fromEntries(h.map((name,i)=>[name,row[i]])));
+  for(const id of areaIds){const r=records.find(r=>r.ID===id);assert.equal(r['Lokasi Pekerjaan'],'Area');assert.equal(r['Kode Mesin'],'-');assert.equal(r['Nama Mesin'],'-');assert.equal(r['Nama Unit'],'-');assert(r['Lokasi/Area'].includes(r['Kategori Area']));}
+  assert.equal(records.find(r=>r.ID===areaIds[0])['Deskripsi Masalah'],'Updated area work');
+  console.log('Area work SQLite: PASS ('+areaIds.length+' locations, category validation, canonical fields, partial edit and reload).');
   console.log('SQLite integration: PASS (migration, save/reload, quantity, partial edit, name-only material completion, mixed Patrol attachments).');
  }finally{db.close();fs.rmSync(tmp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
+

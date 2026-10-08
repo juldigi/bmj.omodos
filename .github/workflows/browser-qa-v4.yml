@@ -1300,6 +1300,58 @@ jobs:
             await page.locator('#resume-detail-close').click();
             result.phases.push('smart-resume-mobile-details');
 
+
+            console.log('[QA] area work logbook mobile');
+            await page.evaluate(()=>{
+              document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+              document.getElementById('view-input').classList.add('active');
+              const toggle=document.getElementById('form-wizard-toggle');
+              toggle.checked=false;toggle.dispatchEvent(new Event('change'));
+              resetSparepartRows();
+            });
+            await page.locator('#select-lokasiPekerjaan').selectOption('Area');
+            await page.locator('#select-kategoriArea').selectOption('Office');
+            await page.locator('#select-namaArea').selectOption('RMS');
+            const areaFormQA=await page.evaluate(async()=>{
+              const form=document.getElementById('form-entry'),oldPost=apiPost,oldLoad=loadAll,oldFix=groqAutoFixEntryFields,oldUrl=WEB_APP_URL;
+              const calls=[];
+              try{
+                if(!document.getElementById('entry-machine-fields').hidden || document.getElementById('select-kodeMesin').required || !document.getElementById('select-kodeMesin').disabled) throw new Error('Machine fields still required for area');
+                saveFormEntryDraft();
+                document.getElementById('select-lokasiPekerjaan').value='Mesin';syncLogbookLocationForm_();restoreFormEntryDraft();
+                if(document.getElementById('select-namaArea').value!=='RMS'||document.getElementById('select-lokasiPekerjaan').value!=='Area') throw new Error('Area draft lost');
+                form.querySelectorAll('[required]').forEach(el=>{
+                  if(el.id==='select-kategoriArea'||el.id==='select-namaArea')return;
+                  if(el.tagName==='SELECT'){
+                    if(el.id==='select-namaPelapor'){let o=document.createElement('option');o.value='QA Area Technician';o.textContent=o.value;el.appendChild(o);el.value=o.value;}
+                    else{const o=[...el.options].find(o=>o.value);if(o)el.value=o.value;}
+                  }else if(el.type==='date')el.value=new Date().toISOString().slice(0,10);
+                  else if(el.type==='time')el.value=el.name==='jamSelesai'?'11:00':'10:00';
+                  else if(el.type!=='file')el.value='QA Area Work';
+                });
+                form.querySelector('[name="jenisPekerjaan"]').value='Instalasi';
+                WEB_APP_URL='https://qa.invalid';apiPost=async p=>{calls.push(JSON.parse(JSON.stringify(p)));return {ok:true,id:'QA-AREA'};};loadAll=async()=>({ok:true});groqAutoFixEntryFields=async()=>0;
+                form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+                for(let i=0;i<50&&!calls.length;i++)await new Promise(r=>setTimeout(r,10));
+                if(!calls.length)throw new Error('Area submit blocked by validation');
+                const e=calls[0].entry;
+                if(e.kodeMesin!=='-'||e.namaMesin!=='-'||e.lokasi!=='Office · RMS'||e.lokasiPekerjaan!=='Area')throw new Error('Area payload wrong: '+JSON.stringify(e));
+                ENTRIES=[{'ID':'QA-AREA','Timestamp Input':new Date().toISOString(),'Tanggal':new Date().toISOString().slice(0,10),'Lokasi Pekerjaan':'Area','Kategori Area':e.kategoriArea,'Nama Area':e.namaArea,'Lokasi/Area':e.lokasi,'Kode Mesin':'-','Nama Mesin':'-','Nama Unit':'-','Jenis Pekerjaan':'Instalasi','Status':'Selesai','Deskripsi Masalah':'QA Area Work','Tindakan Perbaikan':'QA Installation','Downtime (menit)':60}];
+                renderUtama();openDetail('QA-AREA');
+                if(!document.getElementById('modal-content').textContent.includes('Office · RMS'))throw new Error('Area detail missing');
+                renderEntryEditForm(ENTRIES[0]);
+                if(document.getElementById('edit-location-kind').value!=='Area'||document.getElementById('edit-area-name').value!=='RMS')throw new Error('Area edit missing');
+                closeModal();renderDashboardView();
+                const smart=document.getElementById('home-smart-resume').textContent;
+                if(!smart.includes('1 Area')||smart.includes('Kerugian'))throw new Error('Area counted as machine downtime');
+                const idx=buildMachineIndex_();
+                if(matchEntryMachineKey_(ENTRIES[0],idx)!=='area:Office · RMS')throw new Error('Area filter lost');
+                return {category:e.kategoriArea,area:e.namaArea,location:e.lokasi,kind:e.lokasiPekerjaan,machineRequired:false,draft:true,edit:true};
+              }finally{apiPost=oldPost;loadAll=oldLoad;groqAutoFixEntryFields=oldFix;WEB_APP_URL=oldUrl;}
+            });
+            result.areaFormQA=areaFormQA;
+            result.phases.push('area-work-logbook-mobile');
+
             const relevantErrors = errors.filter(x =>
               !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError/i.test(x)
             );

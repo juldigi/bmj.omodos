@@ -12,6 +12,7 @@ nodes['resume-detail-close']={addEventListener(){},focus(){}};
 const entries=['kritikal','perhatian','normal'].map((status,i)=>({'Timestamp Input':new Date(now-i*1000).toISOString(),'Tanggal':'2026-10-08','Nama Mesin':'AHU '+(i+1),'Kode Mesin':'AHU-'+i,'Status':status,'Deskripsi Masalah':'<unsafe>','Tindakan Perbaikan':'Check','Nama Material':'Seal',qty:i+1,minutes:30}));
 const c={console,Date,Map,Array,ENTRIES:entries,SPAREPART_LOKASI:[{nama:'New seal',needsReview:true},{nama:'Reviewed',needsReview:false}],SPAREPART_ETA:[{noPO:'PO-1',namaMaterial:'Motor',estimasiEta:'2026-01-01'}],KPI_DEPARTMENT_MTD:[{Tahun:'2026',KPI:'Loss',Polaritas:'-', 'Target Oct':2,'Realisasi Oct':1}],KPI_KERJA:[],KPI_DEPARTMENT_META:{year:2026,latestActualMonth:'Oct'},KK_BULAN:[],document:{getElementById:id=>nodes[id]||null},renderTrainingSparepartNotice_:()=>{},escapeHtml:s=>String(s).replaceAll('<','&lt;').replaceAll('>','&gt;'),dashStatusKey:s=>s,analyticsMachineBucket_:e=>({key:e['Kode Mesin'],nama:e['Nama Mesin']}),anIsBreakdown:()=>true,parseDurationMinutes:e=>e.minutes,getHomeKerugianPerJamRp:()=>60000,fmtDurationMinutes:n=>n+' menit',parseSparepartDetail:()=>[{}],sparepartEntryTotalQty:e=>e.qty,poStatusKey:()=> 'overdue',kkPolaritasOk:()=>true,closeModal(){}};
 vm.createContext(c);
+vm.runInContext(html.slice(html.indexOf("function isAreaEntry_"),html.indexOf("function populateWorkAreaOptions_")),c);
 const start=html.indexOf('function renderHomeSmartResume(){'),end=html.indexOf('/* ---------------------------------------------------------------------\n   HOME HERO',start);
 vm.runInContext(html.slice(start,end),c);
 c.renderHomeSmartResume();
@@ -30,3 +31,4 @@ c.SPAREPART_LOKASI=[];c.renderHomeSmartResume();assert(!holder.innerHTML.include
 // All inline scripts still parse.
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))new vm.Script(m[1]);
 console.log('Smart Resume: PASS (all nine detail clicks, status/date filters, loss, PO fields, empty logbook, pending master, escaping).');
+
