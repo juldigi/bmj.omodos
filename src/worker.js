@@ -1,3 +1,4 @@
+import "../public/work-areas.js";
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
@@ -461,11 +462,14 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     });
   }
   __name(strictDatedRows, "strictDatedRows");
+  function isAreaWork(o) {return text(o && o["Lokasi Pekerjaan"]).toLowerCase()==="area";}
   function machineCode(o) {
+    if(isAreaWork(o)) return "";
     return text(first(o, ["Kode Mesin", "KodeMesin", "Machine Code", "MachineCode", "Kode", "Functional Loc", "Functional Location"]));
   }
   __name(machineCode, "machineCode");
   function machineName(o) {
+    if(isAreaWork(o)) return "";
     return text(first(o, ["Nama Mesin", "NamaMesin", "Machine", "Mesin", "Machine Name", "Nama"]));
   }
   __name(machineName, "machineName");
@@ -507,6 +511,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
   }
   __name(isHigh, "isHigh");
   function downtimeMinutes(o) {
+    if(isAreaWork(o)) return 0;
     const direct = num(first(o, ["Downtime (menit)", "Downtime", "Downtime Menit", "Downtime Minutes", "Lost Time", "Lost Time (menit)"]));
     if (direct) return direct;
     const hours = num(first(o, ["Downtime (jam)", "Downtime Hours", "Lost Time (jam)"]));
@@ -770,7 +775,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const scopedStock = scope.active ? joinPartRecords(partRefs, stock).map((x) => x.record) : stock;
     const scopedEta = scope.active ? joinPartRecords(partRefs, eta).map((x) => x.record) : eta;
     const criticalMachines = machines.filter((m) => m.healthIndex < 60 || m.openIssues > 0).slice(0, 12);
-    const activeBreakdowns = [...bd, ...log.filter((r) => /breakdown|bd|emergency|corrective/.test(lower(first(r, ["Jenis Pekerjaan", "Type", "Kategori"]))))].filter((r) => !isClosed(r));
+    const activeBreakdowns = [...bd, ...log.filter((r) => !isAreaWork(r) && /breakdown|bd|emergency|corrective/.test(lower(first(r, ["Jenis Pekerjaan", "Type", "Kategori"]))))].filter((r) => !isClosed(r));
     const predictiveRisks = pred.filter((r) => isHigh(r) || !isClosed(r));
     const stockRisks = scopedStock.filter((r) => {
       const qty = num(first(r, ["Stock", "Stock Qty", "Qty", "Quantity", "Stock Aktual", "Stock Fisik", "On Hand"]));
@@ -1075,7 +1080,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const bd = within(sourceRows(SHEETS.breakdown), range.since, range.until).filter(scope.record);
     const rca = within(sourceRows(SHEETS.rca), range.since, range.until).filter(scope.record);
     const corrective = within(sourceRows(SHEETS.corrective), range.since, range.until).filter(scope.record);
-    const failureEvents = [...bd, ...log.filter((r) => /breakdown|emergency|corrective|failure|abnormal/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori", "Status"]))))];
+    const failureEvents = [...bd, ...log.filter((r) => !isAreaWork(r) && /breakdown|emergency|corrective|failure|abnormal/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori", "Status"]))))];
     const byMachineFailures = /* @__PURE__ */ new Map();
     failureEvents.forEach((r) => {
       const key = lower(machineCode(r) || machineName(r));
@@ -1203,7 +1208,7 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     const log = within(sourceRows(SHEETS.logbook), range.since, range.until).filter(scope.record);
     const bd = within(sourceRows(SHEETS.breakdown), range.since, range.until).filter(scope.record);
     const machines = aggregateMachines(range, scope.record);
-    const failures = [...bd, ...log.filter((r) => /breakdown|failure|emergency|abnormal|corrective/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori", "Status"]))))];
+    const failures = [...bd, ...log.filter((r) => !isAreaWork(r) && /breakdown|failure|emergency|abnormal|corrective/.test(lower(first(r, ["Jenis Pekerjaan", "Kategori", "Status"]))))];
     const risks = machines.filter((m) => m.predictive > 0 || m.recurring > 0 || m.healthIndex < 70).slice(0, 50).map((m) => ({
       machine: m.code || m.name,
       risk: m.healthIndex < 40 ? "high" : m.healthIndex < 70 ? "medium" : "watch",
@@ -7987,10 +7992,31 @@ function createBackend(services, env = {}) {
     return jsonOut_({ ok: true, id });
   }
   __name(savePiHardskill_, "savePiHardskill_");
+
+  function normalizeLogbookWorkLocation_(data, existing) {
+    existing=existing||{};
+    var kind=data.lokasiPekerjaan||data["Lokasi Pekerjaan"]||existing["Lokasi Pekerjaan"]||"Mesin";
+    if(kind!=="Mesin" && kind!=="Area") throw {code:"VALIDATION_ERROR",message:"Lokasi pekerjaan harus Mesin atau Area."};
+    data.lokasiPekerjaan=kind;
+    if(kind==="Area"){
+      var category=data.kategoriArea||data["Kategori Area"]||existing["Kategori Area"];
+      var area=data.namaArea||data["Nama Area"]||existing["Nama Area"];
+      if(!(globalThis.OMODOS_WORK_AREAS[category]||[]).includes(area)) throw {code:"VALIDATION_ERROR",message:"Pilih kategori dan area pekerjaan yang sesuai."};
+      data.kategoriArea=category;data.namaArea=area;
+      data.kodeMesin="-";data.namaMesin="-";data.namaUnit="-";
+      data.lokasi=category===area?category:category+" · "+area;
+    }else{
+      data.kategoriArea="-";data.namaArea="-";
+      if(!trainingValue_(data.kodeMesin||data["Kode Mesin"]) || !trainingValue_(data.namaMesin||data["Nama Mesin"])) throw {code:"VALIDATION_ERROR",message:"Kode Mesin dan Nama Mesin wajib diisi untuk pekerjaan mesin."};
+    }
+    return data;
+  }
+
   function addEntry_(body) {
     try {
       var data = body.entry || body.data || body;
       if (!data || typeof data !== "object") throw { code: "VALIDATION_ERROR", message: "Data kosong" };
+      normalizeLogbookWorkLocation_(data);
       if (!String(data.lokasi || data["Lokasi/Area"] || "").trim()) {
         try {
           var machineSheet = getOrCreateSheet_(SHEET_MESIN, MESIN_HEADERS);
@@ -8011,7 +8037,7 @@ function createBackend(services, env = {}) {
       var usesSparepart = materialDetails.length > 0;
       var sh = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
       try {
-        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive", "Sparepart Detail (JSON)"]);
+        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive", "Sparepart Detail (JSON)", "Lokasi Pekerjaan", "Kategori Area", "Nama Area"]);
       } catch (e) {
       }
       try {
@@ -8039,6 +8065,9 @@ function createBackend(services, env = {}) {
       rowMap["Waktu"] = data.waktu || Utilities.formatDate(/* @__PURE__ */ new Date(), Session.getScriptTimeZone(), "HH:mm");
       rowMap["Kode Mesin"] = data.kodeMesin || data["Kode Mesin"] || "";
       rowMap["Nama Mesin"] = data.namaMesin || data["Nama Mesin"] || "";
+      rowMap["Lokasi Pekerjaan"] = data.lokasiPekerjaan;
+      rowMap["Kategori Area"] = data.kategoriArea;
+      rowMap["Nama Area"] = data.namaArea;
       rowMap["Lokasi/Area"] = data.lokasi || data["Lokasi/Area"] || "";
       rowMap["Jenis Pekerjaan"] = data.jenisPekerjaan || "";
       rowMap["Is Preventive"] = data.isPreventive ? "TRUE" : String(data.jenisPekerjaan || "").toLowerCase().indexOf("preventive") !== -1 ? "TRUE" : "FALSE";
@@ -8091,7 +8120,7 @@ function createBackend(services, env = {}) {
       if (!id) throw { code: "VALIDATION_ERROR", message: "ID wajib diisi untuk update" };
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
-      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)"]);
+      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)", "Lokasi Pekerjaan", "Kategori Area", "Nama Area"]);
       var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
       var values = sh.getDataRange().getValues();
       var idCol = headers.indexOf("ID");
@@ -8103,6 +8132,8 @@ function createBackend(services, env = {}) {
         }
       }
       if (targetRow === -1) throw { code: "NOT_FOUND", message: "Entri Logbook dengan ID " + id + " tidak ditemukan" };
+      var locationExisting = Object.fromEntries(headers.map(function(h,c){return [h,values[targetRow-1][c]];}));
+      normalizeLogbookWorkLocation_(data,locationExisting);
       var missing = REQUIRED_ENTRY_FIELDS.filter(function(f) {
         return !data[f] || String(data[f]).trim() === "";
       });
@@ -8131,6 +8162,9 @@ function createBackend(services, env = {}) {
       rowMap["Waktu"] = data.waktu || getExisting("Waktu");
       rowMap["Kode Mesin"] = data.kodeMesin || data["Kode Mesin"] || getExisting("Kode Mesin");
       rowMap["Nama Mesin"] = data.namaMesin || data["Nama Mesin"] || getExisting("Nama Mesin");
+      rowMap["Lokasi Pekerjaan"] = data.lokasiPekerjaan;
+      rowMap["Kategori Area"] = data.kategoriArea;
+      rowMap["Nama Area"] = data.namaArea;
       rowMap["Lokasi/Area"] = data.lokasi || data["Lokasi/Area"] || getExisting("Lokasi/Area");
       rowMap["Jenis Pekerjaan"] = data.jenisPekerjaan || getExisting("Jenis Pekerjaan");
       rowMap["Deskripsi Masalah"] = data.deskripsiMasalah || data.deskripsi || data["Deskripsi Masalah"] || getExisting("Deskripsi Masalah");
