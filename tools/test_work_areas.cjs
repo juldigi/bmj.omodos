@@ -2,6 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync('public/index.html','utf8'),catalog=fs.readFileSync('public/work-areas.js','utf8');
 const c={escapeHtml:s=>String(s).replaceAll('<','&lt;').replaceAll('>','&gt;'),MACHINE_LAINNYA_VALUE:'other',MACHINES:[{'Kode Mesin':'OFS-8','Nama Mesin':'Offset 8','Lokasi/Area':'Printing'}]};
+assert(fs.readFileSync('src/worker.js','utf8').startsWith(catalog.trimEnd()));
 vm.createContext(c);vm.runInContext(catalog,c);
 let start=html.indexOf('function isAreaEntry_'),end=html.indexOf("$('#select-kategoriArea').innerHTML",start);
 vm.runInContext(html.slice(start,end),c);
