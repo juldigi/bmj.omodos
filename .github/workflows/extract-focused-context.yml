@@ -62,7 +62,20 @@ jobs:
               "location.reload",
               "screen.orientation",
               "orientationchange",
-              "window.onresize"
+              "window.onresize",
+              "sparepart-rows",
+              "btn-add-sparepart-row",
+              "form-logbook",
+              "EDITING_ENTRY",
+              "edit-entry",
+              "renderEntries",
+              "populateSparepart",
+              "function addSparepart",
+              "function renderSparepartRows",
+              "data-sparepart",
+              "select[name=\"material\"]",
+              "sparepartSelect",
+              "function renderLogbookTable"
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
