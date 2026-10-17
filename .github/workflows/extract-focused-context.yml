@@ -42,7 +42,12 @@ jobs:
               "function renderCopilot",
               "function openCopilot",
               "copilot-record-title",
-              "data-copilot"
+              "data-copilot",
+              "function copilotSearchInternal_(",
+              "function copilotCompactFields_(",
+              "function copilotRowLabel_(",
+              "function copilotInternalAnswer_(",
+              "function copilotRowCardHtml_("
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
