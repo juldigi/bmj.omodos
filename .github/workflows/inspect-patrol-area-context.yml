@@ -38,7 +38,7 @@ jobs:
             for n, i in enumerate(starts, 1):
               out.append("### Match " + str(n) + " at byte " + str(i))
               out.append("```javascript")
-              out.append(s[max(0, i-700):min(len(s), i+1500)])
+              out.append("\\n".join(line.rstrip() for line in s[max(0, i-700):min(len(s), i+1500)].splitlines()))
               out.append("```")
             out.append("")
           Path("audit").mkdir(exist_ok=True)
