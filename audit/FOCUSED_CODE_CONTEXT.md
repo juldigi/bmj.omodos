@@ -11973,3 +11973,1478 @@ No match.
 08126:   saveSyncQueue_(q);
 ~~~
 
+## action:'login', username
+No match.
+
+## action: 'login', username
+### Around line 6691
+~~~text
+06679:     if(!WEB_APP_URL){
+06680:       errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App).';
+06681:       errEl.style.display = 'block';
+06682:       return;
+06683:     }
+06684:     submitBtn.disabled = true;
+06685:     const originalLabel = submitBtn.innerHTML;
+06686:     submitBtn.innerHTML = '<i class="ph-bold ph-circle-notch ph-spin"></i> Memeriksa...';
+06687:     try{
+06688:       const res = await fetchWithTimeout_(WEB_APP_URL, {
+06689:         method: 'POST',
+06690:         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+06691:         body: JSON.stringify({ action: 'login', username: u, password: p })
+06692:       }, 30000);
+06693:       const json = await parseApiResponse_(res);
+06694:       if(!json.ok || !json.user){
+06695:         errEl.textContent = json.error || 'Username atau password salah.';
+06696:         errEl.style.display = 'block';
+06697:         return;
+06698:       }
+06699:       if(json.user.role !== 'Superadmin'){
+06700:         if(json.sessionToken){
+06701:           fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:json.sessionToken})}).catch(()=>{});
+06702:         }
+06703:         errEl.textContent = 'Akun ini valid, tetapi bukan Superadmin — akses ditolak.';
+06704:         errEl.style.display = 'block';
+06705:         return;
+06706:       }
+06707:       SETTING_AUTH_OK = true;
+06708:       SETTING_SESSION_TOKEN = json.sessionToken || '';
+06709:       closeModal();
+06710:       if(onSuccess) onSuccess();
+06711:     }catch(err){
+06712:       // Step-up auth Setting tidak boleh mengunci sesi aplikasi utama.
+06713:       // Tampilkan error di modal saja; appRoot/login-gate milik sesi utama
+06714:       // berada di scope lain dan memang tidak boleh disentuh dari sini.
+06715:       errEl.textContent = err.message || 'Gagal menghubungi server. Periksa koneksi internet Anda.';
+06716:       errEl.style.display = 'block';
+06717:     }finally{
+06718:       submitBtn.disabled = false;
+06719:       submitBtn.innerHTML = originalLabel;
+06720:     }
+06721:   };
+06722:   $('#btn-setting-login-submit').addEventListener('click', submit);
+06723:   $('#setting-login-password').addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); submit(); } });
+06724:   setTimeout(()=> $('#setting-login-username') && $('#setting-login-username').focus(), 50);
+06725: }
+06726: 
+06727: /* ======================================================================
+06728:    [RBAC] USER MANAGEMENT & ROLE ACCESS MANAGEMENT (khusus Superadmin)
+06729:    ----------------------------------------------------------------------
+06730:    Mengikuti pola render-ke-container yang sudah dipakai di menu Setting
+06731:    lain (renderMachineTable, renderPersonilTable, dst). Semua data
+06732:    (user, role, permission) diambil & disimpan lewat code.gs — frontend
+06733:    di sini hanya UI, tidak menyimpan apa pun secara lokal.
+06734:    ====================================================================== */
+06735: function renderRbacAdminSection(){
+06736:   const holder = $('#rbac-admin-section');
+06737:   if(!holder) return;
+06738:   if(!isSettingAuthed()){ holder.innerHTML = ''; return; }
+06739:   holder.innerHTML = `
+06740:     <div class="card" style="margin-bottom:18px;">
+06741:       <div class="section-title"><i class="ph-bold ph-users"></i> User Management <span style="font-size:11px;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">(khusus Superadmin)</span></div>
+06742:       <div class="sub" style="margin-bottom:12px;">Kelola akun aplikasi tanpa bercampur dengan pengaturan role. Setiap aktivitas user dicatat ke Audit Log terpusat.</div>
+06743:       <div class="grid3">
+06744:         <div class="field"><label>Username</label><input type="text" id="ru-username" placeholder="cth: budi.santoso" autocomplete="off"></div>
+06745:         <div class="field"><label>Nama Tampilan</label><input type="text" id="ru-displayname" placeholder="cth: Budi Santoso"></div>
+06746:         <div class="field"><label>Role</label>
+06747:           <select id="ru-role">
+06748:             <option value="Technician">Technician</option>
+06749:             <option value="Supervisor">Supervisor</option>
+06750:             <option value="Superadmin">Superadmin</option>
+06751:           </select>
+06752:         </div>
+06753:       </div>
+06754:       <div class="field"><label>Password (min. 6 karakter)</label><input type="password" id="ru-password" placeholder="Password awal" autocomplete="new-password"></div>
+06755:       <button class="btn btn-sm btn-primary" id="btn-add-user"><i class="ph-bold ph-user-plus"></i> Tambah User</button>
+~~~
+
+### Around line 21189
+~~~text
+21177:     if(!WEB_APP_URL){
+21178:       errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App). Hubungi Superadmin untuk konfigurasi awal.';
+21179:       return;
+21180:     }
+21181: 
+21182:     submitBtn.disabled = true;
+21183:     const originalLabel = submitBtn.innerHTML;
+21184:     submitBtn.innerHTML = '<i class="ph-bold ph-circle-notch ph-spin"></i> Memeriksa...';
+21185:     try{
+21186:       const res = await fetchWithTimeout_(WEB_APP_URL, {
+21187:         method: 'POST',
+21188:         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+21189:         body: JSON.stringify({ action: 'login', username: u, password: p })
+21190:       }, 30000);
+21191:       const json = await parseApiResponse_(res);
+21192:       if(!json.ok){
+21193:         errEl.textContent = json.error || 'Username atau password salah. Silakan coba lagi.';
+21194:         const box = document.querySelector('.login-box');
+21195:         box.style.animation = 'none';
+21196:         void box.offsetWidth;
+21197:         box.style.animation = 'modalIn 320ms cubic-bezier(.4,0,.2,1)';
+21198:         return;
+21199:       }
+21200:       if(!json.sessionToken){
+21201:         throw new Error('Backend Cloudflare masih versi lama. Deploy ulang FinalOMODOSRilis.gs terbaru, lalu gunakan URL /exec deployment tersebut.');
+21202:       }
+21203:       invalidatePreparedReads_();
+21204:       activateAccountDataCaches_(json.user&&json.user.username,{claimExisting:false});
+21205:       CURRENT_USER = json.user;
+21206:       SESSION_TOKEN = json.sessionToken || '';
+21207:       SESSION_EXPIRES_AT = json.expiresAt || '';
+21208:       PERMISSIONS = json.permissions || {};
+21209:       // Gabungkan daftar dari backend dengan hasil scan DOM sidebar saat ini,
+21210:       // supaya menu apa pun (baru/lama, terdaftar di code.gs atau tidak)
+21211:       // SELALU tergate oleh Role Access Management — tidak ada yang lolos
+21212:       // tampil begitu saja hanya karena belum sempat didaftarkan manual.
+21213:       FEATURE_REGISTRY = (typeof window.mergeFeatureRegistry === 'function')
+21214:         ? window.mergeFeatureRegistry(json.features || [])
+21215:         : (json.features || []);
+21216:       try{ cacheRbacSession_(); }catch(e){}
+21217:       applyRbacToUi();
+21218:       // [FIX] Sinkronkan matrix Tampilan Sederhana dari backend (kalau sudah
+21219:       // tersedia -- lihat handleSaveLcPermissions_/getLcPermissionMatrix_ di
+21220:       // code.gs) supaya perubahan yang diatur Superadmin di satu device ikut
+21221:       // berlaku untuk user lain, bukan cuma tersimpan lokal di browser yang
+21222:       // dipakai mengatur. Backend lama yang belum di-deploy ulang cukup tidak
+21223:       // mengirim field ini (undefined) -- fallback ke localStorage yang sudah
+21224:       // dimuat lebih awal, tidak menimbulkan error.
+21225:       if(json.lcPermissions && Object.keys(json.lcPermissions).length && typeof lcPermsSaveLocal === 'function'){
+21226:         window.LC_PERMISSIONS = json.lcPermissions;
+21227:         lcPermsSaveLocal(json.lcPermissions);
+21228:         if(typeof applyLcPermissionsToUi === 'function') applyLcPermissionsToUi();
+21229:       }
+21230:       // Tema preferensi user (code.gs) menang atas localStorage kalau ada
+21231:       // & berbeda dari yang sedang aktif, tanpa reload halaman.
+21232:       if(json.user.themePref && json.user.themePref !== document.documentElement.getAttribute('data-theme')){
+21233:         setAppTheme(json.user.themePref, { persist:false });
+21234:       } else {
+21235:         renderThemeManager();
+21236:       }
+21237:       // Gaya tampilan (bentuk) preferensi user, kalau backend sudah punya
+21238:       // field stylePref. Kalau belum ada, fallback ke localStorage yang
+21239:       // sudah diterapkan lebih awal di <head> — tidak menimbulkan error.
+21240:       if(json.user.stylePref && json.user.stylePref !== (document.documentElement.getAttribute('data-style') || 'klasik')){
+21241:         setAppStyle(json.user.stylePref, { persist:false });
+21242:       } else {
+21243:         renderStyleManager();
+21244:       }
+21245:       // [FIX] Splash screen "Menyiapkan Data...": jangan langsung buka Home
+21246:       // begitu login sukses. login-gate disembunyikan LANGSUNG (tanpa fade,
+21247:       // supaya tidak ada celah user melihat Home kosong di baliknya), lalu
+21248:       // splash tampil menutupi layar SAMBIL loadAll() menyiapkan seluruh
+21249:       // data (termasuk logbook) di belakang layar. Home/app-root baru
+21250:       // dibuka setelah data benar-benar siap.
+21251:       gate.style.display = 'none';
+21252:       const splash = document.getElementById('app-splash');
+21253:       const splashText = document.getElementById('app-splash-text');
+~~~
+
+## login-gate
+### Around line 252
+~~~text
+00240: html:not([data-theme="red-black"]) .btn-primary{
+00241:   background:var(--red) !important; box-shadow:none !important; color:#fff !important;
+00242: }
+00243: html:not([data-theme="red-black"]) .btn-primary:hover{
+00244:   filter:brightness(1.08) !important; box-shadow:none !important;
+00245: }
+00246: html:not([data-theme="red-black"]) .card:hover{
+00247:   border-color:var(--line) !important; box-shadow:0 6px 20px -12px rgba(0,0,0,.25) !important;
+00248: }
+00249: html:not([data-theme="red-black"]) .card::before{
+00250:   background:linear-gradient(90deg, transparent, var(--line), transparent) !important; opacity:1 !important;
+00251: }
+00252: html:not([data-theme="red-black"]) #login-gate{
+00253:   background:var(--bg) !important;
+00254: }
+00255: html:not([data-theme="red-black"]) #login-gate::before,
+00256: html:not([data-theme="red-black"]) #login-gate::after{
+00257:   display:none !important;
+00258: }
+00259: html:not([data-theme="red-black"]) .login-box{
+00260:   border:1px solid var(--line) !important; box-shadow:0 20px 50px rgba(0,0,0,.18) !important;
+00261:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1) !important;
+00262: }
+00263: 
+00264: /* ===================================================================
+00265:    TEMA (Theme Manager): hanya tema yang benar-benar dipakai di
+00266:    THEME_REGISTRY — omodos (default terang), red-black (dark), dan
+00267:    abu-profesional. Tema lain yang sebelumnya ada di sini sudah dihapus
+00268:    karena tidak dipakai lagi.
+00269:    =================================================================== */
+00270: 
+00271: /* OMODOS (Light Neutral) — tema default aplikasi, mengikuti identitas
+00272:    brand OMODOS: terang, bersih, tanpa efek glow/blur. */
+00273: html[data-theme="omodos"]{
+00274:   --bg:#eef0f3; --bg-grid:#e4e7eb; --panel:#ffffff; --panel-2:#f6f7f9;
+00275:   --panel-glass:rgba(255,255,255,.9); --line:#dfe2e7; --line-soft:#ebedf0;
+00276:   --text:#12141a; --text-dim:#5b6472;
+00277:   --red:#7c1420; --red-dim:#f0d5d8; --red-glow:rgba(124,20,32,.14);
+00278:   --amber:#8a5a00; --amber-dim:#f0ddb0; --green:#146c43; --green-dim:#c9e8d7;
+00279:   --blue:#00AEEF; --holo-2:#8a3a34; --holo-3:#5c130d;
+00280:   --focus-ring:#0b5fae;
+00281:   --on-accent:#ffffff;
+00282: }
+00283: 
+00284: /* Abu Profesional (Slate Gray) — aksen warna BIRU, bukan merah. */
+00285: html[data-theme="abu-profesional"]{
+00286:   --bg:#eef0f2; --bg-grid:#e2e5e9; --panel:#ffffff; --panel-2:#e3e6ea;
+00287:   --panel-glass:rgba(255,255,255,.9); --line:#b7bcc3; --line-soft:#d6dade;
+00288:   --text:#1a1d21; --text-dim:#4d525a;
+00289:   --red:#1a4fa0; --red-dim:#cddced; --red-glow:rgba(26,79,160,.18);
+00290:   --amber:#7a5200; --amber-dim:#efdcae; --green:#1b6b45; --green-dim:#cae6d6;
+00291:   --blue:#1a4fa0; --holo-2:#3a6ea5; --holo-3:#0d3a73;
+00292:   --focus-ring:#1a4fa0;
+00293:   --on-accent:#ffffff;
+00294: }
+00295: 
+00296: /* Dark (red-black) — aksen warna HITAM & ABU, tanpa merah. */
+00297: html[data-theme="red-black"]{
+00298:   --red:#a6acb5; --red-dim:#33373c; --red-glow:rgba(166,172,181,.20);
+00299:   --holo-2:#c7cbd1; --holo-3:#5b6068;
+00300:   --focus-ring:#a6acb5;
+00301: }
+00302: 
+00303: /* ===================================================================
+00304:    [STYLE MANAGER] "Gaya Tampilan Aplikasi" — TERPISAH dari Theme Manager
+00305:    (palet warna). Theme Manager (html[data-theme]) hanya mengatur WARNA.
+00306:    Style Manager (html[data-style]) mengatur BENTUK: sudut card/tombol/
+00307:    input/badge, jenis font, ketebalan border, efek bayangan, tekstur
+00308:    latar, hingga bentuk sidebar & topbar — TANPA mengubah variabel warna
+00309:    sama sekali, supaya kombinasi bebas: gaya apa pun + palet warna apa
+00310:    pun dari Theme Manager yang sudah ada. Menambah gaya baru cukup
+00311:    tambah satu entri STYLE_REGISTRY (skrip) + satu blok
+00312:    `html[data-style="key"]{...}` di sini.
+00313:    Selector `[class*="card"]`, `[class*="chip"]`, `[class*="badge"]`,
+00314:    `[class*="pill"]`, `[class*="box"]` dipakai supaya efek bentuk
+00315:    menjangkau SELURUH modul aplikasi (Logbook, Report, Analitik, People
+00316:    Intelligence, dst) tanpa perlu menulis ulang tiap class satu-satu. */
+~~~
+
+### Around line 255
+~~~text
+00243: html:not([data-theme="red-black"]) .btn-primary:hover{
+00244:   filter:brightness(1.08) !important; box-shadow:none !important;
+00245: }
+00246: html:not([data-theme="red-black"]) .card:hover{
+00247:   border-color:var(--line) !important; box-shadow:0 6px 20px -12px rgba(0,0,0,.25) !important;
+00248: }
+00249: html:not([data-theme="red-black"]) .card::before{
+00250:   background:linear-gradient(90deg, transparent, var(--line), transparent) !important; opacity:1 !important;
+00251: }
+00252: html:not([data-theme="red-black"]) #login-gate{
+00253:   background:var(--bg) !important;
+00254: }
+00255: html:not([data-theme="red-black"]) #login-gate::before,
+00256: html:not([data-theme="red-black"]) #login-gate::after{
+00257:   display:none !important;
+00258: }
+00259: html:not([data-theme="red-black"]) .login-box{
+00260:   border:1px solid var(--line) !important; box-shadow:0 20px 50px rgba(0,0,0,.18) !important;
+00261:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1) !important;
+00262: }
+00263: 
+00264: /* ===================================================================
+00265:    TEMA (Theme Manager): hanya tema yang benar-benar dipakai di
+00266:    THEME_REGISTRY — omodos (default terang), red-black (dark), dan
+00267:    abu-profesional. Tema lain yang sebelumnya ada di sini sudah dihapus
+00268:    karena tidak dipakai lagi.
+00269:    =================================================================== */
+00270: 
+00271: /* OMODOS (Light Neutral) — tema default aplikasi, mengikuti identitas
+00272:    brand OMODOS: terang, bersih, tanpa efek glow/blur. */
+00273: html[data-theme="omodos"]{
+00274:   --bg:#eef0f3; --bg-grid:#e4e7eb; --panel:#ffffff; --panel-2:#f6f7f9;
+00275:   --panel-glass:rgba(255,255,255,.9); --line:#dfe2e7; --line-soft:#ebedf0;
+00276:   --text:#12141a; --text-dim:#5b6472;
+00277:   --red:#7c1420; --red-dim:#f0d5d8; --red-glow:rgba(124,20,32,.14);
+00278:   --amber:#8a5a00; --amber-dim:#f0ddb0; --green:#146c43; --green-dim:#c9e8d7;
+00279:   --blue:#00AEEF; --holo-2:#8a3a34; --holo-3:#5c130d;
+00280:   --focus-ring:#0b5fae;
+00281:   --on-accent:#ffffff;
+00282: }
+00283: 
+00284: /* Abu Profesional (Slate Gray) — aksen warna BIRU, bukan merah. */
+00285: html[data-theme="abu-profesional"]{
+00286:   --bg:#eef0f2; --bg-grid:#e2e5e9; --panel:#ffffff; --panel-2:#e3e6ea;
+00287:   --panel-glass:rgba(255,255,255,.9); --line:#b7bcc3; --line-soft:#d6dade;
+00288:   --text:#1a1d21; --text-dim:#4d525a;
+00289:   --red:#1a4fa0; --red-dim:#cddced; --red-glow:rgba(26,79,160,.18);
+00290:   --amber:#7a5200; --amber-dim:#efdcae; --green:#1b6b45; --green-dim:#cae6d6;
+00291:   --blue:#1a4fa0; --holo-2:#3a6ea5; --holo-3:#0d3a73;
+00292:   --focus-ring:#1a4fa0;
+00293:   --on-accent:#ffffff;
+00294: }
+00295: 
+00296: /* Dark (red-black) — aksen warna HITAM & ABU, tanpa merah. */
+00297: html[data-theme="red-black"]{
+00298:   --red:#a6acb5; --red-dim:#33373c; --red-glow:rgba(166,172,181,.20);
+00299:   --holo-2:#c7cbd1; --holo-3:#5b6068;
+00300:   --focus-ring:#a6acb5;
+00301: }
+00302: 
+00303: /* ===================================================================
+00304:    [STYLE MANAGER] "Gaya Tampilan Aplikasi" — TERPISAH dari Theme Manager
+00305:    (palet warna). Theme Manager (html[data-theme]) hanya mengatur WARNA.
+00306:    Style Manager (html[data-style]) mengatur BENTUK: sudut card/tombol/
+00307:    input/badge, jenis font, ketebalan border, efek bayangan, tekstur
+00308:    latar, hingga bentuk sidebar & topbar — TANPA mengubah variabel warna
+00309:    sama sekali, supaya kombinasi bebas: gaya apa pun + palet warna apa
+00310:    pun dari Theme Manager yang sudah ada. Menambah gaya baru cukup
+00311:    tambah satu entri STYLE_REGISTRY (skrip) + satu blok
+00312:    `html[data-style="key"]{...}` di sini.
+00313:    Selector `[class*="card"]`, `[class*="chip"]`, `[class*="badge"]`,
+00314:    `[class*="pill"]`, `[class*="box"]` dipakai supaya efek bentuk
+00315:    menjangkau SELURUH modul aplikasi (Logbook, Report, Analitik, People
+00316:    Intelligence, dst) tanpa perlu menulis ulang tiap class satu-satu. */
+00317: 
+00318: html[data-style] [class*="card"]:not(.theme-card):not(.style-card):not(.dash-card),
+00319: html[data-style] [class*="chip"],
+~~~
+
+### Around line 256
+~~~text
+00244:   filter:brightness(1.08) !important; box-shadow:none !important;
+00245: }
+00246: html:not([data-theme="red-black"]) .card:hover{
+00247:   border-color:var(--line) !important; box-shadow:0 6px 20px -12px rgba(0,0,0,.25) !important;
+00248: }
+00249: html:not([data-theme="red-black"]) .card::before{
+00250:   background:linear-gradient(90deg, transparent, var(--line), transparent) !important; opacity:1 !important;
+00251: }
+00252: html:not([data-theme="red-black"]) #login-gate{
+00253:   background:var(--bg) !important;
+00254: }
+00255: html:not([data-theme="red-black"]) #login-gate::before,
+00256: html:not([data-theme="red-black"]) #login-gate::after{
+00257:   display:none !important;
+00258: }
+00259: html:not([data-theme="red-black"]) .login-box{
+00260:   border:1px solid var(--line) !important; box-shadow:0 20px 50px rgba(0,0,0,.18) !important;
+00261:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1) !important;
+00262: }
+00263: 
+00264: /* ===================================================================
+00265:    TEMA (Theme Manager): hanya tema yang benar-benar dipakai di
+00266:    THEME_REGISTRY — omodos (default terang), red-black (dark), dan
+00267:    abu-profesional. Tema lain yang sebelumnya ada di sini sudah dihapus
+00268:    karena tidak dipakai lagi.
+00269:    =================================================================== */
+00270: 
+00271: /* OMODOS (Light Neutral) — tema default aplikasi, mengikuti identitas
+00272:    brand OMODOS: terang, bersih, tanpa efek glow/blur. */
+00273: html[data-theme="omodos"]{
+00274:   --bg:#eef0f3; --bg-grid:#e4e7eb; --panel:#ffffff; --panel-2:#f6f7f9;
+00275:   --panel-glass:rgba(255,255,255,.9); --line:#dfe2e7; --line-soft:#ebedf0;
+00276:   --text:#12141a; --text-dim:#5b6472;
+00277:   --red:#7c1420; --red-dim:#f0d5d8; --red-glow:rgba(124,20,32,.14);
+00278:   --amber:#8a5a00; --amber-dim:#f0ddb0; --green:#146c43; --green-dim:#c9e8d7;
+00279:   --blue:#00AEEF; --holo-2:#8a3a34; --holo-3:#5c130d;
+00280:   --focus-ring:#0b5fae;
+00281:   --on-accent:#ffffff;
+00282: }
+00283: 
+00284: /* Abu Profesional (Slate Gray) — aksen warna BIRU, bukan merah. */
+00285: html[data-theme="abu-profesional"]{
+00286:   --bg:#eef0f2; --bg-grid:#e2e5e9; --panel:#ffffff; --panel-2:#e3e6ea;
+00287:   --panel-glass:rgba(255,255,255,.9); --line:#b7bcc3; --line-soft:#d6dade;
+00288:   --text:#1a1d21; --text-dim:#4d525a;
+00289:   --red:#1a4fa0; --red-dim:#cddced; --red-glow:rgba(26,79,160,.18);
+00290:   --amber:#7a5200; --amber-dim:#efdcae; --green:#1b6b45; --green-dim:#cae6d6;
+00291:   --blue:#1a4fa0; --holo-2:#3a6ea5; --holo-3:#0d3a73;
+00292:   --focus-ring:#1a4fa0;
+00293:   --on-accent:#ffffff;
+00294: }
+00295: 
+00296: /* Dark (red-black) — aksen warna HITAM & ABU, tanpa merah. */
+00297: html[data-theme="red-black"]{
+00298:   --red:#a6acb5; --red-dim:#33373c; --red-glow:rgba(166,172,181,.20);
+00299:   --holo-2:#c7cbd1; --holo-3:#5b6068;
+00300:   --focus-ring:#a6acb5;
+00301: }
+00302: 
+00303: /* ===================================================================
+00304:    [STYLE MANAGER] "Gaya Tampilan Aplikasi" — TERPISAH dari Theme Manager
+00305:    (palet warna). Theme Manager (html[data-theme]) hanya mengatur WARNA.
+00306:    Style Manager (html[data-style]) mengatur BENTUK: sudut card/tombol/
+00307:    input/badge, jenis font, ketebalan border, efek bayangan, tekstur
+00308:    latar, hingga bentuk sidebar & topbar — TANPA mengubah variabel warna
+00309:    sama sekali, supaya kombinasi bebas: gaya apa pun + palet warna apa
+00310:    pun dari Theme Manager yang sudah ada. Menambah gaya baru cukup
+00311:    tambah satu entri STYLE_REGISTRY (skrip) + satu blok
+00312:    `html[data-style="key"]{...}` di sini.
+00313:    Selector `[class*="card"]`, `[class*="chip"]`, `[class*="badge"]`,
+00314:    `[class*="pill"]`, `[class*="box"]` dipakai supaya efek bentuk
+00315:    menjangkau SELURUH modul aplikasi (Logbook, Report, Analitik, People
+00316:    Intelligence, dst) tanpa perlu menulis ulang tiap class satu-satu. */
+00317: 
+00318: html[data-style] [class*="card"]:not(.theme-card):not(.style-card):not(.dash-card),
+00319: html[data-style] [class*="chip"],
+00320: html[data-style] [class*="badge"],
+~~~
+
+### Around line 2371
+~~~text
+02359:   opacity:.55;transition:opacity var(--trans);pointer-events:none;
+02360: }
+02361: .card:hover::before{opacity:1;}
+02362: .section-title{position:relative;}
+02363: .section-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg, var(--line), transparent);margin-left:6px;}
+02364: 
+02365: .nav-btn.active::after{
+02366:   content:"";position:absolute;right:8px;top:50%;transform:translateY(-50%);
+02367:   width:5px;height:5px;background:var(--red);box-shadow:0 0 6px 2px var(--red-glow);
+02368:   clip-path:polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+02369: }
+02370: 
+02371: #login-gate{
+02372:   position:fixed;inset:0;z-index:1000;
+02373:   display:flex;align-items:center;justify-content:center;
+02374:   background:
+02375:     radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--red) 10%, transparent), transparent 45%),
+02376:     radial-gradient(circle at 85% 85%, rgba(184,16,42,.10), transparent 40%),
+02377:     linear-gradient(color-mix(in srgb, var(--red) 6%, transparent) 1px, transparent 1px),
+02378:     linear-gradient(90deg, color-mix(in srgb, var(--red) 6%, transparent) 1px, transparent 1px),
+02379:     var(--bg);
+02380:   background-size:auto,auto,38px 38px,38px 38px;
+02381:   padding:20px;
+02382: }
+02383: #login-gate::before{
+02384:   content:"";position:absolute;inset:0;pointer-events:none;
+02385:   background:repeating-linear-gradient(0deg, color-mix(in srgb, var(--red) 3%, transparent) 0px, color-mix(in srgb, var(--red) 3%, transparent) 1px, transparent 1px, transparent 3px);
+02386:   mix-blend-mode:overlay;
+02387: }
+02388: #login-gate::after{
+02389:   content:"";position:absolute;inset:0;pointer-events:none;
+02390:   background:radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--red) 18%, transparent), transparent 55%);
+02391:   animation:loginGlow 10s ease-in-out infinite;
+02392: }
+02393: @keyframes loginGlow{0%,100%{opacity:.5;}50%{opacity:1;}}
+02394: .login-box{
+02395:   position:relative;width:100%;max-width:380px;
+02396:   background:linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+02397:   border:1px solid color-mix(in srgb, var(--red) 30%, transparent);border-radius:16px;padding:34px 30px 28px 30px;
+02398:   box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 15%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 50px -8px var(--red-glow);
+02399:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1), holoBorderPulse 4s ease-in-out infinite;
+02400:   text-align:center;
+02401: }
+02402: @keyframes holoBorderPulse{
+02403:   0%,100%{box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 15%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 40px -8px var(--red-glow);}
+02404:   50%{box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 30%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 65px -6px var(--red-glow);}
+02405: }
+02406: .login-box .i40-hex{width:64px;height:64px;margin:0 auto 16px auto;
+02407:   background:conic-gradient(from 0deg, var(--red), var(--amber), var(--green), var(--blue), var(--red));
+02408:   clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+02409:   display:flex;align-items:center;justify-content:center;animation:hexSpin 10s linear infinite;
+02410: }
+02411: .login-box .i40-hex span{background:var(--bg);width:50px;height:50px;
+02412:   clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+02413:   display:flex;align-items:center;justify-content:center;font-family:var(--font-brand);font-weight:900;font-size:18px;color:var(--text);
+02414:   animation:hexSpinCounter 10s linear infinite;}
+02415: .login-box h1{
+02416:   font-family:var(--font-brand);font-size:17px;font-weight:800;letter-spacing:1.4px;margin:0 0 4px 0;
+02417:   background:linear-gradient(90deg,#fff,var(--red),#fff);background-size:200% auto;
+02418:   -webkit-background-clip:text;background-clip:text;color:transparent;animation:brandShine 5s linear infinite;
+02419:   text-transform:uppercase;
+02420: }
+02421: .login-box .sub-title{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.6px;margin-bottom:26px;text-transform:uppercase;}
+02422: .login-box .field{text-align:left;margin-bottom:16px;}
+02423: .login-box .field label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;}
+02424: .login-box .btn-primary{width:100%;justify-content:center;padding:11px 16px;font-family:var(--font-display);letter-spacing:.6px;font-size:14px;margin-top:6px;}
+02425: .login-box .login-err{
+02426:   font-size:12px;color:var(--red);font-family:var(--font-mono);margin-top:12px;min-height:16px;
+02427: }
+02428: .login-box .login-foot{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);font-size:10.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.4px;}
+02429: 
+02430: /* =====================================================================
+02431:    OMODOS BRAND IDENTITY
+02432:    Logo ring, wordmark, and tagline are part of the fixed brand identity
+02433:    and stay consistent regardless of the active color theme / visual
+02434:    style, so all the shape/animation rules that other themes apply to
+02435:    .mark / .i40-hex are neutralized here with !important.
+~~~
+
+### Around line 2383
+~~~text
+02371: #login-gate{
+02372:   position:fixed;inset:0;z-index:1000;
+02373:   display:flex;align-items:center;justify-content:center;
+02374:   background:
+02375:     radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--red) 10%, transparent), transparent 45%),
+02376:     radial-gradient(circle at 85% 85%, rgba(184,16,42,.10), transparent 40%),
+02377:     linear-gradient(color-mix(in srgb, var(--red) 6%, transparent) 1px, transparent 1px),
+02378:     linear-gradient(90deg, color-mix(in srgb, var(--red) 6%, transparent) 1px, transparent 1px),
+02379:     var(--bg);
+02380:   background-size:auto,auto,38px 38px,38px 38px;
+02381:   padding:20px;
+02382: }
+02383: #login-gate::before{
+02384:   content:"";position:absolute;inset:0;pointer-events:none;
+02385:   background:repeating-linear-gradient(0deg, color-mix(in srgb, var(--red) 3%, transparent) 0px, color-mix(in srgb, var(--red) 3%, transparent) 1px, transparent 1px, transparent 3px);
+02386:   mix-blend-mode:overlay;
+02387: }
+02388: #login-gate::after{
+02389:   content:"";position:absolute;inset:0;pointer-events:none;
+02390:   background:radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--red) 18%, transparent), transparent 55%);
+02391:   animation:loginGlow 10s ease-in-out infinite;
+02392: }
+02393: @keyframes loginGlow{0%,100%{opacity:.5;}50%{opacity:1;}}
+02394: .login-box{
+02395:   position:relative;width:100%;max-width:380px;
+02396:   background:linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+02397:   border:1px solid color-mix(in srgb, var(--red) 30%, transparent);border-radius:16px;padding:34px 30px 28px 30px;
+02398:   box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 15%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 50px -8px var(--red-glow);
+02399:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1), holoBorderPulse 4s ease-in-out infinite;
+02400:   text-align:center;
+02401: }
+02402: @keyframes holoBorderPulse{
+02403:   0%,100%{box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 15%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 40px -8px var(--red-glow);}
+02404:   50%{box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 30%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 65px -6px var(--red-glow);}
+02405: }
+02406: .login-box .i40-hex{width:64px;height:64px;margin:0 auto 16px auto;
+02407:   background:conic-gradient(from 0deg, var(--red), var(--amber), var(--green), var(--blue), var(--red));
+02408:   clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+02409:   display:flex;align-items:center;justify-content:center;animation:hexSpin 10s linear infinite;
+02410: }
+02411: .login-box .i40-hex span{background:var(--bg);width:50px;height:50px;
+02412:   clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+02413:   display:flex;align-items:center;justify-content:center;font-family:var(--font-brand);font-weight:900;font-size:18px;color:var(--text);
+02414:   animation:hexSpinCounter 10s linear infinite;}
+02415: .login-box h1{
+02416:   font-family:var(--font-brand);font-size:17px;font-weight:800;letter-spacing:1.4px;margin:0 0 4px 0;
+02417:   background:linear-gradient(90deg,#fff,var(--red),#fff);background-size:200% auto;
+02418:   -webkit-background-clip:text;background-clip:text;color:transparent;animation:brandShine 5s linear infinite;
+02419:   text-transform:uppercase;
+02420: }
+02421: .login-box .sub-title{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.6px;margin-bottom:26px;text-transform:uppercase;}
+02422: .login-box .field{text-align:left;margin-bottom:16px;}
+02423: .login-box .field label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;}
+02424: .login-box .btn-primary{width:100%;justify-content:center;padding:11px 16px;font-family:var(--font-display);letter-spacing:.6px;font-size:14px;margin-top:6px;}
+02425: .login-box .login-err{
+02426:   font-size:12px;color:var(--red);font-family:var(--font-mono);margin-top:12px;min-height:16px;
+02427: }
+02428: .login-box .login-foot{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);font-size:10.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.4px;}
+02429: 
+02430: /* =====================================================================
+02431:    OMODOS BRAND IDENTITY
+02432:    Logo ring, wordmark, and tagline are part of the fixed brand identity
+02433:    and stay consistent regardless of the active color theme / visual
+02434:    style, so all the shape/animation rules that other themes apply to
+02435:    .mark / .i40-hex are neutralized here with !important.
+02436:    ===================================================================== */
+02437: .omodos-logo{
+02438:   background:none !important;box-shadow:none !important;clip-path:none !important;
+02439:   border-radius:0 !important;animation:none !important;
+02440:   display:flex !important;align-items:center;justify-content:center;
+02441: }
+02442: html:not([data-theme="red-black"]) .brand .mark.omodos-logo{
+02443:   background:none !important;color:inherit !important;
+02444: }
+02445: .omodos-logo span{display:none !important;}
+02446: .omodos-logo-svg{width:100%;height:100%;display:block;}
+02447: .brand .mark.omodos-logo{width:38px;height:38px;}
+~~~
+
+### Around line 2388
+~~~text
+02376:     radial-gradient(circle at 85% 85%, rgba(184,16,42,.10), transparent 40%),
+02377:     linear-gradient(color-mix(in srgb, var(--red) 6%, transparent) 1px, transparent 1px),
+02378:     linear-gradient(90deg, color-mix(in srgb, var(--red) 6%, transparent) 1px, transparent 1px),
+02379:     var(--bg);
+02380:   background-size:auto,auto,38px 38px,38px 38px;
+02381:   padding:20px;
+02382: }
+02383: #login-gate::before{
+02384:   content:"";position:absolute;inset:0;pointer-events:none;
+02385:   background:repeating-linear-gradient(0deg, color-mix(in srgb, var(--red) 3%, transparent) 0px, color-mix(in srgb, var(--red) 3%, transparent) 1px, transparent 1px, transparent 3px);
+02386:   mix-blend-mode:overlay;
+02387: }
+02388: #login-gate::after{
+02389:   content:"";position:absolute;inset:0;pointer-events:none;
+02390:   background:radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--red) 18%, transparent), transparent 55%);
+02391:   animation:loginGlow 10s ease-in-out infinite;
+02392: }
+02393: @keyframes loginGlow{0%,100%{opacity:.5;}50%{opacity:1;}}
+02394: .login-box{
+02395:   position:relative;width:100%;max-width:380px;
+02396:   background:linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+02397:   border:1px solid color-mix(in srgb, var(--red) 30%, transparent);border-radius:16px;padding:34px 30px 28px 30px;
+02398:   box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 15%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 50px -8px var(--red-glow);
+02399:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1), holoBorderPulse 4s ease-in-out infinite;
+02400:   text-align:center;
+02401: }
+02402: @keyframes holoBorderPulse{
+02403:   0%,100%{box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 15%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 40px -8px var(--red-glow);}
+02404:   50%{box-shadow:0 0 0 1px color-mix(in srgb, var(--red) 30%, transparent) inset, 0 24px 70px rgba(0,0,0,.6), 0 0 65px -6px var(--red-glow);}
+02405: }
+02406: .login-box .i40-hex{width:64px;height:64px;margin:0 auto 16px auto;
+02407:   background:conic-gradient(from 0deg, var(--red), var(--amber), var(--green), var(--blue), var(--red));
+02408:   clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+02409:   display:flex;align-items:center;justify-content:center;animation:hexSpin 10s linear infinite;
+02410: }
+02411: .login-box .i40-hex span{background:var(--bg);width:50px;height:50px;
+02412:   clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+02413:   display:flex;align-items:center;justify-content:center;font-family:var(--font-brand);font-weight:900;font-size:18px;color:var(--text);
+02414:   animation:hexSpinCounter 10s linear infinite;}
+02415: .login-box h1{
+02416:   font-family:var(--font-brand);font-size:17px;font-weight:800;letter-spacing:1.4px;margin:0 0 4px 0;
+02417:   background:linear-gradient(90deg,#fff,var(--red),#fff);background-size:200% auto;
+02418:   -webkit-background-clip:text;background-clip:text;color:transparent;animation:brandShine 5s linear infinite;
+02419:   text-transform:uppercase;
+02420: }
+02421: .login-box .sub-title{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.6px;margin-bottom:26px;text-transform:uppercase;}
+02422: .login-box .field{text-align:left;margin-bottom:16px;}
+02423: .login-box .field label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;}
+02424: .login-box .btn-primary{width:100%;justify-content:center;padding:11px 16px;font-family:var(--font-display);letter-spacing:.6px;font-size:14px;margin-top:6px;}
+02425: .login-box .login-err{
+02426:   font-size:12px;color:var(--red);font-family:var(--font-mono);margin-top:12px;min-height:16px;
+02427: }
+02428: .login-box .login-foot{margin-top:22px;padding-top:14px;border-top:1px solid var(--line);font-size:10.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.4px;}
+02429: 
+02430: /* =====================================================================
+02431:    OMODOS BRAND IDENTITY
+02432:    Logo ring, wordmark, and tagline are part of the fixed brand identity
+02433:    and stay consistent regardless of the active color theme / visual
+02434:    style, so all the shape/animation rules that other themes apply to
+02435:    .mark / .i40-hex are neutralized here with !important.
+02436:    ===================================================================== */
+02437: .omodos-logo{
+02438:   background:none !important;box-shadow:none !important;clip-path:none !important;
+02439:   border-radius:0 !important;animation:none !important;
+02440:   display:flex !important;align-items:center;justify-content:center;
+02441: }
+02442: html:not([data-theme="red-black"]) .brand .mark.omodos-logo{
+02443:   background:none !important;color:inherit !important;
+02444: }
+02445: .omodos-logo span{display:none !important;}
+02446: .omodos-logo-svg{width:100%;height:100%;display:block;}
+02447: .brand .mark.omodos-logo{width:38px;height:38px;}
+02448: .i40-banner .i40-hex.omodos-logo{width:50px;height:50px;}
+02449: 
+02450: /* Tema Dark (red-black): logo cincin otomatis diberi garis putih tipis
+02451:    di LUAR dan di DALAM cincin, supaya logo tetap terlihat jelas dan
+02452:    kontras di atas latar gelap/abu. */
+~~~
+
+### Around line 2514
+~~~text
+02502:   font-weight:700; letter-spacing:.4px; margin-bottom:8px;
+02503: }
+02504: .app-splash-sub{
+02505:   font-family:var(--font-mono, inherit); color:var(--text-dim, #8b93a0); font-size:11.5px;
+02506:   letter-spacing:.3px;
+02507: }
+02508: .omodos-divider{display:flex;align-items:center;gap:10px;margin:16px 0;}
+02509: .omodos-divider span{flex:1;height:1px;background:rgba(0,0,0,.18);}
+02510: .omodos-divider i{width:5px;height:5px;border-radius:50%;background:rgba(0,0,0,.35);flex-shrink:0;}
+02511: 
+02512: /* Login screen: fixed light brand splash, independent of the active
+02513:    dark/alternate theme, matching the OMODOS identity artwork. */
+02514: #login-gate{
+02515:   --bg:#eef0f3;--panel:#ffffff;--panel-2:#ffffff;--text:#12141a;--text-dim:#6b7280;--line:#dfe2e7;
+02516:   background:radial-gradient(circle at 30% 20%, rgba(0,0,0,.03), transparent 45%), var(--bg) !important;
+02517: }
+02518: #login-gate::before,#login-gate::after{display:none !important;}
+02519: .login-box{
+02520:   border:1px solid #e4e6ea !important;
+02521:   box-shadow:0 24px 60px -20px rgba(20,22,30,.25) !important;
+02522:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1) !important;
+02523: }
+02524: .login-box .sub-title{
+02525:   font-family:inherit;text-transform:none;letter-spacing:0;font-size:14px;color:#5b6472;margin-bottom:26px;
+02526: }
+02527: .login-box .field label{color:#12141a;}
+02528: .login-box input{background:#f6f7f9;border:1px solid #e2e5ea;color:#12141a;}
+02529: .login-box input::placeholder{color:#9aa1ab;}
+02530: .login-box .btn-primary{background:#7c1420;border-color:#7c1420;color:#fff;}
+02531: .login-box .btn-primary:hover{background:#5f0f18;}
+02532: .login-box .login-foot{border-top:1px solid #eceef1;color:#8b93a0;letter-spacing:.8px;}
+02533: .app{display:none;}
+02534: .app.unlocked{display:grid;}
+02535: .rca-doc-title{
+02536:   font-family:var(--font-display);font-size:18px;font-weight:700;color:#fff;
+02537:   padding:6px 8px;border-radius:6px;letter-spacing:.2px;
+02538: }
+02539: .rca-section{margin-top:24px;padding-top:18px;border-top:1px dashed var(--line);}
+02540: .rca-section:first-child{margin-top:16px;}
+02541: .rca-section-title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+02542: .rca-section-heading{
+02543:   font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--red);
+02544:   padding:2px 4px;border-radius:5px;flex:1;
+02545: }
+02546: .rca-section-sub{font-size:13px;color:var(--text-dim);margin:4px 4px 14px;padding:2px 4px;border-radius:5px;}
+02547: .rca-meta-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+02548: @media(max-width:820px){.rca-meta-row{grid-template-columns:1fr 1fr;}}
+02549: .rca-why-list{padding-left:20px;line-height:1.8;margin:0 0 4px;}
+02550: .rca-why-list li{margin-bottom:4px;font-size:13.5px;}
+02551: .btn-why-remove{
+02552:   display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;
+02553:   border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);cursor:pointer;font-size:9px;
+02554:   vertical-align:middle;margin-left:4px;
+02555: }
+02556: .btn-why-remove:hover{color:var(--red);border-color:var(--red-dim);}
+02557: .btn-why-add{padding:4px 10px;font-size:11.5px;}
+02558: body.pdf-capture-mode .btn-why-remove, body.pdf-capture-mode .btn-why-add{display:none !important;}
+02559: .rca-fb-table{width:100%;border-collapse:collapse;margin-top:8px;}
+02560: .rca-fb-table td{border:1px solid var(--line);padding:10px 12px;font-size:13px;vertical-align:top;line-height:1.6;}
+02561: .rca-fb-label{width:180px;font-weight:700;color:var(--red);background:var(--panel-2);}
+02562: .fishbone-wrap{
+02563:   position:relative;width:900px;max-width:none;height:460px;
+02564:   background:#0f1114;border-radius:10px;border:1px solid var(--line);
+02565: }
+02566: .fb-cat-label{
+02567:   position:absolute;background:#232733;color:#fff;font-family:var(--font-display);
+02568:   font-size:12px;font-weight:700;letter-spacing:.6px;text-align:center;
+02569:   border-radius:5px;padding:5px 6px;
+02570: }
+02571: .fb-cat-causes{
+02572:   position:absolute;color:#c7cbd1;font-size:11px;line-height:1.5;
+02573:   white-space:pre-line;text-align:left;min-height:16px;
+02574: }
+02575: .fb-head-text{
+02576:   position:absolute;color:#fff;font-weight:700;font-size:12.5px;line-height:1.4;
+02577:   display:flex;align-items:center;text-align:center;justify-content:center;
+02578: }
+~~~
+
+### Around line 2518
+~~~text
+02506:   letter-spacing:.3px;
+02507: }
+02508: .omodos-divider{display:flex;align-items:center;gap:10px;margin:16px 0;}
+02509: .omodos-divider span{flex:1;height:1px;background:rgba(0,0,0,.18);}
+02510: .omodos-divider i{width:5px;height:5px;border-radius:50%;background:rgba(0,0,0,.35);flex-shrink:0;}
+02511: 
+02512: /* Login screen: fixed light brand splash, independent of the active
+02513:    dark/alternate theme, matching the OMODOS identity artwork. */
+02514: #login-gate{
+02515:   --bg:#eef0f3;--panel:#ffffff;--panel-2:#ffffff;--text:#12141a;--text-dim:#6b7280;--line:#dfe2e7;
+02516:   background:radial-gradient(circle at 30% 20%, rgba(0,0,0,.03), transparent 45%), var(--bg) !important;
+02517: }
+02518: #login-gate::before,#login-gate::after{display:none !important;}
+02519: .login-box{
+02520:   border:1px solid #e4e6ea !important;
+02521:   box-shadow:0 24px 60px -20px rgba(20,22,30,.25) !important;
+02522:   animation:modalIn 320ms cubic-bezier(.4,0,.2,1) !important;
+02523: }
+02524: .login-box .sub-title{
+02525:   font-family:inherit;text-transform:none;letter-spacing:0;font-size:14px;color:#5b6472;margin-bottom:26px;
+02526: }
+02527: .login-box .field label{color:#12141a;}
+02528: .login-box input{background:#f6f7f9;border:1px solid #e2e5ea;color:#12141a;}
+02529: .login-box input::placeholder{color:#9aa1ab;}
+02530: .login-box .btn-primary{background:#7c1420;border-color:#7c1420;color:#fff;}
+02531: .login-box .btn-primary:hover{background:#5f0f18;}
+02532: .login-box .login-foot{border-top:1px solid #eceef1;color:#8b93a0;letter-spacing:.8px;}
+02533: .app{display:none;}
+02534: .app.unlocked{display:grid;}
+02535: .rca-doc-title{
+02536:   font-family:var(--font-display);font-size:18px;font-weight:700;color:#fff;
+02537:   padding:6px 8px;border-radius:6px;letter-spacing:.2px;
+02538: }
+02539: .rca-section{margin-top:24px;padding-top:18px;border-top:1px dashed var(--line);}
+02540: .rca-section:first-child{margin-top:16px;}
+02541: .rca-section-title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+02542: .rca-section-heading{
+02543:   font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--red);
+02544:   padding:2px 4px;border-radius:5px;flex:1;
+02545: }
+02546: .rca-section-sub{font-size:13px;color:var(--text-dim);margin:4px 4px 14px;padding:2px 4px;border-radius:5px;}
+02547: .rca-meta-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+02548: @media(max-width:820px){.rca-meta-row{grid-template-columns:1fr 1fr;}}
+02549: .rca-why-list{padding-left:20px;line-height:1.8;margin:0 0 4px;}
+02550: .rca-why-list li{margin-bottom:4px;font-size:13.5px;}
+02551: .btn-why-remove{
+02552:   display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;
+02553:   border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);cursor:pointer;font-size:9px;
+02554:   vertical-align:middle;margin-left:4px;
+02555: }
+02556: .btn-why-remove:hover{color:var(--red);border-color:var(--red-dim);}
+02557: .btn-why-add{padding:4px 10px;font-size:11.5px;}
+02558: body.pdf-capture-mode .btn-why-remove, body.pdf-capture-mode .btn-why-add{display:none !important;}
+02559: .rca-fb-table{width:100%;border-collapse:collapse;margin-top:8px;}
+02560: .rca-fb-table td{border:1px solid var(--line);padding:10px 12px;font-size:13px;vertical-align:top;line-height:1.6;}
+02561: .rca-fb-label{width:180px;font-weight:700;color:var(--red);background:var(--panel-2);}
+02562: .fishbone-wrap{
+02563:   position:relative;width:900px;max-width:none;height:460px;
+02564:   background:#0f1114;border-radius:10px;border:1px solid var(--line);
+02565: }
+02566: .fb-cat-label{
+02567:   position:absolute;background:#232733;color:#fff;font-family:var(--font-display);
+02568:   font-size:12px;font-weight:700;letter-spacing:.6px;text-align:center;
+02569:   border-radius:5px;padding:5px 6px;
+02570: }
+02571: .fb-cat-causes{
+02572:   position:absolute;color:#c7cbd1;font-size:11px;line-height:1.5;
+02573:   white-space:pre-line;text-align:left;min-height:16px;
+02574: }
+02575: .fb-head-text{
+02576:   position:absolute;color:#fff;font-weight:700;font-size:12.5px;line-height:1.4;
+02577:   display:flex;align-items:center;text-align:center;justify-content:center;
+02578: }
+02579: .fishbone-wrap [contenteditable="true"]:hover{outline:1px dashed color-mix(in srgb, var(--red) 60%, transparent);}
+02580: .fishbone-wrap [contenteditable="true"]:focus{outline:1.5px dashed var(--red);background:color-mix(in srgb, var(--red) 12%, transparent);}
+02581: [contenteditable="true"]{cursor:text;transition:background var(--trans), outline-color var(--trans);}
+02582: [contenteditable="true"]:hover{background:color-mix(in srgb, var(--red) 6%, transparent);}
+~~~
+
+### Around line 3299
+~~~text
+03287: <link rel="stylesheet" href="/omodos4/hotfix.css" data-safe-v4="3">
+03288: <style id="training-mobile-fix">
+03289: @media(max-width:900px){
+03290:  #dash-grid .dash-card{min-height:112px!important;height:auto!important;container-type:inline-size;}
+03291:  #dash-grid .dc-name,#dash-grid .dc-status{display:block!important;visibility:visible!important;font-size:12px!important;}
+03292:  #dash-grid{grid-auto-rows:minmax(112px,auto)!important;overflow-y:auto!important;}
+03293: }
+03294: </style></head>
+03295: <body>
+03296: <div class="scanline-overlay"></div>
+03297: <div class="scanline-sweep"></div>
+03298: 
+03299: <div id="login-gate">
+03300:   <div class="login-box">
+03301:     <div class="omodos-logo">
+03302:       <svg class="omodos-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+03303:           <circle cx="50" cy="50" r="31" fill="#ffffff"/>
+03304:         <circle cx="50" cy="50" r="38" fill="none" stroke="#111318" stroke-width="14" stroke-dasharray="96.16 46.42 96.16" transform="rotate(-90 50 50)"/>
+03305:         <circle cx="50" cy="50" r="38" fill="none" stroke="#00AEEF" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-96.16" transform="rotate(-90 50 50)"/>
+03306:         <circle cx="50" cy="50" r="38" fill="none" stroke="#EC008C" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-111.63" transform="rotate(-90 50 50)"/>
+03307:         <circle cx="50" cy="50" r="38" fill="none" stroke="#FFC20E" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-127.10" transform="rotate(-90 50 50)"/>
+03308:       </svg>
+03309:     </div>
+03310:     <h1 class="omodos-wordmark">OMODOS</h1>
+03311:     <div class="omodos-tagline">OUR <b class="c-blue">MOTTO</b>. OUR <b class="c-pink">DUTY</b>. OUR <b class="c-amber">STRATEGY</b>.</div>
+03312:     <div class="omodos-divider"><span></span><i></i><span></span></div>
+03313:     <div class="sub-title">Smart Maintenance Reporting Platform <br> Packaging Offset BMJ</div>
+03314:     <form id="form-login" autocomplete="off">
+03315:       <div class="field">
+03316:         <label>Username</label>
+03317:         <input type="text" id="login-username" name="username" placeholder="Masukkan username" required>
+03318:       </div>
+03319:       <div class="field">
+03320:         <label>Password</label>
+03321:         <input type="password" id="login-password" name="password" placeholder="Masukkan password" required>
+03322:       </div>
+03323:       <button type="submit" class="btn btn-primary" id="btn-login-submit">
+03324:         <i class="ph-bold ph-lock-key"></i> Masuk
+03325:       </button>
+03326:       <div class="login-err" id="login-err"></div>
+03327:     </form>
+03328:     <div class="login-foot">PT BUKIT MURIA JAYA <br> © 2026 IDJ. All Rights Reserved.</div>
+03329:   </div>
+03330: </div>
+03331: 
+03332: <div id="app-splash">
+03333:   <div class="app-splash-box">
+03334:     <div class="omodos-logo">
+03335:       <svg class="omodos-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+03336:           <circle cx="50" cy="50" r="31" fill="#ffffff"/>
+03337:         <circle cx="50" cy="50" r="38" fill="none" stroke="#111318" stroke-width="14" stroke-dasharray="96.16 46.42 96.16" transform="rotate(-90 50 50)"/>
+03338:         <circle cx="50" cy="50" r="38" fill="none" stroke="#00AEEF" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-96.16" transform="rotate(-90 50 50)"/>
+03339:         <circle cx="50" cy="50" r="38" fill="none" stroke="#EC008C" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-111.63" transform="rotate(-90 50 50)"/>
+03340:         <circle cx="50" cy="50" r="38" fill="none" stroke="#FFC20E" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-127.10" transform="rotate(-90 50 50)"/>
+03341:       </svg>
+03342:     </div>
+03343:     <div class="app-splash-spinner"><i class="ph-bold ph-circle-notch ph-spin"></i></div>
+03344:     <div class="app-splash-text" id="app-splash-text">Menyiapkan Data...</div>
+03345:     <div class="app-splash-sub">Mohon tunggu sebentar, seluruh data aplikasi sedang dimuat.</div>
+03346:   </div>
+03347: </div>
+03348: 
+03349: <div class="app" id="app-root">
+03350:   <div class="sidebar-overlay" id="sidebar-overlay"></div>
+03351: 
+03352:   <div class="dash-hover-zone" id="dash-hover-zone"></div>
+03353: 
+03354:   <aside class="sidebar" id="sidebar">
+03355:     <div class="brand">
+03356:       <div class="mark omodos-logo">
+03357:         <svg class="omodos-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+03358:           <circle cx="50" cy="50" r="31" fill="#ffffff"/>
+03359:           <circle cx="50" cy="50" r="38" fill="none" stroke="#111318" stroke-width="14" stroke-dasharray="96.16 46.42 96.16" transform="rotate(-90 50 50)"/>
+03360:           <circle cx="50" cy="50" r="38" fill="none" stroke="#00AEEF" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-96.16" transform="rotate(-90 50 50)"/>
+03361:           <circle cx="50" cy="50" r="38" fill="none" stroke="#EC008C" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-111.63" transform="rotate(-90 50 50)"/>
+03362:           <circle cx="50" cy="50" r="38" fill="none" stroke="#FFC20E" stroke-width="14" stroke-dasharray="15.47 223.29" stroke-dashoffset="-127.10" transform="rotate(-90 50 50)"/>
+03363:         </svg>
+~~~
+
+### Around line 6713
+~~~text
+06701:           fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:json.sessionToken})}).catch(()=>{});
+06702:         }
+06703:         errEl.textContent = 'Akun ini valid, tetapi bukan Superadmin — akses ditolak.';
+06704:         errEl.style.display = 'block';
+06705:         return;
+06706:       }
+06707:       SETTING_AUTH_OK = true;
+06708:       SETTING_SESSION_TOKEN = json.sessionToken || '';
+06709:       closeModal();
+06710:       if(onSuccess) onSuccess();
+06711:     }catch(err){
+06712:       // Step-up auth Setting tidak boleh mengunci sesi aplikasi utama.
+06713:       // Tampilkan error di modal saja; appRoot/login-gate milik sesi utama
+06714:       // berada di scope lain dan memang tidak boleh disentuh dari sini.
+06715:       errEl.textContent = err.message || 'Gagal menghubungi server. Periksa koneksi internet Anda.';
+06716:       errEl.style.display = 'block';
+06717:     }finally{
+06718:       submitBtn.disabled = false;
+06719:       submitBtn.innerHTML = originalLabel;
+06720:     }
+06721:   };
+06722:   $('#btn-setting-login-submit').addEventListener('click', submit);
+06723:   $('#setting-login-password').addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); submit(); } });
+06724:   setTimeout(()=> $('#setting-login-username') && $('#setting-login-username').focus(), 50);
+06725: }
+06726: 
+06727: /* ======================================================================
+06728:    [RBAC] USER MANAGEMENT & ROLE ACCESS MANAGEMENT (khusus Superadmin)
+06729:    ----------------------------------------------------------------------
+06730:    Mengikuti pola render-ke-container yang sudah dipakai di menu Setting
+06731:    lain (renderMachineTable, renderPersonilTable, dst). Semua data
+06732:    (user, role, permission) diambil & disimpan lewat code.gs — frontend
+06733:    di sini hanya UI, tidak menyimpan apa pun secara lokal.
+06734:    ====================================================================== */
+06735: function renderRbacAdminSection(){
+06736:   const holder = $('#rbac-admin-section');
+06737:   if(!holder) return;
+06738:   if(!isSettingAuthed()){ holder.innerHTML = ''; return; }
+06739:   holder.innerHTML = `
+06740:     <div class="card" style="margin-bottom:18px;">
+06741:       <div class="section-title"><i class="ph-bold ph-users"></i> User Management <span style="font-size:11px;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">(khusus Superadmin)</span></div>
+06742:       <div class="sub" style="margin-bottom:12px;">Kelola akun aplikasi tanpa bercampur dengan pengaturan role. Setiap aktivitas user dicatat ke Audit Log terpusat.</div>
+06743:       <div class="grid3">
+06744:         <div class="field"><label>Username</label><input type="text" id="ru-username" placeholder="cth: budi.santoso" autocomplete="off"></div>
+06745:         <div class="field"><label>Nama Tampilan</label><input type="text" id="ru-displayname" placeholder="cth: Budi Santoso"></div>
+06746:         <div class="field"><label>Role</label>
+06747:           <select id="ru-role">
+06748:             <option value="Technician">Technician</option>
+06749:             <option value="Supervisor">Supervisor</option>
+06750:             <option value="Superadmin">Superadmin</option>
+06751:           </select>
+06752:         </div>
+06753:       </div>
+06754:       <div class="field"><label>Password (min. 6 karakter)</label><input type="password" id="ru-password" placeholder="Password awal" autocomplete="new-password"></div>
+06755:       <button class="btn btn-sm btn-primary" id="btn-add-user"><i class="ph-bold ph-user-plus"></i> Tambah User</button>
+06756:       <span id="ru-status" style="margin-left:10px;font-size:12.5px;color:var(--text-dim);"></span>
+06757:       <div style="margin-top:16px;" id="rbac-user-table"></div>
+06758:     </div>
+06759: 
+06760:     <div class="card" style="margin-bottom:18px;">
+06761:       <div class="section-title"><i class="ph-bold ph-activity"></i> User Activity Monitor</div>
+06762:       <div class="sub">Pantau login, logout, perubahan data/konfigurasi, serta operasi yang gagal. Detail sensitif seperti password, token, API key, hash, dan salt tetap disensor oleh backend.</div>
+06763:       <div id="rbac-user-activity"></div>
+06764:     </div>
+06765: 
+06766:     <div class="card" style="margin-bottom:18px;">
+06767:       <div class="section-title"><i class="ph-bold ph-broom"></i> Perbaikan Kualitas Data Logbook <span style="font-size:11px;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">(khusus Superadmin)</span></div>
+06768:       <div class="sub" style="margin-bottom:12px;">Untuk data logbook hasil migrasi/export OneNote yang salah input:
+06769:         <b>(1)</b> Tanggal kosong atau tanggal masa depan → dipindah ke tahun <b>2025</b> (bulan/tanggal dipertahankan kalau ada).
+06770:         <b>(2)</b> Baris yang kolom "Deskripsi Masalah"-nya hanya berisi "Preventive"/"PM" dipindahkan ke kolom "Jenis Pekerjaan".
+06771:         <br><br>⚠️ <b>Selalu pratinjau dulu</b> sebelum menerapkan perubahan.</div>
+06772:       <button class="btn btn-sm btn-ghost" id="btn-preview-data-fix"><i class="ph-bold ph-eye"></i> Pratinjau Perubahan</button>
+06773:       <div id="data-fix-result" style="margin-top:14px;"></div>
+06774:     </div>
+06775:   `;
+06776:   $('#btn-add-user').addEventListener('click', handleAddUser_);
+06777:   renderRbacUserTable();
+~~~
+
+## app-root.classList.add('unlocked'
+No match.
+
+## async function loadAll(
+### Around line 8585
+~~~text
+08573:   const ripple = document.createElement('span');
+08574:   const size = Math.max(rect.width, rect.height);
+08575:   ripple.className = 'ripple';
+08576:   ripple.style.width = ripple.style.height = size + 'px';
+08577:   ripple.style.left = (ev.clientX - rect.left - size/2) + 'px';
+08578:   ripple.style.top = (ev.clientY - rect.top - size/2) + 'px';
+08579:   btn.appendChild(ripple);
+08580:   setTimeout(()=> ripple.remove(), 600);
+08581: });
+08582: 
+08583: /* ---------------- DATA LOADING ---------------- */
+08584: let PREPARATION_PROMISE = null;
+08585: async function loadAll(){
+08586:   if(PREPARATION_PROMISE) return PREPARATION_PROMISE;
+08587:   PREPARATION_PROMISE = prepareAllData_();
+08588:   try{ return await PREPARATION_PROMISE; }finally{ PREPARATION_PROMISE = null; }
+08589: }
+08590: async function prepareAllData_(){
+08591:   // Yield until all script declarations (including project/meeting state) exist.
+08592:   await new Promise(resolve=>setTimeout(resolve,0));
+08593:   const token = SESSION_TOKEN;
+08594:   if(!WEB_APP_URL || !token) throw new Error('AUTH_REQUIRED');
+08595: 
+08596:   const manifest = await apiGet('prepareManifest', {fresh:'1'}, 1);
+08597:   if(!manifest || !Array.isArray(manifest.actions)) throw new Error('Manifest persiapan backend tidak valid.');
+08598: 
+08599:   // Backend baru selalu menempatkan bootstrap sebagai sumber minimum untuk
+08600:   // membuka Home. Tetap kompatibel dengan backend transisi yang belum
+08601:   // mencantumkannya: jalur legacy memakai machines/personil sebagai minimum.
+08602:   const hasBootstrap = manifest.actions.includes('bootstrap');
+08603:   const pending = manifest.actions.slice();
+08604:   const data = {};
+08605:   const errors = [];
+08606:   let done = 0;
+08607:   const progress = ()=>{
+08608:     const el = document.getElementById('app-splash-text');
+08609:     if(el) el.textContent = 'Menyiapkan data… '+done+' / '+manifest.actions.length;
+08610:   };
+08611:   progress();
+08612: 
+08613:   await Promise.all(Array.from({length:Math.min(4,Math.max(1,pending.length))},async()=>{
+08614:     while(pending.length){
+08615:       const action = pending.shift();
+08616:       try{
+08617:         data[action] = await apiGet(action, {}, 1);
+08618:       }catch(e){
+08619:         errors.push({action,message:String(e&&e.message||e)});
+08620:       }
+08621:       done++;
+08622:       progress();
+08623:     }
+08624:   }));
+08625: 
+08626:   if(token !== SESSION_TOKEN) throw new Error('SESSION_INVALID');
+08627: 
+08628:   // Jangan biarkan satu modul opsional (KPI/Meeting/Energy/Report/dll)
+08629:   // menggagalkan seluruh login. Yang wajib hanya bootstrap; pada backend
+08630:   // legacy, machines+personil menjadi minimum kompatibilitas.
+08631:   const criticalActions = hasBootstrap ? ['bootstrap'] : ['machines','personil'];
+08632:   const fatal = errors.filter(e=>criticalActions.includes(e.action));
+08633:   if(fatal.length){
+08634:     throw new Error('Data dasar aplikasi gagal dimuat. Coba masuk kembali. '+fatal.map(e=>e.action+': '+e.message).join('; '));
+08635:   }
+08636: 
+08637:   const bootstrap = (data.bootstrap && typeof data.bootstrap==='object') ? data.bootstrap : {};
+08638:   const entriesSource = Array.isArray(data.list)
+08639:     ? data.list
+08640:     : (Array.isArray(bootstrap.recentEntries) ? bootstrap.recentEntries : (Array.isArray(bootstrap.entries) ? bootstrap.entries : []));
+08641:   const machineSource = Array.isArray(data.machines)
+08642:     ? data.machines
+08643:     : (Array.isArray(bootstrap.machines) ? bootstrap.machines : []);
+08644:   const personSource = Array.isArray(data.personil)
+08645:     ? data.personil
+08646:     : (Array.isArray(bootstrap.personil) ? bootstrap.personil : []);
+08647:   const patrolTemplateSource = Array.isArray(data.patrolChecklistTemplate)
+08648:     ? data.patrolChecklistTemplate
+08649:     : (Array.isArray(bootstrap.patrolTemplate) ? bootstrap.patrolTemplate : []);
+~~~
+
+## function loadAll(
+### Around line 8585
+~~~text
+08573:   const ripple = document.createElement('span');
+08574:   const size = Math.max(rect.width, rect.height);
+08575:   ripple.className = 'ripple';
+08576:   ripple.style.width = ripple.style.height = size + 'px';
+08577:   ripple.style.left = (ev.clientX - rect.left - size/2) + 'px';
+08578:   ripple.style.top = (ev.clientY - rect.top - size/2) + 'px';
+08579:   btn.appendChild(ripple);
+08580:   setTimeout(()=> ripple.remove(), 600);
+08581: });
+08582: 
+08583: /* ---------------- DATA LOADING ---------------- */
+08584: let PREPARATION_PROMISE = null;
+08585: async function loadAll(){
+08586:   if(PREPARATION_PROMISE) return PREPARATION_PROMISE;
+08587:   PREPARATION_PROMISE = prepareAllData_();
+08588:   try{ return await PREPARATION_PROMISE; }finally{ PREPARATION_PROMISE = null; }
+08589: }
+08590: async function prepareAllData_(){
+08591:   // Yield until all script declarations (including project/meeting state) exist.
+08592:   await new Promise(resolve=>setTimeout(resolve,0));
+08593:   const token = SESSION_TOKEN;
+08594:   if(!WEB_APP_URL || !token) throw new Error('AUTH_REQUIRED');
+08595: 
+08596:   const manifest = await apiGet('prepareManifest', {fresh:'1'}, 1);
+08597:   if(!manifest || !Array.isArray(manifest.actions)) throw new Error('Manifest persiapan backend tidak valid.');
+08598: 
+08599:   // Backend baru selalu menempatkan bootstrap sebagai sumber minimum untuk
+08600:   // membuka Home. Tetap kompatibel dengan backend transisi yang belum
+08601:   // mencantumkannya: jalur legacy memakai machines/personil sebagai minimum.
+08602:   const hasBootstrap = manifest.actions.includes('bootstrap');
+08603:   const pending = manifest.actions.slice();
+08604:   const data = {};
+08605:   const errors = [];
+08606:   let done = 0;
+08607:   const progress = ()=>{
+08608:     const el = document.getElementById('app-splash-text');
+08609:     if(el) el.textContent = 'Menyiapkan data… '+done+' / '+manifest.actions.length;
+08610:   };
+08611:   progress();
+08612: 
+08613:   await Promise.all(Array.from({length:Math.min(4,Math.max(1,pending.length))},async()=>{
+08614:     while(pending.length){
+08615:       const action = pending.shift();
+08616:       try{
+08617:         data[action] = await apiGet(action, {}, 1);
+08618:       }catch(e){
+08619:         errors.push({action,message:String(e&&e.message||e)});
+08620:       }
+08621:       done++;
+08622:       progress();
+08623:     }
+08624:   }));
+08625: 
+08626:   if(token !== SESSION_TOKEN) throw new Error('SESSION_INVALID');
+08627: 
+08628:   // Jangan biarkan satu modul opsional (KPI/Meeting/Energy/Report/dll)
+08629:   // menggagalkan seluruh login. Yang wajib hanya bootstrap; pada backend
+08630:   // legacy, machines+personil menjadi minimum kompatibilitas.
+08631:   const criticalActions = hasBootstrap ? ['bootstrap'] : ['machines','personil'];
+08632:   const fatal = errors.filter(e=>criticalActions.includes(e.action));
+08633:   if(fatal.length){
+08634:     throw new Error('Data dasar aplikasi gagal dimuat. Coba masuk kembali. '+fatal.map(e=>e.action+': '+e.message).join('; '));
+08635:   }
+08636: 
+08637:   const bootstrap = (data.bootstrap && typeof data.bootstrap==='object') ? data.bootstrap : {};
+08638:   const entriesSource = Array.isArray(data.list)
+08639:     ? data.list
+08640:     : (Array.isArray(bootstrap.recentEntries) ? bootstrap.recentEntries : (Array.isArray(bootstrap.entries) ? bootstrap.entries : []));
+08641:   const machineSource = Array.isArray(data.machines)
+08642:     ? data.machines
+08643:     : (Array.isArray(bootstrap.machines) ? bootstrap.machines : []);
+08644:   const personSource = Array.isArray(data.personil)
+08645:     ? data.personil
+08646:     : (Array.isArray(bootstrap.personil) ? bootstrap.personil : []);
+08647:   const patrolTemplateSource = Array.isArray(data.patrolChecklistTemplate)
+08648:     ? data.patrolChecklistTemplate
+08649:     : (Array.isArray(bootstrap.patrolTemplate) ? bootstrap.patrolTemplate : []);
+~~~
+
+## function refreshRbacFromServer_(
+### Around line 8017
+~~~text
+08005: 
+08006: // [FIX ROOT CAUSE] Sebelumnya PERMISSIONS/FEATURE_REGISTRY di akun yang
+08007: // SUDAH login hanya disegarkan SEKALI, tepat saat halaman pertama dibuka
+08008: // (restoreRbacSession_ di atas). Kalau tab akun lain dibiarkan terbuka
+08009: // lama, atau device-nya dikunci lalu dibuka lagi tanpa reload penuh,
+08010: // perubahan yang Superadmin simpan di Role Access Management tidak akan
+08011: // pernah terlihat sampai user itu logout+login ulang atau menutup total
+08012: // lalu membuka ulang tab-nya -- inilah salah satu sumber laporan "menu
+08013: // yang muncul tidak sesuai config admin" di akun lain. Fungsi ini
+08014: // diekstrak supaya bisa dipanggil ulang secara berkala DAN setiap kali
+08015: // tab kembali terlihat (mis. dibuka lagi setelah di-minimize di HP),
+08016: // tanpa mengubah perilaku restoreRbacSession_ di atas sama sekali.
+08017: async function refreshRbacFromServer_(){
+08018:   if(!CURRENT_USER || !SESSION_TOKEN || !WEB_APP_URL) return;
+08019:   try{
+08020:     const [features, permissions] = await Promise.all([
+08021:       apiGet('features'),
+08022:       apiGet('permissions')
+08023:     ]);
+08024:     FEATURE_REGISTRY = mergeFeatureRegistry(features || []);
+08025:     PERMISSIONS = permissions || {};
+08026:     cacheRbacSession_();
+08027:     applyRbacToUi();
+08028:   }catch(e){
+08029:     // Biarkan sesi tetap aktif dengan cache terakhir; tidak melakukan apa-apa.
+08030:   }
+08031: }
+08032: // Segarkan tiap 3 menit selagi tab terbuka & terlihat, dan segera saat tab
+08033: // kembali aktif (mis. user balik dari aplikasi lain di HP). Ringan karena
+08034: // permission/feature di backend sudah di-cache 10 menit (CacheService),
+08035: // jadi tidak membebani database SQLite.
+08036: setInterval(()=>{ if(document.visibilityState === 'visible') refreshRbacFromServer_(); }, 3*60*1000);
+08037: document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') refreshRbacFromServer_(); });
+08038: 
+08039: /* ---------------- LOGOUT ----------------
+08040:    Membersihkan sesi RBAC (CURRENT_USER, permission, feature registry) &
+08041:    status login menu Setting, lalu menampilkan kembali login-gate supaya
+08042:    pengguna wajib login ulang dengan akun (username/password) untuk
+08043:    masuk ke aplikasi lagi. Data yang sudah tersimpan di database SQLite
+08044:    tidak terpengaruh sama sekali oleh logout. */
+08045: function logoutUser(){
+08046:   try{
+08047:     deactivateAccountDataCaches_(CURRENT_USER&&CURRENT_USER.username);
+08048:   }catch(e){
+08049:     toast('Logout dibatalkan karena cache lokal belum berhasil diamankan. Coba kembali setelah ruang penyimpanan browser tersedia.', true);
+08050:     return;
+08051:   }
+08052:   const tokenToRevoke = SESSION_TOKEN;
+08053:   if(tokenToRevoke && WEB_APP_URL){
+08054:     fetch(WEB_APP_URL, {
+08055:       method:'POST',
+08056:       headers:{'Content-Type':'text/plain;charset=utf-8'},
+08057:       body:JSON.stringify({action:'logout', sessionToken:tokenToRevoke}),
+08058:       keepalive:true
+08059:     }).catch(()=>{});
+08060:   }
+08061:   CURRENT_USER = null;
+08062:   SESSION_TOKEN = '';
+08063:   SESSION_EXPIRES_AT = '';
+08064:   PERMISSIONS = {};
+08065:   FEATURE_REGISTRY = [];
+08066:   try{ localStorage.removeItem(SS_USER_KEY); localStorage.removeItem(SS_TOKEN_KEY); localStorage.removeItem(SS_TOKEN_EXP_KEY); localStorage.removeItem(LS_PERM_KEY); localStorage.removeItem(LS_FEATURES_KEY); }catch(e){}
+08067:   if(typeof resetSettingAuth === 'function') resetSettingAuth();
+08068: 
+08069:   const gate = document.getElementById('login-gate');
+08070:   const appRoot = document.getElementById('app-root');
+08071:   if(appRoot) appRoot.classList.remove('unlocked', 'dash-mode', 'menu-visible');
+08072:   if(gate){
+08073:     gate.style.display = '';
+08074:     gate.style.opacity = '1';
+08075:   }
+08076:   const form = document.getElementById('form-login');
+08077:   if(form) form.reset();
+08078:   const errEl = document.getElementById('login-err');
+08079:   if(errEl) errEl.textContent = '';
+08080:   const userField = document.getElementById('login-username');
+08081:   if(userField) setTimeout(()=> userField.focus(), 50);
+~~~
+
+## function activateAccountDataCaches_(
+### Around line 6331
+~~~text
+06319:       if(key && key.startsWith(prefix)) scoped.push(key);
+06320:     }
+06321:   }catch(e){ return false; }
+06322:   let ok=true;
+06323:   for(const scopedKey of scoped){
+06324:     let original='';
+06325:     try{ original=decodeURIComponent(scopedKey.slice(prefix.length)); }catch(e){ continue; }
+06326:     if(!isAccountDataCacheKey_(original)) continue;
+06327:     if(!moveLocalStorageKey_(scopedKey,original)) ok=false;
+06328:   }
+06329:   return ok;
+06330: }
+06331: function activateAccountDataCaches_(username,{claimExisting=false}={}){
+06332:   const ownerId=accountCacheOwnerId_(username);
+06333:   if(!ownerId) return true;
+06334:   let previous='';
+06335:   try{ previous=localStorage.getItem(LS_ACCOUNT_CACHE_OWNER_KEY)||''; }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06336:   if(previous && previous!==ownerId){
+06337:     if(!stashAccountDataCachesById_(previous)) throw new Error('CACHE_ISOLATION_FAILED');
+06338:   }else if(!previous && !claimExisting && collectAccountDataCacheKeys_().length){
+06339:     // Cache lama dari versi sebelum isolasi akun: jangan wariskan ke akun baru.
+06340:     // Tetap dipreservasi sebagai legacy agar tidak dihancurkan.
+06341:     if(!stashAccountDataCachesById_('legacy')) throw new Error('CACHE_ISOLATION_FAILED');
+06342:   }
+06343:   if(previous!==ownerId && !restoreAccountDataCachesById_(ownerId)){
+06344:     console.warn('[OMODOS] cache akun tersimpan tetapi belum dapat dipulihkan; data server akan dimuat ulang.');
+06345:   }
+06346:   try{ localStorage.setItem(LS_ACCOUNT_CACHE_OWNER_KEY,ownerId); }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06347:   return true;
+06348: }
+06349: function deactivateAccountDataCaches_(username){
+06350:   let ownerId=accountCacheOwnerId_(username);
+06351:   try{ ownerId=ownerId||localStorage.getItem(LS_ACCOUNT_CACHE_OWNER_KEY)||''; }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06352:   if(ownerId && !stashAccountDataCachesById_(ownerId)) throw new Error('CACHE_ISOLATION_FAILED');
+06353:   try{ localStorage.removeItem(LS_ACCOUNT_CACHE_OWNER_KEY); }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06354:   return true;
+06355: }
+06356: let CURRENT_USER = null;        // { username, role, displayName }
+06357: let SESSION_TOKEN = '';
+06358: let SESSION_EXPIRES_AT = '';
+06359: let PERMISSIONS = {};           // { 'view.xxx': { Supervisor:bool, Technician:bool } }
+06360: let FEATURE_REGISTRY = [];      // [{ PermissionKey, Label, Group }]
+06361: try{
+06362:   const cached = localStorage.getItem(SS_USER_KEY);
+06363:   if(cached) CURRENT_USER = JSON.parse(cached);
+06364:   SESSION_TOKEN = localStorage.getItem(SS_TOKEN_KEY) || '';
+06365:   SESSION_EXPIRES_AT = localStorage.getItem(SS_TOKEN_EXP_KEY) || '';
+06366:   if(!SESSION_TOKEN || (SESSION_EXPIRES_AT && Date.parse(SESSION_EXPIRES_AT) <= Date.now())){
+06367:     CURRENT_USER = null;
+06368:     SESSION_TOKEN = '';
+06369:     SESSION_EXPIRES_AT = '';
+06370:   }
+06371:   const cachedPerm = localStorage.getItem(LS_PERM_KEY);
+06372:   if(cachedPerm) PERMISSIONS = JSON.parse(cachedPerm);
+06373:   const cachedFeat = localStorage.getItem(LS_FEATURES_KEY);
+06374:   if(cachedFeat) FEATURE_REGISTRY = JSON.parse(cachedFeat);
+06375: }catch(e){}
+06376: try{
+06377:   if(CURRENT_USER && SESSION_TOKEN) activateAccountDataCaches_(CURRENT_USER.username,{claimExisting:true});
+06378: }catch(e){
+06379:   CURRENT_USER = null;
+06380:   SESSION_TOKEN = '';
+06381:   SESSION_EXPIRES_AT = '';
+06382:   try{
+06383:     localStorage.removeItem(SS_USER_KEY);
+06384:     localStorage.removeItem(SS_TOKEN_KEY);
+06385:     localStorage.removeItem(SS_TOKEN_EXP_KEY);
+06386:   }catch(clearErr){}
+06387: }
+06388: function cacheRbacSession_(){
+06389:   try{
+06390:     localStorage.setItem(SS_USER_KEY, JSON.stringify(CURRENT_USER));
+06391:     localStorage.setItem(SS_TOKEN_KEY, SESSION_TOKEN || '');
+06392:     localStorage.setItem(SS_TOKEN_EXP_KEY, SESSION_EXPIRES_AT || '');
+06393:     localStorage.setItem(LS_PERM_KEY, JSON.stringify(PERMISSIONS));
+06394:     localStorage.setItem(LS_FEATURES_KEY, JSON.stringify(FEATURE_REGISTRY));
+06395:   }catch(e){}
+~~~
+
+## function stashAccountDataCachesById_(
+### Around line 6302
+~~~text
+06290:   try{ value=localStorage.getItem(fromKey); }catch(e){ return false; }
+06291:   if(value===null) return true;
+06292:   try{ localStorage.removeItem(fromKey); }catch(e){ return false; }
+06293:   try{
+06294:     localStorage.setItem(toKey,value);
+06295:     return true;
+06296:   }catch(err){
+06297:     // Jangan hilangkan data lokal bila namespace baru gagal ditulis.
+06298:     try{ localStorage.setItem(fromKey,value); }catch(restoreErr){}
+06299:     return false;
+06300:   }
+06301: }
+06302: function stashAccountDataCachesById_(ownerId){
+06303:   ownerId=String(ownerId||'').trim();
+06304:   if(!ownerId) return true;
+06305:   const keys=collectAccountDataCacheKeys_();
+06306:   for(const key of keys){
+06307:     if(!moveLocalStorageKey_(key,LS_ACCOUNT_CACHE_PREFIX+ownerId+'::'+encodeURIComponent(key))) return false;
+06308:   }
+06309:   return true;
+06310: }
+06311: function restoreAccountDataCachesById_(ownerId){
+06312:   ownerId=String(ownerId||'').trim();
+06313:   if(!ownerId) return true;
+06314:   const prefix=LS_ACCOUNT_CACHE_PREFIX+ownerId+'::';
+06315:   const scoped=[];
+06316:   try{
+06317:     for(let i=0;i<localStorage.length;i++){
+06318:       const key=localStorage.key(i);
+06319:       if(key && key.startsWith(prefix)) scoped.push(key);
+06320:     }
+06321:   }catch(e){ return false; }
+06322:   let ok=true;
+06323:   for(const scopedKey of scoped){
+06324:     let original='';
+06325:     try{ original=decodeURIComponent(scopedKey.slice(prefix.length)); }catch(e){ continue; }
+06326:     if(!isAccountDataCacheKey_(original)) continue;
+06327:     if(!moveLocalStorageKey_(scopedKey,original)) ok=false;
+06328:   }
+06329:   return ok;
+06330: }
+06331: function activateAccountDataCaches_(username,{claimExisting=false}={}){
+06332:   const ownerId=accountCacheOwnerId_(username);
+06333:   if(!ownerId) return true;
+06334:   let previous='';
+06335:   try{ previous=localStorage.getItem(LS_ACCOUNT_CACHE_OWNER_KEY)||''; }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06336:   if(previous && previous!==ownerId){
+06337:     if(!stashAccountDataCachesById_(previous)) throw new Error('CACHE_ISOLATION_FAILED');
+06338:   }else if(!previous && !claimExisting && collectAccountDataCacheKeys_().length){
+06339:     // Cache lama dari versi sebelum isolasi akun: jangan wariskan ke akun baru.
+06340:     // Tetap dipreservasi sebagai legacy agar tidak dihancurkan.
+06341:     if(!stashAccountDataCachesById_('legacy')) throw new Error('CACHE_ISOLATION_FAILED');
+06342:   }
+06343:   if(previous!==ownerId && !restoreAccountDataCachesById_(ownerId)){
+06344:     console.warn('[OMODOS] cache akun tersimpan tetapi belum dapat dipulihkan; data server akan dimuat ulang.');
+06345:   }
+06346:   try{ localStorage.setItem(LS_ACCOUNT_CACHE_OWNER_KEY,ownerId); }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06347:   return true;
+06348: }
+06349: function deactivateAccountDataCaches_(username){
+06350:   let ownerId=accountCacheOwnerId_(username);
+06351:   try{ ownerId=ownerId||localStorage.getItem(LS_ACCOUNT_CACHE_OWNER_KEY)||''; }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06352:   if(ownerId && !stashAccountDataCachesById_(ownerId)) throw new Error('CACHE_ISOLATION_FAILED');
+06353:   try{ localStorage.removeItem(LS_ACCOUNT_CACHE_OWNER_KEY); }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06354:   return true;
+06355: }
+06356: let CURRENT_USER = null;        // { username, role, displayName }
+06357: let SESSION_TOKEN = '';
+06358: let SESSION_EXPIRES_AT = '';
+06359: let PERMISSIONS = {};           // { 'view.xxx': { Supervisor:bool, Technician:bool } }
+06360: let FEATURE_REGISTRY = [];      // [{ PermissionKey, Label, Group }]
+06361: try{
+06362:   const cached = localStorage.getItem(SS_USER_KEY);
+06363:   if(cached) CURRENT_USER = JSON.parse(cached);
+06364:   SESSION_TOKEN = localStorage.getItem(SS_TOKEN_KEY) || '';
+06365:   SESSION_EXPIRES_AT = localStorage.getItem(SS_TOKEN_EXP_KEY) || '';
+06366:   if(!SESSION_TOKEN || (SESSION_EXPIRES_AT && Date.parse(SESSION_EXPIRES_AT) <= Date.now())){
+~~~
+
+## function loadCached
+No match.
+
+## function hydrate
+### Around line 19179
+~~~text
+19167: function loadPmReports(){
+19168:   if(CURRENT_USER && typeof canAccessView_==='function' && !canAccessView_('patrol')){
+19169:     PM_REPORTS = [];
+19170:     return PM_REPORTS;
+19171:   }
+19172:   PM_REPORTS = loadPmReportsLocal();
+19173:   return PM_REPORTS;
+19174: }
+19175: 
+19176: // Findings Patrol versi lama dapat menyimpan blob: URL lokal, sedangkan kolom
+19177: // Files sudah punya URL permanen Cloudflare. Petakan ulang berdasarkan urutan
+19178: // agar data lama langsung pulih di gadget lain tanpa perlu edit ulang record.
+19179: function hydratePatrolFindingFiles_(findings, stableFiles){
+19180:   const out = Array.isArray(findings) ? JSON.parse(JSON.stringify(findings)) : [];
+19181:   const stable = Array.isArray(stableFiles) ? stableFiles.filter(Boolean) : [];
+19182:   let cursor = 0;
+19183:   out.forEach(f=>{
+19184:     if(!Array.isArray(f.files)) return;
+19185:     f.files = f.files.map(old=>{
+19186:       const candidate = stable.find(x=>old && old.id && x.id===old.id) || stable.find(x=>old && old.name && x.name===old.name) || stable[cursor++];
+19187:       if(old && old.viewUrl && !/^(blob:|data:)/.test(String(old.viewUrl))) return parseAttachments([old])[0];
+19188:       if(candidate && candidate.viewUrl && !String(candidate.viewUrl).startsWith('blob:')) return candidate;
+19189:       if(old && old.viewUrl && !String(old.viewUrl).startsWith('blob:')) return old;
+19190:       return { name:(old&&old.name)||'lampiran', mimeType:(old&&old.mimeType)||'', type:(old&&old.type)||'' };
+19191:     });
+19192:   });
+19193:   return out;
+19194: }
+19195: 
+19196: function normalizePmTimestamp_(row){
+19197:   row=row||{};
+19198:   const raw=row.ts ?? row.Timestamp ?? row['Timestamp Input'] ?? '';
+19199:   if(typeof raw==='number' && Number.isFinite(raw) && raw>0) return raw<1e12 ? raw*1000 : raw;
+19200:   const numRaw=Number(raw);
+19201:   if(Number.isFinite(numRaw) && numRaw>0) return numRaw<1e12 ? numRaw*1000 : numRaw;
+19202:   const parsed=Date.parse(String(raw||''));
+19203:   if(Number.isFinite(parsed)) return parsed;
+19204:   const tanggal=String(row.tanggal ?? row.Tanggal ?? '').slice(0,10);
+19205:   const waktu=String(row.waktuPatrol ?? row['Waktu Patrol'] ?? row.Waktu ?? '00:00').slice(0,5);
+19206:   const combined=Date.parse(tanggal ? (tanggal+'T'+waktu+':00') : '');
+19207:   return Number.isFinite(combined)?combined:0;
+19208: }
+19209: function sanitizePmReportForLocal_(report){
+19210:   const copy = JSON.parse(JSON.stringify(report||{}));
+19211:   if(Array.isArray(copy.findings)) copy.findings.forEach(f=>{
+19212:     if(Array.isArray(f.files)) f.files = f.files.map(x=>({
+19213:       name:x.name||'lampiran', mimeType:x.mimeType||'', type:x.type||'',
+19214:       viewUrl:x.viewUrl||'', previewUrl:x.previewUrl||'', thumbUrl:x.thumbUrl||''
+19215:     }));
+19216:   });
+19217:   return copy;
+19218: }
+19219: 
+19220: async function syncPmReportsFromBackend(){
+19221:   if(!WEB_APP_URL) return loadPmReportsLocal();
+19222:   try{
+19223:     const remote = await apiGet('predictiveReports');
+19224:     if(Array.isArray(remote)){
+19225:       const normalized = remote.map(r=>({
+19226:         id: r.id || r.ID, ts: normalizePmTimestamp_(r),
+19227:         tanggal: r.tanggal || r.Tanggal || '', shift: r.shift || r.Shift || '',
+19228:         petugas: r.petugas || r.Petugas || '', kodeMesin: r.kodeMesin || r['Kode Mesin'] || '',
+19229:         namaMesin: r.namaMesin || r['Nama Mesin'] || '', titikInspeksi: r.titikInspeksi || r['Titik Inspeksi'] || '',
+19230:         vibrasi: r.vibrasi || r.Vibrasi || '', suhu: r.suhu || r.Suhu || '', suara: r.suara || r.Suara || '',
+19231:         kebocoran: r.kebocoran || r.Kebocoran || '', kelistrikan: r.kelistrikan || r.Kelistrikan || '',
+19232:         pelumasan: r.pelumasan || r.Pelumasan || '', severity: r.severity || r.Severity || 'Normal',
+19233:         deskripsiTemuan: r.deskripsiTemuan || r['Deskripsi Temuan'] || '',
+19234:         rekomendasi: r.rekomendasi || r.Rekomendasi || '',
+19235:         // Lampiran bisa berupa array objek {name,type,viewUrl} (kalau backend sudah upload ke Drive)
+19236:         // atau string/array nama file lama — parseAttachments() menormalkan keduanya supaya foto/video
+19237:         // tetap bisa ditampilkan sebagai gambar/video asli, sama seperti Lampiran Logbook.
+19238:         files: parseAttachments(r.files || r['Lampiran (JSON)'] || r.Files || []),
+19239:         patrolMode: String(r.patrolMode ?? r['Patrol Mode'] ?? '').toLowerCase()==='true' ||
+19240:           String(r.patrolMode ?? r['Patrol Mode'] ?? '')==='1' ||
+19241:           /^patrol harian/i.test(String(r.titikInspeksi || r['Titik Inspeksi'] || '')),
+19242:         checklist: safeJsonParseClient_(r.checklist || r['Checklist (JSON)'], {}),
+19243:         counts: safeJsonParseClient_(r.counts || r['Counts (JSON)'], {}),
+~~~
+
