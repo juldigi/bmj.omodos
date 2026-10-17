@@ -4678,3 +4678,95 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 const observer=new MutationObserver(()=>{addUnits();attachEditMaterialSuggestions();});
 observer.observe(document.documentElement,{subtree:true,childList:true});
 })();
+
+
+/* OMODOS_REVIEW_FIXES_20261017_V2
+   Make the edit-logbook material picker discoverable on mobile (including
+   when the field is empty), and preserve typed form content during lifecycle
+   transitions. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261017_V2__)return;
+window.__OMODOS_REVIEW_FIXES_20261017_V2__=true;
+function esc2(v){
+  try{return typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+  catch(e){return String(v==null?'':v);}
+}
+function attachPicker(){
+  const holder=document.getElementById('entry-view-mode');
+  if(!holder)return;
+  const name=holder.querySelector('[data-edit-field="Nama Material"]');
+  const sap=holder.querySelector('[data-edit-field="Material Number SAP"]');
+  if(!name||!sap)return;
+  [name,sap].forEach(input=>{
+    const box=input.closest('.field')?.querySelector('.omodos-edit-material-picker');
+    if(!box)return;
+    const byName=input===name;
+    const render=(showAll)=>{
+      let master=[];
+      try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
+      const q=String(input.value||'').trim().toLocaleLowerCase('id');
+      const seen=new Set();
+      const found=master.filter(x=>{
+        const v=String(byName?(x.nama||''):(x.sap||'')).trim();
+        const k=v.toLocaleLowerCase('id');
+        if(!k||seen.has(k)||(q&&!k.includes(q)))return false;
+        seen.add(k);return true;
+      }).slice(0,25);
+      if(!found.length){box.classList.remove('open');box.innerHTML='';return;}
+      box.innerHTML=found.map((x,i)=>'<button type="button" class="sp-suggest-item" data-pick-index="'+i+'" style="display:flex;width:100%;text-align:left;flex-direction:column;gap:2px;padding:10px 12px;border:0;border-bottom:1px solid var(--line,#e5e7eb);background:transparent;color:inherit;cursor:pointer"><span class="sp-suggest-main">'+esc2(byName?x.nama:x.sap)+'</span><span class="sp-suggest-sub">'+esc2(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</span></button>').join('');
+      box.__items=found;box.classList.add('open');
+    };
+    if(input.dataset.materialPickerV2==='1')return;
+    input.dataset.materialPickerV2='1';
+    input.addEventListener('focus',()=>render(true));
+    input.addEventListener('input',()=>render(false));
+    input.addEventListener('keydown',ev=>{
+      if(ev.key==='Escape'){box.classList.remove('open');box.innerHTML='';}
+    });
+    box.addEventListener('pointerdown',ev=>{
+      const option=ev.target.closest('[data-pick-index]');
+      if(!option)return;
+      ev.preventDefault();
+      const item=box.__items?.[Number(option.dataset.pickIndex)];
+      if(!item)return;
+      name.value=item.nama||'';sap.value=item.sap||'';
+      box.classList.remove('open');box.innerHTML='';
+      name.dispatchEvent(new Event('input',{bubbles:true}));
+      sap.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    input.addEventListener('blur',()=>setTimeout(()=>{if(!box.matches(':hover')){box.classList.remove('open');box.innerHTML='';}},250));
+  });
+}
+const originalAttach=attachEditMaterialSuggestions;
+function ensurePicker(){
+  const holder=document.getElementById('entry-view-mode');
+  if(!holder)return;
+  const name=holder.querySelector('[data-edit-field="Nama Material"]');
+  const sap=holder.querySelector('[data-edit-field="Material Number SAP"]');
+  [name,sap].forEach(input=>{
+    if(!input)return;
+    const field=input.closest('.field');
+    if(!field)return;
+    let box=field.querySelector('.omodos-edit-material-picker');
+    if(!box){
+      box=document.createElement('div');
+      box.className='sp-suggest-box omodos-edit-material-picker';
+      box.style.cssText='display:none;position:absolute;z-index:10030;left:0;right:0;top:100%;max-height:240px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line,#d1d5db);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);';
+      field.style.position='relative';field.appendChild(box);
+    }
+  });
+  attachPicker();
+}
+const style=document.createElement('style');
+style.textContent='.omodos-edit-material-picker.open{display:block!important}.omodos-edit-material-picker .sp-suggest-item:active{background:var(--surface-2,#f3f4f6)}';
+document.head.appendChild(style);
+const previousRender=window.renderEntryEditForm;
+if(typeof previousRender==='function'&&!previousRender.__materialPickerV2){
+  const wrapped=function(){const result=previousRender.apply(this,arguments);ensurePicker();return result;};
+  wrapped.__materialPickerV2=true;window.renderEntryEditForm=wrapped;
+}
+function boot(){ensurePicker();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
+})();
