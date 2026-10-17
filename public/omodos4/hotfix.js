@@ -4361,3 +4361,56 @@ ready(function(){
   document.head.appendChild(style);
 });
 })();
+
+
+/* COPILOT_EXTERNAL_SEARCH_LINKS_V1 — make external AI research sources openable from Copilot output. */
+(function(){
+'use strict';
+function inCopilot(node){
+  var el=node&&node.parentElement;
+  while(el&&el!==document.body){
+    var id=String(el.id||'').toLowerCase();
+    var cls=String(el.className&&el.className.baseVal||el.className||'').toLowerCase();
+    if(/copilot|ai-internet|internet-research|external-ai/.test(id+' '+cls))return true;
+    el=el.parentElement;
+  }
+  return false;
+}
+function linkifyTextNode(node){
+  if(!node||node.nodeType!==Node.TEXT_NODE||!inCopilot(node))return;
+  var text=node.nodeValue||'';
+  if(!/https?:\/\//i.test(text)||node.parentElement&&node.parentElement.closest('a,button,script,style,textarea,input,select,option'))return;
+  var re=/https?:\/\/[^\s<>"']+/gi,match,last=0,frag=document.createDocumentFragment(),changed=false;
+  while((match=re.exec(text))){
+    var raw=match[0],url=raw.replace(/[),.;!?]+$/,'');
+    if(!url)continue;
+    frag.appendChild(document.createTextNode(text.slice(last,match.index)));
+    var a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.className='omodos-copilot-source-link';a.textContent=url;
+    frag.appendChild(a);
+    last=match.index+url.length;changed=true;
+  }
+  if(!changed)return;
+  frag.appendChild(document.createTextNode(text.slice(last)));
+  node.parentNode.replaceChild(frag,node);
+}
+function scan(root){
+  if(!root)return;
+  var containers=[];
+  if(root.nodeType===1&&/copilot|ai-internet|internet-research|external-ai/i.test(String(root.id||'')+' '+String(root.className||'')))containers.push(root);
+  if(root.querySelectorAll)containers=containers.concat(Array.from(root.querySelectorAll('[id*="copilot" i],[class*="copilot" i],[id*="internet-research" i],[class*="internet-research" i],[id*="external-ai" i],[class*="external-ai" i]')));
+  containers.forEach(function(container){
+    var walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT),nodes=[],n;
+    while((n=walker.nextNode()))nodes.push(n);
+    nodes.forEach(linkifyTextNode);
+  });
+}
+function boot(){
+  scan(document.body);
+  var observer=new MutationObserver(function(records){records.forEach(function(r){r.addedNodes&&r.addedNodes.forEach(function(n){if(n.nodeType===1)scan(n);else if(n.nodeType===3)linkifyTextNode(n);});});});
+  observer.observe(document.body,{childList:true,subtree:true});
+}
+var style=document.createElement('style');
+style.textContent='.omodos-copilot-source-link{color:var(--primary,#2563eb);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere;cursor:pointer}.omodos-copilot-source-link:focus-visible{outline:2px solid currentColor;outline-offset:2px}';
+document.head.appendChild(style);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
