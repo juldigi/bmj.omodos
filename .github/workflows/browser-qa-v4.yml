@@ -1419,6 +1419,143 @@ jobs:
             result.patrolRevisions=patrolRevisions;
             result.phases.push('patrol-team-pending-finding');
 
+            console.log('[QA] requested mobile/material/multiline regressions');
+            await page.setViewportSize({ width: 390, height: 844 });
+            const requestedFixes = await page.evaluate(async () => {
+              const out = {};
+              const oldRows = SPAREPART_ROWS;
+              const oldRowId = SPAREPART_ROW_ID;
+              const oldMaster = SPAREPART_LOKASI;
+              const holder = document.getElementById('entry-view-mode');
+              const oldHolderDisplay = holder?.style.display || '';
+              const form = document.getElementById('form-entry');
+              const description = form?.querySelector('textarea[name="deskripsiMasalah"]');
+              const oldDescription = description?.value;
+              try {
+                SPAREPART_LOKASI = [{ sap: 'QA-OIL-1', nama: 'QA Hydraulic Oil', lokasiGudang: 'QA Store' }];
+                SPAREPART_ROWS = [{ id: 987654, nama: 'QA Hydraulic Oil', sap: 'QA-OIL-1', jumlah: '1.5', unit: 'pcs' }];
+                SPAREPART_ROW_ID = 987654;
+                renderSparepartRows();
+                const row = document.querySelector('#sparepart-rows .sparepart-row');
+                const unit = row?.querySelector('.sp-unit');
+                const qty = row?.querySelector('.sp-jumlah');
+                if (!unit || !qty) throw new Error('Unit selector missing on sparepart row');
+                unit.value = 'L';
+                qty.value = '1.5';
+                unit.dispatchEvent(new Event('change', { bubbles: true }));
+                qty.dispatchEvent(new Event('input', { bubbles: true }));
+                syncSparepartRowsFromDom();
+                const material = buildMaterialFieldsFromRows();
+                out.units = {
+                  unitChoices: [...unit.options].map(o => o.value),
+                  selected: unit.value,
+                  step: qty.step,
+                  quantity: qty.value,
+                  detailUnit: material.detail?.[0]?.unit,
+                  legacyText: material.namaMaterial
+                };
+                if (!out.units.unitChoices.includes('L') || out.units.selected !== 'L' ||
+                    out.units.detailUnit !== 'L' || !out.units.legacyText.includes('(1.5 L)')) {
+                  throw new Error('Material unit/quantity did not persist into payload: ' + JSON.stringify(out.units));
+                }
+
+                if (description) {
+                  description.value = 'Baris pertama\nBaris kedua';
+                  description.dispatchEvent(new Event('input', { bubbles: true }));
+                  const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+                  description.dispatchEvent(enter);
+                  out.multiline = {
+                    newlinePreserved: description.value.includes('\n'),
+                    whiteSpace: getComputedStyle(description).whiteSpace,
+                    enterNotPrevented: !enter.defaultPrevented
+                  };
+                  if (!out.multiline.newlinePreserved || out.multiline.whiteSpace !== 'pre-wrap' || !out.multiline.enterNotPrevented) {
+                    throw new Error('Logbook multiline regression: ' + JSON.stringify(out.multiline));
+                  }
+                } else {
+                  throw new Error('Logbook description textarea not found for multiline QA');
+                }
+
+                const originalFullscreen = document.documentElement.requestFullscreen;
+                let fullscreenCalls = 0;
+                try {
+                  Object.defineProperty(document.documentElement, 'requestFullscreen', {
+                    configurable: true,
+                    value: () => { fullscreenCalls++; return Promise.resolve(); }
+                  });
+                  if (typeof window.aktifkanFullscreen === 'function') window.aktifkanFullscreen();
+                  out.mobile = {
+                    viewportWidth: window.innerWidth,
+                    mobileMedia: matchMedia('(max-width: 767px), (pointer: coarse)').matches,
+                    fullscreenCalls
+                  };
+                  if (!out.mobile.mobileMedia || fullscreenCalls !== 0) {
+                    throw new Error('Mobile fullscreen/orientation helper was not suppressed: ' + JSON.stringify(out.mobile));
+                  }
+                } finally {
+                  try {
+                    if (originalFullscreen) Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: originalFullscreen });
+                    else delete document.documentElement.requestFullscreen;
+                  } catch (e) {}
+                }
+
+                if (!holder || typeof renderEntryEditForm !== 'function') throw new Error('Edit-logbook material form is unavailable');
+                holder.style.display = 'block';
+                renderEntryEditForm({
+                  ID: 'QA-EDIT-MATERIAL',
+                  'Lokasi Pekerjaan': 'Mesin',
+                  'Kategori Area': '',
+                  'Nama Area': '',
+                  'Nama Material': '',
+                  'Material Number SAP': ''
+                });
+                await new Promise(resolve => setTimeout(resolve, 120));
+                const nameInput = holder.querySelector('[data-edit-field="Nama Material"]');
+                const sapInput = holder.querySelector('[data-edit-field="Material Number SAP"]');
+                if (!nameInput || !sapInput) throw new Error('Edit-logbook material fields are missing');
+                nameInput.focus();
+                await new Promise(resolve => setTimeout(resolve, 100));
+                const picker = nameInput.closest('.field')?.querySelector('.omodos-edit-material-picker');
+                const option = picker?.querySelector('[data-v4-pick], [data-pick-index]');
+                out.materialPicker = {
+                  present: !!picker,
+                  open: !!picker?.classList.contains('open'),
+                  options: picker?.querySelectorAll('[data-v4-pick], [data-pick-index]').length || 0
+                };
+                if (!picker || !option || !out.materialPicker.open) {
+                  throw new Error('Edit-logbook material suggestions did not open: ' + JSON.stringify(out.materialPicker));
+                }
+                option.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch' }));
+                out.materialPicker.selectedName = nameInput.value;
+                out.materialPicker.selectedSap = sapInput.value;
+                if (nameInput.value !== 'QA Hydraulic Oil' || sapInput.value !== 'QA-OIL-1') {
+                  throw new Error('Material picker did not populate both name and SAP: ' + JSON.stringify(out.materialPicker));
+                }
+
+                if (!form || !description) throw new Error('Logbook form is unavailable for unsaved-change guard QA');
+                description.dispatchEvent(new Event('input', { bubbles: true }));
+                const before = new Event('beforeunload', { cancelable: true });
+                window.dispatchEvent(before);
+                out.unsavedDraftGuard = { prevented: before.defaultPrevented, listenerInstalled: form.dataset.dirtyGuard === '1' };
+                if (!out.unsavedDraftGuard.prevented || !out.unsavedDraftGuard.listenerInstalled) {
+                  throw new Error('Unsaved logbook draft navigation guard did not fire');
+                }
+                form.dispatchEvent(new Event('reset', { bubbles: true }));
+                return out;
+              } finally {
+                SPAREPART_ROWS = oldRows;
+                SPAREPART_ROW_ID = oldRowId;
+                SPAREPART_LOKASI = oldMaster;
+                renderSparepartRows();
+                if (description && oldDescription !== undefined) description.value = oldDescription;
+                if (form) form.dispatchEvent(new Event('reset', { bubbles: true }));
+                if (holder) holder.style.display = oldHolderDisplay;
+              }
+            });
+            result.requestedFixes = requestedFixes;
+            result.phases.push('requested-mobile-material-multiline-regressions');
+            await page.setViewportSize({ width: 1440, height: 1000 });
+
             const relevantErrors = errors.filter(x =>
               !/API|backend|Cloudflare|Web App|Failed to fetch|NetworkError/i.test(x)
             );
