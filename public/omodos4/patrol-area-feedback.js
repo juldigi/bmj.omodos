@@ -184,7 +184,6 @@ ready(function(){
       if(!bottomCamera.files||!bottomCamera.files.length)return;
       try{
         const transfer=new DataTransfer();
-        Array.from(bottomInput.files||[]).forEach(f=>transfer.items.add(f));
         Array.from(bottomCamera.files).forEach(f=>transfer.items.add(f));
         bottomInput.files=transfer.files;
         bottomInput.dispatchEvent(new Event('change',{bubbles:true}));
