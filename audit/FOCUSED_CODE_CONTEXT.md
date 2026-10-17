@@ -2860,3 +2860,413 @@ No match.
 23370: const PI_DISC_MAP = {
 ~~~
 
+## function copilotSearchInternal_(
+### Around line 22990
+~~~text
+22978: function copilotRowDate_(row){
+22979:   const keys=['Tanggal','tanggal','Date','date','Tanggal Input','Timestamp Input','Created At','createdAt','Jadwal Meeting','Tanggal Meeting'];
+22980:   for(const k of keys){ if(row&&row[k]) return String(row[k]).slice(0,10); }
+22981:   return '';
+22982: }
+22983: function copilotRowLabel_(row){
+22984:   const keys=['Nama Mesin','Nama Material','Material Number SAP','Material Number','Nama','Nama Personil','Judul','title','Nama Project','Nama Tim','Jenis Meeting','Status','Tanggal','Lokasi Gudang','Lokasi/Area','Deskripsi Masalah','ID'];
+22985:   const parts=[];
+22986:   keys.forEach(k=>{ if(row&&row[k]!==undefined&&row[k]!==''&&parts.length<4) parts.push(String(row[k])); });
+22987:   if(parts.length) return parts.join(' · ');
+22988:   const text=copilotRowText_(row); return text.slice(0,180)+(text.length>180?'…':'');
+22989: }
+22990: function copilotSearchInternal_(question){
+22991:   const qn=copilotNorm_(question), tokens=copilotTokens_(question), today=copilotLocalToday_();
+22992:   const wantsToday=/hari ini|today/.test(qn);
+22993:   const wantsLatest=/\b(terbaru|terkini|latest)\b/.test(qn);
+22994:   const statusTerms=['selesai','proses','pending','emergency','planning','completed','on going','hold','cancel','closed','open','normal','perhatian','kritikal','critical'];
+22995:   const askedStatus=statusTerms.find(x=>qn.includes(x))||'';
+22996:   const sources=copilotDataSources_();
+22997:   const machineTargets=copilotResolveMachineTargets_(question);
+22998:   const machineAliases=Array.from(new Set(machineTargets.flatMap(t=>t.aliases)));
+22999:   const machineIntent=/\b(mesin|machine|workcenter|work center|equipment)\b/.test(qn) || machineTargets.length>0;
+23000:   const intents=copilotIntentProfile_(question);
+23001:   if(machineIntent && !machineTargets.length) return [];
+23002:   const groups=[];
+23003:   for(const src of sources){
+23004:     if(!copilotSourceAllowedByIntent_(src.name,intents)) continue;
+23005:     const sourceNorms=[...src.keywords.map(copilotNorm_),copilotNorm_(src.name)];
+23006:     const sourceHit=sourceNorms.some(k=>k&&qn.includes(k));
+23007:     let contentTokens=tokens.filter(t=>!sourceNorms.some(k=>k===t||k.split(' ').includes(t)) && !statusTerms.includes(t));
+23008:     if(machineTargets.length) contentTokens=contentTokens.filter(t=>!machineAliases.some(a=>a.split(/\s+/).includes(t)));
+23009:     const ranked=[];
+23010:     for(const row of src.rows){
+23011:       if(machineTargets.length && !copilotRowMatchesMachineTargets_(row,machineTargets,src.name)) continue;
+23012:       if(!copilotRowMatchesIntent_(row,intents,src.name)) continue;
+23013:       const txt=copilotNorm_(copilotRowText_(row));
+23014:       let score=sourceHit?4:0, contentHits=0;
+23015:       if(machineTargets.length) score+=20;
+23016:       for(const t of contentTokens){ if(txt.includes(t)){ score+=3; contentHits++; } }
+23017:       const minContentHits=contentTokens.length ? Math.max(1,Math.ceil(contentTokens.length*0.55)) : 0;
+23018:       if(contentTokens.length && contentHits<minContentHits) continue;
+23019:       if(askedStatus){ if(txt.includes(askedStatus)) score+=3; else continue; }
+23020:       if(wantsToday && copilotRowDate_(row)!==today) continue;
+23021:       if(score>0 || machineTargets.length || sourceHit) ranked.push({row,score,date:copilotRowDate_(row)});
+23022:     }
+23023:     ranked.sort((a,b)=>b.score-a.score || (wantsLatest?String(b.date||'').localeCompare(String(a.date||'')):0));
+23024:     if(ranked.length) groups.push({src,total:ranked.length,matches:ranked.slice(0,8).map(x=>x.row),sourceHit,machineHit:machineTargets.length>0,machineTargets});
+23025:   }
+23026:   groups.sort((a,b)=>(Number(b.machineHit)-Number(a.machineHit))||(b.sourceHit-a.sourceHit)||(b.total-a.total));
+23027:   return groups.slice(0,12);
+23028: }
+23029: function copilotCategoryMeta_(sourceName){
+23030:   const n=copilotNorm_(sourceName);
+23031:   if(/logbook|maintenance/.test(n)) return {icon:'📘',label:'Logbook & Maintenance',tone:'logbook'};
+23032:   if(/database mesin|machine|mesin|workcenter/.test(n)) return {icon:'⚙️',label:'Mesin & Equipment',tone:'machine'};
+23033:   if(/personil|personnel|hard skill|soft skill|employee/.test(n)) return {icon:'👥',label:'People & Kompetensi',tone:'people'};
+23034:   if(/knowledge|kb|lesson|best practice/.test(n)) return {icon:'🧠',label:'Knowledge Base',tone:'knowledge'};
+23035:   if(/sparepart|material|warehouse|opname|\bpo\b|eta|sap status/.test(n)) return {icon:'📦',label:'Sparepart & Warehouse',tone:'sparepart'};
+23036:   if(/patrol|predictive|finding|temuan/.test(n)) return {icon:'🛡️',label:'Patrol & Predictive',tone:'patrol'};
+23037:   if(/kpi|breakdown|record ytd|run hour/.test(n)) return {icon:'📊',label:'KPI & Performance',tone:'kpi'};
+23038:   if(/energy|utility|toe|ipal/.test(n)) return {icon:'⚡',label:'Energy & Utility',tone:'energy'};
+23039:   if(/project|kaizen|sga|meeting|rca|corrective|report/.test(n)) return {icon:'🗂️',label:'Report & Improvement',tone:'report'};
+23040:   return {icon:'🧩',label:String(sourceName||'Data OMODOS'),tone:'default'};
+23041: }
+23042: 
+23043: function copilotCompactFields_(row){
+23044:   if(!row || typeof row!=='object') return [];
+23045:   const preferred=[
+23046:     'Status','status','Tanggal','tanggal','Waktu','waktu','Nama Mesin','namaMesin','Kode Mesin','kodeMesin',
+23047:     'Nama Unit','Unit','Nama Material','Material Number SAP','Material Number','Lokasi Gudang','Lokasi/Area','Lokasi',
+23048:     'Nama Pelapor','Pelapor','PIC','pic','Petugas','petugas','Shift','shift','Severity','severity','Durasi','Downtime',
+23049:     'Deskripsi Masalah','deskripsiTemuan','Deskripsi Temuan','Tindakan Perbaikan','Rekomendasi','rekomendasi','Judul','title','ID'
+23050:   ];
+23051:   const skip=/password|token|base64|attachment.*data|file.*data|session/i;
+23052:   const seen=new Set(), fields=[];
+23053:   const push=(k,v)=>{
+23054:     if(fields.length>=7 || seen.has(k) || skip.test(k) || v===null || v===undefined || v==='') return;
+~~~
+
+## function copilotCompactFields_(
+### Around line 23043
+~~~text
+23031:   if(/logbook|maintenance/.test(n)) return {icon:'📘',label:'Logbook & Maintenance',tone:'logbook'};
+23032:   if(/database mesin|machine|mesin|workcenter/.test(n)) return {icon:'⚙️',label:'Mesin & Equipment',tone:'machine'};
+23033:   if(/personil|personnel|hard skill|soft skill|employee/.test(n)) return {icon:'👥',label:'People & Kompetensi',tone:'people'};
+23034:   if(/knowledge|kb|lesson|best practice/.test(n)) return {icon:'🧠',label:'Knowledge Base',tone:'knowledge'};
+23035:   if(/sparepart|material|warehouse|opname|\bpo\b|eta|sap status/.test(n)) return {icon:'📦',label:'Sparepart & Warehouse',tone:'sparepart'};
+23036:   if(/patrol|predictive|finding|temuan/.test(n)) return {icon:'🛡️',label:'Patrol & Predictive',tone:'patrol'};
+23037:   if(/kpi|breakdown|record ytd|run hour/.test(n)) return {icon:'📊',label:'KPI & Performance',tone:'kpi'};
+23038:   if(/energy|utility|toe|ipal/.test(n)) return {icon:'⚡',label:'Energy & Utility',tone:'energy'};
+23039:   if(/project|kaizen|sga|meeting|rca|corrective|report/.test(n)) return {icon:'🗂️',label:'Report & Improvement',tone:'report'};
+23040:   return {icon:'🧩',label:String(sourceName||'Data OMODOS'),tone:'default'};
+23041: }
+23042: 
+23043: function copilotCompactFields_(row){
+23044:   if(!row || typeof row!=='object') return [];
+23045:   const preferred=[
+23046:     'Status','status','Tanggal','tanggal','Waktu','waktu','Nama Mesin','namaMesin','Kode Mesin','kodeMesin',
+23047:     'Nama Unit','Unit','Nama Material','Material Number SAP','Material Number','Lokasi Gudang','Lokasi/Area','Lokasi',
+23048:     'Nama Pelapor','Pelapor','PIC','pic','Petugas','petugas','Shift','shift','Severity','severity','Durasi','Downtime',
+23049:     'Deskripsi Masalah','deskripsiTemuan','Deskripsi Temuan','Tindakan Perbaikan','Rekomendasi','rekomendasi','Judul','title','ID'
+23050:   ];
+23051:   const skip=/password|token|base64|attachment.*data|file.*data|session/i;
+23052:   const seen=new Set(), fields=[];
+23053:   const push=(k,v)=>{
+23054:     if(fields.length>=7 || seen.has(k) || skip.test(k) || v===null || v===undefined || v==='') return;
+23055:     if(!['string','number','boolean'].includes(typeof v)) return;
+23056:     let txt=String(v).replace(/\s+/g,' ').trim();
+23057:     if(!txt) return;
+23058:     if(txt.length>180) txt=txt.slice(0,177)+'…';
+23059:     seen.add(k); fields.push({key:k,value:txt});
+23060:   };
+23061:   preferred.forEach(k=>{ if(Object.prototype.hasOwnProperty.call(row,k)) push(k,row[k]); });
+23062:   Object.entries(row).forEach(([k,v])=>push(k,v));
+23063:   return fields.slice(0,6);
+23064: }
+23065: 
+23066: function copilotPrettyFieldName_(key){
+23067:   return String(key||'').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/[_\.]/g,' ').replace(/\s+/g,' ').trim();
+23068: }
+23069: 
+23070: function copilotRowCardHtml_(row,sourceName,index){
+23071:   const fields=copilotCompactFields_(row);
+23072:   const title=copilotRowLabel_(row);
+23073:   const fieldHtml=fields.length ? '<div class="copilot-kv-grid">'+fields.map(f=>
+23074:     '<div class="copilot-kv"><div class="copilot-kv-key">'+escapeHtml(copilotPrettyFieldName_(f.key))+'</div><div class="copilot-kv-value">'+escapeHtml(f.value)+'</div></div>'
+23075:   ).join('')+'</div>' : '<div class="copilot-record-empty">Detail ringkas tidak tersedia.</div>';
+23076:   return '<article class="copilot-data-record" data-copilot-source="'+escapeHtml(sourceName||'')+'">'+
+23077:     '<div class="copilot-record-top"><span class="copilot-record-index">#'+(index+1)+'</span><div class="copilot-record-title">'+escapeHtml(title)+'</div></div>'+
+23078:     fieldHtml+'</article>';
+23079: }
+23080: 
+23081: function copilotExternalAutoCategory_(text){
+23082:   const n=copilotNorm_(text);
+23083:   if(/bahaya|risiko|safety|keselamatan|warning|peringatan|catatan/.test(n)) return {title:'Risiko & Catatan',icon:'⚠️',tone:'warning'};
+23084:   if(/langkah|tindakan|rekomendasi|solusi|perbaikan|action/.test(n)) return {title:'Tindakan & Rekomendasi',icon:'🛠️',tone:'action'};
+23085:   if(/sparepart|material|part|komponen|bearing|seal|sensor/.test(n)) return {title:'Komponen / Sparepart',icon:'📦',tone:'sparepart'};
+23086:   if(/kpi|mtbf|mttr|downtime|trend|angka|data/.test(n)) return {title:'Data & Analisis',icon:'📊',tone:'kpi'};
+23087:   if(/penyebab|diagnos|indikasi|gejala|temuan|root cause/.test(n)) return {title:'Diagnosis & Temuan',icon:'🔎',tone:'diagnosis'};
+23088:   return {title:'Ringkasan',icon:'✨',tone:'summary'};
+23089: }
+23090: 
+23091: function copilotNarrativeBodyHtml_(text){
+23092:   const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+23093:   const list=[], paragraphs=[], kv=[];
+23094:   lines.forEach(line=>{
+23095:     const bullet=line.match(/^(?:[-*•]|\d+[.)])\s+(.+)/);
+23096:     const pair=!bullet && line.length<240 ? line.match(/^([^:]{2,45}):\s*(.+)$/) : null;
+23097:     if(bullet) list.push(bullet[1]);
+23098:     else if(pair) kv.push({k:pair[1],v:pair[2]});
+23099:     else paragraphs.push(line.replace(/^#{1,6}\s*/,'').replace(/^\*\*(.+)\*\*$/,'$1'));
+23100:   });
+23101:   let out='';
+23102:   if(kv.length) out+='<div class="copilot-external-kv-grid">'+kv.map(x=>'<div class="copilot-external-kv"><span>'+escapeHtml(x.k)+'</span><b>'+escapeHtml(x.v)+'</b></div>').join('')+'</div>';
+23103:   if(paragraphs.length) out+=paragraphs.map(p=>'<p>'+escapeHtml(p)+'</p>').join('');
+23104:   if(list.length) out+='<ul class="copilot-external-list">'+list.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul>';
+23105:   return out || '<div class="copilot-record-empty">Tidak ada isi yang dapat ditampilkan.</div>';
+23106: }
+23107: 
+~~~
+
+## function copilotRowLabel_(
+### Around line 22983
+~~~text
+22971:   if(intents.includes('sparepart') && /logbook/.test(n)){
+22972:     const material=String(row?.['Nama Material'] ?? row?.['Material Number SAP'] ?? row?.['Material Number'] ?? '').trim();
+22973:     if(!material) return false;
+22974:   }
+22975:   return true;
+22976: }
+22977: 
+22978: function copilotRowDate_(row){
+22979:   const keys=['Tanggal','tanggal','Date','date','Tanggal Input','Timestamp Input','Created At','createdAt','Jadwal Meeting','Tanggal Meeting'];
+22980:   for(const k of keys){ if(row&&row[k]) return String(row[k]).slice(0,10); }
+22981:   return '';
+22982: }
+22983: function copilotRowLabel_(row){
+22984:   const keys=['Nama Mesin','Nama Material','Material Number SAP','Material Number','Nama','Nama Personil','Judul','title','Nama Project','Nama Tim','Jenis Meeting','Status','Tanggal','Lokasi Gudang','Lokasi/Area','Deskripsi Masalah','ID'];
+22985:   const parts=[];
+22986:   keys.forEach(k=>{ if(row&&row[k]!==undefined&&row[k]!==''&&parts.length<4) parts.push(String(row[k])); });
+22987:   if(parts.length) return parts.join(' · ');
+22988:   const text=copilotRowText_(row); return text.slice(0,180)+(text.length>180?'…':'');
+22989: }
+22990: function copilotSearchInternal_(question){
+22991:   const qn=copilotNorm_(question), tokens=copilotTokens_(question), today=copilotLocalToday_();
+22992:   const wantsToday=/hari ini|today/.test(qn);
+22993:   const wantsLatest=/\b(terbaru|terkini|latest)\b/.test(qn);
+22994:   const statusTerms=['selesai','proses','pending','emergency','planning','completed','on going','hold','cancel','closed','open','normal','perhatian','kritikal','critical'];
+22995:   const askedStatus=statusTerms.find(x=>qn.includes(x))||'';
+22996:   const sources=copilotDataSources_();
+22997:   const machineTargets=copilotResolveMachineTargets_(question);
+22998:   const machineAliases=Array.from(new Set(machineTargets.flatMap(t=>t.aliases)));
+22999:   const machineIntent=/\b(mesin|machine|workcenter|work center|equipment)\b/.test(qn) || machineTargets.length>0;
+23000:   const intents=copilotIntentProfile_(question);
+23001:   if(machineIntent && !machineTargets.length) return [];
+23002:   const groups=[];
+23003:   for(const src of sources){
+23004:     if(!copilotSourceAllowedByIntent_(src.name,intents)) continue;
+23005:     const sourceNorms=[...src.keywords.map(copilotNorm_),copilotNorm_(src.name)];
+23006:     const sourceHit=sourceNorms.some(k=>k&&qn.includes(k));
+23007:     let contentTokens=tokens.filter(t=>!sourceNorms.some(k=>k===t||k.split(' ').includes(t)) && !statusTerms.includes(t));
+23008:     if(machineTargets.length) contentTokens=contentTokens.filter(t=>!machineAliases.some(a=>a.split(/\s+/).includes(t)));
+23009:     const ranked=[];
+23010:     for(const row of src.rows){
+23011:       if(machineTargets.length && !copilotRowMatchesMachineTargets_(row,machineTargets,src.name)) continue;
+23012:       if(!copilotRowMatchesIntent_(row,intents,src.name)) continue;
+23013:       const txt=copilotNorm_(copilotRowText_(row));
+23014:       let score=sourceHit?4:0, contentHits=0;
+23015:       if(machineTargets.length) score+=20;
+23016:       for(const t of contentTokens){ if(txt.includes(t)){ score+=3; contentHits++; } }
+23017:       const minContentHits=contentTokens.length ? Math.max(1,Math.ceil(contentTokens.length*0.55)) : 0;
+23018:       if(contentTokens.length && contentHits<minContentHits) continue;
+23019:       if(askedStatus){ if(txt.includes(askedStatus)) score+=3; else continue; }
+23020:       if(wantsToday && copilotRowDate_(row)!==today) continue;
+23021:       if(score>0 || machineTargets.length || sourceHit) ranked.push({row,score,date:copilotRowDate_(row)});
+23022:     }
+23023:     ranked.sort((a,b)=>b.score-a.score || (wantsLatest?String(b.date||'').localeCompare(String(a.date||'')):0));
+23024:     if(ranked.length) groups.push({src,total:ranked.length,matches:ranked.slice(0,8).map(x=>x.row),sourceHit,machineHit:machineTargets.length>0,machineTargets});
+23025:   }
+23026:   groups.sort((a,b)=>(Number(b.machineHit)-Number(a.machineHit))||(b.sourceHit-a.sourceHit)||(b.total-a.total));
+23027:   return groups.slice(0,12);
+23028: }
+23029: function copilotCategoryMeta_(sourceName){
+23030:   const n=copilotNorm_(sourceName);
+23031:   if(/logbook|maintenance/.test(n)) return {icon:'📘',label:'Logbook & Maintenance',tone:'logbook'};
+23032:   if(/database mesin|machine|mesin|workcenter/.test(n)) return {icon:'⚙️',label:'Mesin & Equipment',tone:'machine'};
+23033:   if(/personil|personnel|hard skill|soft skill|employee/.test(n)) return {icon:'👥',label:'People & Kompetensi',tone:'people'};
+23034:   if(/knowledge|kb|lesson|best practice/.test(n)) return {icon:'🧠',label:'Knowledge Base',tone:'knowledge'};
+23035:   if(/sparepart|material|warehouse|opname|\bpo\b|eta|sap status/.test(n)) return {icon:'📦',label:'Sparepart & Warehouse',tone:'sparepart'};
+23036:   if(/patrol|predictive|finding|temuan/.test(n)) return {icon:'🛡️',label:'Patrol & Predictive',tone:'patrol'};
+23037:   if(/kpi|breakdown|record ytd|run hour/.test(n)) return {icon:'📊',label:'KPI & Performance',tone:'kpi'};
+23038:   if(/energy|utility|toe|ipal/.test(n)) return {icon:'⚡',label:'Energy & Utility',tone:'energy'};
+23039:   if(/project|kaizen|sga|meeting|rca|corrective|report/.test(n)) return {icon:'🗂️',label:'Report & Improvement',tone:'report'};
+23040:   return {icon:'🧩',label:String(sourceName||'Data OMODOS'),tone:'default'};
+23041: }
+23042: 
+23043: function copilotCompactFields_(row){
+23044:   if(!row || typeof row!=='object') return [];
+23045:   const preferred=[
+23046:     'Status','status','Tanggal','tanggal','Waktu','waktu','Nama Mesin','namaMesin','Kode Mesin','kodeMesin',
+23047:     'Nama Unit','Unit','Nama Material','Material Number SAP','Material Number','Lokasi Gudang','Lokasi/Area','Lokasi',
+~~~
+
+## function copilotInternalAnswer_(
+### Around line 23140
+~~~text
+23128:     sections.push({title:'Langkah Perbaikan',icon:'🛠️',tone:'action',body:data.langkahPerbaikan.map((x,i)=>(i+1)+'. '+x).join('\n')});
+23129:   }
+23130:   if(data && data.catatan) sections.push({title:'Catatan Penting',icon:'⚠️',tone:'warning',body:String(data.catatan)});
+23131:   if(data && Array.isArray(data.sumberInternet) && data.sumberInternet.length){
+23132:     sections.push({title:'Sumber Referensi',icon:'🔗',tone:'source',body:data.sumberInternet.map(x=>(x.title||'Sumber')+': '+(x.url||'')).join('\n')});
+23133:   }
+23134:   if(!sections.length) sections.push({title:'Ringkasan',icon:'✨',tone:'summary',body:raw||'AI External tidak mengembalikan jawaban.'});
+23135:   return '<div class="copilot-external-card-stack">'+sections.slice(0,10).map(sec=>
+23136:     '<section class="copilot-external-card ext-'+sec.tone+'"><div class="copilot-external-head"><span class="copilot-external-icon">'+sec.icon+'</span><span>'+escapeHtml(sec.title)+'</span></div><div class="copilot-external-body">'+copilotNarrativeBodyHtml_(sec.body)+'</div></section>'
+23137:   ).join('')+'</div>';
+23138: }
+23139: 
+23140: function copilotInternalAnswer_(question){
+23141:   const qn=copilotNorm_(question);
+23142:   if(!qn) return {html:'Masukkan pertanyaan terlebih dahulu.',context:[],confidence:'low'};
+23143:   if(/fungsi|halaman ini|menu ini|fitur ini/.test(qn)){
+23144:     const view=PREVIOUS_ACTIVE_VIEW||'dashboard';
+23145:     const info=COPILOT_PAGE_INFO[view];
+23146:     if(info){
+23147:       const viewName=copilotViewLabel(view);
+23148:       const html='<div class="copilot-answer-head">AI Internal · konteks aplikasi</div>'+
+23149:         '<div class="copilot-category-stack"><section class="copilot-category-card cat-default">'+
+23150:         '<div class="copilot-category-head"><div class="copilot-category-title"><span class="copilot-category-icon">🧭</span><span>Konteks Halaman</span></div><span class="copilot-count-badge">Aktif</span></div>'+
+23151:         '<div class="copilot-category-sub">'+escapeHtml(viewName)+'</div><div class="copilot-page-explain">'+escapeHtml(info)+'</div></section></div>';
+23152:       return {html,context:['Halaman aktif: '+viewName+'. '+info],confidence:'high'};
+23153:     }
+23154:   }
+23155:   const machineTargets=copilotResolveMachineTargets_(question);
+23156:   const machineIntent=/\b(mesin|machine|workcenter|work center|equipment)\b/.test(qn) || machineTargets.length>0;
+23157:   const groups=copilotSearchInternal_(question);
+23158:   const wantsCount=/\b(berapa|jumlah|total)\b/.test(qn);
+23159:   const context=[];
+23160:   if(machineIntent && !machineTargets.length){
+23161:     return {html:'<div class="copilot-answer-head">AI Internal · scope mesin</div><div class="copilot-empty-card"><span>⚙️</span><div><b>Mesin yang dimaksud belum dapat dipastikan</b><small>Saya tidak akan menampilkan data mesin lain untuk mengisi kekosongan. Gunakan nama/kode mesin persis seperti di Master Mesin.</small></div></div>',context:[],confidence:'low'};
+23162:   }
+23163:   if(!groups.length){
+23164:     return {html:'<div class="copilot-answer-head">AI Internal</div><div class="copilot-empty-card"><span>🔎</span><div><b>Data relevan belum ditemukan</b><small>Coba gunakan nama mesin, kode material, tanggal, status, atau kategori data yang lebih spesifik. AI External tetap dapat dipakai untuk pengetahuan umum.</small></div></div>',context:[],confidence:'low'};
+23165:   }
+23166:   const machineQuery=machineIntent;
+23167:   const machineScopeLabel=machineTargets.map(t=>t.label).join(', ');
+23168:   const visible=groups.slice(0,machineQuery?10:6);
+23169:   const top=visible[0];
+23170:   const totalHits=visible.reduce((sum,g)=>sum+g.total,0);
+23171:   let html='<div class="copilot-answer-head">AI Internal · '+(machineQuery?'pencarian lintas seluruh database':'data aplikasi')+'</div>';
+23172:   if(machineScopeLabel) html+='<div class="copilot-scope-lock"><span>🔒</span><div><b>Scope dikunci: '+escapeHtml(machineScopeLabel)+'</b><small>Record tanpa identitas mesin yang cocok persis tidak ditampilkan.</small></div></div>';
+23173:   html+='<div class="copilot-answer-summary"><div><span class="copilot-summary-number">'+totalHits.toLocaleString('id-ID')+'</span><span class="copilot-summary-label">kecocokan ditampilkan</span></div><div><span class="copilot-summary-number">'+visible.length+'</span><span class="copilot-summary-label">kategori data</span></div>'+(wantsCount&&top?'<div><span class="copilot-summary-number">'+top.total.toLocaleString('id-ID')+'</span><span class="copilot-summary-label">'+escapeHtml(top.src.name)+'</span></div>':'')+'</div>';
+23174:   html+='<div class="copilot-category-stack">';
+23175:   visible.forEach(g=>{
+23176:     const meta=copilotCategoryMeta_(g.src.name);
+23177:     html+='<section class="copilot-category-card cat-'+meta.tone+'">'+
+23178:       '<div class="copilot-category-head"><div class="copilot-category-title"><span class="copilot-category-icon">'+meta.icon+'</span><div><span>'+escapeHtml(meta.label)+'</span><small>'+escapeHtml(g.src.name)+'</small></div></div><span class="copilot-count-badge">'+g.total+' cocok</span></div>'+
+23179:       '<div class="copilot-record-list">'+g.matches.slice(0,machineQuery?6:4).map((r,i)=>copilotRowCardHtml_(r,g.src.name,i)).join('')+'</div>'+
+23180:       (g.total>g.matches.slice(0,machineQuery?6:4).length?'<div class="copilot-more-note">+'+(g.total-g.matches.slice(0,machineQuery?6:4).length)+' data relevan lain tersedia di kategori ini.</div>':'')+'</section>';
+23181:     g.matches.slice(0,machineQuery?6:4).forEach(r=>{ if(context.length<14) context.push('['+g.src.name+'] '+copilotRowText_(r).slice(0,700)); });
+23182:   });
+23183:   html+='</div>';
+23184:   const high=(top.sourceHit && top.total>0) || (top.total>=3);
+23185:   if(!high) html+='<div class="copilot-confidence-note">Kecocokan data internal masih terbatas. Gunakan AI External bila memerlukan interpretasi atau referensi tambahan.</div>';
+23186:   return {html,context,confidence:high?'high':'medium'};
+23187: }
+23188: 
+23189: function copilotAppendMessage_(type,content,isHtml){
+23190:   const body=$('#copilot-body');
+23191:   if(!body) return;
+23192:   const msg=document.createElement('div'); msg.className=`copilot-msg ${type}`;
+23193:   const bubble=document.createElement('div'); bubble.className='copilot-bubble';
+23194:   if(isHtml) bubble.innerHTML=content; else bubble.textContent=content;
+23195:   msg.appendChild(bubble); body.appendChild(msg); body.scrollTop=body.scrollHeight;
+23196:   return msg;
+23197: }
+23198: function copilotSetThinking_(label){
+23199:   const el=copilotAppendMessage_('internal',`<div class="copilot-thinking"><span class="ai-spinner"></span>${escapeHtml(label||'Mencari data internal...')}</div>`,true);
+23200:   if(el) el.dataset.thinking='1'; return el;
+23201: }
+23202: async function copilotAskInternal_(){
+23203:   const qEl=$('#copilot-question'); const q=String(qEl?.value||'').trim();
+23204:   if(!q){ toast('Tulis pertanyaan untuk Copilot.',true); return; }
+~~~
+
+## function copilotRowCardHtml_(
+### Around line 23070
+~~~text
+23058:     if(txt.length>180) txt=txt.slice(0,177)+'…';
+23059:     seen.add(k); fields.push({key:k,value:txt});
+23060:   };
+23061:   preferred.forEach(k=>{ if(Object.prototype.hasOwnProperty.call(row,k)) push(k,row[k]); });
+23062:   Object.entries(row).forEach(([k,v])=>push(k,v));
+23063:   return fields.slice(0,6);
+23064: }
+23065: 
+23066: function copilotPrettyFieldName_(key){
+23067:   return String(key||'').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/[_\.]/g,' ').replace(/\s+/g,' ').trim();
+23068: }
+23069: 
+23070: function copilotRowCardHtml_(row,sourceName,index){
+23071:   const fields=copilotCompactFields_(row);
+23072:   const title=copilotRowLabel_(row);
+23073:   const fieldHtml=fields.length ? '<div class="copilot-kv-grid">'+fields.map(f=>
+23074:     '<div class="copilot-kv"><div class="copilot-kv-key">'+escapeHtml(copilotPrettyFieldName_(f.key))+'</div><div class="copilot-kv-value">'+escapeHtml(f.value)+'</div></div>'
+23075:   ).join('')+'</div>' : '<div class="copilot-record-empty">Detail ringkas tidak tersedia.</div>';
+23076:   return '<article class="copilot-data-record" data-copilot-source="'+escapeHtml(sourceName||'')+'">'+
+23077:     '<div class="copilot-record-top"><span class="copilot-record-index">#'+(index+1)+'</span><div class="copilot-record-title">'+escapeHtml(title)+'</div></div>'+
+23078:     fieldHtml+'</article>';
+23079: }
+23080: 
+23081: function copilotExternalAutoCategory_(text){
+23082:   const n=copilotNorm_(text);
+23083:   if(/bahaya|risiko|safety|keselamatan|warning|peringatan|catatan/.test(n)) return {title:'Risiko & Catatan',icon:'⚠️',tone:'warning'};
+23084:   if(/langkah|tindakan|rekomendasi|solusi|perbaikan|action/.test(n)) return {title:'Tindakan & Rekomendasi',icon:'🛠️',tone:'action'};
+23085:   if(/sparepart|material|part|komponen|bearing|seal|sensor/.test(n)) return {title:'Komponen / Sparepart',icon:'📦',tone:'sparepart'};
+23086:   if(/kpi|mtbf|mttr|downtime|trend|angka|data/.test(n)) return {title:'Data & Analisis',icon:'📊',tone:'kpi'};
+23087:   if(/penyebab|diagnos|indikasi|gejala|temuan|root cause/.test(n)) return {title:'Diagnosis & Temuan',icon:'🔎',tone:'diagnosis'};
+23088:   return {title:'Ringkasan',icon:'✨',tone:'summary'};
+23089: }
+23090: 
+23091: function copilotNarrativeBodyHtml_(text){
+23092:   const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+23093:   const list=[], paragraphs=[], kv=[];
+23094:   lines.forEach(line=>{
+23095:     const bullet=line.match(/^(?:[-*•]|\d+[.)])\s+(.+)/);
+23096:     const pair=!bullet && line.length<240 ? line.match(/^([^:]{2,45}):\s*(.+)$/) : null;
+23097:     if(bullet) list.push(bullet[1]);
+23098:     else if(pair) kv.push({k:pair[1],v:pair[2]});
+23099:     else paragraphs.push(line.replace(/^#{1,6}\s*/,'').replace(/^\*\*(.+)\*\*$/,'$1'));
+23100:   });
+23101:   let out='';
+23102:   if(kv.length) out+='<div class="copilot-external-kv-grid">'+kv.map(x=>'<div class="copilot-external-kv"><span>'+escapeHtml(x.k)+'</span><b>'+escapeHtml(x.v)+'</b></div>').join('')+'</div>';
+23103:   if(paragraphs.length) out+=paragraphs.map(p=>'<p>'+escapeHtml(p)+'</p>').join('');
+23104:   if(list.length) out+='<ul class="copilot-external-list">'+list.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul>';
+23105:   return out || '<div class="copilot-record-empty">Tidak ada isi yang dapat ditampilkan.</div>';
+23106: }
+23107: 
+23108: function copilotExternalCardsHtml_(text,data){
+23109:   const raw=String(text||'').trim();
+23110:   const sections=[];
+23111:   const paragraphs=raw ? raw.split(/\n\s*\n+/).map(x=>x.trim()).filter(Boolean) : [];
+23112:   paragraphs.forEach(p=>{
+23113:     const first=(p.split(/\r?\n/)[0]||'').trim();
+23114:     const headingMatch=first.match(/^(?:#{1,6}\s*)?(?:\*\*)?([A-Za-zÀ-ÿ0-9 /&()_-]{3,70})(?:\*\*)?:?$/);
+23115:     const looksHeading=headingMatch && p.split(/\r?\n/).length>1 && first.length<72;
+23116:     if(looksHeading){
+23117:       const title=headingMatch[1].replace(/\*\*/g,'').trim();
+23118:       const body=p.split(/\r?\n/).slice(1).join('\n').trim();
+23119:       const auto=copilotExternalAutoCategory_(title+' '+body);
+23120:       sections.push({title,icon:auto.icon,tone:auto.tone,body:body||title});
+23121:     }else{
+23122:       const auto=copilotExternalAutoCategory_(p);
+23123:       const existing=sections.find(x=>x.title===auto.title);
+23124:       if(existing) existing.body += '\n'+p; else sections.push({title:auto.title,icon:auto.icon,tone:auto.tone,body:p});
+23125:     }
+23126:   });
+23127:   if(data && Array.isArray(data.langkahPerbaikan) && data.langkahPerbaikan.length){
+23128:     sections.push({title:'Langkah Perbaikan',icon:'🛠️',tone:'action',body:data.langkahPerbaikan.map((x,i)=>(i+1)+'. '+x).join('\n')});
+23129:   }
+23130:   if(data && data.catatan) sections.push({title:'Catatan Penting',icon:'⚠️',tone:'warning',body:String(data.catatan)});
+23131:   if(data && Array.isArray(data.sumberInternet) && data.sumberInternet.length){
+23132:     sections.push({title:'Sumber Referensi',icon:'🔗',tone:'source',body:data.sumberInternet.map(x=>(x.title||'Sumber')+': '+(x.url||'')).join('\n')});
+23133:   }
+23134:   if(!sections.length) sections.push({title:'Ringkasan',icon:'✨',tone:'summary',body:raw||'AI External tidak mengembalikan jawaban.'});
+~~~
+
