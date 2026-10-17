@@ -5490,3 +5490,842 @@ No match.
 ## window.onresize
 No match.
 
+## sparepart-rows
+### Around line 3591
+~~~text
+03579:               <option>Emergency Repair</option>
+03580:               <option>Instalasi</option><option>Modifikasi</option><option>Pemindahan</option><option>Pelepasan / Dismantle / Uninstall</option>
+03581:               <option>Lainnya</option>
+03582:             </select>
+03583:           </div>
+03584:           <div class="field"><label>Deskripsi Pekerjaan / Masalah
+03585:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-deskripsiMasalah" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03586:           </label><textarea name="deskripsiMasalah" id="ta-deskripsiMasalah" rows="3" placeholder="Jelaskan pekerjaan, kebutuhan, atau masalah yang ditemukan..." required></textarea></div>
+03587:           <div class="field"><label>Tindakan Perbaikan yang Dilakukan
+03588:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-tindakanPerbaikan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03589:           </label><textarea name="tindakanPerbaikan" id="ta-tindakanPerbaikan" rows="3" placeholder="Jelaskan tindakan yang sudah/sedang dilakukan..." required></textarea></div>
+03590:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-wrench"></i> Sparepart yang Digunakan</div>
+03591:           <div id="sparepart-rows"></div>
+03592:           <button type="button" class="btn btn-ghost btn-sm" id="btn-add-sparepart-row" style="margin:4px 0 8px 0;"><i class="ph-bold ph-plus"></i> Tambah Sparepart Lain</button>
+03593: 
+03594:           <div class="grid3">
+03595:             <div class="field"><label>Status Pekerjaan</label>
+03596:               <select name="status" required><option>Proses</option><option>Selesai</option><option>Pending</option><option>Emergency</option></select>
+03597:             </div>
+03598:             <div class="field"><label>Jam Mulai</label><input type="time" name="jamMulai" id="input-jamMulai" required></div>
+03599:             <div class="field"><label>Jam Selesai</label><input type="time" name="jamSelesai" id="input-jamSelesai" required></div>
+03600:           </div>
+03601:           <div class="field"><label>Estimasi Pekerjaan (Otomatis)</label><input type="text" name="downtime" id="input-downtime" placeholder="Terisi otomatis dari Jam Mulai & Jam Selesai" readonly></div>
+03602:           <div class="field"><label>Catatan Tambahan
+03603:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-catatan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03604:           </label><textarea name="catatan" id="ta-catatan" rows="2" placeholder="Rekomendasi tindak lanjut, kondisi khusus, dll." required></textarea></div>
+03605: 
+03606:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-paperclip"></i> Lampiran Foto / Video</div>
+03607:           <div class="file-drop" id="file-drop">
+03608:             <i class="ph-bold ph-upload-simple"></i> Klik atau tarik file ke sini (foto/video bukti pekerjaan) — opsional. Foto otomatis dikompres ke maks. 720px, video ke maks. 540p.
+03609:             <input type="file" id="file-input" accept="image/*,video/*" multiple style="display:none;">
+03610:           </div>
+03611:           <div class="file-preview-row" id="file-preview-row"></div>
+03612: 
+03613:           <div id="wizard-nav" style="display:none;margin-top:18px;"></div>
+03614: 
+03615:           <div style="margin-top:22px;display:flex;gap:10px;" id="entry-actions-bar">
+03616:             <button type="submit" class="btn btn-primary" id="btn-submit"><i class="ph-bold ph-check-circle"></i> Simpan Logbook</button>
+03617:             <button type="reset" class="btn btn-ghost">Bersihkan Form</button>
+03618:           </div>
+03619:         </form>
+03620:       </div>
+03621:     </section>
+03622: 
+03623:     <section class="view" id="view-report">
+03624:       <div class="topbar">
+03625:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+03626:         <div><h1>Approval Center</h1><div class="sub">Review item yang menunggu keputusan, sekaligus akses report terkait bila dibutuhkan.</div></div>
+03627:         <button class="btn btn-sm" id="btn-report-back-cat" style="display:none;"><i class="ph-bold ph-arrow-left"></i> Kembali ke Kategori</button>
+03628:       </div>
+03629: 
+03630:       <div id="report-cat-grid" class="report-cat-grid"></div>
+03631: 
+03632:       <div id="ipal-form-wrap" style="display:none;"></div>
+03633:     </section>
+03634: 
+03635:     <section class="view" id="view-report-hub">
+03636:       <button class="btn btn-sm btn-back-to-input-report" onclick="goToView('report')" style="margin-bottom:10px;"><i class="ph-bold ph-arrow-left"></i> Input Report</button>
+03637:       <div class="topbar">
+03638:         <div><h1>Riwayat Laporan</h1><div class="sub" id="report-hub-sub">Semua riwayat report — IPAL, RCA &amp; Laporan Proyek — dalam satu tempat, per kategori.</div></div>
+03639:         <div style="display:flex;gap:8px;">
+03640:           <button class="btn btn-sm" id="btn-report-hub-back-cat" style="display:none;"><i class="ph-bold ph-arrow-left"></i> Kembali ke Kategori</button>
+03641:           <button class="btn btn-sm" id="btn-report-hub-refresh"><i class="ph-bold ph-arrows-clockwise"></i> Muat Ulang</button>
+03642:         </div>
+03643:       </div>
+03644: 
+03645:       <div id="report-hub-cat-grid" class="report-cat-grid"></div>
+03646: 
+03647:       <div id="report-hub-detail" style="display:none;">
+03648:         <div class="filter-bar" id="report-hub-filterbar" style="display:none;">
+03649:           <input class="grow" type="text" id="search-report-hub" placeholder="Cari judul, kode, PIC/penulis...">
+03650:           <select id="filter-report-hub-type" style="display:none;">
+03651:             <option value="">Semua Jenis</option>
+03652:             <option value="wi">Work Instruction</option>
+03653:             <option value="project">Laporan Proyek</option>
+03654:           </select>
+03655:         </div>
+~~~
+
+### Around line 17280
+~~~text
+17268: /* ---------------- SPAREPART ROWS (INPUT LOGBOOK) ---------------- */
+17269: let SPAREPART_ROW_ID = 0;
+17270: let SPAREPART_ROWS = [];
+17271: function addSparepartRow(){
+17272:   SPAREPART_ROWS.push({ id: ++SPAREPART_ROW_ID, nama:'', sap:'', jumlah:'' });
+17273:   renderSparepartRows();
+17274: }
+17275: function removeSparepartRow(id){
+17276:   SPAREPART_ROWS = SPAREPART_ROWS.filter(r=>r.id!==id);
+17277:   if(!SPAREPART_ROWS.length) addSparepartRow(); else renderSparepartRows();
+17278: }
+17279: function renderSparepartRows(){
+17280:   const holder = $('#sparepart-rows');
+17281:   if(!holder) return;
+17282:   holder.innerHTML = SPAREPART_ROWS.map((r,i)=>`
+17283:     <div class="sparepart-row" data-id="${r.id}">
+17284:       <div class="field"><label>${i===0?'Nama Material yang Digunakan (opsional)':'Nama Material (opsional)'}</label>
+17285:         <div class="sp-suggest-wrap">
+17286:           <input type="text" class="sp-nama" autocomplete="off" placeholder="Ketik nama material untuk melihat suggestion" value="${escapeHtml(r.nama)}">
+17287:           <div class="sp-suggest-box sp-nama-suggest"></div>
+17288:         </div>
+17289:       </div>
+17290:       <div class="field"><label><span>Material Number SAP (opsional)</span><span class="sp-lokasi-hint" style="font-size:11px;font-weight:400;color:var(--amber);">${(()=>{ const l=findSparepartLokasiBySap(r.sap); return l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : ''; })()}</span></label>
+17291:         <div class="sp-suggest-wrap">
+17292:           <input type="text" class="sp-sap" autocomplete="off" placeholder="Ketik nomor material untuk melihat suggestion" value="${escapeHtml(r.sap)}">
+17293:           <div class="sp-suggest-box sp-sap-suggest"></div>
+17294:         </div>
+17295:       </div>
+17296:       <div class="field"><label>Jumlah (wajib jika menggunakan sparepart)</label>
+17297:         <input type="number" class="sp-jumlah" min="1" step="1" inputmode="numeric" placeholder="Masukkan jumlah pemakaian jika menggunakan sparepart" value="${escapeHtml(r.jumlah)}">
+17298:       </div>
+17299:       ${SPAREPART_ROWS.length>1 ? `<button type="button" class="sparepart-row-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>` : `<span></span>`}
+17300:     </div>`).join('');
+17301:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17302:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17303:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17304:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17305:   $$('.sp-nama, .sp-sap', holder).forEach(el=> el.addEventListener('blur', ()=> setTimeout(()=> closeSparepartSuggestBox_(el.closest('.sparepart-row')), 150)));
+17306:   $$('.sp-jumlah', holder).forEach(el=> el.addEventListener('input', syncSparepartRowsFromDom));
+17307:   $$('.sparepart-row-remove', holder).forEach(btn=>{
+17308:     btn.addEventListener('click', ()=> removeSparepartRow(Number(btn.dataset.id)));
+17309:   });
+17310: }
+17311: function closeSparepartSuggestBox_(rowEl){
+17312:   if(!rowEl) return;
+17313:   $$('.sp-suggest-box', rowEl).forEach(box=>{ box.classList.remove('open'); box.innerHTML=''; });
+17314: }
+17315: /* Menampilkan suggestion KHUSUS berdasarkan field yang sedang diketik:
+17316:    - field Nama Material -> filter & cocokkan HANYA terhadap x.nama
+17317:    - field Material Number SAP -> filter & cocokkan HANYA terhadap x.sap
+17318:    Dibuat custom (bukan <datalist> bawaan browser) supaya suggestion tidak
+17319:    pernah "ketuker" antara nama & nomor material seperti pada native datalist. */
+17320: function handleSparepartLookupInput_(rowEl, source){
+17321:   if(!rowEl) return;
+17322:   const namaEl = $('.sp-nama', rowEl);
+17323:   const sapEl = $('.sp-sap', rowEl);
+17324:   const master = Array.isArray(SPAREPART_LOKASI) ? SPAREPART_LOKASI : [];
+17325:   const normalize = v=>String(v||'').trim().toLowerCase();
+17326: 
+17327:   if(source === 'nama'){
+17328:     const box = $('.sp-nama-suggest', rowEl);
+17329:     const q = normalize(namaEl.value);
+17330:     if(box){
+17331:       const seen = new Set();
+17332:       const results = q ? master.filter(x=>{
+17333:         const key = normalize(x.nama);
+17334:         if(!key || !key.includes(q) || seen.has(key)) return false;
+17335:         seen.add(key); return true;
+17336:       }).slice(0,30) : [];
+17337:       renderSparepartSuggestBox_(box, results, (item)=>{
+17338:         namaEl.value = item.nama || '';
+17339:         sapEl.value = item.sap || '';
+17340:         closeSparepartSuggestBox_(rowEl);
+17341:         syncSparepartRowsFromDom();
+17342:       }, x=>x.nama, x=> x.sap ? `SAP: ${x.sap}` : 'Belum ada nomor material');
+17343:     }
+17344:     // Preserve manual edits; fill the paired field only after an explicit suggestion selection.
+~~~
+
+### Around line 17379
+~~~text
+17367:   if(!results.length){ box.classList.remove('open'); box.innerHTML=''; return; }
+17368:   box.innerHTML = results.map((x,idx)=>`
+17369:     <div class="sp-suggest-item" data-idx="${idx}">
+17370:       <span class="sp-suggest-main">${escapeHtml(mainFn(x)||'-')}</span>
+17371:       <span class="sp-suggest-sub">${escapeHtml(subFn(x)||'')}</span>
+17372:     </div>`).join('');
+17373:   box.classList.add('open');
+17374:   $$('.sp-suggest-item', box).forEach(el=>{
+17375:     el.addEventListener('mousedown', (ev)=>{ ev.preventDefault(); onPick(results[Number(el.dataset.idx)]); });
+17376:   });
+17377: }
+17378: function syncSparepartRowsFromDom(){
+17379:   $$('.sparepart-row', $('#sparepart-rows')).forEach(rowEl=>{
+17380:     const id = Number(rowEl.dataset.id);
+17381:     const row = SPAREPART_ROWS.find(r=>r.id===id);
+17382:     if(!row) return;
+17383:     row.nama = $('.sp-nama', rowEl).value;
+17384:     row.sap = $('.sp-sap', rowEl).value;
+17385:     row.jumlah = $('.sp-jumlah', rowEl).value;
+17386:     const hintEl = $('.sp-lokasi-hint', rowEl);
+17387:     if(hintEl){
+17388:       const l = findSparepartLokasiBySap(row.sap);
+17389:       hintEl.innerHTML = l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : '';
+17390:     }
+17391:   });
+17392: }
+17393: function resetSparepartRows(){
+17394:   SPAREPART_ROWS = [];
+17395:   addSparepartRow();
+17396: }
+17397: resetSparepartRows();
+17398: const btnAddSparepartRow = $('#btn-add-sparepart-row');
+17399: if(btnAddSparepartRow) btnAddSparepartRow.addEventListener('click', addSparepartRow);
+17400: 
+17401: /* ---------------- PERSONIL TAMBAHAN (INPUT LOGBOOK) ----------------
+17402:    Baris opsional untuk menambahkan personil lain selain Nama Pelapor /
+17403:    Teknisi Utama. Polanya disamakan dengan SPAREPART ROWS di atas supaya
+17404:    konsisten: array state + render ulang ke dalam container setiap ada
+17405:    perubahan (tambah/hapus/pilih nama). */
+17406: let ADDITIONAL_PERSONIL_ID = 0;
+17407: let ADDITIONAL_PERSONIL_ROWS = [];
+17408: function addAdditionalPersonilRow(){
+17409:   ADDITIONAL_PERSONIL_ROWS.push({ id: ++ADDITIONAL_PERSONIL_ID, nama:'' });
+17410:   renderAdditionalPersonil();
+17411: }
+17412: function removeAdditionalPersonilRow(id){
+17413:   ADDITIONAL_PERSONIL_ROWS = ADDITIONAL_PERSONIL_ROWS.filter(r=>r.id!==id);
+17414:   renderAdditionalPersonil();
+17415: }
+17416: function renderAdditionalPersonil(){
+17417:   const holder = $('#additional-personil-container');
+17418:   if(!holder) return;
+17419:   const mainName = ($('#select-namaPelapor') && $('#select-namaPelapor').value) || '';
+17420:   const names = (typeof PERSONIL !== 'undefined' ? PERSONIL : [])
+17421:     .map(p=>p['Nama Personil']).filter(Boolean).sort();
+17422:   holder.innerHTML = ADDITIONAL_PERSONIL_ROWS.map(r=>`
+17423:     <div class="additional-personil-row" data-id="${r.id}" style="display:flex; gap:8px; align-items:center;">
+17424:       <select class="ap-nama" style="flex:1;">
+17425:         <option value="">Pilih personil...</option>
+17426:         ${names.map(n=>`<option value="${escapeHtml(n)}" ${r.nama===n?'selected':''} ${n===mainName?'disabled':''}>${escapeHtml(n)}</option>`).join('')}
+17427:       </select>
+17428:       <button type="button" class="btn btn-ghost btn-sm additional-personil-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>
+17429:     </div>`).join('');
+17430:   $$('.ap-nama', holder).forEach(el=> el.addEventListener('change', ()=>{
+17431:     const id = Number(el.closest('.additional-personil-row').dataset.id);
+17432:     const row = ADDITIONAL_PERSONIL_ROWS.find(r=>r.id===id);
+17433:     if(row) row.nama = el.value;
+17434:   }));
+17435:   $$('.additional-personil-remove', holder).forEach(btn=>{
+17436:     btn.addEventListener('click', ()=> removeAdditionalPersonilRow(Number(btn.dataset.id)));
+17437:   });
+17438: }
+17439: function getAdditionalPersonilNames(){
+17440:   return ADDITIONAL_PERSONIL_ROWS.map(r=>r.nama).filter(Boolean);
+17441: }
+17442: function resetAdditionalPersonil(){
+17443:   ADDITIONAL_PERSONIL_ROWS = [];
+~~~
+
+### Around line 17667
+~~~text
+17655:   $$('.fp-media').forEach(el=>{
+17656:     el.addEventListener('click', (ev)=>{
+17657:       ev.stopPropagation();
+17658:       openLightbox(el.dataset.url, el.dataset.type, el.dataset.name);
+17659:     });
+17660:   });
+17661: }
+17662: 
+17663: /* ---------------- FORM WIZARD MODE (Mode Standar <-> Mode Wizard) ----------------
+17664:    Toggle switch (reuse komponen .lc-switch) untuk mengubah form panjang jadi
+17665:    alur step-by-step. Section form yang sudah ada (dipisah oleh .section-title)
+17666:    otomatis dibungkus jadi .wizard-step tanpa perlu ubah markup satu-satu, jadi
+17667:    struktur & handler input yang sudah ada (file-drop, sparepart-rows, dst) tetap
+17668:    utuh — cuma direparent ke wrapper step-nya. Kalau user klik Submit padahal
+17669:    step wizard belum lengkap, submit dicegah + toast peringatan + lompat ke
+17670:    step yang belum lengkap (lihat form._wizardGuardSubmit, dipanggil di
+17671:    handler submit form-entry di bawah). */
+17672: function initFormWizard(formSel, toggleSel, labelSel, navSel){
+17673:   const form = $(formSel), toggle = $(toggleSel), label = $(labelSel), nav = $(navSel);
+17674:   if(!form || !toggle || !nav || form.dataset.wizardReady) return;
+17675:   form.dataset.wizardReady = '1';
+17676: 
+17677:   const actionsBar = form.querySelector('#entry-actions-bar');
+17678:   const kids = Array.from(form.children).filter(el=> el !== actionsBar && el !== nav);
+17679:   const groups = [];
+17680:   kids.forEach(el=>{
+17681:     if(el.classList.contains('section-title') || !groups.length){
+17682:       groups.push({ title: el.classList.contains('section-title') ? el.textContent.trim() : 'Data', els: [] });
+17683:     }
+17684:     groups[groups.length-1].els.push(el);
+17685:   });
+17686:   const steps = groups.map((g, i)=>{
+17687:     const wrap = document.createElement('div');
+17688:     wrap.className = 'wizard-step';
+17689:     wrap.dataset.step = i;
+17690:     wrap.dataset.title = g.title;
+17691:     g.els[0].parentNode.insertBefore(wrap, g.els[0]);
+17692:     g.els.forEach(el=> wrap.appendChild(el));
+17693:     return wrap;
+17694:   });
+17695:   let current = 0;
+17696: 
+17697:   const requiredFieldsIn = stepEl => $$('input[required], select[required], textarea[required]', stepEl);
+17698:   // PENTING: pakai `f.validity.valid`, BUKAN `f.checkValidity()`/`reportValidity()`.
+17699:   // Field yang berada di step non-aktif punya `display:none` (lewat CSS
+17700:   // `form.wizard-mode .wizard-step{display:none}`), dan elemen yang tidak
+17701:   // dirender otomatis "barred from constraint validation" oleh browser —
+17702:   // artinya checkValidity() SELALU return true untuknya walau kosong.
+17703:   // Sebelumnya ini membuat validasi step tersembunyi lolos begitu saja.
+17704:   // `.validity.valid` tetap mencerminkan constraint sebenarnya terlepas
+17705:   // dari status render, jadi baris kosong di step manapun tetap terdeteksi.
+17706:   const stepIsValid = stepEl => requiredFieldsIn(stepEl).every(f=> f.validity.valid);
+17707:   const firstInvalidStepIndex = () => steps.findIndex(s=> !stepIsValid(s));
+17708:   // Fokuskan & tampilkan pesan validasi native untuk field tertentu, meski
+17709:   // field itu ada di step yang sedang disembunyikan (harus dipindah ke
+17710:   // step aktif dulu supaya reportValidity() punya efek visual).
+17711:   function focusInvalidField(f){
+17712:     const stepEl = f.closest('.wizard-step');
+17713:     if(stepEl){ const idx = steps.indexOf(stepEl); if(idx !== -1) goToStep(idx); }
+17714:     setTimeout(()=>{ f.reportValidity(); f.focus({preventScroll:false}); }, 0);
+17715:   }
+17716: 
+17717:   function renderNav(){
+17718:     if(!form.classList.contains('wizard-mode')){ nav.style.display='none'; nav.innerHTML=''; return; }
+17719:     nav.style.display = '';
+17720:     nav.innerHTML = `
+17721:       <div class="wizard-progress">${steps.map((s,i)=>`<span class="wp-dot ${i<current?'done':(i===current?'current':'')}"></span>`).join('')}</div>
+17722:       <div class="wizard-stepinfo">Langkah <b>${current+1}</b> dari <b>${steps.length}</b>: <b>${escapeHtml(steps[current].dataset.title||'')}</b></div>
+17723:       <div class="wizard-nav-btns">
+17724:         ${current>0 ? `<button type="button" class="btn btn-ghost btn-sm" id="wizard-btn-prev"><i class="ph-bold ph-arrow-left"></i> Sebelumnya</button>` : ''}
+17725:         ${current<steps.length-1 ? `<button type="button" class="btn btn-primary btn-sm" id="wizard-btn-next">Lanjut <i class="ph-bold ph-arrow-right"></i></button>` : ''}
+17726:       </div>`;
+17727:     const btnPrev = $('#wizard-btn-prev', nav), btnNext = $('#wizard-btn-next', nav);
+17728:     if(btnPrev) btnPrev.addEventListener('click', ()=> goToStep(current-1));
+17729:     // Sengaja TIDAK ada validasi wajib di sini untuk pindah "Lanjut" antar
+17730:     // langkah — konsisten dengan aturan "validasi hanya sekali, di tombol
+17731:     // Simpan akhir" (lihat form._wizardGuardSubmit / validateFormEntryOnce
+~~~
+
+## btn-add-sparepart-row
+### Around line 3592
+~~~text
+03580:               <option>Instalasi</option><option>Modifikasi</option><option>Pemindahan</option><option>Pelepasan / Dismantle / Uninstall</option>
+03581:               <option>Lainnya</option>
+03582:             </select>
+03583:           </div>
+03584:           <div class="field"><label>Deskripsi Pekerjaan / Masalah
+03585:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-deskripsiMasalah" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03586:           </label><textarea name="deskripsiMasalah" id="ta-deskripsiMasalah" rows="3" placeholder="Jelaskan pekerjaan, kebutuhan, atau masalah yang ditemukan..." required></textarea></div>
+03587:           <div class="field"><label>Tindakan Perbaikan yang Dilakukan
+03588:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-tindakanPerbaikan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03589:           </label><textarea name="tindakanPerbaikan" id="ta-tindakanPerbaikan" rows="3" placeholder="Jelaskan tindakan yang sudah/sedang dilakukan..." required></textarea></div>
+03590:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-wrench"></i> Sparepart yang Digunakan</div>
+03591:           <div id="sparepart-rows"></div>
+03592:           <button type="button" class="btn btn-ghost btn-sm" id="btn-add-sparepart-row" style="margin:4px 0 8px 0;"><i class="ph-bold ph-plus"></i> Tambah Sparepart Lain</button>
+03593: 
+03594:           <div class="grid3">
+03595:             <div class="field"><label>Status Pekerjaan</label>
+03596:               <select name="status" required><option>Proses</option><option>Selesai</option><option>Pending</option><option>Emergency</option></select>
+03597:             </div>
+03598:             <div class="field"><label>Jam Mulai</label><input type="time" name="jamMulai" id="input-jamMulai" required></div>
+03599:             <div class="field"><label>Jam Selesai</label><input type="time" name="jamSelesai" id="input-jamSelesai" required></div>
+03600:           </div>
+03601:           <div class="field"><label>Estimasi Pekerjaan (Otomatis)</label><input type="text" name="downtime" id="input-downtime" placeholder="Terisi otomatis dari Jam Mulai & Jam Selesai" readonly></div>
+03602:           <div class="field"><label>Catatan Tambahan
+03603:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-catatan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03604:           </label><textarea name="catatan" id="ta-catatan" rows="2" placeholder="Rekomendasi tindak lanjut, kondisi khusus, dll." required></textarea></div>
+03605: 
+03606:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-paperclip"></i> Lampiran Foto / Video</div>
+03607:           <div class="file-drop" id="file-drop">
+03608:             <i class="ph-bold ph-upload-simple"></i> Klik atau tarik file ke sini (foto/video bukti pekerjaan) — opsional. Foto otomatis dikompres ke maks. 720px, video ke maks. 540p.
+03609:             <input type="file" id="file-input" accept="image/*,video/*" multiple style="display:none;">
+03610:           </div>
+03611:           <div class="file-preview-row" id="file-preview-row"></div>
+03612: 
+03613:           <div id="wizard-nav" style="display:none;margin-top:18px;"></div>
+03614: 
+03615:           <div style="margin-top:22px;display:flex;gap:10px;" id="entry-actions-bar">
+03616:             <button type="submit" class="btn btn-primary" id="btn-submit"><i class="ph-bold ph-check-circle"></i> Simpan Logbook</button>
+03617:             <button type="reset" class="btn btn-ghost">Bersihkan Form</button>
+03618:           </div>
+03619:         </form>
+03620:       </div>
+03621:     </section>
+03622: 
+03623:     <section class="view" id="view-report">
+03624:       <div class="topbar">
+03625:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+03626:         <div><h1>Approval Center</h1><div class="sub">Review item yang menunggu keputusan, sekaligus akses report terkait bila dibutuhkan.</div></div>
+03627:         <button class="btn btn-sm" id="btn-report-back-cat" style="display:none;"><i class="ph-bold ph-arrow-left"></i> Kembali ke Kategori</button>
+03628:       </div>
+03629: 
+03630:       <div id="report-cat-grid" class="report-cat-grid"></div>
+03631: 
+03632:       <div id="ipal-form-wrap" style="display:none;"></div>
+03633:     </section>
+03634: 
+03635:     <section class="view" id="view-report-hub">
+03636:       <button class="btn btn-sm btn-back-to-input-report" onclick="goToView('report')" style="margin-bottom:10px;"><i class="ph-bold ph-arrow-left"></i> Input Report</button>
+03637:       <div class="topbar">
+03638:         <div><h1>Riwayat Laporan</h1><div class="sub" id="report-hub-sub">Semua riwayat report — IPAL, RCA &amp; Laporan Proyek — dalam satu tempat, per kategori.</div></div>
+03639:         <div style="display:flex;gap:8px;">
+03640:           <button class="btn btn-sm" id="btn-report-hub-back-cat" style="display:none;"><i class="ph-bold ph-arrow-left"></i> Kembali ke Kategori</button>
+03641:           <button class="btn btn-sm" id="btn-report-hub-refresh"><i class="ph-bold ph-arrows-clockwise"></i> Muat Ulang</button>
+03642:         </div>
+03643:       </div>
+03644: 
+03645:       <div id="report-hub-cat-grid" class="report-cat-grid"></div>
+03646: 
+03647:       <div id="report-hub-detail" style="display:none;">
+03648:         <div class="filter-bar" id="report-hub-filterbar" style="display:none;">
+03649:           <input class="grow" type="text" id="search-report-hub" placeholder="Cari judul, kode, PIC/penulis...">
+03650:           <select id="filter-report-hub-type" style="display:none;">
+03651:             <option value="">Semua Jenis</option>
+03652:             <option value="wi">Work Instruction</option>
+03653:             <option value="project">Laporan Proyek</option>
+03654:           </select>
+03655:         </div>
+03656:         <div id="report-hub-grid" class="report-cat-grid"></div>
+~~~
+
+### Around line 17398
+~~~text
+17386:     const hintEl = $('.sp-lokasi-hint', rowEl);
+17387:     if(hintEl){
+17388:       const l = findSparepartLokasiBySap(row.sap);
+17389:       hintEl.innerHTML = l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : '';
+17390:     }
+17391:   });
+17392: }
+17393: function resetSparepartRows(){
+17394:   SPAREPART_ROWS = [];
+17395:   addSparepartRow();
+17396: }
+17397: resetSparepartRows();
+17398: const btnAddSparepartRow = $('#btn-add-sparepart-row');
+17399: if(btnAddSparepartRow) btnAddSparepartRow.addEventListener('click', addSparepartRow);
+17400: 
+17401: /* ---------------- PERSONIL TAMBAHAN (INPUT LOGBOOK) ----------------
+17402:    Baris opsional untuk menambahkan personil lain selain Nama Pelapor /
+17403:    Teknisi Utama. Polanya disamakan dengan SPAREPART ROWS di atas supaya
+17404:    konsisten: array state + render ulang ke dalam container setiap ada
+17405:    perubahan (tambah/hapus/pilih nama). */
+17406: let ADDITIONAL_PERSONIL_ID = 0;
+17407: let ADDITIONAL_PERSONIL_ROWS = [];
+17408: function addAdditionalPersonilRow(){
+17409:   ADDITIONAL_PERSONIL_ROWS.push({ id: ++ADDITIONAL_PERSONIL_ID, nama:'' });
+17410:   renderAdditionalPersonil();
+17411: }
+17412: function removeAdditionalPersonilRow(id){
+17413:   ADDITIONAL_PERSONIL_ROWS = ADDITIONAL_PERSONIL_ROWS.filter(r=>r.id!==id);
+17414:   renderAdditionalPersonil();
+17415: }
+17416: function renderAdditionalPersonil(){
+17417:   const holder = $('#additional-personil-container');
+17418:   if(!holder) return;
+17419:   const mainName = ($('#select-namaPelapor') && $('#select-namaPelapor').value) || '';
+17420:   const names = (typeof PERSONIL !== 'undefined' ? PERSONIL : [])
+17421:     .map(p=>p['Nama Personil']).filter(Boolean).sort();
+17422:   holder.innerHTML = ADDITIONAL_PERSONIL_ROWS.map(r=>`
+17423:     <div class="additional-personil-row" data-id="${r.id}" style="display:flex; gap:8px; align-items:center;">
+17424:       <select class="ap-nama" style="flex:1;">
+17425:         <option value="">Pilih personil...</option>
+17426:         ${names.map(n=>`<option value="${escapeHtml(n)}" ${r.nama===n?'selected':''} ${n===mainName?'disabled':''}>${escapeHtml(n)}</option>`).join('')}
+17427:       </select>
+17428:       <button type="button" class="btn btn-ghost btn-sm additional-personil-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>
+17429:     </div>`).join('');
+17430:   $$('.ap-nama', holder).forEach(el=> el.addEventListener('change', ()=>{
+17431:     const id = Number(el.closest('.additional-personil-row').dataset.id);
+17432:     const row = ADDITIONAL_PERSONIL_ROWS.find(r=>r.id===id);
+17433:     if(row) row.nama = el.value;
+17434:   }));
+17435:   $$('.additional-personil-remove', holder).forEach(btn=>{
+17436:     btn.addEventListener('click', ()=> removeAdditionalPersonilRow(Number(btn.dataset.id)));
+17437:   });
+17438: }
+17439: function getAdditionalPersonilNames(){
+17440:   return ADDITIONAL_PERSONIL_ROWS.map(r=>r.nama).filter(Boolean);
+17441: }
+17442: function resetAdditionalPersonil(){
+17443:   ADDITIONAL_PERSONIL_ROWS = [];
+17444:   renderAdditionalPersonil();
+17445: }
+17446: resetAdditionalPersonil();
+17447: 
+17448: /* ---------------- KOREKSI PENULISAN VIA AI EXTERNAL ----------------
+17449:    Semua field yang menyediakan fitur koreksi penulisan mengirim teks ke
+17450:    backend Cloudflare. Backend memilih provider external yang tersedia
+17451:    (Groq, dengan fallback Gemini). API key tidak pernah berada di browser.
+17452:    Koreksi manual selalu ditampilkan Sebelum/Sesudah agar user tetap
+17453:    memutuskan apakah usulan diterapkan. Jalur koreksi otomatis saat simpan
+17454:    bersifat fail-open: bila AI external tidak tersedia, teks asli tetap
+17455:    disimpan dan pengguna diberi informasi, bukan kehilangan input. */
+17456: async function groqFixTextRaw(text, fieldLabel, options){
+17457:   const original = String(text||'').trim();
+17458:   if(!original) return null;
+17459:   const opts = options || {};
+17460:   try{
+17461:     const res = await apiPost({ action:'groqFixTypo', text: original, field: fieldLabel, provider:'external' });
+17462:     const corrected = (res && typeof res.corrected === 'string') ? res.corrected.trim() : '';
+~~~
+
+## form-logbook
+No match.
+
+## EDITING_ENTRY
+No match.
+
+## edit-entry
+### Around line 16772
+~~~text
+16760:     ['Estimasi Pekerjaan', e['Downtime (menit)']],
+16761:     ['Catatan', e['Catatan Tambahan']],
+16762:     ['Keterangan', isOneNoteImport(e['Tanggal']) ? 'Import dari OneNote' : ''],
+16763:   ];
+16764:   const st = statusClass(e['Status']);
+16765:   $('#modal-content').innerHTML = `
+16766:     <div class="modal-head">
+16767:       <div>
+16768:         <span class="badge badge-${st}"><span class="led led-${st}" style="margin-right:4px;vertical-align:middle;"></span>${escapeHtml(e['Status']||'-')}</span>
+16769:         <h2 style="font-family:var(--font-display);margin:8px 0 0 0;">${mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin']||'-') : escapeHtml(logbookLocationLabel_(e))}</h2>
+16770:       </div>
+16771:       <div style="display:flex;gap:8px;">
+16772:         <button class="btn btn-sm" id="btn-edit-entry"><i class="ph-bold ph-pencil-simple"></i> Edit</button>
+16773:         <button class="btn btn-sm btn-danger" id="btn-delete-entry"><i class="ph-bold ph-trash"></i> Hapus</button>
+16774:         <button class="modal-close" id="btn-close-modal">✕</button>
+16775:       </div>
+16776:     </div>
+16777:     <div id="entry-view-mode">
+16778:       ${rows.filter(r=>r[1]).map(r=>`<div class="detail-row"><div class="k">${r[0]}</div><div class="v">${customRowHtml.hasOwnProperty(r[0]) ? customRowHtml[r[0]] : escapeHtml(r[1])}</div></div>`).join('')}
+16779:       ${renderAttachGrid(atts, 'Lampiran')}
+16780:       <div style="margin-top:20px;display:flex;gap:10px;">
+16781:         <select id="quick-status" style="width:auto;">
+16782:           <option value="">Ubah status...</option>
+16783:           <option>Proses</option><option>Selesai</option><option>Pending</option><option>Emergency</option>
+16784:         </select>
+16785:         <button class="btn btn-sm btn-primary" id="btn-quick-status">Terapkan</button>
+16786:       </div>
+16787:     </div>
+16788:   `;
+16789:   $('#modal-bg').classList.add('active');
+16790:   $('#btn-close-modal').addEventListener('click', closeModal);
+16791:   $('#btn-delete-entry').addEventListener('click', ()=> deleteEntry(id));
+16792:   $('#btn-edit-entry').addEventListener('click', ()=> renderEntryEditForm(e));
+16793:   $('#btn-quick-status').addEventListener('click', ()=> quickUpdateStatus(id));
+16794:   bindAttachGridClicks($('#modal-content'));
+16795: }
+16796: // [FITUR EDIT LOGBOOK] Ganti tampilan detail (read-only) di dalam modal yang sama
+16797: // menjadi form yang bisa diedit langsung, lalu kirim ke backend lewat action
+16798: // 'updateEntry' (meng-update baris yang sudah ada di Sheet, bukan menambah baris baru).
+16799: const ENTRY_EDIT_FIELDS = [
+16800:   { key:'Tanggal', label:'Tanggal', type:'date', toInput:v=>v?String(v).slice(0,10):'' },
+16801:   { key:'Waktu', label:'Waktu Lapor', type:'time' },
+16802:   { key:'Shift', label:'Shift', type:'select', options:['Pagi','Siang','Malam'] },
+16803:   { key:'Grouping Pekerjaan', label:'Grouping Pekerjaan', type:'text' },
+16804:   { key:'Grouping Team', label:'Grouping Team', type:'text' },
+16805:   { key:'Nama Pelapor', label:'Nama Pelapor', type:'text' },
+16806:   { key:'Personil Tambahan', label:'Personil Tambahan (pisah koma)', type:'text' },
+16807:   { key:'Nomor Notifikasi Pekerjaan', label:'Nomor Notifikasi Pekerjaan', type:'text' },
+16808:   { key:'Kode Mesin', label:'Kode Mesin', type:'text' },
+16809:   { key:'Nama Mesin', label:'Nama Mesin', type:'text' },
+16810:   { key:'Nama Unit', label:'Nama Unit (Sub-Mesin)', type:'text' },
+16811:   { key:'Jenis Pekerjaan', label:'Jenis Pekerjaan', type:'text' },
+16812:   { key:'Prioritas', label:'Prioritas', type:'select', options:['Low','Medium','High','Urgent'] },
+16813:   { key:'Status', label:'Status', type:'select', options:['Proses','Selesai','Pending','Emergency'] },
+16814:   { key:'Deskripsi Masalah', label:'Deskripsi Masalah', type:'textarea' },
+16815:   { key:'Tindakan Perbaikan', label:'Tindakan Perbaikan', type:'textarea' },
+16816:   { key:'Nama Material', label:'Nama Material', type:'text' },
+16817:   { key:'Material Number SAP', label:'Material Number SAP', type:'text' },
+16818:   { key:'Spare Part Digunakan', label:'Spare Part (catatan)', type:'text' },
+16819:   { key:'Jam Mulai', label:'Jam Mulai', type:'time' },
+16820:   { key:'Jam Selesai', label:'Jam Selesai', type:'time' },
+16821:   { key:'Downtime (menit)', label:'Estimasi Pekerjaan (menit)', type:'number' },
+16822:   { key:'Catatan Tambahan', label:'Catatan', type:'textarea' }
+16823: ];
+16824: function renderEntryEditForm(e){
+16825:   const holder = $('#entry-view-mode');
+16826:   if(!holder) return;
+16827:   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
+16828:     const raw = e[f.key] || '';
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+~~~
+
+### Around line 16792
+~~~text
+16780:       <div style="margin-top:20px;display:flex;gap:10px;">
+16781:         <select id="quick-status" style="width:auto;">
+16782:           <option value="">Ubah status...</option>
+16783:           <option>Proses</option><option>Selesai</option><option>Pending</option><option>Emergency</option>
+16784:         </select>
+16785:         <button class="btn btn-sm btn-primary" id="btn-quick-status">Terapkan</button>
+16786:       </div>
+16787:     </div>
+16788:   `;
+16789:   $('#modal-bg').classList.add('active');
+16790:   $('#btn-close-modal').addEventListener('click', closeModal);
+16791:   $('#btn-delete-entry').addEventListener('click', ()=> deleteEntry(id));
+16792:   $('#btn-edit-entry').addEventListener('click', ()=> renderEntryEditForm(e));
+16793:   $('#btn-quick-status').addEventListener('click', ()=> quickUpdateStatus(id));
+16794:   bindAttachGridClicks($('#modal-content'));
+16795: }
+16796: // [FITUR EDIT LOGBOOK] Ganti tampilan detail (read-only) di dalam modal yang sama
+16797: // menjadi form yang bisa diedit langsung, lalu kirim ke backend lewat action
+16798: // 'updateEntry' (meng-update baris yang sudah ada di Sheet, bukan menambah baris baru).
+16799: const ENTRY_EDIT_FIELDS = [
+16800:   { key:'Tanggal', label:'Tanggal', type:'date', toInput:v=>v?String(v).slice(0,10):'' },
+16801:   { key:'Waktu', label:'Waktu Lapor', type:'time' },
+16802:   { key:'Shift', label:'Shift', type:'select', options:['Pagi','Siang','Malam'] },
+16803:   { key:'Grouping Pekerjaan', label:'Grouping Pekerjaan', type:'text' },
+16804:   { key:'Grouping Team', label:'Grouping Team', type:'text' },
+16805:   { key:'Nama Pelapor', label:'Nama Pelapor', type:'text' },
+16806:   { key:'Personil Tambahan', label:'Personil Tambahan (pisah koma)', type:'text' },
+16807:   { key:'Nomor Notifikasi Pekerjaan', label:'Nomor Notifikasi Pekerjaan', type:'text' },
+16808:   { key:'Kode Mesin', label:'Kode Mesin', type:'text' },
+16809:   { key:'Nama Mesin', label:'Nama Mesin', type:'text' },
+16810:   { key:'Nama Unit', label:'Nama Unit (Sub-Mesin)', type:'text' },
+16811:   { key:'Jenis Pekerjaan', label:'Jenis Pekerjaan', type:'text' },
+16812:   { key:'Prioritas', label:'Prioritas', type:'select', options:['Low','Medium','High','Urgent'] },
+16813:   { key:'Status', label:'Status', type:'select', options:['Proses','Selesai','Pending','Emergency'] },
+16814:   { key:'Deskripsi Masalah', label:'Deskripsi Masalah', type:'textarea' },
+16815:   { key:'Tindakan Perbaikan', label:'Tindakan Perbaikan', type:'textarea' },
+16816:   { key:'Nama Material', label:'Nama Material', type:'text' },
+16817:   { key:'Material Number SAP', label:'Material Number SAP', type:'text' },
+16818:   { key:'Spare Part Digunakan', label:'Spare Part (catatan)', type:'text' },
+16819:   { key:'Jam Mulai', label:'Jam Mulai', type:'time' },
+16820:   { key:'Jam Selesai', label:'Jam Selesai', type:'time' },
+16821:   { key:'Downtime (menit)', label:'Estimasi Pekerjaan (menit)', type:'number' },
+16822:   { key:'Catatan Tambahan', label:'Catatan', type:'textarea' }
+16823: ];
+16824: function renderEntryEditForm(e){
+16825:   const holder = $('#entry-view-mode');
+16826:   if(!holder) return;
+16827:   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
+16828:     const raw = e[f.key] || '';
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+~~~
+
+## renderEntries
+No match.
+
+## populateSparepart
+No match.
+
+## function addSparepart
+### Around line 17271
+~~~text
+17259:     blob=await compressVideoFile(file);
+17260:     if(blob!==file){ mimeType='video/webm'; name=name.replace(/\.[^.]+$/, '')+'.webm'; }
+17261:   }
+17262:   if(blob.size > MAX_CLIENT_UPLOAD_BYTES){
+17263:     throw new Error(`File "${name}" masih terlalu besar setelah kompresi (${(blob.size/1024/1024).toFixed(1)} MB). Maksimal 9 MB per file.`);
+17264:   }
+17265:   return {name,mimeType,base64:await fileToBase64(blob),_blob:blob};
+17266: }
+17267: 
+17268: /* ---------------- SPAREPART ROWS (INPUT LOGBOOK) ---------------- */
+17269: let SPAREPART_ROW_ID = 0;
+17270: let SPAREPART_ROWS = [];
+17271: function addSparepartRow(){
+17272:   SPAREPART_ROWS.push({ id: ++SPAREPART_ROW_ID, nama:'', sap:'', jumlah:'' });
+17273:   renderSparepartRows();
+17274: }
+17275: function removeSparepartRow(id){
+17276:   SPAREPART_ROWS = SPAREPART_ROWS.filter(r=>r.id!==id);
+17277:   if(!SPAREPART_ROWS.length) addSparepartRow(); else renderSparepartRows();
+17278: }
+17279: function renderSparepartRows(){
+17280:   const holder = $('#sparepart-rows');
+17281:   if(!holder) return;
+17282:   holder.innerHTML = SPAREPART_ROWS.map((r,i)=>`
+17283:     <div class="sparepart-row" data-id="${r.id}">
+17284:       <div class="field"><label>${i===0?'Nama Material yang Digunakan (opsional)':'Nama Material (opsional)'}</label>
+17285:         <div class="sp-suggest-wrap">
+17286:           <input type="text" class="sp-nama" autocomplete="off" placeholder="Ketik nama material untuk melihat suggestion" value="${escapeHtml(r.nama)}">
+17287:           <div class="sp-suggest-box sp-nama-suggest"></div>
+17288:         </div>
+17289:       </div>
+17290:       <div class="field"><label><span>Material Number SAP (opsional)</span><span class="sp-lokasi-hint" style="font-size:11px;font-weight:400;color:var(--amber);">${(()=>{ const l=findSparepartLokasiBySap(r.sap); return l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : ''; })()}</span></label>
+17291:         <div class="sp-suggest-wrap">
+17292:           <input type="text" class="sp-sap" autocomplete="off" placeholder="Ketik nomor material untuk melihat suggestion" value="${escapeHtml(r.sap)}">
+17293:           <div class="sp-suggest-box sp-sap-suggest"></div>
+17294:         </div>
+17295:       </div>
+17296:       <div class="field"><label>Jumlah (wajib jika menggunakan sparepart)</label>
+17297:         <input type="number" class="sp-jumlah" min="1" step="1" inputmode="numeric" placeholder="Masukkan jumlah pemakaian jika menggunakan sparepart" value="${escapeHtml(r.jumlah)}">
+17298:       </div>
+17299:       ${SPAREPART_ROWS.length>1 ? `<button type="button" class="sparepart-row-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>` : `<span></span>`}
+17300:     </div>`).join('');
+17301:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17302:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17303:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17304:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17305:   $$('.sp-nama, .sp-sap', holder).forEach(el=> el.addEventListener('blur', ()=> setTimeout(()=> closeSparepartSuggestBox_(el.closest('.sparepart-row')), 150)));
+17306:   $$('.sp-jumlah', holder).forEach(el=> el.addEventListener('input', syncSparepartRowsFromDom));
+17307:   $$('.sparepart-row-remove', holder).forEach(btn=>{
+17308:     btn.addEventListener('click', ()=> removeSparepartRow(Number(btn.dataset.id)));
+17309:   });
+17310: }
+17311: function closeSparepartSuggestBox_(rowEl){
+17312:   if(!rowEl) return;
+17313:   $$('.sp-suggest-box', rowEl).forEach(box=>{ box.classList.remove('open'); box.innerHTML=''; });
+17314: }
+17315: /* Menampilkan suggestion KHUSUS berdasarkan field yang sedang diketik:
+17316:    - field Nama Material -> filter & cocokkan HANYA terhadap x.nama
+17317:    - field Material Number SAP -> filter & cocokkan HANYA terhadap x.sap
+17318:    Dibuat custom (bukan <datalist> bawaan browser) supaya suggestion tidak
+17319:    pernah "ketuker" antara nama & nomor material seperti pada native datalist. */
+17320: function handleSparepartLookupInput_(rowEl, source){
+17321:   if(!rowEl) return;
+17322:   const namaEl = $('.sp-nama', rowEl);
+17323:   const sapEl = $('.sp-sap', rowEl);
+17324:   const master = Array.isArray(SPAREPART_LOKASI) ? SPAREPART_LOKASI : [];
+17325:   const normalize = v=>String(v||'').trim().toLowerCase();
+17326: 
+17327:   if(source === 'nama'){
+17328:     const box = $('.sp-nama-suggest', rowEl);
+17329:     const q = normalize(namaEl.value);
+17330:     if(box){
+17331:       const seen = new Set();
+17332:       const results = q ? master.filter(x=>{
+17333:         const key = normalize(x.nama);
+17334:         if(!key || !key.includes(q) || seen.has(key)) return false;
+17335:         seen.add(key); return true;
+~~~
+
+## function renderSparepartRows
+### Around line 17279
+~~~text
+17267: 
+17268: /* ---------------- SPAREPART ROWS (INPUT LOGBOOK) ---------------- */
+17269: let SPAREPART_ROW_ID = 0;
+17270: let SPAREPART_ROWS = [];
+17271: function addSparepartRow(){
+17272:   SPAREPART_ROWS.push({ id: ++SPAREPART_ROW_ID, nama:'', sap:'', jumlah:'' });
+17273:   renderSparepartRows();
+17274: }
+17275: function removeSparepartRow(id){
+17276:   SPAREPART_ROWS = SPAREPART_ROWS.filter(r=>r.id!==id);
+17277:   if(!SPAREPART_ROWS.length) addSparepartRow(); else renderSparepartRows();
+17278: }
+17279: function renderSparepartRows(){
+17280:   const holder = $('#sparepart-rows');
+17281:   if(!holder) return;
+17282:   holder.innerHTML = SPAREPART_ROWS.map((r,i)=>`
+17283:     <div class="sparepart-row" data-id="${r.id}">
+17284:       <div class="field"><label>${i===0?'Nama Material yang Digunakan (opsional)':'Nama Material (opsional)'}</label>
+17285:         <div class="sp-suggest-wrap">
+17286:           <input type="text" class="sp-nama" autocomplete="off" placeholder="Ketik nama material untuk melihat suggestion" value="${escapeHtml(r.nama)}">
+17287:           <div class="sp-suggest-box sp-nama-suggest"></div>
+17288:         </div>
+17289:       </div>
+17290:       <div class="field"><label><span>Material Number SAP (opsional)</span><span class="sp-lokasi-hint" style="font-size:11px;font-weight:400;color:var(--amber);">${(()=>{ const l=findSparepartLokasiBySap(r.sap); return l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : ''; })()}</span></label>
+17291:         <div class="sp-suggest-wrap">
+17292:           <input type="text" class="sp-sap" autocomplete="off" placeholder="Ketik nomor material untuk melihat suggestion" value="${escapeHtml(r.sap)}">
+17293:           <div class="sp-suggest-box sp-sap-suggest"></div>
+17294:         </div>
+17295:       </div>
+17296:       <div class="field"><label>Jumlah (wajib jika menggunakan sparepart)</label>
+17297:         <input type="number" class="sp-jumlah" min="1" step="1" inputmode="numeric" placeholder="Masukkan jumlah pemakaian jika menggunakan sparepart" value="${escapeHtml(r.jumlah)}">
+17298:       </div>
+17299:       ${SPAREPART_ROWS.length>1 ? `<button type="button" class="sparepart-row-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>` : `<span></span>`}
+17300:     </div>`).join('');
+17301:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17302:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17303:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17304:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17305:   $$('.sp-nama, .sp-sap', holder).forEach(el=> el.addEventListener('blur', ()=> setTimeout(()=> closeSparepartSuggestBox_(el.closest('.sparepart-row')), 150)));
+17306:   $$('.sp-jumlah', holder).forEach(el=> el.addEventListener('input', syncSparepartRowsFromDom));
+17307:   $$('.sparepart-row-remove', holder).forEach(btn=>{
+17308:     btn.addEventListener('click', ()=> removeSparepartRow(Number(btn.dataset.id)));
+17309:   });
+17310: }
+17311: function closeSparepartSuggestBox_(rowEl){
+17312:   if(!rowEl) return;
+17313:   $$('.sp-suggest-box', rowEl).forEach(box=>{ box.classList.remove('open'); box.innerHTML=''; });
+17314: }
+17315: /* Menampilkan suggestion KHUSUS berdasarkan field yang sedang diketik:
+17316:    - field Nama Material -> filter & cocokkan HANYA terhadap x.nama
+17317:    - field Material Number SAP -> filter & cocokkan HANYA terhadap x.sap
+17318:    Dibuat custom (bukan <datalist> bawaan browser) supaya suggestion tidak
+17319:    pernah "ketuker" antara nama & nomor material seperti pada native datalist. */
+17320: function handleSparepartLookupInput_(rowEl, source){
+17321:   if(!rowEl) return;
+17322:   const namaEl = $('.sp-nama', rowEl);
+17323:   const sapEl = $('.sp-sap', rowEl);
+17324:   const master = Array.isArray(SPAREPART_LOKASI) ? SPAREPART_LOKASI : [];
+17325:   const normalize = v=>String(v||'').trim().toLowerCase();
+17326: 
+17327:   if(source === 'nama'){
+17328:     const box = $('.sp-nama-suggest', rowEl);
+17329:     const q = normalize(namaEl.value);
+17330:     if(box){
+17331:       const seen = new Set();
+17332:       const results = q ? master.filter(x=>{
+17333:         const key = normalize(x.nama);
+17334:         if(!key || !key.includes(q) || seen.has(key)) return false;
+17335:         seen.add(key); return true;
+17336:       }).slice(0,30) : [];
+17337:       renderSparepartSuggestBox_(box, results, (item)=>{
+17338:         namaEl.value = item.nama || '';
+17339:         sapEl.value = item.sap || '';
+17340:         closeSparepartSuggestBox_(rowEl);
+17341:         syncSparepartRowsFromDom();
+17342:       }, x=>x.nama, x=> x.sap ? `SAP: ${x.sap}` : 'Belum ada nomor material');
+17343:     }
+~~~
+
+## data-sparepart
+No match.
+
+## select[name="material"]
+No match.
+
+## sparepartSelect
+No match.
+
+## function renderLogbookTable
+No match.
+
