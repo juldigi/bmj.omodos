@@ -4517,3 +4517,164 @@ function boot(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
+
+
+/* OMODOS REVIEW FIXES — 2026-10-17
+   - unit-aware logbook material quantities
+   - preserve line breaks in logbook descriptions
+   - mobile-safe fullscreen/orientation behavior
+   - material suggestions in the existing logbook edit modal
+*/
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261017__) return;
+window.__OMODOS_REVIEW_FIXES_20261017__ = true;
+
+function esc(v){
+  try { return typeof escapeHtml==='function' ? escapeHtml(String(v==null?'':v)) : String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  catch(e){ return String(v==null?'':v); }
+}
+function addUnits(){
+  const holder=document.getElementById('sparepart-rows');
+  if(!holder) return;
+  holder.querySelectorAll('.sparepart-row').forEach(row=>{
+    const qtyField=row.querySelector('.sp-jumlah')?.closest('.field');
+    if(!qtyField || row.querySelector('.sp-unit')) return;
+    const id=Number(row.dataset.id);
+    let data=null;
+    try{ data=(typeof SPAREPART_ROWS!=='undefined' ? SPAREPART_ROWS.find(r=>Number(r.id)===id) : null); }catch(e){}
+    const unit=String(data?.unit||'pcs');
+    const options=['pcs','unit','set','kg','g','ml','L','mL','meter','cm','roll','botol','kaleng','pack','lembar'];
+    const html='<div class="field sp-unit-field"><label>Satuan</label><select class="sp-unit" aria-label="Satuan jumlah material">'+options.map(o=>'<option value="'+o+'" '+(o===unit?'selected':'')+'>'+o+'</option>').join('')+'</select></div>';
+    qtyField.insertAdjacentHTML('afterend',html);
+    const select=row.querySelector('.sp-unit');
+    if(select) select.addEventListener('change',()=>{ try{syncSparepartRowsFromDom();}catch(e){} });
+    const qty=row.querySelector('.sp-jumlah');
+    if(qty){ qty.removeAttribute('step'); qty.setAttribute('step','any'); qty.setAttribute('min','0.001'); qty.setAttribute('inputmode','decimal'); }
+  });
+}
+const oldRender=window.renderSparepartRows;
+if(typeof oldRender==='function'){
+  window.renderSparepartRows=function(){
+    const result=oldRender.apply(this,arguments);
+    addUnits();
+    return result;
+  };
+}
+const oldSync=window.syncSparepartRowsFromDom;
+if(typeof oldSync==='function'){
+  window.syncSparepartRowsFromDom=function(){
+    const result=oldSync.apply(this,arguments);
+    try{
+      const holder=document.getElementById('sparepart-rows');
+      if(holder && typeof SPAREPART_ROWS!=='undefined'){
+        holder.querySelectorAll('.sparepart-row').forEach(el=>{
+          const row=SPAREPART_ROWS.find(r=>Number(r.id)===Number(el.dataset.id));
+          if(row){ row.unit=el.querySelector('.sp-unit')?.value||row.unit||'pcs'; }
+        });
+      }
+    }catch(e){}
+    return result;
+  };
+}
+const oldBuild=window.buildMaterialFieldsFromRows;
+if(typeof oldBuild==='function'){
+  window.buildMaterialFieldsFromRows=function(){
+    const data=oldBuild.apply(this,arguments);
+    if(data && Array.isArray(data.detail)){
+      data.namaMaterial=data.detail.map(r=>{
+        const name=String(r.nama||'').trim();
+        const qty=String(r.jumlah||'').trim();
+        const unit=String(r.unit||'pcs').trim()||'pcs';
+        return name ? (qty ? name+' ('+qty+' '+unit+')' : name) : '';
+      }).filter(Boolean).join('; ');
+    }
+    return data;
+  };
+}
+
+function attachEditMaterialSuggestions(){
+  const holder=document.getElementById('entry-view-mode');
+  if(!holder || !holder.querySelector('[data-edit-field="Nama Material"]')) return;
+  const nameInput=holder.querySelector('[data-edit-field="Nama Material"]');
+  const sapInput=holder.querySelector('[data-edit-field="Material Number SAP"]');
+  if(!nameInput || !sapInput || nameInput.dataset.materialSuggestReady==='1') return;
+  nameInput.dataset.materialSuggestReady='1';
+  sapInput.dataset.materialSuggestReady='1';
+  [nameInput,sapInput].forEach(input=>{
+    const field=input.closest('.field');
+    if(field) field.style.position='relative';
+    const box=document.createElement('div');
+    box.className='sp-suggest-box';
+    box.style.cssText='position:absolute;z-index:10020;left:0;right:0;top:100%;max-height:220px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line,#d1d5db);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);';
+    if(field) field.appendChild(box);
+    const byName=input===nameInput;
+    const run=()=>{
+      let master=[];
+      try{ master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[]; }catch(e){}
+      const q=input.value.trim().toLowerCase();
+      if(!q){box.classList.remove('open');box.innerHTML='';return;}
+      const seen=new Set();
+      const found=master.filter(x=>{
+        const v=String(byName?(x.nama||''):(x.sap||'')).trim();
+        const k=v.toLowerCase();
+        if(!k.includes(q)||seen.has(k))return false;
+        seen.add(k);return true;
+      }).slice(0,25);
+      if(!found.length){box.classList.remove('open');box.innerHTML='';return;}
+      box.innerHTML=found.map((x,i)=>'<div class="sp-suggest-item" data-edit-material-idx="'+i+'" style="display:flex;flex-direction:column;gap:2px;padding:9px 11px;cursor:pointer;border-bottom:1px solid var(--line,#e5e7eb)"><span class="sp-suggest-main">'+esc(byName?x.nama:x.sap)+'</span><span class="sp-suggest-sub">'+esc(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</span></div>').join('');
+      box.classList.add('open');
+      box.querySelectorAll('[data-edit-material-idx]').forEach(el=>el.addEventListener('mousedown',ev=>{
+        ev.preventDefault();
+        const item=found[Number(el.dataset.editMaterialIdx)];
+        if(!item)return;
+        nameInput.value=item.nama||'';
+        sapInput.value=item.sap||'';
+        box.classList.remove('open');box.innerHTML='';
+        nameInput.dispatchEvent(new Event('input',{bubbles:true}));
+        sapInput.dispatchEvent(new Event('input',{bubbles:true}));
+      }));
+    };
+    input.addEventListener('input',run);
+    input.addEventListener('focus',run);
+    input.addEventListener('blur',()=>setTimeout(()=>{box.classList.remove('open');box.innerHTML='';},180));
+  });
+}
+const oldEdit=window.renderEntryEditForm;
+if(typeof oldEdit==='function'){
+  window.renderEntryEditForm=function(){
+    const result=oldEdit.apply(this,arguments);
+    attachEditMaterialSuggestions();
+    return result;
+  };
+}
+const style=document.createElement('style');
+style.textContent=
+  '.detail-row .v{white-space:pre-line;overflow-wrap:anywhere}'+
+  '#entry-view-mode [data-edit-field="Deskripsi Masalah"],#entry-view-mode [data-edit-field="Tindakan Perbaikan"],#entry-view-mode [data-edit-field="Catatan Tambahan"]{white-space:pre-wrap;min-height:100px}'+
+  '#sparepart-rows .sparepart-row{align-items:end}'+
+  '#sparepart-rows .sp-unit-field{min-width:90px}'+
+  '#entry-view-mode .sp-suggest-box.open{display:block}';
+document.head.appendChild(style);
+
+/* The legacy login helper was locking orientation to landscape and requesting
+   fullscreen again on visibility changes. Disable that behavior on phones;
+   never force a mobile device into landscape. */
+if(typeof window.aktifkanFullscreen==='function'){
+  window.aktifkanFullscreen=function(){
+    const mobile=window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;
+    if(mobile) return;
+    const el=document.documentElement;
+    try{
+      if(!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+    }catch(e){}
+  };
+}
+function init(){
+  addUnits();
+  attachEditMaterialSuggestions();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+const observer=new MutationObserver(()=>{addUnits();attachEditMaterialSuggestions();});
+observer.observe(document.documentElement,{subtree:true,childList:true});
+})();
