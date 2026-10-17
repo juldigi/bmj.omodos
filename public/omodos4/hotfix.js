@@ -4817,3 +4817,88 @@ function boot(){bindMultiline();bindDirtyGuard();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
 })();
+
+
+/* OMODOS_REVIEW_FIXES_20261017_V4
+   Load the authoritative sparepart master before showing edit suggestions,
+   keep selected units in the structured payload/legacy text, and avoid
+   forcing mobile orientation. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261017_V4__)return;
+window.__OMODOS_REVIEW_FIXES_20261017_V4__=true;
+function mobile(){try{return matchMedia('(max-width: 767px), (pointer: coarse)').matches;}catch(e){return innerWidth<768;}}
+/* Re-wrap fullscreen helper after all older hotfix layers have loaded. */
+if(typeof window.aktifkanFullscreen==='function'){
+ const safeFullscreen=function(){
+   if(mobile())return;
+   try{const el=document.documentElement;if(!document.fullscreenElement&&el.requestFullscreen)el.requestFullscreen().catch(()=>{});}catch(e){}
+ };
+ window.aktifkanFullscreen=safeFullscreen;
+}
+/* Edit-logbook material picker: refresh the master list if cache is empty,
+   then populate results on focus (including an empty search) for touch users. */
+function escape(v){try{return typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}catch(e){return '';}}
+function bindEditPicker(){
+ const holder=document.getElementById('entry-view-mode');if(!holder)return;
+ const name=holder.querySelector('[data-edit-field="Nama Material"]');
+ const sap=holder.querySelector('[data-edit-field="Material Number SAP"]');
+ if(!name||!sap)return;
+ [name,sap].forEach(input=>{
+   const field=input.closest('.field');if(!field)return;
+   /* Remove legacy suggestion layers in this edit field to prevent overlap. */
+   field.querySelectorAll('.sp-suggest-box').forEach(box=>{if(!box.classList.contains('omodos-edit-material-picker'))box.remove();});
+   let box=field.querySelector('.omodos-edit-material-picker');
+   if(!box){box=document.createElement('div');box.className='sp-suggest-box omodos-edit-material-picker';box.style.cssText='display:none;position:absolute;z-index:10040;left:0;right:0;top:100%;max-height:240px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line,#d1d5db);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);';field.style.position='relative';field.appendChild(box);}
+   if(input.dataset.materialPickerV4==='1')return;
+   input.dataset.materialPickerV4='1';
+   const byName=input===name;
+   let items=[];
+   const render=()=>{
+     let master=[];try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
+     const q=String(input.value||'').trim().toLocaleLowerCase('id');const seen=new Set();
+     items=master.filter(x=>{const val=String(byName?(x.nama||''):(x.sap||'')).trim();const k=val.toLocaleLowerCase('id');if(!k||seen.has(k)||(q&&!k.includes(q)))return false;seen.add(k);return true;}).slice(0,30);
+     if(!items.length){box.classList.remove('open');box.innerHTML='<div style="padding:10px 12px;color:var(--text-dim)">'+(master.length?'Tidak ada material yang cocok.':'Master material belum termuat. Coba buka kembali setelah koneksi tersedia.')+'</div>';if(master.length)box.classList.add('open');return;}
+     box.innerHTML=items.map((x,i)=>'<button type="button" data-v4-pick="'+i+'" style="display:flex;width:100%;text-align:left;flex-direction:column;gap:2px;padding:10px 12px;border:0;border-bottom:1px solid var(--line,#e5e7eb);background:transparent;color:inherit;cursor:pointer"><span>'+escape(byName?x.nama:x.sap)+'</span><small>'+escape(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</small></button>').join('');
+     box.classList.add('open');
+   };
+   const loadThenRender=async()=>{
+     let master=[];try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
+     if(!master.length&&typeof syncSparepartLokasiFromBackend==='function'){try{await syncSparepartLokasiFromBackend();}catch(e){}}
+     render();
+   };
+   input.addEventListener('focus',loadThenRender);
+   input.addEventListener('input',render);
+   input.addEventListener('keydown',ev=>{if(ev.key==='Escape'){box.classList.remove('open');box.innerHTML='';}});
+   box.addEventListener('pointerdown',ev=>{
+     const opt=ev.target.closest('[data-v4-pick]');if(!opt)return;ev.preventDefault();
+     const item=items[Number(opt.dataset.v4Pick)];if(!item)return;
+     name.value=item.nama||'';sap.value=item.sap||'';
+     box.classList.remove('open');box.innerHTML='';
+     name.dispatchEvent(new Event('input',{bubbles:true}));sap.dispatchEvent(new Event('input',{bubbles:true}));
+   });
+   input.addEventListener('blur',()=>setTimeout(()=>{if(!box.contains(document.activeElement)){box.classList.remove('open');box.innerHTML='';}},300));
+ });
+}
+function boot(){bindEditPicker();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
+/* Ensure quantity is decimal-capable and keep units reflected in every
+   material detail before the legacy-compatible logbook payload is assembled. */
+const prevBuild=window.buildMaterialFieldsFromRows;
+if(typeof prevBuild==='function'&&!prevBuild.__unitV4){
+ const wrapped=function(){
+   try{if(typeof syncSparepartRowsFromDom==='function')syncSparepartRowsFromDom();}catch(e){}
+   const data=prevBuild.apply(this,arguments);
+   if(data&&Array.isArray(data.detail)){
+     data.detail=data.detail.map(r=>({...r,unit:String(r.unit||'pcs').trim()||'pcs'}));
+     data.namaMaterial=data.detail.map(r=>{const n=String(r.nama||'').trim(),q=String(r.jumlah||'').trim(),u=String(r.unit||'pcs').trim();return n?(q?n+' ('+q+' '+u+')':n):'';}).filter(Boolean).join('; ');
+   }
+   return data;
+ };
+ wrapped.__unitV4=true;window.buildMaterialFieldsFromRows=wrapped;
+}
+const css=document.createElement('style');
+css.textContent='#form-entry textarea[name="deskripsiMasalah"],#form-entry textarea[name="tindakanPerbaikan"],#form-entry textarea[name="catatan"],#entry-view-mode textarea{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}.omodos-edit-material-picker.open{display:block!important}';
+document.head.appendChild(css);
+})();
