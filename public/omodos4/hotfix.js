@@ -4902,3 +4902,45 @@ const css=document.createElement('style');
 css.textContent='#form-entry textarea[name="deskripsiMasalah"],#form-entry textarea[name="tindakanPerbaikan"],#form-entry textarea[name="catatan"],#entry-view-mode textarea{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}.omodos-edit-material-picker.open{display:block!important}';
 document.head.appendChild(css);
 })();
+
+
+/* OMODOS_REVIEW_FIXES_20261018_V5
+   Flush the existing logbook draft immediately on lifecycle transitions.
+   This does not trigger reloads; it reduces the chance that a sudden browser
+   refresh/background suspension loses the last few seconds of typing. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261018_V5__)return;
+window.__OMODOS_REVIEW_FIXES_20261018_V5__=true;
+function flushLogbookDraft(){
+  try{
+    if(typeof formEntryDraftSaveTimer!=='undefined' && formEntryDraftSaveTimer){
+      clearTimeout(formEntryDraftSaveTimer);
+      formEntryDraftSaveTimer=null;
+    }
+  }catch(e){}
+  try{
+    if(typeof saveFormEntryDraft==='function') saveFormEntryDraft();
+  }catch(e){}
+}
+function bind(){
+  const form=document.getElementById('form-entry');
+  if(form && form.dataset.lifecycleDraftFlush!=='1'){
+    form.dataset.lifecycleDraftFlush='1';
+    ['input','change'].forEach(type=>form.addEventListener(type,()=>{
+      try{
+        if(typeof formEntryDraftSaveTimer!=='undefined' && formEntryDraftSaveTimer){
+          clearTimeout(formEntryDraftSaveTimer);
+          formEntryDraftSaveTimer=null;
+        }
+        if(typeof saveFormEntryDraft==='function') saveFormEntryDraft();
+      }catch(e){}
+    },{capture:true}));
+  }
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+new MutationObserver(bind).observe(document.documentElement,{subtree:true,childList:true});
+window.addEventListener('pagehide',flushLogbookDraft,{capture:true});
+window.addEventListener('beforeunload',flushLogbookDraft,{capture:true});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushLogbookDraft();},{capture:true});
+})();
