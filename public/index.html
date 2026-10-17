@@ -7832,11 +7832,17 @@ async function fetchWithTimeout_(url, options={}, timeoutMs=45000){
 function handleApiAuthFailure_(message, requestToken){
   const msg = String(message || '');
   if(!/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(msg)) return;
+  // Ignore responses from a request started under a previous session.
+  // A stale background response must not sign out a newly logged-in user.
+  if(!requestToken) return;
   if(SETTING_AUTH_OK && SETTING_SESSION_TOKEN && requestToken === SETTING_SESSION_TOKEN){
     resetSettingAuth();
     return;
   }
-  logoutUser();
+  if(requestToken !== SESSION_TOKEN) return;
+  // Authentication errors return to the login gate without reloading
+  // the whole application or discarding the in-memory page state abruptly.
+  logoutUser({reload:false, reason:'session-expired'});
 }
 // Session-only read cache; isolated by backend, token and parameters.
 const READY_READS = new Map();
@@ -8042,7 +8048,7 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState 
    pengguna wajib login ulang dengan akun (username/password) untuk
    masuk ke aplikasi lagi. Data yang sudah tersimpan di database SQLite
    tidak terpengaruh sama sekali oleh logout. */
-function logoutUser(){
+function logoutUser(options={}){
   try{
     deactivateAccountDataCaches_(CURRENT_USER&&CURRENT_USER.username);
   }catch(e){
@@ -8080,11 +8086,19 @@ function logoutUser(){
   const userField = document.getElementById('login-username');
   if(userField) setTimeout(()=> userField.focus(), 50);
 
-  // Hapus state runtime akun lama lalu reload. Cache data/draft/offline
-  // tidak dihapus: semuanya sudah dipindahkan ke namespace akun yang logout,
-  // sehingga akun berikutnya tidak mewarisi cache tersebut.
+  // Cache akun sudah diamankan pada namespace pemiliknya di atas.
+  // Logout manual tetap me-reload untuk membersihkan seluruh state runtime.
+  // Sesi kedaluwarsa kembali ke login-gate tanpa refresh browser mendadak.
   try{ READY_READS.clear(); ACTIVE_READS.clear(); READ_GENERATION++; }catch(e){}
-  setTimeout(()=> location.reload(), 60);
+  if(!options || options.reload !== false){
+    setTimeout(()=> location.reload(), 60);
+  }else if(options.reason === 'session-expired'){
+    const loginErr = document.getElementById('login-err');
+    if(loginErr){
+      loginErr.textContent = 'Sesi Anda berakhir atau tidak lagi valid. Silakan masuk kembali. Draft logbook disimpan otomatis.';
+      loginErr.style.display = 'block';
+    }
+  }
 }
 document.addEventListener('click', (e)=>{
   if(e.target.closest('#btn-logout')){
