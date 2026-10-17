@@ -34,7 +34,15 @@ jobs:
               "function latestPatrolForMachine_",
               "function currentMachineStatusSnapshot_",
               "omodos4.view",
-              "Bantuan"
+              "Bantuan",
+              "copilot-data-record",
+              "copilot-external-card",
+              "copilot-result-group",
+              "aiInternetResearch",
+              "function renderCopilot",
+              "function openCopilot",
+              "copilot-record-title",
+              "data-copilot"
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
