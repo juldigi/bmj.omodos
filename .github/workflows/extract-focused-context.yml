@@ -47,7 +47,22 @@ jobs:
               "function copilotCompactFields_(",
               "function copilotRowLabel_(",
               "function copilotInternalAnswer_(",
-              "function copilotRowCardHtml_("
+              "function copilotRowCardHtml_(",
+              "Deskripsi Pekerjaan",
+              "Nama Material",
+              "Jumlah Material",
+              "Satuan",
+              "editLogbook",
+              "logbook-edit",
+              "materialSelect",
+              "addLogbookMaterial",
+              "function renderLogbook",
+              "function openEditLogbook",
+              "function saveLogbook",
+              "location.reload",
+              "screen.orientation",
+              "orientationchange",
+              "window.onresize"
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
