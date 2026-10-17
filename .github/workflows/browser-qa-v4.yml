@@ -1513,6 +1513,14 @@ jobs:
                 const nameInput = holder.querySelector('[data-edit-field="Nama Material"]');
                 const sapInput = holder.querySelector('[data-edit-field="Material Number SAP"]');
                 if (!nameInput || !sapInput) throw new Error('Edit-logbook material fields are missing');
+                /* The form is normally opened from a visible logbook detail view.
+                   In this isolated regression test, reveal hidden ancestors so focus
+                   has the same effect as a real user editing an entry. */
+                for (let ancestor = holder; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
+                  ancestor.hidden = false;
+                  if (getComputedStyle(ancestor).display === 'none') ancestor.style.display = 'block';
+                  if (getComputedStyle(ancestor).visibility === 'hidden') ancestor.style.visibility = 'visible';
+                }
                 nameInput.focus();
                 await new Promise(resolve => setTimeout(resolve, 100));
                 const picker = nameInput.closest('.field')?.querySelector('.omodos-edit-material-picker');
