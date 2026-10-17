@@ -1,0 +1,117 @@
+name: Patch OMODOS unexpected auth reload
+
+on:
+  push:
+    paths:
+      - ".github/workflows/patch-auth-reload.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch session-expiry handling
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("public/index.html")
+          source = path.read_text(encoding="utf-8")
+
+          old_handler = """function handleApiAuthFailure_(message, requestToken){
+            const msg = String(message || '');
+            if(!/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(msg)) return;
+            if(SETTING_AUTH_OK && SETTING_SESSION_TOKEN && requestToken === SETTING_SESSION_TOKEN){
+              resetSettingAuth();
+              return;
+            }
+            logoutUser();
+          }"""
+          new_handler = """function handleApiAuthFailure_(message, requestToken){
+            const msg = String(message || '');
+            if(!/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(msg)) return;
+            // Ignore responses from a request started under a previous session.
+            // A stale background response must not sign out a newly logged-in user.
+            if(!requestToken) return;
+            if(SETTING_AUTH_OK && SETTING_SESSION_TOKEN && requestToken === SETTING_SESSION_TOKEN){
+              resetSettingAuth();
+              return;
+            }
+            if(requestToken !== SESSION_TOKEN) return;
+            // Authentication errors return to the login gate without reloading
+            // the whole application or discarding the in-memory page state abruptly.
+            logoutUser({reload:false, reason:'session-expired'});
+          }"""
+
+          old_tail = """  // Hapus state runtime akun lama lalu reload. Cache data/draft/offline
+            // tidak dihapus: semuanya sudah dipindahkan ke namespace akun yang logout,
+            // sehingga akun berikutnya tidak mewarisi cache tersebut.
+            try{ READY_READS.clear(); ACTIVE_READS.clear(); READ_GENERATION++; }catch(e){}
+            setTimeout(()=> location.reload(), 60);"""
+          new_tail = """  // Cache akun sudah diamankan pada namespace pemiliknya di atas.
+            // Logout manual tetap me-reload untuk membersihkan seluruh state runtime.
+            // Sesi kedaluwarsa kembali ke login-gate tanpa refresh browser mendadak.
+            try{ READY_READS.clear(); ACTIVE_READS.clear(); READ_GENERATION++; }catch(e){}
+            if(!options || options.reload !== false){
+              setTimeout(()=> location.reload(), 60);
+            }else if(options.reason === 'session-expired'){
+              const loginErr = document.getElementById('login-err');
+              if(loginErr){
+                loginErr.textContent = 'Sesi Anda berakhir atau tidak lagi valid. Silakan masuk kembali. Draft logbook disimpan otomatis.';
+                loginErr.style.display = 'block';
+              }
+            }"""
+
+          if source.count(old_handler) != 1:
+              raise SystemExit(f"Expected one auth handler, found {source.count(old_handler)}")
+          if source.count("function logoutUser(){") != 1:
+              raise SystemExit(f"Expected one logoutUser function, found {source.count('function logoutUser(){')}")
+          if source.count(old_tail) != 1:
+              raise SystemExit(f"Expected one logout reload tail, found {source.count(old_tail)}")
+
+          source = source.replace(old_handler, new_handler, 1)
+          source = source.replace("function logoutUser(){", "function logoutUser(options={}){", 1)
+          source = source.replace(old_tail, new_tail, 1)
+
+          if source.count("function handleApiAuthFailure_(message, requestToken){") != 1:
+              raise SystemExit("Auth handler count changed after patch")
+          if "logoutUser({reload:false, reason:'session-expired'});" not in source:
+              raise SystemExit("Session-expiry no-reload path missing")
+          if "function logoutUser(options={}){" not in source:
+              raise SystemExit("Logout options signature missing")
+          path.write_text(source, encoding="utf-8")
+          print("Patched: stale session responses are ignored; current session expiry uses login-gate without page reload.")
+          print("Explicit logout still retains its intentional reload.")
+
+      - name: Verify source invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          s = Path("public/index.html").read_text(encoding="utf-8")
+          assert "if(requestToken !== SESSION_TOKEN) return;" in s
+          assert "logoutUser({reload:false, reason:'session-expired'});" in s
+          assert "function logoutUser(options={}){" in s
+          assert "if(!options || options.reload !== false){" in s
+          # There are only the two intended hard reload sites: manual logout and
+          # the explicit user action to clear local cache.
+          assert s.count("location.reload()") == 2, s.count("location.reload()")
+          print("Session reload invariants OK.")
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          if git diff --cached --quiet; then
+            echo "No patch required."
+            exit 0
+          fi
+          git commit -m "Fix unexpected reload on stale or expired session"
+          git push
