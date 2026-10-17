@@ -10411,3 +10411,1565 @@ No match.
 27191:         <input type="file" id="pmc-log-fileinput" accept="image/*" multiple style="display:none;">
 ~~~
 
+## function logoutUser(
+### Around line 8045
+~~~text
+08033: // kembali aktif (mis. user balik dari aplikasi lain di HP). Ringan karena
+08034: // permission/feature di backend sudah di-cache 10 menit (CacheService),
+08035: // jadi tidak membebani database SQLite.
+08036: setInterval(()=>{ if(document.visibilityState === 'visible') refreshRbacFromServer_(); }, 3*60*1000);
+08037: document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') refreshRbacFromServer_(); });
+08038: 
+08039: /* ---------------- LOGOUT ----------------
+08040:    Membersihkan sesi RBAC (CURRENT_USER, permission, feature registry) &
+08041:    status login menu Setting, lalu menampilkan kembali login-gate supaya
+08042:    pengguna wajib login ulang dengan akun (username/password) untuk
+08043:    masuk ke aplikasi lagi. Data yang sudah tersimpan di database SQLite
+08044:    tidak terpengaruh sama sekali oleh logout. */
+08045: function logoutUser(){
+08046:   try{
+08047:     deactivateAccountDataCaches_(CURRENT_USER&&CURRENT_USER.username);
+08048:   }catch(e){
+08049:     toast('Logout dibatalkan karena cache lokal belum berhasil diamankan. Coba kembali setelah ruang penyimpanan browser tersedia.', true);
+08050:     return;
+08051:   }
+08052:   const tokenToRevoke = SESSION_TOKEN;
+08053:   if(tokenToRevoke && WEB_APP_URL){
+08054:     fetch(WEB_APP_URL, {
+08055:       method:'POST',
+08056:       headers:{'Content-Type':'text/plain;charset=utf-8'},
+08057:       body:JSON.stringify({action:'logout', sessionToken:tokenToRevoke}),
+08058:       keepalive:true
+08059:     }).catch(()=>{});
+08060:   }
+08061:   CURRENT_USER = null;
+08062:   SESSION_TOKEN = '';
+08063:   SESSION_EXPIRES_AT = '';
+08064:   PERMISSIONS = {};
+08065:   FEATURE_REGISTRY = [];
+08066:   try{ localStorage.removeItem(SS_USER_KEY); localStorage.removeItem(SS_TOKEN_KEY); localStorage.removeItem(SS_TOKEN_EXP_KEY); localStorage.removeItem(LS_PERM_KEY); localStorage.removeItem(LS_FEATURES_KEY); }catch(e){}
+08067:   if(typeof resetSettingAuth === 'function') resetSettingAuth();
+08068: 
+08069:   const gate = document.getElementById('login-gate');
+08070:   const appRoot = document.getElementById('app-root');
+08071:   if(appRoot) appRoot.classList.remove('unlocked', 'dash-mode', 'menu-visible');
+08072:   if(gate){
+08073:     gate.style.display = '';
+08074:     gate.style.opacity = '1';
+08075:   }
+08076:   const form = document.getElementById('form-login');
+08077:   if(form) form.reset();
+08078:   const errEl = document.getElementById('login-err');
+08079:   if(errEl) errEl.textContent = '';
+08080:   const userField = document.getElementById('login-username');
+08081:   if(userField) setTimeout(()=> userField.focus(), 50);
+08082: 
+08083:   // Hapus state runtime akun lama lalu reload. Cache data/draft/offline
+08084:   // tidak dihapus: semuanya sudah dipindahkan ke namespace akun yang logout,
+08085:   // sehingga akun berikutnya tidak mewarisi cache tersebut.
+08086:   try{ READY_READS.clear(); ACTIVE_READS.clear(); READ_GENERATION++; }catch(e){}
+08087:   setTimeout(()=> location.reload(), 60);
+08088: }
+08089: document.addEventListener('click', (e)=>{
+08090:   if(e.target.closest('#btn-logout')){
+08091:     if(confirm('Keluar dari aplikasi? Anda perlu login lagi untuk melanjutkan.')) logoutUser();
+08092:   }
+08093: });
+08094: 
+08095: /* ---------------- OFFLINE MODE: ANTREAN SINKRON OTOMATIS ----------------
+08096:    Aplikasi ini SUDAH menyimpan semua data ke localStorage dulu sebelum
+08097:    mengirim ke backend (lihat pola persistPmReport, saveGrReportsLocal, dkk),
+08098:    jadi tetap bisa dipakai penuh tanpa internet. Yang ditambahkan di sini:
+08099:    setiap kali apiPost gagal karena masalah jaringan, payload-nya diantre;
+08100:    begitu koneksi kembali (event 'online' / polling berkala), antrean ini
+08101:    otomatis dikirim ulang ke backend tanpa perlu aksi manual dari pengguna. */
+08102: const LS_SYNC_QUEUE_KEY = 'logbook_pending_sync_queue';
+08103: let APP_ONLINE_STATUS = navigator.onLine;
+08104: 
+08105: function loadSyncQueue_(){ try{ return JSON.parse(localStorage.getItem(LS_SYNC_QUEUE_KEY) || '[]'); }catch(e){ return []; } }
+08106: function saveSyncQueue_(q){ localStorage.setItem(LS_SYNC_QUEUE_KEY, JSON.stringify(q)); renderOfflineBanner(); }
+08107: function isSecurityConfigAction_(action){
+08108:   return ['savePermissions','saveLcPermissions','saveRoleAccessConfig','createUser','updateUser','resetPassword','setUserActive','deleteUser'].includes(String(action||''));
+08109: }
+~~~
+
+## const logoutUser =
+No match.
+
+## logoutUser = function
+No match.
+
+## handleApiAuthFailure_(
+### Around line 7832
+~~~text
+07820:   }
+07821: }
+07822: async function fetchWithTimeout_(url, options={}, timeoutMs=45000){
+07823:   // PATCHED v2.1 - timeout 45s default + pesan cold start
+07824:   const controller = new AbortController();
+07825:   const timer = setTimeout(()=>controller.abort(), timeoutMs);
+07826:   try{ return await fetch(url, {...options, signal:controller.signal}); }
+07827:   catch(err){
+07828:     if(err && err.name==='AbortError') throw new Error('Backend timeout setelah '+Math.round(timeoutMs/1000)+' detik. Periksa koneksi internet lalu coba kembali.');
+07829:     throw err;
+07830:   }finally{ clearTimeout(timer); }
+07831: }
+07832: function handleApiAuthFailure_(message, requestToken){
+07833:   const msg = String(message || '');
+07834:   if(!/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(msg)) return;
+07835:   if(SETTING_AUTH_OK && SETTING_SESSION_TOKEN && requestToken === SETTING_SESSION_TOKEN){
+07836:     resetSettingAuth();
+07837:     return;
+07838:   }
+07839:   logoutUser();
+07840: }
+07841: // Session-only read cache; isolated by backend, token and parameters.
+07842: const READY_READS = new Map();
+07843: const ACTIVE_READS = new Map();
+07844: let READ_GENERATION = 0;
+07845: function invalidatePreparedReads_(){
+07846:   READY_READS.clear(); READ_GENERATION++;
+07847:   if(typeof PMC_STATE !== 'undefined') PMC_STATE.loaded = false;
+07848:   if(typeof MTG_STATE !== 'undefined') MTG_STATE.loaded = false;
+07849: }
+07850: async function apiGet(action, params={}, retries=2){
+07851:   const token = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07852:   const key = JSON.stringify([WEB_APP_URL, token, action, Object.keys(params).sort().map(k=>[k,params[k]])]);
+07853:   const fresh = params.fresh || params._ts;
+07854:   const cached = READY_READS.get(key);
+07855:   if(!fresh && cached && Date.now()-cached.time < 60000) return structuredReadCopy_(cached.data);
+07856:   const activeKey = key + ':' + READ_GENERATION;
+07857:   if(ACTIVE_READS.has(activeKey)) return structuredReadCopy_(await ACTIVE_READS.get(activeKey));
+07858:   const generation = READ_GENERATION;
+07859:   const promise = apiGetNetwork_(action, params, retries).then(data=>{
+07860:     if(generation === READ_GENERATION) READY_READS.set(key,{data:structuredReadCopy_(data),time:Date.now()});
+07861:     return data;
+07862:   });
+07863:   ACTIVE_READS.set(activeKey,promise);
+07864:   try{ return structuredReadCopy_(await promise); }finally{ ACTIVE_READS.delete(activeKey); }
+07865: }
+07866: function structuredReadCopy_(data){ return data === undefined ? data : JSON.parse(JSON.stringify(data)); }
+07867: 
+07868: async function apiGetNetwork_(action, params={}, retries=2){
+07869:   // PATCHED v2.1 - 45s + retry 2x dengan backoff, prioritas bootstrap
+07870:   if(!WEB_APP_URL){ throw new Error('NO_URL'); }
+07871:   if(!SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07872:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07873:   const qs = new URLSearchParams({action, ...params}).toString();
+07874:   let lastErr=null;
+07875:   for(let attempt=0; attempt<=retries; attempt++){
+07876:     try{
+07877:       const res = await fetchWithTimeout_(WEB_APP_URL + '?' + qs, {headers:{Authorization:'Bearer '+requestToken}}, 45000);
+07878:       const json = await parseApiResponse_(res);
+07879:       if(!json.ok){
+07880:         handleApiAuthFailure_(json.error || '', requestToken);
+07881:         throw new Error(json.error || 'Gagal mengambil data');
+07882:       }
+07883:       return json.data;
+07884:     }catch(e){
+07885:       lastErr=e;
+07886:       if(/FORBIDDEN|PERMISSION|UNKNOWN_ACTION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(e.message||'')) throw e;
+07887:       if(attempt<retries){
+07888:         await new Promise(r=>setTimeout(r, 1200*(attempt+1)));
+07889:       }
+07890:     }
+07891:   }
+07892:   throw lastErr;
+07893: }
+07894: async function apiPost(payload){
+07895:   // Tetap antrekan operasi tulis ketika URL belum tersedia. Sebelumnya
+07896:   // fungsi berhenti sebelum masuk blok try/catch sehingga data yang dibuat
+~~~
+
+### Around line 7880
+~~~text
+07868: async function apiGetNetwork_(action, params={}, retries=2){
+07869:   // PATCHED v2.1 - 45s + retry 2x dengan backoff, prioritas bootstrap
+07870:   if(!WEB_APP_URL){ throw new Error('NO_URL'); }
+07871:   if(!SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07872:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07873:   const qs = new URLSearchParams({action, ...params}).toString();
+07874:   let lastErr=null;
+07875:   for(let attempt=0; attempt<=retries; attempt++){
+07876:     try{
+07877:       const res = await fetchWithTimeout_(WEB_APP_URL + '?' + qs, {headers:{Authorization:'Bearer '+requestToken}}, 45000);
+07878:       const json = await parseApiResponse_(res);
+07879:       if(!json.ok){
+07880:         handleApiAuthFailure_(json.error || '', requestToken);
+07881:         throw new Error(json.error || 'Gagal mengambil data');
+07882:       }
+07883:       return json.data;
+07884:     }catch(e){
+07885:       lastErr=e;
+07886:       if(/FORBIDDEN|PERMISSION|UNKNOWN_ACTION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(e.message||'')) throw e;
+07887:       if(attempt<retries){
+07888:         await new Promise(r=>setTimeout(r, 1200*(attempt+1)));
+07889:       }
+07890:     }
+07891:   }
+07892:   throw lastErr;
+07893: }
+07894: async function apiPost(payload){
+07895:   // Tetap antrekan operasi tulis ketika URL belum tersedia. Sebelumnya
+07896:   // fungsi berhenti sebelum masuk blok try/catch sehingga data yang dibuat
+07897:   // saat koneksi belum dikonfigurasi tidak pernah ikut sinkron otomatis.
+07898:   if(!WEB_APP_URL){
+07899:     if(payload.action !== 'login') queueForSync_(payload);
+07900:     throw new Error('NO_URL');
+07901:   }
+07902:   if(payload.action !== 'login' && !SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07903:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07904:   const securedPayload = payload.action === 'login' ? payload : {...payload, sessionToken:requestToken};
+07905:   try{
+07906:     // text/plain menghindari CORS preflight ke Cloudflare
+07907:     const requestBodyText = JSON.stringify(securedPayload);
+07908:     // Cloudflare endpoint membatasi request 50 MB. Base64 lebih besar ±33%
+07909:     // dari file asli, jadi hentikan lebih awal dengan pesan yang jelas alih-alih
+07910:     // membiarkan upload putus dan record tersisa hanya filename.
+07911:     if(new Blob([requestBodyText]).size > 45 * 1024 * 1024){
+07912:       throw new Error('Total lampiran terlalu besar untuk satu kali simpan. Kurangi jumlah/ukuran file lalu coba lagi.');
+07913:     }
+07914:     const res = await fetchWithTimeout_(WEB_APP_URL, {
+07915:       method: 'POST',
+07916:       mode: 'cors',
+07917:       credentials: 'same-origin',
+07918:       redirect: 'follow',
+07919:       cache: 'no-store',
+07920:       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+07921:       body: requestBodyText
+07922:     }, 60000); // PATCHED: 60s untuk POST (upload file bisa lama)
+07923:     const json = await parseApiResponse_(res);
+07924:     if(!json.ok){
+07925:       handleApiAuthFailure_(json.error || '', requestToken);
+07926:       throw new Error(json.error || 'Gagal menyimpan data');
+07927:     }
+07928:     invalidatePreparedReads_();
+07929:     setAppOnlineStatus(true);
+07930:     return json;
+07931:   }catch(err){
+07932:     // Kegagalan level jaringan (offline/tidak terjangkau) -> antre untuk
+07933:     // disinkron otomatis nanti begitu internet kembali. Kegagalan dari
+07934:     // server (json.ok === false, misal validasi) TIDAK diantre karena
+07935:     // request sudah benar-benar sampai & ditolak, bukan soal koneksi.
+07936:     const isNetworkErr = err instanceof TypeError ||
+07937:       /Failed to fetch|NetworkError|Load failed|Backend timeout|AbortError|aborted/i.test(err.message || '');
+07938:     if(isNetworkErr){
+07939:       queueForSync_(securedPayload);
+07940:       setAppOnlineStatus(false);
+07941:     }
+07942:     throw err;
+07943:   }
+07944: }
+~~~
+
+### Around line 7925
+~~~text
+07913:     }
+07914:     const res = await fetchWithTimeout_(WEB_APP_URL, {
+07915:       method: 'POST',
+07916:       mode: 'cors',
+07917:       credentials: 'same-origin',
+07918:       redirect: 'follow',
+07919:       cache: 'no-store',
+07920:       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+07921:       body: requestBodyText
+07922:     }, 60000); // PATCHED: 60s untuk POST (upload file bisa lama)
+07923:     const json = await parseApiResponse_(res);
+07924:     if(!json.ok){
+07925:       handleApiAuthFailure_(json.error || '', requestToken);
+07926:       throw new Error(json.error || 'Gagal menyimpan data');
+07927:     }
+07928:     invalidatePreparedReads_();
+07929:     setAppOnlineStatus(true);
+07930:     return json;
+07931:   }catch(err){
+07932:     // Kegagalan level jaringan (offline/tidak terjangkau) -> antre untuk
+07933:     // disinkron otomatis nanti begitu internet kembali. Kegagalan dari
+07934:     // server (json.ok === false, misal validasi) TIDAK diantre karena
+07935:     // request sudah benar-benar sampai & ditolak, bukan soal koneksi.
+07936:     const isNetworkErr = err instanceof TypeError ||
+07937:       /Failed to fetch|NetworkError|Load failed|Backend timeout|AbortError|aborted/i.test(err.message || '');
+07938:     if(isNetworkErr){
+07939:       queueForSync_(securedPayload);
+07940:       setAppOnlineStatus(false);
+07941:     }
+07942:     throw err;
+07943:   }
+07944: }
+07945: 
+07946: /* ---------------- RBAC: PULIHKAN SESI SAAT REFRESH HALAMAN ----------------
+07947:    CURRENT_USER (username/role) di-cache di localStorage supaya refresh
+07948:    halaman ATAU membuka lagi file/tab-nya di browser yang sama tidak
+07949:    memaksa login ulang. Permission & feature registry TETAP diambil ulang
+07950:    dari code.gs (single source of truth) tiap kali, bukan dari cache,
+07951:    supaya perubahan Role Access Management langsung berlaku begitu halaman
+07952:    dibuka lagi. */
+07953: (async function restoreRbacSession_(){
+07954:   if(!CURRENT_USER) return;
+07955:   const gate = document.getElementById('login-gate');
+07956:   const appRoot = document.getElementById('app-root');
+07957:   // Unlock LANGSUNG memakai sesi & permission yang sudah di-cache di
+07958:   // localStorage (dari login sebelumnya), TANPA menunggu server dulu.
+07959:   // Ini mencegah refresh/buka-ulang balik ke halaman login hanya gara-gara
+07960:   // koneksi ke server sedang lambat/gagal saat halaman baru dimuat —
+07961:   // sesuatu yang sebelumnya bisa terjadi kalau pemulihan sesi mensyaratkan
+07962:   // fetch features/permissions berhasil lebih dulu.
+07963:   applyRbacToUi();
+07964:   if(gate) gate.style.display = 'none';
+07965:   document.getElementById('app-splash')?.classList.add('show','visible');
+07966:   // [FIX] switchToView('dashboard') dipanggil lewat setTimeout(...,0), BUKAN
+07967:   // langsung sinkron di sini. Alasan: IIFE ini jalan di TENGAH proses parsing
+07968:   // script (jauh sebelum baris const LS_MBD_KEY/LS_CR_KEY/LS_ENG_KEY di bawah
+07969:   // dieksekusi). switchToView() memanggil ensureClearLocalCacheButton() ->
+07970:   // getViewLocalStorageKeys() yang mereferensikan const-const tsb -- karena
+07971:   // masih dalam temporal dead zone, ini melempar
+07972:   // "ReferenceError: Cannot access 'LS_MBD_KEY' before initialization"
+07973:   // setiap kali ada sesi RBAC yang di-cache (mis. user buka ulang browser
+07974:   // setelah pernah login). Menunda 1 tick memastikan seluruh script (semua
+07975:   // deklarasi const) sudah selesai dieksekusi dulu sebelum switchToView jalan.
+07976:   if(typeof switchToView === 'function'){ setTimeout(()=> switchToView('dashboard'), 0); }
+07977:   // [FIX] Sebelumnya "Promise.resolve(INITIAL_LOAD_PROMISE).then(...)" dipanggil
+07978:   // LANGSUNG di sini secara sinkron. INITIAL_LOAD_PROMISE dibaca PADA SAAT ITU
+07979:   // JUGA, padahal nilainya masih default (Promise.resolve() dari deklarasi
+07980:   // awal) -- promise loadAll() yang SESUNGGUHNYA baru di-assign belakangan oleh
+07981:   // IIFE init() (dekat baris 19000-an), yang berjalan SETELAH baris ini secara
+07982:   // sinkron. Akibatnya .then() di sini nempel ke promise BASI yang sudah
+07983:   // resolved duluan, sehingga callback-nya (render ulang Home) tereksekusi
+07984:   // hampir seketika -- SEBELUM data ENTRIES/MACHINES/KPI_KERJA/SPAREPART_ETA
+07985:   // yang sebenarnya selesai dimuat oleh loadAll() yang sungguhan. Untuk sesi
+07986:   // yang di-restore dari cache (bukan login baru), tidak ada render ulang lain
+07987:   // setelah loadAll() betul-betul selesai -- jadi Home/Smart Resume (termasuk
+07988:   // chip KPI/PO/Sparepart Terpakai) bisa nyangkut di kondisi data belum
+07989:   // lengkap. Menunda pembacaan INITIAL_LOAD_PROMISE lewat setTimeout(...,0)
+~~~
+
+## function resetSettingAuth(
+### Around line 6648
+~~~text
+06636:    memang ber-role Superadmin, menu ini langsung terbuka tanpa login
+06637:    ulang. Kalau bukan, sistem meminta login dengan akun Superadmin lain
+06638:    (step-up auth) khusus untuk membuka menu ini — status step-up ini
+06639:    HANYA berlaku selama pengguna tetap berada di menu Setting, begitu
+06640:    pindah menu otomatis di-reset (wajib login ulang tiap kembali). Ini
+06641:    terpisah total dari koneksi Cloudflare (WEB_APP_URL) & dari
+06642:    sesi login utama (CURRENT_USER), yang tidak ikut berubah/hilang. */
+06643: let SETTING_AUTH_OK = false; // in-memory saja (bukan sessionStorage) -> reset tiap pindah menu
+06644: let SETTING_SESSION_TOKEN = '';
+06645: function isSettingAuthed(){
+06646:   return SETTING_AUTH_OK === true || isSuperadmin();
+06647: }
+06648: function resetSettingAuth(){
+06649:   const tokenToRevoke = SETTING_SESSION_TOKEN;
+06650:   if(tokenToRevoke && WEB_APP_URL){
+06651:     fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:tokenToRevoke})}).catch(()=>{});
+06652:   }
+06653:   SETTING_AUTH_OK = false;
+06654:   SETTING_SESSION_TOKEN = '';
+06655: }
+06656: function showSettingLoginModal(onSuccess){
+06657:   $('#modal-content').innerHTML = `
+06658:     <div class="modal-head">
+06659:       <div><h2 style="font-family:var(--font-display);margin:0;"><i class="ph-bold ph-lock-key"></i> Akses Master Mesin &amp; Koneksi</h2></div>
+06660:       <button class="modal-close" id="btn-close-modal">✕</button>
+06661:     </div>
+06662:     <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">Menu ini berisi data master &amp; koneksi database SQLite, khusus akun ber-role <b>Superadmin</b>. Masukkan username &amp; password akun Superadmin Anda untuk melanjutkan. Akses ini hanya berlaku selama Anda berada di menu ini — begitu pindah menu, Anda perlu memverifikasi ulang untuk masuk ke sini.</div>
+06663:     <div class="field"><label>Username</label><input type="text" id="setting-login-username" autocomplete="username"></div>
+06664:     <div class="field"><label>Password</label><input type="password" id="setting-login-password" autocomplete="current-password"></div>
+06665:     <div id="setting-login-error" style="color:var(--red);font-size:12px;margin-top:4px;display:none;">Username/password salah, atau akun tersebut bukan Superadmin.</div>
+06666:     <div style="margin-top:16px;display:flex;gap:10px;">
+06667:       <button class="btn btn-sm btn-primary" id="btn-setting-login-submit"><i class="ph-bold ph-sign-in"></i> Masuk</button>
+06668:     </div>
+06669:   `;
+06670:   $('#modal-bg').classList.add('active');
+06671:   $('#btn-close-modal').addEventListener('click', closeModal);
+06672:   const submit = async ()=>{
+06673:     const u = $('#setting-login-username').value.trim();
+06674:     const p = $('#setting-login-password').value;
+06675:     const errEl = $('#setting-login-error');
+06676:     const submitBtn = $('#btn-setting-login-submit');
+06677:     errEl.style.display = 'none';
+06678:     if(!u || !p) return;
+06679:     if(!WEB_APP_URL){
+06680:       errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App).';
+06681:       errEl.style.display = 'block';
+06682:       return;
+06683:     }
+06684:     submitBtn.disabled = true;
+06685:     const originalLabel = submitBtn.innerHTML;
+06686:     submitBtn.innerHTML = '<i class="ph-bold ph-circle-notch ph-spin"></i> Memeriksa...';
+06687:     try{
+06688:       const res = await fetchWithTimeout_(WEB_APP_URL, {
+06689:         method: 'POST',
+06690:         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+06691:         body: JSON.stringify({ action: 'login', username: u, password: p })
+06692:       }, 30000);
+06693:       const json = await parseApiResponse_(res);
+06694:       if(!json.ok || !json.user){
+06695:         errEl.textContent = json.error || 'Username atau password salah.';
+06696:         errEl.style.display = 'block';
+06697:         return;
+06698:       }
+06699:       if(json.user.role !== 'Superadmin'){
+06700:         if(json.sessionToken){
+06701:           fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:json.sessionToken})}).catch(()=>{});
+06702:         }
+06703:         errEl.textContent = 'Akun ini valid, tetapi bukan Superadmin — akses ditolak.';
+06704:         errEl.style.display = 'block';
+06705:         return;
+06706:       }
+06707:       SETTING_AUTH_OK = true;
+06708:       SETTING_SESSION_TOKEN = json.sessionToken || '';
+06709:       closeModal();
+06710:       if(onSuccess) onSuccess();
+06711:     }catch(err){
+06712:       // Step-up auth Setting tidak boleh mengunci sesi aplikasi utama.
+~~~
+
+## function apiGet(
+### Around line 7850
+~~~text
+07838:   }
+07839:   logoutUser();
+07840: }
+07841: // Session-only read cache; isolated by backend, token and parameters.
+07842: const READY_READS = new Map();
+07843: const ACTIVE_READS = new Map();
+07844: let READ_GENERATION = 0;
+07845: function invalidatePreparedReads_(){
+07846:   READY_READS.clear(); READ_GENERATION++;
+07847:   if(typeof PMC_STATE !== 'undefined') PMC_STATE.loaded = false;
+07848:   if(typeof MTG_STATE !== 'undefined') MTG_STATE.loaded = false;
+07849: }
+07850: async function apiGet(action, params={}, retries=2){
+07851:   const token = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07852:   const key = JSON.stringify([WEB_APP_URL, token, action, Object.keys(params).sort().map(k=>[k,params[k]])]);
+07853:   const fresh = params.fresh || params._ts;
+07854:   const cached = READY_READS.get(key);
+07855:   if(!fresh && cached && Date.now()-cached.time < 60000) return structuredReadCopy_(cached.data);
+07856:   const activeKey = key + ':' + READ_GENERATION;
+07857:   if(ACTIVE_READS.has(activeKey)) return structuredReadCopy_(await ACTIVE_READS.get(activeKey));
+07858:   const generation = READ_GENERATION;
+07859:   const promise = apiGetNetwork_(action, params, retries).then(data=>{
+07860:     if(generation === READ_GENERATION) READY_READS.set(key,{data:structuredReadCopy_(data),time:Date.now()});
+07861:     return data;
+07862:   });
+07863:   ACTIVE_READS.set(activeKey,promise);
+07864:   try{ return structuredReadCopy_(await promise); }finally{ ACTIVE_READS.delete(activeKey); }
+07865: }
+07866: function structuredReadCopy_(data){ return data === undefined ? data : JSON.parse(JSON.stringify(data)); }
+07867: 
+07868: async function apiGetNetwork_(action, params={}, retries=2){
+07869:   // PATCHED v2.1 - 45s + retry 2x dengan backoff, prioritas bootstrap
+07870:   if(!WEB_APP_URL){ throw new Error('NO_URL'); }
+07871:   if(!SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07872:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07873:   const qs = new URLSearchParams({action, ...params}).toString();
+07874:   let lastErr=null;
+07875:   for(let attempt=0; attempt<=retries; attempt++){
+07876:     try{
+07877:       const res = await fetchWithTimeout_(WEB_APP_URL + '?' + qs, {headers:{Authorization:'Bearer '+requestToken}}, 45000);
+07878:       const json = await parseApiResponse_(res);
+07879:       if(!json.ok){
+07880:         handleApiAuthFailure_(json.error || '', requestToken);
+07881:         throw new Error(json.error || 'Gagal mengambil data');
+07882:       }
+07883:       return json.data;
+07884:     }catch(e){
+07885:       lastErr=e;
+07886:       if(/FORBIDDEN|PERMISSION|UNKNOWN_ACTION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(e.message||'')) throw e;
+07887:       if(attempt<retries){
+07888:         await new Promise(r=>setTimeout(r, 1200*(attempt+1)));
+07889:       }
+07890:     }
+07891:   }
+07892:   throw lastErr;
+07893: }
+07894: async function apiPost(payload){
+07895:   // Tetap antrekan operasi tulis ketika URL belum tersedia. Sebelumnya
+07896:   // fungsi berhenti sebelum masuk blok try/catch sehingga data yang dibuat
+07897:   // saat koneksi belum dikonfigurasi tidak pernah ikut sinkron otomatis.
+07898:   if(!WEB_APP_URL){
+07899:     if(payload.action !== 'login') queueForSync_(payload);
+07900:     throw new Error('NO_URL');
+07901:   }
+07902:   if(payload.action !== 'login' && !SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07903:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07904:   const securedPayload = payload.action === 'login' ? payload : {...payload, sessionToken:requestToken};
+07905:   try{
+07906:     // text/plain menghindari CORS preflight ke Cloudflare
+07907:     const requestBodyText = JSON.stringify(securedPayload);
+07908:     // Cloudflare endpoint membatasi request 50 MB. Base64 lebih besar ±33%
+07909:     // dari file asli, jadi hentikan lebih awal dengan pesan yang jelas alih-alih
+07910:     // membiarkan upload putus dan record tersisa hanya filename.
+07911:     if(new Blob([requestBodyText]).size > 45 * 1024 * 1024){
+07912:       throw new Error('Total lampiran terlalu besar untuk satu kali simpan. Kurangi jumlah/ukuran file lalu coba lagi.');
+07913:     }
+07914:     const res = await fetchWithTimeout_(WEB_APP_URL, {
+~~~
+
+## function apiPost(
+### Around line 7894
+~~~text
+07882:       }
+07883:       return json.data;
+07884:     }catch(e){
+07885:       lastErr=e;
+07886:       if(/FORBIDDEN|PERMISSION|UNKNOWN_ACTION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(e.message||'')) throw e;
+07887:       if(attempt<retries){
+07888:         await new Promise(r=>setTimeout(r, 1200*(attempt+1)));
+07889:       }
+07890:     }
+07891:   }
+07892:   throw lastErr;
+07893: }
+07894: async function apiPost(payload){
+07895:   // Tetap antrekan operasi tulis ketika URL belum tersedia. Sebelumnya
+07896:   // fungsi berhenti sebelum masuk blok try/catch sehingga data yang dibuat
+07897:   // saat koneksi belum dikonfigurasi tidak pernah ikut sinkron otomatis.
+07898:   if(!WEB_APP_URL){
+07899:     if(payload.action !== 'login') queueForSync_(payload);
+07900:     throw new Error('NO_URL');
+07901:   }
+07902:   if(payload.action !== 'login' && !SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07903:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07904:   const securedPayload = payload.action === 'login' ? payload : {...payload, sessionToken:requestToken};
+07905:   try{
+07906:     // text/plain menghindari CORS preflight ke Cloudflare
+07907:     const requestBodyText = JSON.stringify(securedPayload);
+07908:     // Cloudflare endpoint membatasi request 50 MB. Base64 lebih besar ±33%
+07909:     // dari file asli, jadi hentikan lebih awal dengan pesan yang jelas alih-alih
+07910:     // membiarkan upload putus dan record tersisa hanya filename.
+07911:     if(new Blob([requestBodyText]).size > 45 * 1024 * 1024){
+07912:       throw new Error('Total lampiran terlalu besar untuk satu kali simpan. Kurangi jumlah/ukuran file lalu coba lagi.');
+07913:     }
+07914:     const res = await fetchWithTimeout_(WEB_APP_URL, {
+07915:       method: 'POST',
+07916:       mode: 'cors',
+07917:       credentials: 'same-origin',
+07918:       redirect: 'follow',
+07919:       cache: 'no-store',
+07920:       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+07921:       body: requestBodyText
+07922:     }, 60000); // PATCHED: 60s untuk POST (upload file bisa lama)
+07923:     const json = await parseApiResponse_(res);
+07924:     if(!json.ok){
+07925:       handleApiAuthFailure_(json.error || '', requestToken);
+07926:       throw new Error(json.error || 'Gagal menyimpan data');
+07927:     }
+07928:     invalidatePreparedReads_();
+07929:     setAppOnlineStatus(true);
+07930:     return json;
+07931:   }catch(err){
+07932:     // Kegagalan level jaringan (offline/tidak terjangkau) -> antre untuk
+07933:     // disinkron otomatis nanti begitu internet kembali. Kegagalan dari
+07934:     // server (json.ok === false, misal validasi) TIDAK diantre karena
+07935:     // request sudah benar-benar sampai & ditolak, bukan soal koneksi.
+07936:     const isNetworkErr = err instanceof TypeError ||
+07937:       /Failed to fetch|NetworkError|Load failed|Backend timeout|AbortError|aborted/i.test(err.message || '');
+07938:     if(isNetworkErr){
+07939:       queueForSync_(securedPayload);
+07940:       setAppOnlineStatus(false);
+07941:     }
+07942:     throw err;
+07943:   }
+07944: }
+07945: 
+07946: /* ---------------- RBAC: PULIHKAN SESI SAAT REFRESH HALAMAN ----------------
+07947:    CURRENT_USER (username/role) di-cache di localStorage supaya refresh
+07948:    halaman ATAU membuka lagi file/tab-nya di browser yang sama tidak
+07949:    memaksa login ulang. Permission & feature registry TETAP diambil ulang
+07950:    dari code.gs (single source of truth) tiap kali, bukan dari cache,
+07951:    supaya perubahan Role Access Management langsung berlaku begitu halaman
+07952:    dibuka lagi. */
+07953: (async function restoreRbacSession_(){
+07954:   if(!CURRENT_USER) return;
+07955:   const gate = document.getElementById('login-gate');
+07956:   const appRoot = document.getElementById('app-root');
+07957:   // Unlock LANGSUNG memakai sesi & permission yang sudah di-cache di
+07958:   // localStorage (dari login sebelumnya), TANPA menunggu server dulu.
+~~~
+
+## location.href
+### Around line 26
+~~~text
+00014: <meta name="mobile-web-app-capable" content="yes">
+00015: <meta name="apple-mobile-web-app-capable" content="yes">
+00016: <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+00017: <meta name="apple-mobile-web-app-title" content="OMODOS">
+00018: <meta name="theme-color" content="#111318">
+00019: <link rel="manifest" id="pwa-manifest-link" href="">
+00020: <script src="/work-areas.js"></script>
+00021: <script>
+00022:   // Manifest dibuat dinamis (bukan file statis) supaya start_url-nya selalu
+00023:   // mengikuti URL deployment /exec yang sedang dipakai (Cloudflare tidak
+00024:   // bisa menyajikan file manifest.json terpisah di path tetap).
+00025:   (function(){
+00026:     var startUrl = window.location.href.split('?')[0].split('#')[0];
+00027:     var manifest = {
+00028:       name: 'OMODOS - Maintenance Operating System',
+00029:       short_name: 'OMODOS',
+00030:       start_url: startUrl,
+00031:       scope: startUrl,
+00032:       display: 'fullscreen',
+00033:       orientation: 'any',
+00034:       background_color: '#111318',
+00035:       theme_color: '#111318',
+00036:       icons: []
+00037:     };
+00038:     var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+00039:     document.getElementById('pwa-manifest-link').setAttribute('href', URL.createObjectURL(blob));
+00040:   })();
+00041: </script>
+00042: <title>OMODOS - Smart Maintenance Reporting Platform | Packaging Offset || © 2026 IDJ</title>
+00043: <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23111111' stroke-width='16'/%3E%3Cpath d='M50 88 A38 38 0 0 1 21.7 74.8' fill='none' stroke='%2300AEEF' stroke-width='16'/%3E%3Cpath d='M21.7 74.8 A38 38 0 0 1 50 88' fill='none' stroke='%23EC008C' stroke-width='16'/%3E%3Cpath d='M50 88 A38 38 0 0 0 78.3 74.8' fill='none' stroke='%23FFC20E' stroke-width='16'/%3E%3C/svg%3E">
+00044: <script>(function(){ try{ var t = localStorage.getItem('app_theme') || 'omodos'; document.documentElement.setAttribute('data-theme', t); }catch(e){} try{ var s = localStorage.getItem('app_style') || 'klasik'; if(s !== 'klasik'){ document.documentElement.setAttribute('data-style', s); } }catch(e){} })();
+00045: document.addEventListener('click', async (e)=>{
+00046:   if(e.target.closest('#btn-pi-hs-add-row')){
+00047:     renderPiHardSkillEditItems([...PI_HS_EDIT_ITEMS, piBlankHardSkillItem()]);
+00048:   }
+00049:   if(e.target.closest('.pi-hs-row-remove')){
+00050:     const row = e.target.closest('.pi-hs-unit-row');
+00051:     const idx = Number(row.dataset.idx);
+00052:     const next = PI_HS_EDIT_ITEMS.slice();
+00053:     next.splice(idx,1);
+00054:     renderPiHardSkillEditItems(next);
+00055:   }
+00056:   if(e.target.closest('#btn-pi-hs-save-manual')){
+00057:     const resume = piComputeHardSkillResume(PI_HS_EDIT_ITEMS);
+00058:     const selectedNama = $('#pi-hs-employee').value;
+00059:     // Guard: nama HARUS berasal dari daftar karyawan master (dropdown), tidak
+00060:     // boleh string kosong/lain-lain yang bisa membuat "karyawan hantu" baru
+00061:     // ikut tersimpan ke database SQLite & muncul lagi di dropdown berikutnya.
+00062:     const validNames = piEmployeeList();
+00063:     if(!selectedNama || !validNames.includes(selectedNama)){
+00064:       toast('Nama karyawan tidak valid atau daftar karyawan belum termuat. Silakan tunggu data selesai dimuat lalu pilih ulang nama karyawan.', true);
+00065:       return;
+00066:     }
+00067:     const payload = {
+00068:       nama: selectedNama,
+00069:       posisi: $('#pi-hs-position').value.trim(),
+00070:       tahun: Number($('#pi-hs-year').value)||new Date().getFullYear(),
+00071:       assessor: $('#pi-hs-assessor').value.trim(),
+00072:       items: PI_HS_EDIT_ITEMS,
+00073:       kompeten: resume.kompeten,
+00074:       belumKompeten: resume.belumKompeten,
+00075:       // Penjelasan Belum Kompeten SELALU dihitung otomatis dari penjelasan
+00076:       // per unit kompetensi (satu penjelasan terikat ke satu unit) — tidak
+00077:       // ada lagi input manual terpisah di level resume agar tidak double input.
+00078:       penjelasanBelumKompeten: resume.penjelasanBelumKompeten,
+00079:       selfLearning: $('#pi-hs-resume-selflearning').value.trim(),
+00080:       mentoring: $('#pi-hs-resume-mentoring').value.trim(),
+00081:       coaching: $('#pi-hs-resume-coaching').value.trim()
+00082:     };
+00083:     if(!payload.nama || !payload.posisi || !payload.items.length){ toast('Lengkapi nama, posisi, dan minimal satu unit kompetensi hard skill.', true); return; }
+00084:     if(payload.items.some(it=>!it.unitKompetensi || !it.statusManager)){ toast('Lengkapi Unit Kompetensi dan status penilaian (Kompeten/Belum Kompeten) dari direct manager untuk setiap baris.', true); return; }
+00085:     if(payload.items.some(it=>it.statusManager==='Belum Kompeten' && !String(it.penjelasanBelumKompeten||'').trim())){ toast('Isi Penjelasan untuk setiap unit kompetensi berstatus Belum Kompeten.', true); return; }
+00086:     try{
+00087:       await apiPost({action:'savePiHardskill', assessment:payload});
+00088:       // Sinkronkan ulang dari backend lalu langsung dorong hasilnya ke Personnel
+00089:       // (card personil) dan PI Dashboard supaya kedua menu itu langsung
+00090:       // menampilkan hasil assessment terbaru tanpa perlu reload halaman.
+~~~
+
+## session expired
+No match.
+
+## SESSION_INVALID
+### Around line 7300
+~~~text
+07288:     toast('Perubahan Role Access berhasil disimpan dan dibaca ulang dari database SQLite.');
+07289:     applyRbacToUi();
+07290:     return true;
+07291:   }catch(err){
+07292:     const raw = (err && err.message) ? err.message : String(err || 'Gagal menyimpan perubahan akses.');
+07293:     let hint = '';
+07294:     if(/UNKNOWN_ACTION|Action tidak terdaftar|METHOD_NOT_ALLOWED/i.test(raw)){
+07295:       hint = ' Backend /exec yang aktif belum memakai Code.gs terbaru. Deploy > Manage deployments > Edit > pilih New version, lalu Deploy.';
+07296:     }else if(/Backend mengirim halaman HTML|Unexpected token.*</i.test(raw)){
+07297:       hint = ' Deployment Web App kemungkinan meminta login Google. Untuk frontend GitHub Pages, deploy Cloudflare sebagai Web App yang dieksekusi sebagai pemilik/deployer dan dapat diakses Anyone.';
+07298:     }else if(/Failed to fetch|NetworkError|Load failed|CORS/i.test(raw)){
+07299:       hint = ' Browser tidak dapat mengakses Web App. Pastikan URL berakhiran /exec dan deployment mengizinkan akses dari browser publik.';
+07300:     }else if(/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/i.test(raw)){
+07301:       hint = ' Sesi autentikasi sudah tidak valid; login ulang diperlukan.';
+07302:     }else if(/FORBIDDEN|rbac\.manage/i.test(raw)){
+07303:       hint = ' Request harus memakai sesi Superadmin.';
+07304:     }
+07305:     statusEl.textContent = 'Gagal pada tahap: ' + stage + '.';
+07306:     toast('Gagal ' + stage + ': ' + raw + hint, true);
+07307:     console.error('[RBAC SAVE FAILED]', {stage, error:err, backend:WEB_APP_URL});
+07308:     return false;
+07309:   }finally{
+07310:     if(saveBtn) saveBtn.disabled = false;
+07311:   }
+07312: }
+07313: // Penanda agar patch Tampilan Sederhana lama di bagian bawah file TIDAK membungkus
+07314: // fungsi ini lagi. Fungsi di atas sudah menyimpan RBAC + LC secara atomik.
+07315: handleSavePermissions_.__lcAtomic = true;
+07316: 
+07317: let SPAREPART_STATUS = {}; // {entryId: 'DONE' | 'PENDING'} — status validasi collect admin gudang
+07318: 
+07319: const $ = (sel, root=document) => root.querySelector(sel);
+07320: const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+07321: 
+07322: /* ---------------- PAGINATION STANDAR GLOBAL ----------------
+07323:    Dipakai oleh halaman/list/table yang dapat berisi banyak data.
+07324:    Pilihan: 10 / 25 / 50 / 100 / Semua.
+07325:    Tidak mengubah data sumber; hanya mengatur item yang tampil di browser. */
+07326: const UNIVERSAL_PAGE_SIZE_OPTIONS = [10,25,50,100,0];
+07327: const UNIVERSAL_PAGINATION_TARGETS = [
+07328:   'list-utama','list-mesin','list-tanggal','list-pelapor','list-group','list-durasi',
+07329:   'database-grid','list-patrol-temuan','list-patrol-riwayat','kb-list','kb-suggest-list',
+07330:   'list-rca-saved','list-project-report','list-sparepart-eta','list-sparepart-opname',
+07331:   'list-sparepart-warehouse','sparepart-lokasi-table','mbd-tbody','ryt-tbody','rhc-tbody',
+07332:   'ect-tbody','cr-tbody','eng-tbody','machine-list-table','personil-list-table','pct-list-table',
+07333:   'rbac-user-table','pmc-list-wrap','mtg-list-wrap','ipal-saved-list','list-expert-finder',
+07334:   'pi-personnel-grid','pi-sr-grid','pi-ss-history','pi-hs-history','pi-dash-gap-table','kd-grid',
+07335:   'an-machine-grid','kpi-kerja-table','corr-pairs-table','pareto-table','imp-preview-table','sp-opname-checklist'
+07336: ];
+07337: const UNIVERSAL_PAGINATION_STATE = new Map();
+07338: 
+07339: (function injectUniversalPaginationStyle(){
+07340:   if(document.getElementById('universal-pagination-style')) return;
+07341:   const style=document.createElement('style');
+07342:   style.id='universal-pagination-style';
+07343:   style.textContent=`
+07344:     .universal-pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px 0 18px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+07345:     .universal-pager .up-left,.universal-pager .up-right{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+07346:     .universal-pager label,.universal-pager .up-info{font-size:11.5px;color:var(--text-dim);font-weight:600}
+07347:     .universal-pager select{min-width:86px;height:34px}
+07348:     .universal-pager button{min-width:34px;height:34px;padding:0 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--text);font:700 11px/1 var(--font-body);cursor:pointer}
+07349:     .universal-pager button:hover:not(:disabled){border-color:var(--red);color:var(--red)}
+07350:     .universal-pager button.active{background:var(--red);border-color:var(--red);color:var(--on-accent)}
+07351:     .universal-pager button:disabled{opacity:.4;cursor:not-allowed}
+07352:     @media(max-width:640px){.universal-pager{align-items:stretch}.universal-pager .up-left,.universal-pager .up-right{width:100%}.universal-pager .up-right{justify-content:center}.universal-pager .up-info{width:100%}}
+07353:   `;
+07354:   document.head.appendChild(style);
+07355: })();
+07356: function universalPaginationItems_(container,id){
+07357:   if(!container) return [];
+07358:   if(id==='list-tanggal' || id==='list-durasi') return Array.from(container.querySelectorAll('.entry'));
+07359:   if(container.tagName==='TBODY') return Array.from(container.children).filter(x=>x.tagName==='TR');
+07360:   if(container.tagName==='TABLE'){
+07361:     const tb=container.tBodies && container.tBodies[0];
+07362:     return tb ? Array.from(tb.rows) : [];
+07363:   }
+07364:   const table=container.querySelector(':scope > table');
+~~~
+
+### Around line 7834
+~~~text
+07822: async function fetchWithTimeout_(url, options={}, timeoutMs=45000){
+07823:   // PATCHED v2.1 - timeout 45s default + pesan cold start
+07824:   const controller = new AbortController();
+07825:   const timer = setTimeout(()=>controller.abort(), timeoutMs);
+07826:   try{ return await fetch(url, {...options, signal:controller.signal}); }
+07827:   catch(err){
+07828:     if(err && err.name==='AbortError') throw new Error('Backend timeout setelah '+Math.round(timeoutMs/1000)+' detik. Periksa koneksi internet lalu coba kembali.');
+07829:     throw err;
+07830:   }finally{ clearTimeout(timer); }
+07831: }
+07832: function handleApiAuthFailure_(message, requestToken){
+07833:   const msg = String(message || '');
+07834:   if(!/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(msg)) return;
+07835:   if(SETTING_AUTH_OK && SETTING_SESSION_TOKEN && requestToken === SETTING_SESSION_TOKEN){
+07836:     resetSettingAuth();
+07837:     return;
+07838:   }
+07839:   logoutUser();
+07840: }
+07841: // Session-only read cache; isolated by backend, token and parameters.
+07842: const READY_READS = new Map();
+07843: const ACTIVE_READS = new Map();
+07844: let READ_GENERATION = 0;
+07845: function invalidatePreparedReads_(){
+07846:   READY_READS.clear(); READ_GENERATION++;
+07847:   if(typeof PMC_STATE !== 'undefined') PMC_STATE.loaded = false;
+07848:   if(typeof MTG_STATE !== 'undefined') MTG_STATE.loaded = false;
+07849: }
+07850: async function apiGet(action, params={}, retries=2){
+07851:   const token = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07852:   const key = JSON.stringify([WEB_APP_URL, token, action, Object.keys(params).sort().map(k=>[k,params[k]])]);
+07853:   const fresh = params.fresh || params._ts;
+07854:   const cached = READY_READS.get(key);
+07855:   if(!fresh && cached && Date.now()-cached.time < 60000) return structuredReadCopy_(cached.data);
+07856:   const activeKey = key + ':' + READ_GENERATION;
+07857:   if(ACTIVE_READS.has(activeKey)) return structuredReadCopy_(await ACTIVE_READS.get(activeKey));
+07858:   const generation = READ_GENERATION;
+07859:   const promise = apiGetNetwork_(action, params, retries).then(data=>{
+07860:     if(generation === READ_GENERATION) READY_READS.set(key,{data:structuredReadCopy_(data),time:Date.now()});
+07861:     return data;
+07862:   });
+07863:   ACTIVE_READS.set(activeKey,promise);
+07864:   try{ return structuredReadCopy_(await promise); }finally{ ACTIVE_READS.delete(activeKey); }
+07865: }
+07866: function structuredReadCopy_(data){ return data === undefined ? data : JSON.parse(JSON.stringify(data)); }
+07867: 
+07868: async function apiGetNetwork_(action, params={}, retries=2){
+07869:   // PATCHED v2.1 - 45s + retry 2x dengan backoff, prioritas bootstrap
+07870:   if(!WEB_APP_URL){ throw new Error('NO_URL'); }
+07871:   if(!SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07872:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07873:   const qs = new URLSearchParams({action, ...params}).toString();
+07874:   let lastErr=null;
+07875:   for(let attempt=0; attempt<=retries; attempt++){
+07876:     try{
+07877:       const res = await fetchWithTimeout_(WEB_APP_URL + '?' + qs, {headers:{Authorization:'Bearer '+requestToken}}, 45000);
+07878:       const json = await parseApiResponse_(res);
+07879:       if(!json.ok){
+07880:         handleApiAuthFailure_(json.error || '', requestToken);
+07881:         throw new Error(json.error || 'Gagal mengambil data');
+07882:       }
+07883:       return json.data;
+07884:     }catch(e){
+07885:       lastErr=e;
+07886:       if(/FORBIDDEN|PERMISSION|UNKNOWN_ACTION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(e.message||'')) throw e;
+07887:       if(attempt<retries){
+07888:         await new Promise(r=>setTimeout(r, 1200*(attempt+1)));
+07889:       }
+07890:     }
+07891:   }
+07892:   throw lastErr;
+07893: }
+07894: async function apiPost(payload){
+07895:   // Tetap antrekan operasi tulis ketika URL belum tersedia. Sebelumnya
+07896:   // fungsi berhenti sebelum masuk blok try/catch sehingga data yang dibuat
+07897:   // saat koneksi belum dikonfigurasi tidak pernah ikut sinkron otomatis.
+07898:   if(!WEB_APP_URL){
+~~~
+
+### Around line 7886
+~~~text
+07874:   let lastErr=null;
+07875:   for(let attempt=0; attempt<=retries; attempt++){
+07876:     try{
+07877:       const res = await fetchWithTimeout_(WEB_APP_URL + '?' + qs, {headers:{Authorization:'Bearer '+requestToken}}, 45000);
+07878:       const json = await parseApiResponse_(res);
+07879:       if(!json.ok){
+07880:         handleApiAuthFailure_(json.error || '', requestToken);
+07881:         throw new Error(json.error || 'Gagal mengambil data');
+07882:       }
+07883:       return json.data;
+07884:     }catch(e){
+07885:       lastErr=e;
+07886:       if(/FORBIDDEN|PERMISSION|UNKNOWN_ACTION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(e.message||'')) throw e;
+07887:       if(attempt<retries){
+07888:         await new Promise(r=>setTimeout(r, 1200*(attempt+1)));
+07889:       }
+07890:     }
+07891:   }
+07892:   throw lastErr;
+07893: }
+07894: async function apiPost(payload){
+07895:   // Tetap antrekan operasi tulis ketika URL belum tersedia. Sebelumnya
+07896:   // fungsi berhenti sebelum masuk blok try/catch sehingga data yang dibuat
+07897:   // saat koneksi belum dikonfigurasi tidak pernah ikut sinkron otomatis.
+07898:   if(!WEB_APP_URL){
+07899:     if(payload.action !== 'login') queueForSync_(payload);
+07900:     throw new Error('NO_URL');
+07901:   }
+07902:   if(payload.action !== 'login' && !SESSION_TOKEN){ throw new Error('AUTH_REQUIRED'); }
+07903:   const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+07904:   const securedPayload = payload.action === 'login' ? payload : {...payload, sessionToken:requestToken};
+07905:   try{
+07906:     // text/plain menghindari CORS preflight ke Cloudflare
+07907:     const requestBodyText = JSON.stringify(securedPayload);
+07908:     // Cloudflare endpoint membatasi request 50 MB. Base64 lebih besar ±33%
+07909:     // dari file asli, jadi hentikan lebih awal dengan pesan yang jelas alih-alih
+07910:     // membiarkan upload putus dan record tersisa hanya filename.
+07911:     if(new Blob([requestBodyText]).size > 45 * 1024 * 1024){
+07912:       throw new Error('Total lampiran terlalu besar untuk satu kali simpan. Kurangi jumlah/ukuran file lalu coba lagi.');
+07913:     }
+07914:     const res = await fetchWithTimeout_(WEB_APP_URL, {
+07915:       method: 'POST',
+07916:       mode: 'cors',
+07917:       credentials: 'same-origin',
+07918:       redirect: 'follow',
+07919:       cache: 'no-store',
+07920:       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+07921:       body: requestBodyText
+07922:     }, 60000); // PATCHED: 60s untuk POST (upload file bisa lama)
+07923:     const json = await parseApiResponse_(res);
+07924:     if(!json.ok){
+07925:       handleApiAuthFailure_(json.error || '', requestToken);
+07926:       throw new Error(json.error || 'Gagal menyimpan data');
+07927:     }
+07928:     invalidatePreparedReads_();
+07929:     setAppOnlineStatus(true);
+07930:     return json;
+07931:   }catch(err){
+07932:     // Kegagalan level jaringan (offline/tidak terjangkau) -> antre untuk
+07933:     // disinkron otomatis nanti begitu internet kembali. Kegagalan dari
+07934:     // server (json.ok === false, misal validasi) TIDAK diantre karena
+07935:     // request sudah benar-benar sampai & ditolak, bukan soal koneksi.
+07936:     const isNetworkErr = err instanceof TypeError ||
+07937:       /Failed to fetch|NetworkError|Load failed|Backend timeout|AbortError|aborted/i.test(err.message || '');
+07938:     if(isNetworkErr){
+07939:       queueForSync_(securedPayload);
+07940:       setAppOnlineStatus(false);
+07941:     }
+07942:     throw err;
+07943:   }
+07944: }
+07945: 
+07946: /* ---------------- RBAC: PULIHKAN SESI SAAT REFRESH HALAMAN ----------------
+07947:    CURRENT_USER (username/role) di-cache di localStorage supaya refresh
+07948:    halaman ATAU membuka lagi file/tab-nya di browser yang sama tidak
+07949:    memaksa login ulang. Permission & feature registry TETAP diambil ulang
+07950:    dari code.gs (single source of truth) tiap kali, bukan dari cache,
+~~~
+
+### Around line 8626
+~~~text
+08614:     while(pending.length){
+08615:       const action = pending.shift();
+08616:       try{
+08617:         data[action] = await apiGet(action, {}, 1);
+08618:       }catch(e){
+08619:         errors.push({action,message:String(e&&e.message||e)});
+08620:       }
+08621:       done++;
+08622:       progress();
+08623:     }
+08624:   }));
+08625: 
+08626:   if(token !== SESSION_TOKEN) throw new Error('SESSION_INVALID');
+08627: 
+08628:   // Jangan biarkan satu modul opsional (KPI/Meeting/Energy/Report/dll)
+08629:   // menggagalkan seluruh login. Yang wajib hanya bootstrap; pada backend
+08630:   // legacy, machines+personil menjadi minimum kompatibilitas.
+08631:   const criticalActions = hasBootstrap ? ['bootstrap'] : ['machines','personil'];
+08632:   const fatal = errors.filter(e=>criticalActions.includes(e.action));
+08633:   if(fatal.length){
+08634:     throw new Error('Data dasar aplikasi gagal dimuat. Coba masuk kembali. '+fatal.map(e=>e.action+': '+e.message).join('; '));
+08635:   }
+08636: 
+08637:   const bootstrap = (data.bootstrap && typeof data.bootstrap==='object') ? data.bootstrap : {};
+08638:   const entriesSource = Array.isArray(data.list)
+08639:     ? data.list
+08640:     : (Array.isArray(bootstrap.recentEntries) ? bootstrap.recentEntries : (Array.isArray(bootstrap.entries) ? bootstrap.entries : []));
+08641:   const machineSource = Array.isArray(data.machines)
+08642:     ? data.machines
+08643:     : (Array.isArray(bootstrap.machines) ? bootstrap.machines : []);
+08644:   const personSource = Array.isArray(data.personil)
+08645:     ? data.personil
+08646:     : (Array.isArray(bootstrap.personil) ? bootstrap.personil : []);
+08647:   const patrolTemplateSource = Array.isArray(data.patrolChecklistTemplate)
+08648:     ? data.patrolChecklistTemplate
+08649:     : (Array.isArray(bootstrap.patrolTemplate) ? bootstrap.patrolTemplate : []);
+08650: 
+08651:   for(const [name,value] of [['Logbook',entriesSource],['machines',machineSource],['personil',personSource],['patrol template',patrolTemplateSource]]){
+08652:     if(!Array.isArray(value)) throw new Error('Format data '+name+' tidak valid.');
+08653:   }
+08654: 
+08655:   // Simpan peringatan diagnostik tanpa memblokir user. Setiap view tetap
+08656:   // punya sync/lazy render sendiri, sehingga endpoint opsional dapat pulih
+08657:   // saat menu tersebut dibuka atau data dimuat ulang.
+08658:   const optionalErrors = errors.filter(e=>!criticalActions.includes(e.action));
+08659:   window.OMODOS_PREPARE_WARNINGS = optionalErrors.slice();
+08660:   if(optionalErrors.length){
+08661:     console.warn('[OMODOS] Persiapan parsial; modul opsional akan memakai fallback/lazy retry:', optionalErrors);
+08662:   }
+08663: 
+08664:   // Keep prefetched responses fresh throughout hydration, even on slow connections.
+08665:   READY_READS.forEach(value=>{value.time=Date.now();});
+08666:   ENTRIES = entriesSource.slice().sort((a,b)=>new Date(b['Timestamp Input'])-new Date(a['Timestamp Input']));
+08667:   MACHINES = machineSource.map(m=>({...m,'Kode Mesin':norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : '', 'Nama Mesin':norm_(m['Nama Mesin']) ? String(m['Nama Mesin']).trim() : (norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : 'Mesin tanpa nama')}));
+08668:   PERSONIL = personSource;
+08669:   PATROL_TEMPLATE = patrolTemplateSource;
+08670:   HOME_PATROL_STATUS = Array.isArray(bootstrap.homePatrolLatest) ? bootstrap.homePatrolLatest.slice() : [];
+08671: 
+08672:   const tasks = [['predictiveReports',syncPmReportsFromBackend],['generalReports',syncGrReportsFromBackend],['ipalReports',syncIpalReportsFromBackend],['rcaReports',syncRcaReportsFromBackend],['kbEntries',loadKbEntries],['sparepartLokasi',syncSparepartLokasiFromBackend],['sparepartStatus',syncSparepartStatusFromBackend],['sparepartEta',syncSparepartEtaFromBackend],['sparepartWarehouse',syncSparepartWarehouseFromBackend],['sparepartOpname',syncSparepartOpnameFromBackend],['kpiKerjaList',syncKpiKerjaFromBackend],['kpiDepartmentData',syncKpiDepartmentData],['machineBreakdownList',loadMachineBreakdownList],['recordYtdList',loadRecordYtdList],['runHourComparisonList',loadRunHourComparisonList],['energyCostToeList',loadEnergyCostToeList],['correctiveReportList',loadCorrectiveReportList],['energyUtilityList',loadEnergyUtilityList],['analitikConfig',syncAnalitikConfigFromBackend],['patrolCategoryConfig',syncPatrolCategoryConfigFromBackend],['patrolGeneralChecklist',syncPatrolGeneralChecklistFromBackend],['piHardSkillStandard',piSyncHardSkillFromBackend],['piSoftskillAssessments',piSyncSoftskillFromBackend],['piPersonnelMaster',syncPiPersonnelMasterFromBackend]];
+08673:   for(const [action,fn] of tasks){
+08674:     if(Object.prototype.hasOwnProperty.call(data,action)){
+08675:       try{ await fn(); }
+08676:       catch(err){
+08677:         window.OMODOS_PREPARE_WARNINGS.push({action,message:String(err&&err.message||err)});
+08678:         console.warn('[OMODOS] Hydration opsional gagal:',action,err);
+08679:       }
+08680:     }
+08681:   }
+08682:   if(data.pmcFactoryProjects && data.pmcKaizens && data.pmcSgas){
+08683:     try{ await pmcLoadAll(true); }catch(err){ window.OMODOS_PREPARE_WARNINGS.push({action:'project-center',message:String(err&&err.message||err)}); }
+08684:   }
+08685:   if(data.meetingList && data.meetingActionList){
+08686:     try{ await mtgLoadAll(true); }catch(err){ window.OMODOS_PREPARE_WARNINGS.push({action:'meeting',message:String(err&&err.message||err)}); }
+08687:   }
+08688: 
+08689:   populateMachineSelects();
+08690:   engPopulateAreaSelect();
+~~~
+
+### Around line 24061
+~~~text
+24049:   const serverIds = new Set(serverRows.map(r=>String(r&&r.id||'')).filter(Boolean));
+24050:   const missingLegacy = legacyLocal.filter(r=>r&&r.id&&r.nama&&!serverIds.has(String(r.id)));
+24051:   for(const assessment of missingLegacy){
+24052:     try{
+24053:       await apiPost({
+24054:         action:'savePiSoftskill',
+24055:         assessment,
+24056:         transactionId:'PI-SS-MIGRATE-'+String(assessment.id),
+24057:         actor:(CURRENT_USER&&CURRENT_USER.username)||''
+24058:       });
+24059:       serverIds.add(String(assessment.id));
+24060:     }catch(err){
+24061:       if(/FORBIDDEN|PERMISSION|AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED/.test(String(err&&err.message||err))) break;
+24062:       console.warn('[OMODOS] Soft Skill legacy migration tertunda:',assessment.id,err);
+24063:       break;
+24064:     }
+24065:   }
+24066:   return PI_SOFTSKILL_ASSESSMENTS;
+24067: }
+24068: async function savePiSoftskill(assessment){
+24069:   if(!assessment||!assessment.nama) throw new Error('Data Soft Skill Assessment tidak valid.');
+24070:   const id = assessment.id || ('ss_'+Date.now()+'_'+Math.random().toString(36).slice(2,8));
+24071:   const record = {...assessment,id};
+24072:   const current = piSoftskillMergeById_(PI_SOFTSKILL_ASSESSMENTS, loadPiSoftskillLocal_()).filter(r=>String(r&&r.id)!==String(id));
+24073:   current.push(record);
+24074:   PI_SOFTSKILL_ASSESSMENTS = current;
+24075:   savePiSoftskillLocal_(current);
+24076:   const transactionId = 'PI-SS-'+String(id);
+24077:   try{
+24078:     await apiPost({action:'savePiSoftskill',assessment:record,transactionId,actor:(CURRENT_USER&&CURRENT_USER.username)||''});
+24079:     await piSyncSoftskillFromBackend();
+24080:     return record;
+24081:   }catch(err){
+24082:     // apiPost otomatis memasukkan kegagalan jaringan ke offline sync queue.
+24083:     // Cache lokal dipertahankan agar assessment tidak hilang saat perangkat offline.
+24084:     if(/FORBIDDEN|PERMISSION|VALIDATION|UNKNOWN_ACTION/.test(String(err&&err.message||err))){
+24085:       PI_SOFTSKILL_ASSESSMENTS = current.filter(r=>String(r&&r.id)!==String(id));
+24086:       savePiSoftskillLocal_(PI_SOFTSKILL_ASSESSMENTS);
+24087:     }
+24088:     throw err;
+24089:   }
+24090: }
+24091: 
+24092: function piNormalizeName(name){
+24093:   return String(name||'')
+24094:     .toLowerCase()
+24095:     .replace(/\([^)]*\)/g, ' ')
+24096:     .replace(/[^a-z0-9]+/g, ' ')
+24097:     .replace(/\b(pt|mr|mrs|ms|bpk|ibu|saudara|sdr|teknisi|operator|staff|supervisor|leader|group|admin)\b/g, ' ')
+24098:     .replace(/\s+/g, ' ')
+24099:     .trim();
+24100: }
+24101: function piNamesMatch(a,b){
+24102:   const na = piNormalizeName(a);
+24103:   const nb = piNormalizeName(b);
+24104:   return !!na && !!nb && (na===nb || na.includes(nb) || nb.includes(na));
+24105: }
+24106: function piFindByName(list, nama, getter){
+24107:   return (list||[]).find(item=> piNamesMatch(getter(item), nama)) || null;
+24108: }
+24109: function piFilterByName(list, nama, getter){
+24110:   return (list||[]).filter(item=> piNamesMatch(getter(item), nama));
+24111: }
+24112: function piLatestByDate(list, getDate){
+24113:   return (list||[]).slice().sort((a,b)=> new Date(getDate(b)||0) - new Date(getDate(a)||0))[0] || null;
+24114: }
+24115: 
+24116: function piEmployeeList(){
+24117:   const names = new Map();
+24118:   // [EDIT] Sumber utama sekarang PI_PERSONNEL_MASTER (Master Personil khusus
+24119:   // People Intelligent) — bukan lagi PERSONIL (Master Personil umum di menu
+24120:   // Master Koneksi), supaya daftar personil di seluruh menu People
+24121:   // Intelligent murni linkage ke data yang memang di-scope untuk PI saja.
+24122:   // PERSONIL tetap dipertahankan sebagai fallback supaya nama yang cuma
+24123:   // pernah dinilai lewat Soft/Hard Skill Assessment (belum ada di master
+24124:   // manapun) tetap muncul.
+24125:   try{ (PI_PERSONNEL_MASTER||[]).forEach(p=>{ if(p && p['Nama']) names.set(piNormalizeName(p['Nama']), p['Nama']); }); }catch(e){}
+~~~
+
+## APP_SESSION
+No match.
+
+## SESSION_TOKEN = null
+No match.
+
+## SESSION_TOKEN = ''
+### Around line 6357
+~~~text
+06345:   }
+06346:   try{ localStorage.setItem(LS_ACCOUNT_CACHE_OWNER_KEY,ownerId); }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06347:   return true;
+06348: }
+06349: function deactivateAccountDataCaches_(username){
+06350:   let ownerId=accountCacheOwnerId_(username);
+06351:   try{ ownerId=ownerId||localStorage.getItem(LS_ACCOUNT_CACHE_OWNER_KEY)||''; }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06352:   if(ownerId && !stashAccountDataCachesById_(ownerId)) throw new Error('CACHE_ISOLATION_FAILED');
+06353:   try{ localStorage.removeItem(LS_ACCOUNT_CACHE_OWNER_KEY); }catch(e){ throw new Error('CACHE_ISOLATION_FAILED'); }
+06354:   return true;
+06355: }
+06356: let CURRENT_USER = null;        // { username, role, displayName }
+06357: let SESSION_TOKEN = '';
+06358: let SESSION_EXPIRES_AT = '';
+06359: let PERMISSIONS = {};           // { 'view.xxx': { Supervisor:bool, Technician:bool } }
+06360: let FEATURE_REGISTRY = [];      // [{ PermissionKey, Label, Group }]
+06361: try{
+06362:   const cached = localStorage.getItem(SS_USER_KEY);
+06363:   if(cached) CURRENT_USER = JSON.parse(cached);
+06364:   SESSION_TOKEN = localStorage.getItem(SS_TOKEN_KEY) || '';
+06365:   SESSION_EXPIRES_AT = localStorage.getItem(SS_TOKEN_EXP_KEY) || '';
+06366:   if(!SESSION_TOKEN || (SESSION_EXPIRES_AT && Date.parse(SESSION_EXPIRES_AT) <= Date.now())){
+06367:     CURRENT_USER = null;
+06368:     SESSION_TOKEN = '';
+06369:     SESSION_EXPIRES_AT = '';
+06370:   }
+06371:   const cachedPerm = localStorage.getItem(LS_PERM_KEY);
+06372:   if(cachedPerm) PERMISSIONS = JSON.parse(cachedPerm);
+06373:   const cachedFeat = localStorage.getItem(LS_FEATURES_KEY);
+06374:   if(cachedFeat) FEATURE_REGISTRY = JSON.parse(cachedFeat);
+06375: }catch(e){}
+06376: try{
+06377:   if(CURRENT_USER && SESSION_TOKEN) activateAccountDataCaches_(CURRENT_USER.username,{claimExisting:true});
+06378: }catch(e){
+06379:   CURRENT_USER = null;
+06380:   SESSION_TOKEN = '';
+06381:   SESSION_EXPIRES_AT = '';
+06382:   try{
+06383:     localStorage.removeItem(SS_USER_KEY);
+06384:     localStorage.removeItem(SS_TOKEN_KEY);
+06385:     localStorage.removeItem(SS_TOKEN_EXP_KEY);
+06386:   }catch(clearErr){}
+06387: }
+06388: function cacheRbacSession_(){
+06389:   try{
+06390:     localStorage.setItem(SS_USER_KEY, JSON.stringify(CURRENT_USER));
+06391:     localStorage.setItem(SS_TOKEN_KEY, SESSION_TOKEN || '');
+06392:     localStorage.setItem(SS_TOKEN_EXP_KEY, SESSION_EXPIRES_AT || '');
+06393:     localStorage.setItem(LS_PERM_KEY, JSON.stringify(PERMISSIONS));
+06394:     localStorage.setItem(LS_FEATURES_KEY, JSON.stringify(FEATURE_REGISTRY));
+06395:   }catch(e){}
+06396: }
+06397: 
+06398: function hasPermission(permissionKey){
+06399:   if(!CURRENT_USER) return false;
+06400:   if(CURRENT_USER.role === 'Superadmin') return true; // selalu full access, tidak dapat dibatasi
+06401:   const p = PERMISSIONS[permissionKey];
+06402:   return !!(p && p[CURRENT_USER.role]);
+06403: }
+06404: function isSuperadmin(){ return !!CURRENT_USER && CURRENT_USER.role === 'Superadmin'; }
+06405: 
+06406: // ---- Sumber kebenaran fitur/menu: SELALU discan langsung dari sidebar
+06407: // (dan grup collapsible-nya) yang sedang ada di DOM, bukan dari daftar
+06408: // yang diketik manual. Dipakai di setiap titik yang mengisi FEATURE_REGISTRY
+06409: // (login, restore sesi, buka Role Access Management) supaya menu apa pun —
+06410: // baru, lama, atau belum sempat didaftarkan di backend — tetap otomatis
+06411: // tergate oleh Role Access Management, tidak ada yang hardcoded/lolos.
+06412: function discoverFeatureRegistryFromDom(){
+06413:   const seen = new Set();
+06414:   const list = [];
+06415:   const labelOf = (btn)=>{
+06416:     const clone = btn.cloneNode(true);
+06417:     clone.querySelectorAll('.ico, .chev, .count, .ihc-desc').forEach(el=> el.remove());
+06418:     return clone.textContent.replace(/\s+/g,' ').trim();
+06419:   };
+06420:   document.querySelectorAll('.sidebar .nav-btn[data-view]').forEach(btn=>{
+06421:     const view = btn.dataset.view;
+~~~
+
+### Around line 6368
+~~~text
+06356: let CURRENT_USER = null;        // { username, role, displayName }
+06357: let SESSION_TOKEN = '';
+06358: let SESSION_EXPIRES_AT = '';
+06359: let PERMISSIONS = {};           // { 'view.xxx': { Supervisor:bool, Technician:bool } }
+06360: let FEATURE_REGISTRY = [];      // [{ PermissionKey, Label, Group }]
+06361: try{
+06362:   const cached = localStorage.getItem(SS_USER_KEY);
+06363:   if(cached) CURRENT_USER = JSON.parse(cached);
+06364:   SESSION_TOKEN = localStorage.getItem(SS_TOKEN_KEY) || '';
+06365:   SESSION_EXPIRES_AT = localStorage.getItem(SS_TOKEN_EXP_KEY) || '';
+06366:   if(!SESSION_TOKEN || (SESSION_EXPIRES_AT && Date.parse(SESSION_EXPIRES_AT) <= Date.now())){
+06367:     CURRENT_USER = null;
+06368:     SESSION_TOKEN = '';
+06369:     SESSION_EXPIRES_AT = '';
+06370:   }
+06371:   const cachedPerm = localStorage.getItem(LS_PERM_KEY);
+06372:   if(cachedPerm) PERMISSIONS = JSON.parse(cachedPerm);
+06373:   const cachedFeat = localStorage.getItem(LS_FEATURES_KEY);
+06374:   if(cachedFeat) FEATURE_REGISTRY = JSON.parse(cachedFeat);
+06375: }catch(e){}
+06376: try{
+06377:   if(CURRENT_USER && SESSION_TOKEN) activateAccountDataCaches_(CURRENT_USER.username,{claimExisting:true});
+06378: }catch(e){
+06379:   CURRENT_USER = null;
+06380:   SESSION_TOKEN = '';
+06381:   SESSION_EXPIRES_AT = '';
+06382:   try{
+06383:     localStorage.removeItem(SS_USER_KEY);
+06384:     localStorage.removeItem(SS_TOKEN_KEY);
+06385:     localStorage.removeItem(SS_TOKEN_EXP_KEY);
+06386:   }catch(clearErr){}
+06387: }
+06388: function cacheRbacSession_(){
+06389:   try{
+06390:     localStorage.setItem(SS_USER_KEY, JSON.stringify(CURRENT_USER));
+06391:     localStorage.setItem(SS_TOKEN_KEY, SESSION_TOKEN || '');
+06392:     localStorage.setItem(SS_TOKEN_EXP_KEY, SESSION_EXPIRES_AT || '');
+06393:     localStorage.setItem(LS_PERM_KEY, JSON.stringify(PERMISSIONS));
+06394:     localStorage.setItem(LS_FEATURES_KEY, JSON.stringify(FEATURE_REGISTRY));
+06395:   }catch(e){}
+06396: }
+06397: 
+06398: function hasPermission(permissionKey){
+06399:   if(!CURRENT_USER) return false;
+06400:   if(CURRENT_USER.role === 'Superadmin') return true; // selalu full access, tidak dapat dibatasi
+06401:   const p = PERMISSIONS[permissionKey];
+06402:   return !!(p && p[CURRENT_USER.role]);
+06403: }
+06404: function isSuperadmin(){ return !!CURRENT_USER && CURRENT_USER.role === 'Superadmin'; }
+06405: 
+06406: // ---- Sumber kebenaran fitur/menu: SELALU discan langsung dari sidebar
+06407: // (dan grup collapsible-nya) yang sedang ada di DOM, bukan dari daftar
+06408: // yang diketik manual. Dipakai di setiap titik yang mengisi FEATURE_REGISTRY
+06409: // (login, restore sesi, buka Role Access Management) supaya menu apa pun —
+06410: // baru, lama, atau belum sempat didaftarkan di backend — tetap otomatis
+06411: // tergate oleh Role Access Management, tidak ada yang hardcoded/lolos.
+06412: function discoverFeatureRegistryFromDom(){
+06413:   const seen = new Set();
+06414:   const list = [];
+06415:   const labelOf = (btn)=>{
+06416:     const clone = btn.cloneNode(true);
+06417:     clone.querySelectorAll('.ico, .chev, .count, .ihc-desc').forEach(el=> el.remove());
+06418:     return clone.textContent.replace(/\s+/g,' ').trim();
+06419:   };
+06420:   document.querySelectorAll('.sidebar .nav-btn[data-view]').forEach(btn=>{
+06421:     const view = btn.dataset.view;
+06422:     if(!view) return;
+06423:     const key = 'view.' + view;
+06424:     if(seen.has(key)) return;
+06425:     seen.add(key);
+06426:     const groupEl = btn.closest('.nav-group-collapsible');
+06427:     let group = 'Umum';
+06428:     if(groupEl){
+06429:       const parentBtn = groupEl.querySelector('.nav-parent-btn');
+06430:       if(parentBtn){ const g = labelOf(parentBtn); if(g) group = g; }
+06431:     }
+06432:     list.push({ PermissionKey:key, Label: labelOf(btn) || view, Group: group });
+~~~
+
+### Around line 6380
+~~~text
+06368:     SESSION_TOKEN = '';
+06369:     SESSION_EXPIRES_AT = '';
+06370:   }
+06371:   const cachedPerm = localStorage.getItem(LS_PERM_KEY);
+06372:   if(cachedPerm) PERMISSIONS = JSON.parse(cachedPerm);
+06373:   const cachedFeat = localStorage.getItem(LS_FEATURES_KEY);
+06374:   if(cachedFeat) FEATURE_REGISTRY = JSON.parse(cachedFeat);
+06375: }catch(e){}
+06376: try{
+06377:   if(CURRENT_USER && SESSION_TOKEN) activateAccountDataCaches_(CURRENT_USER.username,{claimExisting:true});
+06378: }catch(e){
+06379:   CURRENT_USER = null;
+06380:   SESSION_TOKEN = '';
+06381:   SESSION_EXPIRES_AT = '';
+06382:   try{
+06383:     localStorage.removeItem(SS_USER_KEY);
+06384:     localStorage.removeItem(SS_TOKEN_KEY);
+06385:     localStorage.removeItem(SS_TOKEN_EXP_KEY);
+06386:   }catch(clearErr){}
+06387: }
+06388: function cacheRbacSession_(){
+06389:   try{
+06390:     localStorage.setItem(SS_USER_KEY, JSON.stringify(CURRENT_USER));
+06391:     localStorage.setItem(SS_TOKEN_KEY, SESSION_TOKEN || '');
+06392:     localStorage.setItem(SS_TOKEN_EXP_KEY, SESSION_EXPIRES_AT || '');
+06393:     localStorage.setItem(LS_PERM_KEY, JSON.stringify(PERMISSIONS));
+06394:     localStorage.setItem(LS_FEATURES_KEY, JSON.stringify(FEATURE_REGISTRY));
+06395:   }catch(e){}
+06396: }
+06397: 
+06398: function hasPermission(permissionKey){
+06399:   if(!CURRENT_USER) return false;
+06400:   if(CURRENT_USER.role === 'Superadmin') return true; // selalu full access, tidak dapat dibatasi
+06401:   const p = PERMISSIONS[permissionKey];
+06402:   return !!(p && p[CURRENT_USER.role]);
+06403: }
+06404: function isSuperadmin(){ return !!CURRENT_USER && CURRENT_USER.role === 'Superadmin'; }
+06405: 
+06406: // ---- Sumber kebenaran fitur/menu: SELALU discan langsung dari sidebar
+06407: // (dan grup collapsible-nya) yang sedang ada di DOM, bukan dari daftar
+06408: // yang diketik manual. Dipakai di setiap titik yang mengisi FEATURE_REGISTRY
+06409: // (login, restore sesi, buka Role Access Management) supaya menu apa pun —
+06410: // baru, lama, atau belum sempat didaftarkan di backend — tetap otomatis
+06411: // tergate oleh Role Access Management, tidak ada yang hardcoded/lolos.
+06412: function discoverFeatureRegistryFromDom(){
+06413:   const seen = new Set();
+06414:   const list = [];
+06415:   const labelOf = (btn)=>{
+06416:     const clone = btn.cloneNode(true);
+06417:     clone.querySelectorAll('.ico, .chev, .count, .ihc-desc').forEach(el=> el.remove());
+06418:     return clone.textContent.replace(/\s+/g,' ').trim();
+06419:   };
+06420:   document.querySelectorAll('.sidebar .nav-btn[data-view]').forEach(btn=>{
+06421:     const view = btn.dataset.view;
+06422:     if(!view) return;
+06423:     const key = 'view.' + view;
+06424:     if(seen.has(key)) return;
+06425:     seen.add(key);
+06426:     const groupEl = btn.closest('.nav-group-collapsible');
+06427:     let group = 'Umum';
+06428:     if(groupEl){
+06429:       const parentBtn = groupEl.querySelector('.nav-parent-btn');
+06430:       if(parentBtn){ const g = labelOf(parentBtn); if(g) group = g; }
+06431:     }
+06432:     list.push({ PermissionKey:key, Label: labelOf(btn) || view, Group: group });
+06433:   });
+06434:   // Grup collapsible itu sendiri juga jadi "fitur" tergate-able (untuk
+06435:   // menyembunyikan seluruh grup, bukan cuma item di dalamnya).
+06436:   document.querySelectorAll('.sidebar .nav-group-collapsible[data-group-key]').forEach(g=>{
+06437:     const gk = g.dataset.groupKey;
+06438:     if(!gk) return;
+06439:     const key = 'group.' + gk;
+06440:     if(seen.has(key)) return;
+06441:     seen.add(key);
+06442:     const parentBtn = g.querySelector('.nav-parent-btn');
+06443:     list.push({ PermissionKey:key, Label: (parentBtn ? labelOf(parentBtn) : gk) + ' (Grup)', Group: 'Grup Menu' });
+06444:   });
+~~~
+
+### Around line 6644
+~~~text
+06632:    backend yang sama dengan login utama (action:'login' di code.gs),
+06633:    yang mengembalikan role sebenarnya dari akun tsb.
+06634: 
+06635:    PENTING (perilaku akses Setting): kalau pengguna yang SEDANG login
+06636:    memang ber-role Superadmin, menu ini langsung terbuka tanpa login
+06637:    ulang. Kalau bukan, sistem meminta login dengan akun Superadmin lain
+06638:    (step-up auth) khusus untuk membuka menu ini — status step-up ini
+06639:    HANYA berlaku selama pengguna tetap berada di menu Setting, begitu
+06640:    pindah menu otomatis di-reset (wajib login ulang tiap kembali). Ini
+06641:    terpisah total dari koneksi Cloudflare (WEB_APP_URL) & dari
+06642:    sesi login utama (CURRENT_USER), yang tidak ikut berubah/hilang. */
+06643: let SETTING_AUTH_OK = false; // in-memory saja (bukan sessionStorage) -> reset tiap pindah menu
+06644: let SETTING_SESSION_TOKEN = '';
+06645: function isSettingAuthed(){
+06646:   return SETTING_AUTH_OK === true || isSuperadmin();
+06647: }
+06648: function resetSettingAuth(){
+06649:   const tokenToRevoke = SETTING_SESSION_TOKEN;
+06650:   if(tokenToRevoke && WEB_APP_URL){
+06651:     fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:tokenToRevoke})}).catch(()=>{});
+06652:   }
+06653:   SETTING_AUTH_OK = false;
+06654:   SETTING_SESSION_TOKEN = '';
+06655: }
+06656: function showSettingLoginModal(onSuccess){
+06657:   $('#modal-content').innerHTML = `
+06658:     <div class="modal-head">
+06659:       <div><h2 style="font-family:var(--font-display);margin:0;"><i class="ph-bold ph-lock-key"></i> Akses Master Mesin &amp; Koneksi</h2></div>
+06660:       <button class="modal-close" id="btn-close-modal">✕</button>
+06661:     </div>
+06662:     <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">Menu ini berisi data master &amp; koneksi database SQLite, khusus akun ber-role <b>Superadmin</b>. Masukkan username &amp; password akun Superadmin Anda untuk melanjutkan. Akses ini hanya berlaku selama Anda berada di menu ini — begitu pindah menu, Anda perlu memverifikasi ulang untuk masuk ke sini.</div>
+06663:     <div class="field"><label>Username</label><input type="text" id="setting-login-username" autocomplete="username"></div>
+06664:     <div class="field"><label>Password</label><input type="password" id="setting-login-password" autocomplete="current-password"></div>
+06665:     <div id="setting-login-error" style="color:var(--red);font-size:12px;margin-top:4px;display:none;">Username/password salah, atau akun tersebut bukan Superadmin.</div>
+06666:     <div style="margin-top:16px;display:flex;gap:10px;">
+06667:       <button class="btn btn-sm btn-primary" id="btn-setting-login-submit"><i class="ph-bold ph-sign-in"></i> Masuk</button>
+06668:     </div>
+06669:   `;
+06670:   $('#modal-bg').classList.add('active');
+06671:   $('#btn-close-modal').addEventListener('click', closeModal);
+06672:   const submit = async ()=>{
+06673:     const u = $('#setting-login-username').value.trim();
+06674:     const p = $('#setting-login-password').value;
+06675:     const errEl = $('#setting-login-error');
+06676:     const submitBtn = $('#btn-setting-login-submit');
+06677:     errEl.style.display = 'none';
+06678:     if(!u || !p) return;
+06679:     if(!WEB_APP_URL){
+06680:       errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App).';
+06681:       errEl.style.display = 'block';
+06682:       return;
+06683:     }
+06684:     submitBtn.disabled = true;
+06685:     const originalLabel = submitBtn.innerHTML;
+06686:     submitBtn.innerHTML = '<i class="ph-bold ph-circle-notch ph-spin"></i> Memeriksa...';
+06687:     try{
+06688:       const res = await fetchWithTimeout_(WEB_APP_URL, {
+06689:         method: 'POST',
+06690:         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+06691:         body: JSON.stringify({ action: 'login', username: u, password: p })
+06692:       }, 30000);
+06693:       const json = await parseApiResponse_(res);
+06694:       if(!json.ok || !json.user){
+06695:         errEl.textContent = json.error || 'Username atau password salah.';
+06696:         errEl.style.display = 'block';
+06697:         return;
+06698:       }
+06699:       if(json.user.role !== 'Superadmin'){
+06700:         if(json.sessionToken){
+06701:           fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:json.sessionToken})}).catch(()=>{});
+06702:         }
+06703:         errEl.textContent = 'Akun ini valid, tetapi bukan Superadmin — akses ditolak.';
+06704:         errEl.style.display = 'block';
+06705:         return;
+06706:       }
+06707:       SETTING_AUTH_OK = true;
+06708:       SETTING_SESSION_TOKEN = json.sessionToken || '';
+~~~
+
+### Around line 6654
+~~~text
+06642:    sesi login utama (CURRENT_USER), yang tidak ikut berubah/hilang. */
+06643: let SETTING_AUTH_OK = false; // in-memory saja (bukan sessionStorage) -> reset tiap pindah menu
+06644: let SETTING_SESSION_TOKEN = '';
+06645: function isSettingAuthed(){
+06646:   return SETTING_AUTH_OK === true || isSuperadmin();
+06647: }
+06648: function resetSettingAuth(){
+06649:   const tokenToRevoke = SETTING_SESSION_TOKEN;
+06650:   if(tokenToRevoke && WEB_APP_URL){
+06651:     fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:tokenToRevoke})}).catch(()=>{});
+06652:   }
+06653:   SETTING_AUTH_OK = false;
+06654:   SETTING_SESSION_TOKEN = '';
+06655: }
+06656: function showSettingLoginModal(onSuccess){
+06657:   $('#modal-content').innerHTML = `
+06658:     <div class="modal-head">
+06659:       <div><h2 style="font-family:var(--font-display);margin:0;"><i class="ph-bold ph-lock-key"></i> Akses Master Mesin &amp; Koneksi</h2></div>
+06660:       <button class="modal-close" id="btn-close-modal">✕</button>
+06661:     </div>
+06662:     <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">Menu ini berisi data master &amp; koneksi database SQLite, khusus akun ber-role <b>Superadmin</b>. Masukkan username &amp; password akun Superadmin Anda untuk melanjutkan. Akses ini hanya berlaku selama Anda berada di menu ini — begitu pindah menu, Anda perlu memverifikasi ulang untuk masuk ke sini.</div>
+06663:     <div class="field"><label>Username</label><input type="text" id="setting-login-username" autocomplete="username"></div>
+06664:     <div class="field"><label>Password</label><input type="password" id="setting-login-password" autocomplete="current-password"></div>
+06665:     <div id="setting-login-error" style="color:var(--red);font-size:12px;margin-top:4px;display:none;">Username/password salah, atau akun tersebut bukan Superadmin.</div>
+06666:     <div style="margin-top:16px;display:flex;gap:10px;">
+06667:       <button class="btn btn-sm btn-primary" id="btn-setting-login-submit"><i class="ph-bold ph-sign-in"></i> Masuk</button>
+06668:     </div>
+06669:   `;
+06670:   $('#modal-bg').classList.add('active');
+06671:   $('#btn-close-modal').addEventListener('click', closeModal);
+06672:   const submit = async ()=>{
+06673:     const u = $('#setting-login-username').value.trim();
+06674:     const p = $('#setting-login-password').value;
+06675:     const errEl = $('#setting-login-error');
+06676:     const submitBtn = $('#btn-setting-login-submit');
+06677:     errEl.style.display = 'none';
+06678:     if(!u || !p) return;
+06679:     if(!WEB_APP_URL){
+06680:       errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App).';
+06681:       errEl.style.display = 'block';
+06682:       return;
+06683:     }
+06684:     submitBtn.disabled = true;
+06685:     const originalLabel = submitBtn.innerHTML;
+06686:     submitBtn.innerHTML = '<i class="ph-bold ph-circle-notch ph-spin"></i> Memeriksa...';
+06687:     try{
+06688:       const res = await fetchWithTimeout_(WEB_APP_URL, {
+06689:         method: 'POST',
+06690:         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+06691:         body: JSON.stringify({ action: 'login', username: u, password: p })
+06692:       }, 30000);
+06693:       const json = await parseApiResponse_(res);
+06694:       if(!json.ok || !json.user){
+06695:         errEl.textContent = json.error || 'Username atau password salah.';
+06696:         errEl.style.display = 'block';
+06697:         return;
+06698:       }
+06699:       if(json.user.role !== 'Superadmin'){
+06700:         if(json.sessionToken){
+06701:           fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'logout',sessionToken:json.sessionToken})}).catch(()=>{});
+06702:         }
+06703:         errEl.textContent = 'Akun ini valid, tetapi bukan Superadmin — akses ditolak.';
+06704:         errEl.style.display = 'block';
+06705:         return;
+06706:       }
+06707:       SETTING_AUTH_OK = true;
+06708:       SETTING_SESSION_TOKEN = json.sessionToken || '';
+06709:       closeModal();
+06710:       if(onSuccess) onSuccess();
+06711:     }catch(err){
+06712:       // Step-up auth Setting tidak boleh mengunci sesi aplikasi utama.
+06713:       // Tampilkan error di modal saja; appRoot/login-gate milik sesi utama
+06714:       // berada di scope lain dan memang tidak boleh disentuh dari sini.
+06715:       errEl.textContent = err.message || 'Gagal menghubungi server. Periksa koneksi internet Anda.';
+06716:       errEl.style.display = 'block';
+06717:     }finally{
+06718:       submitBtn.disabled = false;
+~~~
+
+### Around line 8062
+~~~text
+08050:     return;
+08051:   }
+08052:   const tokenToRevoke = SESSION_TOKEN;
+08053:   if(tokenToRevoke && WEB_APP_URL){
+08054:     fetch(WEB_APP_URL, {
+08055:       method:'POST',
+08056:       headers:{'Content-Type':'text/plain;charset=utf-8'},
+08057:       body:JSON.stringify({action:'logout', sessionToken:tokenToRevoke}),
+08058:       keepalive:true
+08059:     }).catch(()=>{});
+08060:   }
+08061:   CURRENT_USER = null;
+08062:   SESSION_TOKEN = '';
+08063:   SESSION_EXPIRES_AT = '';
+08064:   PERMISSIONS = {};
+08065:   FEATURE_REGISTRY = [];
+08066:   try{ localStorage.removeItem(SS_USER_KEY); localStorage.removeItem(SS_TOKEN_KEY); localStorage.removeItem(SS_TOKEN_EXP_KEY); localStorage.removeItem(LS_PERM_KEY); localStorage.removeItem(LS_FEATURES_KEY); }catch(e){}
+08067:   if(typeof resetSettingAuth === 'function') resetSettingAuth();
+08068: 
+08069:   const gate = document.getElementById('login-gate');
+08070:   const appRoot = document.getElementById('app-root');
+08071:   if(appRoot) appRoot.classList.remove('unlocked', 'dash-mode', 'menu-visible');
+08072:   if(gate){
+08073:     gate.style.display = '';
+08074:     gate.style.opacity = '1';
+08075:   }
+08076:   const form = document.getElementById('form-login');
+08077:   if(form) form.reset();
+08078:   const errEl = document.getElementById('login-err');
+08079:   if(errEl) errEl.textContent = '';
+08080:   const userField = document.getElementById('login-username');
+08081:   if(userField) setTimeout(()=> userField.focus(), 50);
+08082: 
+08083:   // Hapus state runtime akun lama lalu reload. Cache data/draft/offline
+08084:   // tidak dihapus: semuanya sudah dipindahkan ke namespace akun yang logout,
+08085:   // sehingga akun berikutnya tidak mewarisi cache tersebut.
+08086:   try{ READY_READS.clear(); ACTIVE_READS.clear(); READ_GENERATION++; }catch(e){}
+08087:   setTimeout(()=> location.reload(), 60);
+08088: }
+08089: document.addEventListener('click', (e)=>{
+08090:   if(e.target.closest('#btn-logout')){
+08091:     if(confirm('Keluar dari aplikasi? Anda perlu login lagi untuk melanjutkan.')) logoutUser();
+08092:   }
+08093: });
+08094: 
+08095: /* ---------------- OFFLINE MODE: ANTREAN SINKRON OTOMATIS ----------------
+08096:    Aplikasi ini SUDAH menyimpan semua data ke localStorage dulu sebelum
+08097:    mengirim ke backend (lihat pola persistPmReport, saveGrReportsLocal, dkk),
+08098:    jadi tetap bisa dipakai penuh tanpa internet. Yang ditambahkan di sini:
+08099:    setiap kali apiPost gagal karena masalah jaringan, payload-nya diantre;
+08100:    begitu koneksi kembali (event 'online' / polling berkala), antrean ini
+08101:    otomatis dikirim ulang ke backend tanpa perlu aksi manual dari pengguna. */
+08102: const LS_SYNC_QUEUE_KEY = 'logbook_pending_sync_queue';
+08103: let APP_ONLINE_STATUS = navigator.onLine;
+08104: 
+08105: function loadSyncQueue_(){ try{ return JSON.parse(localStorage.getItem(LS_SYNC_QUEUE_KEY) || '[]'); }catch(e){ return []; } }
+08106: function saveSyncQueue_(q){ localStorage.setItem(LS_SYNC_QUEUE_KEY, JSON.stringify(q)); renderOfflineBanner(); }
+08107: function isSecurityConfigAction_(action){
+08108:   return ['savePermissions','saveLcPermissions','saveRoleAccessConfig','createUser','updateUser','resetPassword','setUserActive','deleteUser'].includes(String(action||''));
+08109: }
+08110: function queueForSync_(payload){
+08111:   // Konfigurasi keamanan harus online-only. Jangan simpan request role/permission
+08112:   // ke antrean offline karena request lama dapat menimpa konfigurasi terbaru saat
+08113:   // koneksi pulih beberapa menit/jam kemudian.
+08114:   if(isSecurityConfigAction_(payload && payload.action)) return;
+08115:   const q = loadSyncQueue_();
+08116:   const queuedPayload = {...payload};
+08117:   delete queuedPayload.sessionToken;
+08118:   // Cegah item identik menumpuk jika pengguna menekan simpan lagi setelah
+08119:   // timeout. Payload berbeda tetap dipertahankan sebagai operasi terpisah.
+08120:   const signature = JSON.stringify(queuedPayload);
+08121:   if(q.some(item => JSON.stringify(item.payload) === signature)){
+08122:     renderOfflineBanner();
+08123:     return;
+08124:   }
+08125:   q.push({ id: 'sync_'+Date.now()+'_'+Math.random().toString(36).slice(2), payload:queuedPayload, ts: Date.now() });
+08126:   saveSyncQueue_(q);
+~~~
+
