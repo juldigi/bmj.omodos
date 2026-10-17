@@ -1562,6 +1562,57 @@ jobs:
             });
             result.requestedFixes = requestedFixes;
             result.phases.push('requested-mobile-material-multiline-regressions');
+            console.log('[QA] stale-auth-response and no-reload session expiry');
+            const authReloadQA = await page.evaluate(() => {
+              const saved = {
+                user: CURRENT_USER,
+                token: SESSION_TOKEN,
+                settingAuth: SETTING_AUTH_OK,
+                settingToken: SETTING_SESSION_TOKEN
+              };
+              const realLogout = window.logoutUser;
+              const calls = [];
+              try {
+                window.logoutUser = options => { calls.push(options || null); };
+                CURRENT_USER = { username: 'qa-auth-current', displayName: 'QA Auth Current', role: 'Superadmin' };
+                SESSION_TOKEN = 'qa-current-session';
+                SETTING_AUTH_OK = false;
+                SETTING_SESSION_TOKEN = '';
+
+                handleApiAuthFailure_('SESSION_EXPIRED', 'qa-stale-session');
+                const staleResponseIgnored = calls.length === 0 && SESSION_TOKEN === 'qa-current-session';
+
+                handleApiAuthFailure_('SESSION_EXPIRED', 'qa-current-session');
+                const logoutOptions = calls[0] || null;
+                const handlerSource = String(handleApiAuthFailure_);
+                const logoutSource = String(realLogout);
+                const out = {
+                  staleResponseIgnored,
+                  currentSessionHandled: calls.length === 1,
+                  reload: logoutOptions?.reload,
+                  reason: logoutOptions?.reason,
+                  authHandlerHasStaleGuard: handlerSource.includes('requestToken !== SESSION_TOKEN'),
+                  authHandlerUsesNoReload: handlerSource.includes('reload:false'),
+                  logoutSupportsNoReload: logoutSource.includes('options.reload !== false')
+                };
+                if (!out.staleResponseIgnored || !out.currentSessionHandled ||
+                    out.reload !== false || out.reason !== 'session-expired' ||
+                    !out.authHandlerHasStaleGuard || !out.authHandlerUsesNoReload ||
+                    !out.logoutSupportsNoReload) {
+                  throw new Error('Unexpected auth reload policy: ' + JSON.stringify(out));
+                }
+                return out;
+              } finally {
+                window.logoutUser = realLogout;
+                CURRENT_USER = saved.user;
+                SESSION_TOKEN = saved.token;
+                SETTING_AUTH_OK = saved.settingAuth;
+                SETTING_SESSION_TOKEN = saved.settingToken;
+              }
+            });
+            result.authReloadQA = authReloadQA;
+            result.phases.push('stale-auth-no-reload');
+
             await page.setViewportSize({ width: 1440, height: 1000 });
 
             const relevantErrors = errors.filter(x =>
