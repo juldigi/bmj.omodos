@@ -8612,3 +8612,1802 @@ No match.
 17848: /* ---------------- SETTING VIEW: KONEKSI & MASTER MESIN ---------------- */
 ~~~
 
+## const rows = SPAREPART_ROWS
+### Around line 17561
+~~~text
+17549:   await Promise.all(GROQ_AUTOFIX_ENTRY_FIELDS.map(async ({key,label})=>{
+17550:     if(!entry[key]) return;
+17551:     const corrected = await groqFixTextRaw(entry[key], label, {failOpen:true});
+17552:     if(corrected){ entry[key] = corrected; changedCount++; }
+17553:   }));
+17554:   return changedCount;
+17555: }
+17556: 
+17557: function buildMaterialFieldsFromRows(){
+17558:   syncSparepartRowsFromDom();
+17559:   // Seluruh field sparepart bersifat opsional. Simpan setiap nilai yang
+17560:   // memang diisi tanpa memaksa kelengkapan field lain pada baris yang sama.
+17561:   const rows = SPAREPART_ROWS
+17562:     .map(r=>({...r,nama:norm_(r.nama)?String(r.nama).trim():'',sap:norm_(r.sap)?String(r.sap).trim():'',jumlah:norm_(r.jumlah)?r.jumlah:''}))
+17563:     .filter(r=>r.nama.trim() || r.sap.trim() || String(r.jumlah).trim())
+17564:     .map(r=>{
+17565:       const master = r.sap.trim() ? findSparepartLokasiBySap(r.sap.trim()) : null;
+17566:       return { ...r, lokasiSparepart: master ? String(master.lokasiGudang||'').trim() : '' };
+17567:     });
+17568:   rows.forEach((r,i)=>{ if(!(Number(r.jumlah)>0) || !Number.isFinite(Number(r.jumlah))) throw new Error('Jumlah sparepart baris '+(i+1)+' wajib diisi dengan angka lebih dari 0.'); if(!r.nama.trim() && !r.sap.trim()) throw new Error('Isi nama atau nomor SAP sparepart baris '+(i+1)+'.'); });
+17569:   const namaMaterial = rows.map(r=> r.jumlah ? `${r.nama.trim()} (${r.jumlah} pcs)` : r.nama.trim()).filter(Boolean).join('; ');
+17570:   const materialNumberSAP = rows.map(r=> r.sap.trim()).filter(Boolean).join('; ');
+17571:   // Backend lama mewajibkan kolom Lokasi Sparepart. Nilai fallback ini
+17572:   // menjaga kompatibilitas tanpa menjadikan input sparepart wajib bagi user.
+17573:   const lokasiSparepart = rows.length
+17574:     ? rows.map(r=>r.lokasiSparepart || 'Belum terdaftar').join('; ')
+17575:     : 'Tidak menggunakan sparepart';
+17576:   return { namaMaterial, materialNumberSAP, lokasiSparepart, detail: rows };
+17577: }
+17578: 
+17579: /* ---------------- FILE UPLOAD (FORM) ---------------- */
+17580: const fileDrop = $('#file-drop');
+17581: const fileInput = $('#file-input');
+17582: fileDrop.addEventListener('click', ()=> fileInput.click());
+17583: fileDrop.addEventListener('dragover', ev=>{ ev.preventDefault(); fileDrop.style.borderColor='var(--red)'; });
+17584: fileDrop.addEventListener('dragleave', ()=>{ fileDrop.style.borderColor='var(--line)'; });
+17585: fileDrop.addEventListener('drop', ev=>{
+17586:   ev.preventDefault(); fileDrop.style.borderColor='var(--line)';
+17587:   handleFiles(ev.dataTransfer.files);
+17588: });
+17589: fileInput.addEventListener('change', ()=> { handleFiles(fileInput.files); fileInput.value=''; });
+17590: 
+17591: async function handleFiles(fileList){
+17592:   const files = Array.from(fileList);
+17593:   for(const file of files){
+17594:     if(file.size > 120 * 1024 * 1024){
+17595:       toast(`File "${file.name}" terlalu besar (maks 120MB sebelum kompresi).`, true);
+17596:       continue;
+17597:     }
+17598:     const isImage = file.type.startsWith('image');
+17599:     const isVideo = file.type.startsWith('video');
+17600:     let blob = file, mimeType = file.type, name = file.name;
+17601: 
+17602:     if(isImage){
+17603:       toast(`Mengompres foto "${file.name}"...`);
+17604:       blob = await compressImageFile(file);
+17605:       mimeType = 'image/jpeg';
+17606:       name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+17607:     } else if(isVideo){
+17608:       toast(`Mengompres video "${file.name}", mohon tunggu (± sepanjang durasi video)...`);
+17609:       blob = await compressVideoFile(file);
+17610:       if(blob !== file){
+17611:         mimeType = 'video/webm';
+17612:         name = file.name.replace(/\.[^.]+$/, '') + '.webm';
+17613:       }
+17614:     }
+17615: 
+17616:     if(blob.size > MAX_CLIENT_UPLOAD_BYTES){
+17617:       toast(`File "${name}" masih terlalu besar setelah kompresi (${(blob.size/1024/1024).toFixed(1)} MB). Maksimal 9 MB per file.`, true);
+17618:       continue;
+17619:     }
+17620: 
+17621:     await new Promise((resolveRead)=>{
+17622:       const reader = new FileReader();
+17623:       reader.onload = ()=>{
+17624:         const base64 = reader.result.split(',')[1];
+17625:         PENDING_FILES.push({
+~~~
+
+## Jumlah sparepart baris
+### Around line 17568
+~~~text
+17556: 
+17557: function buildMaterialFieldsFromRows(){
+17558:   syncSparepartRowsFromDom();
+17559:   // Seluruh field sparepart bersifat opsional. Simpan setiap nilai yang
+17560:   // memang diisi tanpa memaksa kelengkapan field lain pada baris yang sama.
+17561:   const rows = SPAREPART_ROWS
+17562:     .map(r=>({...r,nama:norm_(r.nama)?String(r.nama).trim():'',sap:norm_(r.sap)?String(r.sap).trim():'',jumlah:norm_(r.jumlah)?r.jumlah:''}))
+17563:     .filter(r=>r.nama.trim() || r.sap.trim() || String(r.jumlah).trim())
+17564:     .map(r=>{
+17565:       const master = r.sap.trim() ? findSparepartLokasiBySap(r.sap.trim()) : null;
+17566:       return { ...r, lokasiSparepart: master ? String(master.lokasiGudang||'').trim() : '' };
+17567:     });
+17568:   rows.forEach((r,i)=>{ if(!(Number(r.jumlah)>0) || !Number.isFinite(Number(r.jumlah))) throw new Error('Jumlah sparepart baris '+(i+1)+' wajib diisi dengan angka lebih dari 0.'); if(!r.nama.trim() && !r.sap.trim()) throw new Error('Isi nama atau nomor SAP sparepart baris '+(i+1)+'.'); });
+17569:   const namaMaterial = rows.map(r=> r.jumlah ? `${r.nama.trim()} (${r.jumlah} pcs)` : r.nama.trim()).filter(Boolean).join('; ');
+17570:   const materialNumberSAP = rows.map(r=> r.sap.trim()).filter(Boolean).join('; ');
+17571:   // Backend lama mewajibkan kolom Lokasi Sparepart. Nilai fallback ini
+17572:   // menjaga kompatibilitas tanpa menjadikan input sparepart wajib bagi user.
+17573:   const lokasiSparepart = rows.length
+17574:     ? rows.map(r=>r.lokasiSparepart || 'Belum terdaftar').join('; ')
+17575:     : 'Tidak menggunakan sparepart';
+17576:   return { namaMaterial, materialNumberSAP, lokasiSparepart, detail: rows };
+17577: }
+17578: 
+17579: /* ---------------- FILE UPLOAD (FORM) ---------------- */
+17580: const fileDrop = $('#file-drop');
+17581: const fileInput = $('#file-input');
+17582: fileDrop.addEventListener('click', ()=> fileInput.click());
+17583: fileDrop.addEventListener('dragover', ev=>{ ev.preventDefault(); fileDrop.style.borderColor='var(--red)'; });
+17584: fileDrop.addEventListener('dragleave', ()=>{ fileDrop.style.borderColor='var(--line)'; });
+17585: fileDrop.addEventListener('drop', ev=>{
+17586:   ev.preventDefault(); fileDrop.style.borderColor='var(--line)';
+17587:   handleFiles(ev.dataTransfer.files);
+17588: });
+17589: fileInput.addEventListener('change', ()=> { handleFiles(fileInput.files); fileInput.value=''; });
+17590: 
+17591: async function handleFiles(fileList){
+17592:   const files = Array.from(fileList);
+17593:   for(const file of files){
+17594:     if(file.size > 120 * 1024 * 1024){
+17595:       toast(`File "${file.name}" terlalu besar (maks 120MB sebelum kompresi).`, true);
+17596:       continue;
+17597:     }
+17598:     const isImage = file.type.startsWith('image');
+17599:     const isVideo = file.type.startsWith('video');
+17600:     let blob = file, mimeType = file.type, name = file.name;
+17601: 
+17602:     if(isImage){
+17603:       toast(`Mengompres foto "${file.name}"...`);
+17604:       blob = await compressImageFile(file);
+17605:       mimeType = 'image/jpeg';
+17606:       name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+17607:     } else if(isVideo){
+17608:       toast(`Mengompres video "${file.name}", mohon tunggu (± sepanjang durasi video)...`);
+17609:       blob = await compressVideoFile(file);
+17610:       if(blob !== file){
+17611:         mimeType = 'video/webm';
+17612:         name = file.name.replace(/\.[^.]+$/, '') + '.webm';
+17613:       }
+17614:     }
+17615: 
+17616:     if(blob.size > MAX_CLIENT_UPLOAD_BYTES){
+17617:       toast(`File "${name}" masih terlalu besar setelah kompresi (${(blob.size/1024/1024).toFixed(1)} MB). Maksimal 9 MB per file.`, true);
+17618:       continue;
+17619:     }
+17620: 
+17621:     await new Promise((resolveRead)=>{
+17622:       const reader = new FileReader();
+17623:       reader.onload = ()=>{
+17624:         const base64 = reader.result.split(',')[1];
+17625:         PENDING_FILES.push({
+17626:           name, mimeType, base64,
+17627:           _localUrl: URL.createObjectURL(blob),
+17628:           _isVideo: isVideo
+17629:         });
+17630:         renderFilePreviews();
+17631:         const kb = (blob.size/1024).toFixed(0);
+17632:         toast(`"${name}" siap diunggah (${kb} KB)`);
+~~~
+
+## sparePart:
+### Around line 5224
+~~~text
+05212:             <option value="all">Semua Riwayat</option>
+05213:           </select>
+05214:           <button class="btn btn-sm" id="btn-export-sparepart-opname"><i class="ph-bold ph-file-xls"></i> Export Excel</button>
+05215:         </div>
+05216:         <div id="list-sparepart-opname"></div>
+05217:       </div>
+05218: 
+05219:       <!-- ============ TAB 5: MASTER SPAREPART (dipindah dari Master Koneksi) ============ -->
+05220:       <div id="sp-tabMaster" class="sp-tab-panel">
+05221:         <div class="card" style="margin-bottom:18px;">
+05222:           <div class="section-title"><i class="ph-bold ph-map-pin"></i> Master Sparepart — Lokasi, Harga &amp; Stock Gudang</div>
+05223:           <div class="sub" style="margin-bottom:12px;">
+05224:             Satu data master per Material Number SAP dipakai bersama oleh SELURUH fitur yang berhubungan dengan sparepart:
+05225:             kartu ringkasan &amp; grafik cost di menu Sparepart, kartu lokasi rak yang otomatis dicocokkan dari form input Logbook,
+05226:             dan Stock Sistem di checklist Stock Opname. Cukup diisi/diedit di satu tempat ini.
+05227:             <br>Sebelumnya ada di menu Master Koneksi, sekarang dipindah ke sini supaya 1 tempat dengan Daily Collection &amp; PO Monitoring.
+05228:           </div>
+05229:           <div class="grid3">
+05230:             <div class="field"><label>Material Number SAP</label><input type="text" id="sl-sap" placeholder="1000234567"></div>
+05231:             <div class="field"><label>Nama Material</label><input type="text" id="sl-nama" placeholder="Bearing 6205"></div>
+05232:             <div class="field"><label>Lokasi Gudang/Rak</label><input type="text" id="sl-lokasi" placeholder="Gudang A - Rak 3B"></div>
+05233:           </div>
+05234:           <div class="grid3">
+05235:             <div class="field"><label>Harga Satuan (Rp)</label><input type="number" id="sl-harga" min="0" step="100" placeholder="0"></div>
+05236:             <div class="field"><label>Stock Qty</label><input type="number" id="sl-stock" min="0" step="1" placeholder="0"></div>
+05237:             <div class="field"><label>Satuan</label><input type="text" id="sl-satuan" placeholder="cth: pcs, unit, set"></div>
+05238:           </div>
+05239:           <button class="btn btn-sm" id="btn-save-sparepart-lokasi">+ Simpan Data Sparepart</button>
+05240:           <button class="btn btn-sm" id="btn-cancel-edit-sparepart-lokasi" style="display:none;">Batal Edit</button>
+05241:           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+05242:             <div class="field" style="flex:1 1 280px;margin:0;">
+05243:               <label for="search-master-sparepart">Cari Sparepart</label>
+05244:               <div style="position:relative;">
+05245:                 <i class="ph-bold ph-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);"></i>
+05246:                 <input type="search" id="search-master-sparepart" placeholder="Cari Nama Material atau Material Number SAP..." autocomplete="off" style="padding-left:36px;">
+05247:               </div>
+05248:             </div>
+05249:             <button type="button" class="btn btn-sm" id="btn-reset-master-sparepart-search" style="margin-top:18px;"><i class="ph-bold ph-x"></i> Reset</button>
+05250:           </div>
+05251:           <div id="master-sparepart-search-info" style="font-size:12px;color:var(--text-dim);margin-top:6px;"></div>
+05252:           <div style="margin-top:10px;" id="sparepart-lokasi-table"></div>
+05253:         </div>
+05254:       </div>
+05255:     </section>
+05256: 
+05257:     <section class="view" id="view-expert-finder">
+05258:       <div class="topbar">
+05259:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05260:         <div><h1>People Intelligence</h1><div class="sub">Ranking personil paling berpengalaman, dihitung otomatis dari histori Logbook (Nama Pelapor, Status, Jenis Pekerjaan) yang sudah tersimpan — tidak ada data baru yang perlu diisi.</div></div>
+05261:         <div class="stat-strip" id="ef-stat-strip"></div>
+05262:       </div>
+05263:       <div class="filter-bar">
+05264:         <input class="grow" type="text" id="search-expert-nama" placeholder="Cari nama personil...">
+05265:         <input class="grow" type="text" id="search-expert-konteks" placeholder="Ranking khusus untuk mesin/masalah tertentu (mis. nama mesin, kode mesin, atau kata kunci masalah)...">
+05266:         <button class="btn btn-sm" id="btn-reset-expert-konteks"><i class="ph-bold ph-x"></i> Reset Konteks</button>
+05267:       </div>
+05268:       <div class="sub" id="ef-konteks-info" style="margin:-6px 0 14px 2px;"></div>
+05269:       <div id="list-expert-finder"></div>
+05270:     </section>
+05271: 
+05272:     <section class="view" id="view-knowledge-graph">
+05273:       <div class="topbar">
+05274:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05275:         <div><h1>Knowledge Graph</h1><div class="sub">Visualisasi hubungan antar Personil, Mesin, Sparepart/SAP, dan Masalah — dibangun otomatis dari data Logbook yang sudah ada (vis-network). Klik node untuk detail, drag untuk atur posisi, scroll untuk zoom.</div></div>
+05276:         <div class="stat-strip" id="kg-stat-strip"></div>
+05277:       </div>
+05278:       <div class="filter-bar">
+05279:         <input class="grow" type="text" id="search-kg" placeholder="Cari & sorot node (nama personil, mesin, sparepart, kata kunci masalah)...">
+05280:         <select id="filter-kg-type">
+05281:           <option value="">Semua Tipe Node</option>
+05282:           <option value="personil">Personil</option>
+05283:           <option value="mesin">Mesin</option>
+05284:           <option value="sparepart">Sparepart</option>
+05285:           <option value="masalah">Masalah</option>
+05286:         </select>
+05287:         <button class="btn btn-sm" id="btn-kg-reset-view"><i class="ph-bold ph-arrows-out-cardinal"></i> Reset Tampilan</button>
+05288:       </div>
+~~~
+
+### Around line 12736
+~~~text
+12724:       Object.keys(remote).forEach(id=>{
+12725:         const raw = String(remote[id]||'PENDING').toUpperCase();
+12726:         next[id] = { status:(raw==='DONE'||raw==='COMPLETED'||raw==='COLLECTED')?'COMPLETED':'PENDING', sapDoc:'', pic:'' };
+12727:       });
+12728:       SPAREPART_STATUS = next;
+12729:       saveSparepartStatusLocal();
+12730:       return true;
+12731:     }
+12732:   }catch(e){ /* backend tidak tersedia: pakai cache lokal yang sudah dimuat */ }
+12733:   return false;
+12734: }
+12735: 
+12736: /* ---------------- MASTER SPAREPART: LOKASI, HARGA & STOCK GUDANG (Setting) ----------------
+12737:    [EDIT] Sebelumnya "Stock Sparepart Gudang" (read-only, sheet terpisah
+12738:    Stock_Sparepart) dan "Lokasi & Harga Sparepart" (Sparepart_Lokasi, CRUD)
+12739:    adalah dua card & dua sumber data yang terpisah. Sekarang DIGABUNG jadi
+12740:    satu master (SPAREPART_LOKASI, dari sheet Sparepart_Lokasi yang sudah
+12741:    diperluas kolomnya: SAP, Nama, Lokasi Gudang, Harga Satuan, Stock Qty,
+12742:    Satuan) supaya SATU Material Number SAP = SATU baris data yang dipakai
+12743:    bersama oleh SELURUH fitur sparepart: kartu & grafik cost di menu
+12744:    Sparepart, kartu lokasi rak di form input Logbook, dan Stock Sistem di
+12745:    Stock Opname (dulu baca dari STOCK_SPAREPART terpisah, sekarang dari
+12746:    sini juga -- lihat findStockSistemBySap di bawah). Backend otomatis
+12747:    meng-impor sisa data dari sheet Stock_Sparepart lama (kalau ada) ke
+12748:    master ini sekali jalan, jadi tidak ada data yang hilang. */
+12749: let SPAREPART_LOKASI = [];
+12750: let SPAREPART_LOKASI_EDIT_SAP = null;
+12751: let SPAREPART_LOKASI_EDIT_NAME = null;
+12752: 
+12753: function loadSparepartLokasiLocal(){ try{ return JSON.parse(localStorage.getItem(LS_SPAREPART_LOKASI_KEY)||'[]'); }catch(e){ return []; } }
+12754: function saveSparepartLokasiLocal(list){ localStorage.setItem(LS_SPAREPART_LOKASI_KEY, JSON.stringify(list)); SPAREPART_LOKASI = list; }
+12755: async function syncSparepartLokasiFromBackend(){
+12756:   SPAREPART_LOKASI = loadSparepartLokasiLocal();
+12757:   if(!WEB_APP_URL) return SPAREPART_LOKASI;
+12758:   try{
+12759:     const remote = await apiGet('sparepartLokasi');
+12760:     if(Array.isArray(remote)){
+12761:       const normalized = remote.map(r=>({
+12762:         sap: String(r['Material Number SAP']||'').trim(),
+12763:         nama: r['Nama Material']||'',
+12764:         lokasiGudang: r['Lokasi Gudang']||'',
+12765:         harga: Number(r['Harga Satuan']) || 0,
+12766:         stockQty: (r['Stock Qty']===''||r['Stock Qty']==null) ? null : Number(r['Stock Qty']),
+12767:         satuan: r['Satuan']||'',
+12768:         needsReview: r['Perlu Verifikasi']===true || String(r['Perlu Verifikasi']).toLowerCase()==='true',
+12769:         sourceLogbook: r['Sumber Logbook']||''
+12770:       }));
+12771:       saveSparepartLokasiLocal(normalized);
+12772:     }
+12773:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+12774:   return SPAREPART_LOKASI;
+12775: }
+12776: function findSparepartLokasiBySap(sap){
+12777:   const s = String(sap||'').trim();
+12778:   if(!s) return null;
+12779:   return SPAREPART_LOKASI.find(x=> x.sap === s) || null;
+12780: }
+12781: // [EDIT] Menggantikan findStockSistemBySap yang dulu baca dari STOCK_SPAREPART
+12782: // (sheet Stock_Sparepart terpisah, perlu tombol "Muat Ulang Stock" manual) --
+12783: // sekarang Stock Qty adalah bagian dari master SPAREPART_LOKASI yang sama,
+12784: // jadi otomatis tersedia begitu SPAREPART_LOKASI sudah dimuat (loadAll),
+12785: // tanpa perlu langkah muat ulang terpisah.
+12786: function findStockSistemBySap(sap){
+12787:   const r = findSparepartLokasiBySap(sap);
+12788:   return (r && r.stockQty != null) ? r.stockQty : null;
+12789: }
+12790: function resetSparepartLokasiForm(){
+12791:   SPAREPART_LOKASI_EDIT_SAP = null;
+12792:   SPAREPART_LOKASI_EDIT_NAME = null;
+12793:   $('#sl-sap').value=''; $('#sl-nama').value=''; $('#sl-lokasi').value=''; $('#sl-harga').value='';
+12794:   const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
+12795:   if(stockEl) stockEl.value=''; if(satuanEl) satuanEl.value='';
+12796:   $('#btn-save-sparepart-lokasi').innerHTML = '+ Simpan Data Sparepart';
+12797:   $('#btn-cancel-edit-sparepart-lokasi').style.display = 'none';
+12798: }
+12799: let SPAREPART_LOKASI_SEARCH = '';
+12800: function renderSparepartLokasiTable(){
+~~~
+
+### Around line 12743
+~~~text
+12731:     }
+12732:   }catch(e){ /* backend tidak tersedia: pakai cache lokal yang sudah dimuat */ }
+12733:   return false;
+12734: }
+12735: 
+12736: /* ---------------- MASTER SPAREPART: LOKASI, HARGA & STOCK GUDANG (Setting) ----------------
+12737:    [EDIT] Sebelumnya "Stock Sparepart Gudang" (read-only, sheet terpisah
+12738:    Stock_Sparepart) dan "Lokasi & Harga Sparepart" (Sparepart_Lokasi, CRUD)
+12739:    adalah dua card & dua sumber data yang terpisah. Sekarang DIGABUNG jadi
+12740:    satu master (SPAREPART_LOKASI, dari sheet Sparepart_Lokasi yang sudah
+12741:    diperluas kolomnya: SAP, Nama, Lokasi Gudang, Harga Satuan, Stock Qty,
+12742:    Satuan) supaya SATU Material Number SAP = SATU baris data yang dipakai
+12743:    bersama oleh SELURUH fitur sparepart: kartu & grafik cost di menu
+12744:    Sparepart, kartu lokasi rak di form input Logbook, dan Stock Sistem di
+12745:    Stock Opname (dulu baca dari STOCK_SPAREPART terpisah, sekarang dari
+12746:    sini juga -- lihat findStockSistemBySap di bawah). Backend otomatis
+12747:    meng-impor sisa data dari sheet Stock_Sparepart lama (kalau ada) ke
+12748:    master ini sekali jalan, jadi tidak ada data yang hilang. */
+12749: let SPAREPART_LOKASI = [];
+12750: let SPAREPART_LOKASI_EDIT_SAP = null;
+12751: let SPAREPART_LOKASI_EDIT_NAME = null;
+12752: 
+12753: function loadSparepartLokasiLocal(){ try{ return JSON.parse(localStorage.getItem(LS_SPAREPART_LOKASI_KEY)||'[]'); }catch(e){ return []; } }
+12754: function saveSparepartLokasiLocal(list){ localStorage.setItem(LS_SPAREPART_LOKASI_KEY, JSON.stringify(list)); SPAREPART_LOKASI = list; }
+12755: async function syncSparepartLokasiFromBackend(){
+12756:   SPAREPART_LOKASI = loadSparepartLokasiLocal();
+12757:   if(!WEB_APP_URL) return SPAREPART_LOKASI;
+12758:   try{
+12759:     const remote = await apiGet('sparepartLokasi');
+12760:     if(Array.isArray(remote)){
+12761:       const normalized = remote.map(r=>({
+12762:         sap: String(r['Material Number SAP']||'').trim(),
+12763:         nama: r['Nama Material']||'',
+12764:         lokasiGudang: r['Lokasi Gudang']||'',
+12765:         harga: Number(r['Harga Satuan']) || 0,
+12766:         stockQty: (r['Stock Qty']===''||r['Stock Qty']==null) ? null : Number(r['Stock Qty']),
+12767:         satuan: r['Satuan']||'',
+12768:         needsReview: r['Perlu Verifikasi']===true || String(r['Perlu Verifikasi']).toLowerCase()==='true',
+12769:         sourceLogbook: r['Sumber Logbook']||''
+12770:       }));
+12771:       saveSparepartLokasiLocal(normalized);
+12772:     }
+12773:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+12774:   return SPAREPART_LOKASI;
+12775: }
+12776: function findSparepartLokasiBySap(sap){
+12777:   const s = String(sap||'').trim();
+12778:   if(!s) return null;
+12779:   return SPAREPART_LOKASI.find(x=> x.sap === s) || null;
+12780: }
+12781: // [EDIT] Menggantikan findStockSistemBySap yang dulu baca dari STOCK_SPAREPART
+12782: // (sheet Stock_Sparepart terpisah, perlu tombol "Muat Ulang Stock" manual) --
+12783: // sekarang Stock Qty adalah bagian dari master SPAREPART_LOKASI yang sama,
+12784: // jadi otomatis tersedia begitu SPAREPART_LOKASI sudah dimuat (loadAll),
+12785: // tanpa perlu langkah muat ulang terpisah.
+12786: function findStockSistemBySap(sap){
+12787:   const r = findSparepartLokasiBySap(sap);
+12788:   return (r && r.stockQty != null) ? r.stockQty : null;
+12789: }
+12790: function resetSparepartLokasiForm(){
+12791:   SPAREPART_LOKASI_EDIT_SAP = null;
+12792:   SPAREPART_LOKASI_EDIT_NAME = null;
+12793:   $('#sl-sap').value=''; $('#sl-nama').value=''; $('#sl-lokasi').value=''; $('#sl-harga').value='';
+12794:   const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
+12795:   if(stockEl) stockEl.value=''; if(satuanEl) satuanEl.value='';
+12796:   $('#btn-save-sparepart-lokasi').innerHTML = '+ Simpan Data Sparepart';
+12797:   $('#btn-cancel-edit-sparepart-lokasi').style.display = 'none';
+12798: }
+12799: let SPAREPART_LOKASI_SEARCH = '';
+12800: function renderSparepartLokasiTable(){
+12801:   const holder = $('#sparepart-lokasi-table');
+12802:   if(!holder) return;
+12803:   const q = String(SPAREPART_LOKASI_SEARCH||'').trim().toLowerCase();
+12804:   const rows = !q ? SPAREPART_LOKASI : SPAREPART_LOKASI.filter(r=>
+12805:     String(r.nama||'').toLowerCase().includes(q) || String(r.sap||'').toLowerCase().includes(q)
+12806:   );
+12807:   const info = $('#master-sparepart-search-info');
+~~~
+
+### Around line 14853
+~~~text
+14841:   return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+14842: }
+14843: 
+14844: let SP_COLLECT_PAGE = 1;
+14845: let SP_COLLECT_PAGE_SIZE = 10;
+14846: 
+14847: function renderTrainingSparepartNotice_(){
+14848:   const pending=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview);
+14849:   [['view-sparepart','training-sparepart-notice']].forEach(([target,id])=>{
+14850:     const host=document.getElementById(target),old=document.getElementById(id);
+14851:     if(old) old.remove(); if(!host || !pending.length) return;
+14852:     const n=document.createElement('div');n.id=id;n.className='card';n.setAttribute('role','status');
+14853:     n.textContent=pending.length+' sparepart baru dari Logbook perlu dilengkapi di Master Sparepart: '+pending.map(r=>r.nama||r.sap).join(', ');
+14854:     if(target==='home-smart-resume') host.before(n); else host.prepend(n);
+14855:   });
+14856: }
+14857: function renderSparepartView(){
+14858:   renderTrainingSparepartNotice_();
+14859:   loadSparepartStatusLocal();
+14860:   renderSparepartCollectDash();
+14861:   applySparepartFilters();
+14862:   renderSparepartPeriodikChart();
+14863:   syncSparepartStatusFromBackend().then((synced)=>{ if(synced){ renderSparepartCollectDash(); applySparepartFilters(); } });
+14864: 
+14865:   renderSparepartPoDash();
+14866:   renderSparepartEtaList();
+14867:   syncSparepartEtaFromBackend().then(()=>{ renderSparepartPoDash(); renderSparepartEtaList(); renderSparepartWarehouseList(); });
+14868: 
+14869:   renderSparepartWarehouseList();
+14870:   syncSparepartWarehouseFromBackend().then(()=> renderSparepartWarehouseList());
+14871: 
+14872:   renderSparepartOpnameList();
+14873:   renderSparepartTargetBanner();
+14874:   renderSparepartOpnameDash();
+14875:   renderSparepartOpnameChecklist();
+14876:   syncSparepartOpnameFromBackend().then(()=>{
+14877:     renderSparepartOpnameList(); renderSparepartTargetBanner(); renderSparepartOpnameDash(); renderSparepartOpnameChecklist();
+14878:   });
+14879: 
+14880:   // Tab "Master Sparepart" (Lokasi/Harga/Stock) sebelumnya HANYA dirender
+14881:   // saat masuk menu Setting, sehingga tab ini tampak kosong/lama muncul
+14882:   // kalau user belum pernah membuka Setting di sesi tsb. Render dulu dari
+14883:   // cache lokal (instan), lalu sinkron ke backend & render ulang.
+14884:   renderSparepartLokasiTable();
+14885:   syncSparepartLokasiFromBackend().then(()=> renderSparepartLokasiTable());
+14886: }
+14887: 
+14888: let SPAREPART_PERIODIK_CHART = null;
+14889: function renderSparepartPeriodikChart(){
+14890:   const canvas = $('#chart-sparepart-periodik');
+14891:   if(!canvas || typeof Chart === 'undefined') return;
+14892:   const byMonth = {}; // { 'YYYY-MM': { qty, cost } }
+14893:   sparepartRows().forEach(({entry:e})=>{
+14894:     const d = new Date(e['Tanggal']);
+14895:     if(isNaN(d)) return;
+14896:     const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+14897:     if(!byMonth[key]) byMonth[key] = { qty:0, cost:0 };
+14898:     parseSparepartDetail(e).forEach(det=>{
+14899:       byMonth[key].qty += det.qty || 1;
+14900:       const lokasi = findSparepartLokasiBySap(det.sap);
+14901:       if(lokasi) byMonth[key].cost += (lokasi.harga||0) * (det.qty||1);
+14902:     });
+14903:   });
+14904:   const months = Object.keys(byMonth).sort().slice(-12); // 12 bulan terakhir yang ada datanya
+14905:   const colors = (typeof anThemeColors === 'function') ? anThemeColors() : { red:'#e63946', amber:'#ffb703', text:'#eceef0', line:'rgba(255,255,255,.08)' };
+14906:   if(SPAREPART_PERIODIK_CHART) SPAREPART_PERIODIK_CHART.destroy();
+14907:   SPAREPART_PERIODIK_CHART = new Chart(canvas, {
+14908:     data: {
+14909:       labels: months,
+14910:       datasets: [
+14911:         { type:'bar', label:'Jumlah Pengambilan', data: months.map(m=>byMonth[m].qty), backgroundColor: colors.amber, yAxisID:'y' },
+14912:         { type:'line', label:'Estimasi Cost (Rp)', data: months.map(m=>byMonth[m].cost), borderColor: colors.red, backgroundColor:'color-mix(in srgb, var(--red) 15%, transparent)', tension:.3, yAxisID:'y1' }
+14913:       ]
+14914:     },
+14915:     options: {
+14916:       interaction:{ mode:'index', intersect:false },
+14917:       plugins:{ legend:{ labels:{ color: colors.text } } },
+~~~
+
+### Around line 15181
+~~~text
+15169: }
+15170: const btnExportCollect = $('#btn-export-sparepart-collect');
+15171: if(btnExportCollect) btnExportCollect.addEventListener('click', ()=>{
+15172:   const rows = sparepartCollectFilteredSorted().map(({entry:e, sap})=>[
+15173:     fmtDate(e['Tanggal']), e['ID'], e['Nama Mesin']||'-', e['Nomor WO']||e['No WO']||'-',
+15174:     e['Nama Pelapor']||'-', e['Nama Material']||'-', sparepartEntryTotalQty(e),
+15175:     (sap.status||'PENDING')==='COMPLETED' ? 'Sudah Dicollect + SAP' : 'Belum Dicollect'
+15176:   ]);
+15177:   sparepartExportExcel('Sparepart_Daily_Collection.xls',
+15178:     ['Date','Logbook No','Machine','WO','PIC','Spare Part','Qty','Status Collection'], rows);
+15179: });
+15180: 
+15181: /* ---------------- SPAREPART: TAB SWITCH ---------------- */
+15182: document.querySelectorAll('#view-sparepart .sp-tab-btn').forEach(btn=>{
+15183:   btn.addEventListener('click', ()=>{
+15184:     document.querySelectorAll('#view-sparepart .sp-tab-btn').forEach(b=>b.classList.remove('active'));
+15185:     document.querySelectorAll('#view-sparepart .sp-tab-panel').forEach(p=>p.classList.remove('active'));
+15186:     btn.classList.add('active');
+15187:     $('#'+btn.dataset.sptab).classList.add('active');
+15188:   });
+15189: });
+15190: 
+15191: /* =========================================================
+15192:    TAB 2: PO MONITORING
+15193:    Dikelola independen (nomor PO, vendor, ETA), TIDAK terhubung ke record
+15194:    pemakaian sparepart Logbook — hanya dipakai untuk memantau kedatangan
+15195:    barang yang sudah dipesan ke vendor.
+15196:    ========================================================= */
+15197: let SPAREPART_ETA = [];
+15198: function loadSparepartEtaLocal(){
+15199:   try{ SPAREPART_ETA = JSON.parse(localStorage.getItem(LS_SPAREPART_ETA_KEY) || '[]'); }
+15200:   catch(e){ SPAREPART_ETA = []; }
+15201:   // Migrasi status lama (MENUNGGU/TERLAMBAT/TIBA) ke status PO baru
+15202:   SPAREPART_ETA.forEach(item=>{
+15203:     if(item.status==='MENUNGGU') item.status='WAITING';
+15204:     else if(item.status==='TERLAMBAT') item.status='WAITING'; // overdue dihitung otomatis dari tanggal
+15205:     else if(item.status==='TIBA') item.status='ARRIVED';
+15206:   });
+15207: }
+15208: function saveSparepartEtaLocal(){ localStorage.setItem(LS_SPAREPART_ETA_KEY, JSON.stringify(SPAREPART_ETA)); }
+15209: 
+15210: // Status PO final ditentukan otomatis dari tanggal, kecuali sudah ARRIVED/WAREHOUSE (manual/validasi).
+15211: function poStatusKey(item){
+15212:   if(item.status === 'WAREHOUSE') return 'warehouse';
+15213:   if(item.status === 'ARRIVED') return 'arrived';
+15214:   const today = new Date(); today.setHours(0,0,0,0);
+15215:   if(item.estimasiEta){
+15216:     const eta = new Date(item.estimasiEta);
+15217:     if(!isNaN(eta) && eta < today) return 'overdue';
+15218:   }
+15219:   if(item.tanggalPO){
+15220:     const po = new Date(item.tanggalPO);
+15221:     if(!isNaN(po) && po <= today) return 'intransit';
+15222:   }
+15223:   return 'waiting';
+15224: }
+15225: const PO_STATUS_LABEL = { waiting:'Waiting', intransit:'In Transit', overdue:'Overdue', arrived:'Arrived', warehouse:'Warehouse' };
+15226: 
+15227: loadSparepartEtaLocal();
+15228: async function syncSparepartEtaFromBackend(){
+15229:   if(!WEB_APP_URL) return SPAREPART_ETA;
+15230:   try{
+15231:     const remote = await apiGet('sparepartEta');
+15232:     if(Array.isArray(remote)){
+15233:       SPAREPART_ETA = remote.map(r=>{
+15234:         let status = r['Status']||'WAITING';
+15235:         if(status==='MENUNGGU') status='WAITING'; else if(status==='TERLAMBAT') status='WAITING'; else if(status==='TIBA') status='ARRIVED';
+15236:         return {
+15237:           id: r['ID']||('PO-'+Date.now()+Math.random()),
+15238:           namaMaterial: r['Nama Material']||'',
+15239:           sap: r['Material Number SAP']||'',
+15240:           noPO: r['Nomor PO']||'',
+15241:           vendor: r['Vendor']||'',
+15242:           qty: Number(r['Qty'])||1,
+15243:           tanggalPO: r['Tanggal PO']||'',
+15244:           estimasiEta: r['Estimasi ETA']||'',
+15245:           status,
+~~~
+
+### Around line 15914
+~~~text
+15902:       });
+15903:     }
+15904:   });
+15905: 
+15906:   const edges = [];
+15907:   edgeWeights.forEach((weight, key)=>{
+15908:     const [from,to] = key.split('|');
+15909:     edges.push({ from, to, value: weight });
+15910:   });
+15911:   return { nodes: [...nodes.values()], edges };
+15912: }
+15913: 
+15914: const KG_GROUP_COLORS = { personil:'#4d9de8', mesin:'#e63946', sparepart:'#ffb703', masalah:'#39ffc4' };
+15915: const KG_GROUP_LABELS = { personil:'Personil', mesin:'Mesin', sparepart:'Sparepart', masalah:'Masalah' };
+15916: 
+15917: function renderKnowledgeGraphView(){
+15918:   const holder = $('#kg-network');
+15919:   if(typeof vis === 'undefined'){
+15920:     holder.innerHTML = `<div style="padding:20px;color:var(--text-dim);font-size:13px;">Library vis-network gagal dimuat (butuh koneksi internet untuk CDN). Coba refresh halaman.</div>`;
+15921:     return;
+15922:   }
+15923:   const data = buildKnowledgeGraphData();
+15924:   KG_ALL_NODES = data.nodes;
+15925:   KG_ALL_EDGES = data.edges;
+15926: 
+15927:   $('#kg-stat-strip').innerHTML = `
+15928:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='personil').length}</div><div class="l">Personil</div></div>
+15929:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='mesin').length}</div><div class="l">Mesin</div></div>
+15930:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='sparepart').length}</div><div class="l">Sparepart</div></div>
+15931:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='masalah').length}</div><div class="l">Masalah</div></div>
+15932:   `;
+15933: 
+15934:   kgDrawNetwork();
+15935: }
+15936: 
+15937: function kgDrawNetwork(){
+15938:   const holder = $('#kg-network');
+15939:   const typeFilter = $('#filter-kg-type').value;
+15940:   const q = ($('#search-kg').value || '').trim().toLowerCase();
+15941: 
+15942:   let nodesToShow = KG_ALL_NODES.filter(n=> !typeFilter || n.group===typeFilter);
+15943:   let nodeIds = new Set(nodesToShow.map(n=>n.id));
+15944:   let edgesToShow = KG_ALL_EDGES.filter(e=> nodeIds.has(e.from) && nodeIds.has(e.to));
+15945: 
+15946:   // Kalau ada pencarian: persempit ke node yang cocok + tetangga langsungnya
+15947:   // (ego network), supaya fokus ke bagian graph yang relevan saja.
+15948:   if(q){
+15949:     const matched = new Set(nodesToShow.filter(n=> n.label.toLowerCase().includes(q)).map(n=>n.id));
+15950:     if(matched.size){
+15951:       const keep = new Set(matched);
+15952:       edgesToShow.forEach(e=>{ if(matched.has(e.from)) keep.add(e.to); if(matched.has(e.to)) keep.add(e.from); });
+15953:       nodesToShow = nodesToShow.filter(n=> keep.has(n.id));
+15954:       nodeIds = new Set(nodesToShow.map(n=>n.id));
+15955:       edgesToShow = edgesToShow.filter(e=> nodeIds.has(e.from) && nodeIds.has(e.to));
+15956:     }
+15957:   }
+15958: 
+15959:   const visNodes = new vis.DataSet(nodesToShow.map(n=>({
+15960:     id:n.id, label:n.label, group:n.group,
+15961:     color:{ background:KG_GROUP_COLORS[n.group], border:KG_GROUP_COLORS[n.group] },
+15962:     font:{ color:'#eceef0', size:13 }
+15963:   })));
+15964:   const visEdges = new vis.DataSet(edgesToShow.map((e,i)=>({ id:i, from:e.from, to:e.to, value:e.value, color:{ color:'rgba(255,255,255,.18)' } })));
+15965: 
+15966:   if(KG_NETWORK){ KG_NETWORK.destroy(); KG_NETWORK = null; }
+15967:   KG_NETWORK = new vis.Network(holder, { nodes:visNodes, edges:visEdges }, {
+15968:     nodes:{ shape:'dot', size:16, borderWidth:2 },
+15969:     edges:{ smooth:{ type:'continuous' }, scaling:{ min:1, max:6 } },
+15970:     physics:{ stabilization:{ iterations:120 }, barnesHut:{ gravitationalConstant:-2500, springLength:110 } },
+15971:     interaction:{ hover:true, tooltipDelay:150, dragNodes:true, zoomView:true, dragView:true },
+15972:     groups:{
+15973:       personil:{ color:{ background:KG_GROUP_COLORS.personil, border:KG_GROUP_COLORS.personil } },
+15974:       mesin:{ color:{ background:KG_GROUP_COLORS.mesin, border:KG_GROUP_COLORS.mesin } },
+15975:       sparepart:{ color:{ background:KG_GROUP_COLORS.sparepart, border:KG_GROUP_COLORS.sparepart } },
+15976:       masalah:{ color:{ background:KG_GROUP_COLORS.masalah, border:KG_GROUP_COLORS.masalah } }
+15977:     }
+15978:   });
+~~~
+
+### Around line 15915
+~~~text
+15903:     }
+15904:   });
+15905: 
+15906:   const edges = [];
+15907:   edgeWeights.forEach((weight, key)=>{
+15908:     const [from,to] = key.split('|');
+15909:     edges.push({ from, to, value: weight });
+15910:   });
+15911:   return { nodes: [...nodes.values()], edges };
+15912: }
+15913: 
+15914: const KG_GROUP_COLORS = { personil:'#4d9de8', mesin:'#e63946', sparepart:'#ffb703', masalah:'#39ffc4' };
+15915: const KG_GROUP_LABELS = { personil:'Personil', mesin:'Mesin', sparepart:'Sparepart', masalah:'Masalah' };
+15916: 
+15917: function renderKnowledgeGraphView(){
+15918:   const holder = $('#kg-network');
+15919:   if(typeof vis === 'undefined'){
+15920:     holder.innerHTML = `<div style="padding:20px;color:var(--text-dim);font-size:13px;">Library vis-network gagal dimuat (butuh koneksi internet untuk CDN). Coba refresh halaman.</div>`;
+15921:     return;
+15922:   }
+15923:   const data = buildKnowledgeGraphData();
+15924:   KG_ALL_NODES = data.nodes;
+15925:   KG_ALL_EDGES = data.edges;
+15926: 
+15927:   $('#kg-stat-strip').innerHTML = `
+15928:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='personil').length}</div><div class="l">Personil</div></div>
+15929:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='mesin').length}</div><div class="l">Mesin</div></div>
+15930:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='sparepart').length}</div><div class="l">Sparepart</div></div>
+15931:     <div class="stat-chip"><div class="n">${data.nodes.filter(n=>n.group==='masalah').length}</div><div class="l">Masalah</div></div>
+15932:   `;
+15933: 
+15934:   kgDrawNetwork();
+15935: }
+15936: 
+15937: function kgDrawNetwork(){
+15938:   const holder = $('#kg-network');
+15939:   const typeFilter = $('#filter-kg-type').value;
+15940:   const q = ($('#search-kg').value || '').trim().toLowerCase();
+15941: 
+15942:   let nodesToShow = KG_ALL_NODES.filter(n=> !typeFilter || n.group===typeFilter);
+15943:   let nodeIds = new Set(nodesToShow.map(n=>n.id));
+15944:   let edgesToShow = KG_ALL_EDGES.filter(e=> nodeIds.has(e.from) && nodeIds.has(e.to));
+15945: 
+15946:   // Kalau ada pencarian: persempit ke node yang cocok + tetangga langsungnya
+15947:   // (ego network), supaya fokus ke bagian graph yang relevan saja.
+15948:   if(q){
+15949:     const matched = new Set(nodesToShow.filter(n=> n.label.toLowerCase().includes(q)).map(n=>n.id));
+15950:     if(matched.size){
+15951:       const keep = new Set(matched);
+15952:       edgesToShow.forEach(e=>{ if(matched.has(e.from)) keep.add(e.to); if(matched.has(e.to)) keep.add(e.from); });
+15953:       nodesToShow = nodesToShow.filter(n=> keep.has(n.id));
+15954:       nodeIds = new Set(nodesToShow.map(n=>n.id));
+15955:       edgesToShow = edgesToShow.filter(e=> nodeIds.has(e.from) && nodeIds.has(e.to));
+15956:     }
+15957:   }
+15958: 
+15959:   const visNodes = new vis.DataSet(nodesToShow.map(n=>({
+15960:     id:n.id, label:n.label, group:n.group,
+15961:     color:{ background:KG_GROUP_COLORS[n.group], border:KG_GROUP_COLORS[n.group] },
+15962:     font:{ color:'#eceef0', size:13 }
+15963:   })));
+15964:   const visEdges = new vis.DataSet(edgesToShow.map((e,i)=>({ id:i, from:e.from, to:e.to, value:e.value, color:{ color:'rgba(255,255,255,.18)' } })));
+15965: 
+15966:   if(KG_NETWORK){ KG_NETWORK.destroy(); KG_NETWORK = null; }
+15967:   KG_NETWORK = new vis.Network(holder, { nodes:visNodes, edges:visEdges }, {
+15968:     nodes:{ shape:'dot', size:16, borderWidth:2 },
+15969:     edges:{ smooth:{ type:'continuous' }, scaling:{ min:1, max:6 } },
+15970:     physics:{ stabilization:{ iterations:120 }, barnesHut:{ gravitationalConstant:-2500, springLength:110 } },
+15971:     interaction:{ hover:true, tooltipDelay:150, dragNodes:true, zoomView:true, dragView:true },
+15972:     groups:{
+15973:       personil:{ color:{ background:KG_GROUP_COLORS.personil, border:KG_GROUP_COLORS.personil } },
+15974:       mesin:{ color:{ background:KG_GROUP_COLORS.mesin, border:KG_GROUP_COLORS.mesin } },
+15975:       sparepart:{ color:{ background:KG_GROUP_COLORS.sparepart, border:KG_GROUP_COLORS.sparepart } },
+15976:       masalah:{ color:{ background:KG_GROUP_COLORS.masalah, border:KG_GROUP_COLORS.masalah } }
+15977:     }
+15978:   });
+15979: 
+~~~
+
+### Around line 15975
+~~~text
+15963:   })));
+15964:   const visEdges = new vis.DataSet(edgesToShow.map((e,i)=>({ id:i, from:e.from, to:e.to, value:e.value, color:{ color:'rgba(255,255,255,.18)' } })));
+15965: 
+15966:   if(KG_NETWORK){ KG_NETWORK.destroy(); KG_NETWORK = null; }
+15967:   KG_NETWORK = new vis.Network(holder, { nodes:visNodes, edges:visEdges }, {
+15968:     nodes:{ shape:'dot', size:16, borderWidth:2 },
+15969:     edges:{ smooth:{ type:'continuous' }, scaling:{ min:1, max:6 } },
+15970:     physics:{ stabilization:{ iterations:120 }, barnesHut:{ gravitationalConstant:-2500, springLength:110 } },
+15971:     interaction:{ hover:true, tooltipDelay:150, dragNodes:true, zoomView:true, dragView:true },
+15972:     groups:{
+15973:       personil:{ color:{ background:KG_GROUP_COLORS.personil, border:KG_GROUP_COLORS.personil } },
+15974:       mesin:{ color:{ background:KG_GROUP_COLORS.mesin, border:KG_GROUP_COLORS.mesin } },
+15975:       sparepart:{ color:{ background:KG_GROUP_COLORS.sparepart, border:KG_GROUP_COLORS.sparepart } },
+15976:       masalah:{ color:{ background:KG_GROUP_COLORS.masalah, border:KG_GROUP_COLORS.masalah } }
+15977:     }
+15978:   });
+15979: 
+15980:   KG_NETWORK.on('click', (params)=>{
+15981:     if(!params.nodes.length){ $('#kg-node-detail').style.display = 'none'; return; }
+15982:     kgShowNodeDetail(params.nodes[0]);
+15983:   });
+15984: 
+15985:   if(!holder.querySelector('.kg-legend')){
+15986:     holder.insertAdjacentHTML('afterend', `<div class="kg-legend">${Object.keys(KG_GROUP_COLORS).map(g=>
+15987:       `<span><span class="dot" style="background:${KG_GROUP_COLORS[g]};"></span>${KG_GROUP_LABELS[g]}</span>`
+15988:     ).join('')}</div>`);
+15989:   }
+15990: }
+15991: 
+15992: function kgShowNodeDetail(nodeId){
+15993:   const [type, ...rest] = nodeId.split(':');
+15994:   const label = rest.join(':');
+15995:   const panel = $('#kg-node-detail');
+15996:   panel.style.display = 'block';
+15997: 
+15998:   if(type==='p'){
+15999:     const stats = expertFinderStats(ENTRIES).find(s=>s.nama===label);
+16000:     panel.innerHTML = `
+16001:       <div class="section-title"><i class="ph-bold ph-user"></i> ${escapeHtml(label)}</div>
+16002:       ${stats ? `<div class="sub">${stats.total} kasus · ${stats.breakdown} breakdown · ${Math.round(stats.successRate*100)}% selesai · ${stats.mesinCount} mesin berbeda</div>` : `<div class="sub">Belum ada histori kasus.</div>`}
+16003:       <button type="button" class="btn btn-sm" style="margin-top:10px;" id="kg-goto-pelapor"><i class="ph-bold ph-arrow-right"></i> Lihat Histori Lengkap</button>
+16004:       <button type="button" class="btn btn-sm" style="margin-top:10px;" id="kg-goto-wiki-p"><i class="ph-bold ph-book-open-text"></i> Buka Halaman Wiki</button>
+16005:     `;
+16006:     $('#kg-goto-pelapor').addEventListener('click', ()=>{ CURRENT_PELAPOR_FILTER = label; goToView('pelapor'); });
+16007:     $('#kg-goto-wiki-p').addEventListener('click', ()=> openWikiPage('personil', label));
+16008:   } else if(type==='m'){
+16009:     const m = findMachineByIdentity_(label);
+16010:     const kode = m ? (m['Kode Mesin']||m['Nama Mesin']) : label;
+16011:     const displayName = m ? (m['Nama Mesin']||m['Kode Mesin']||label) : label;
+16012:     const hs = machineHealthScore(kode);
+16013:     panel.innerHTML = `
+16014:       <div class="section-title"><i class="ph-bold ph-gear-six"></i> ${escapeHtml(displayName)}</div>
+16015:       <div class="sub">Machine Health: ${hs.score}% (${escapeHtml(hs.label)}) · ${hs.breakdown} breakdown tercatat</div>
+16016:       <button type="button" class="btn btn-sm" style="margin-top:10px;" id="kg-goto-mesin"><i class="ph-bold ph-arrow-right"></i> Lihat Detail Mesin</button>
+16017:       <button type="button" class="btn btn-sm" style="margin-top:10px;" id="kg-goto-wiki-m"><i class="ph-bold ph-book-open-text"></i> Buka Halaman Wiki</button>
+16018:     `;
+16019:     $('#kg-goto-mesin').addEventListener('click', ()=> openMachineDetail(kode));
+16020:     $('#kg-goto-wiki-m').addEventListener('click', ()=> openWikiPage('mesin', kode));
+16021:   } else if(type==='s'){
+16022:     const relatedMesin = new Map();
+16023:     // [FIX SOT] Konsisten dengan buildKnowledgeGraphData() -- relasi hanya dari data source-of-truth.
+16024:     sotEntries().forEach(e=>{
+16025:       if(!parseSparepartDetail(e).some(d=>d.nama.toLowerCase()===label.toLowerCase())) return;
+16026:       if(isAreaEntry_(e) || !(e['Kode Mesin']||e['Nama Mesin'])) return;
+16027:       const bucket=analyticsMachineBucket_(e);
+16028:       relatedMesin.set(bucket.key,bucket.nama);
+16029:     });
+16030:     panel.innerHTML = `
+16031:       <div class="section-title"><i class="ph-bold ph-wrench"></i> ${escapeHtml(label)}</div>
+16032:       <div class="sub">Dipakai di ${relatedMesin.size} mesin berbeda: ${[...relatedMesin.values()].filter(Boolean).map(escapeHtml).join(', ') || '-'}</div>
+16033:       <button type="button" class="btn btn-sm" style="margin-top:10px;" id="kg-goto-wiki-s"><i class="ph-bold ph-book-open-text"></i> Buka Halaman Wiki</button>
+16034:     `;
+16035:     $('#kg-goto-wiki-s').addEventListener('click', ()=> openWikiPage('sparepart', label));
+16036:   } else if(type==='k'){
+16037:     const relatedMesin = new Map();
+16038:     // [FIX SOT] Sama seperti di atas.
+16039:     sotEntries().forEach(e=>{
+~~~
+
+### Around line 17566
+~~~text
+17554:   return changedCount;
+17555: }
+17556: 
+17557: function buildMaterialFieldsFromRows(){
+17558:   syncSparepartRowsFromDom();
+17559:   // Seluruh field sparepart bersifat opsional. Simpan setiap nilai yang
+17560:   // memang diisi tanpa memaksa kelengkapan field lain pada baris yang sama.
+17561:   const rows = SPAREPART_ROWS
+17562:     .map(r=>({...r,nama:norm_(r.nama)?String(r.nama).trim():'',sap:norm_(r.sap)?String(r.sap).trim():'',jumlah:norm_(r.jumlah)?r.jumlah:''}))
+17563:     .filter(r=>r.nama.trim() || r.sap.trim() || String(r.jumlah).trim())
+17564:     .map(r=>{
+17565:       const master = r.sap.trim() ? findSparepartLokasiBySap(r.sap.trim()) : null;
+17566:       return { ...r, lokasiSparepart: master ? String(master.lokasiGudang||'').trim() : '' };
+17567:     });
+17568:   rows.forEach((r,i)=>{ if(!(Number(r.jumlah)>0) || !Number.isFinite(Number(r.jumlah))) throw new Error('Jumlah sparepart baris '+(i+1)+' wajib diisi dengan angka lebih dari 0.'); if(!r.nama.trim() && !r.sap.trim()) throw new Error('Isi nama atau nomor SAP sparepart baris '+(i+1)+'.'); });
+17569:   const namaMaterial = rows.map(r=> r.jumlah ? `${r.nama.trim()} (${r.jumlah} pcs)` : r.nama.trim()).filter(Boolean).join('; ');
+17570:   const materialNumberSAP = rows.map(r=> r.sap.trim()).filter(Boolean).join('; ');
+17571:   // Backend lama mewajibkan kolom Lokasi Sparepart. Nilai fallback ini
+17572:   // menjaga kompatibilitas tanpa menjadikan input sparepart wajib bagi user.
+17573:   const lokasiSparepart = rows.length
+17574:     ? rows.map(r=>r.lokasiSparepart || 'Belum terdaftar').join('; ')
+17575:     : 'Tidak menggunakan sparepart';
+17576:   return { namaMaterial, materialNumberSAP, lokasiSparepart, detail: rows };
+17577: }
+17578: 
+17579: /* ---------------- FILE UPLOAD (FORM) ---------------- */
+17580: const fileDrop = $('#file-drop');
+17581: const fileInput = $('#file-input');
+17582: fileDrop.addEventListener('click', ()=> fileInput.click());
+17583: fileDrop.addEventListener('dragover', ev=>{ ev.preventDefault(); fileDrop.style.borderColor='var(--red)'; });
+17584: fileDrop.addEventListener('dragleave', ()=>{ fileDrop.style.borderColor='var(--line)'; });
+17585: fileDrop.addEventListener('drop', ev=>{
+17586:   ev.preventDefault(); fileDrop.style.borderColor='var(--line)';
+17587:   handleFiles(ev.dataTransfer.files);
+17588: });
+17589: fileInput.addEventListener('change', ()=> { handleFiles(fileInput.files); fileInput.value=''; });
+17590: 
+17591: async function handleFiles(fileList){
+17592:   const files = Array.from(fileList);
+17593:   for(const file of files){
+17594:     if(file.size > 120 * 1024 * 1024){
+17595:       toast(`File "${file.name}" terlalu besar (maks 120MB sebelum kompresi).`, true);
+17596:       continue;
+17597:     }
+17598:     const isImage = file.type.startsWith('image');
+17599:     const isVideo = file.type.startsWith('video');
+17600:     let blob = file, mimeType = file.type, name = file.name;
+17601: 
+17602:     if(isImage){
+17603:       toast(`Mengompres foto "${file.name}"...`);
+17604:       blob = await compressImageFile(file);
+17605:       mimeType = 'image/jpeg';
+17606:       name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+17607:     } else if(isVideo){
+17608:       toast(`Mengompres video "${file.name}", mohon tunggu (± sepanjang durasi video)...`);
+17609:       blob = await compressVideoFile(file);
+17610:       if(blob !== file){
+17611:         mimeType = 'video/webm';
+17612:         name = file.name.replace(/\.[^.]+$/, '') + '.webm';
+17613:       }
+17614:     }
+17615: 
+17616:     if(blob.size > MAX_CLIENT_UPLOAD_BYTES){
+17617:       toast(`File "${name}" masih terlalu besar setelah kompresi (${(blob.size/1024/1024).toFixed(1)} MB). Maksimal 9 MB per file.`, true);
+17618:       continue;
+17619:     }
+17620: 
+17621:     await new Promise((resolveRead)=>{
+17622:       const reader = new FileReader();
+17623:       reader.onload = ()=>{
+17624:         const base64 = reader.result.split(',')[1];
+17625:         PENDING_FILES.push({
+17626:           name, mimeType, base64,
+17627:           _localUrl: URL.createObjectURL(blob),
+17628:           _isVideo: isVideo
+17629:         });
+17630:         renderFilePreviews();
+~~~
+
+### Around line 22300
+~~~text
+22288: }
+22289: 
+22290: /* ---------------- RESUME COPILOT BERDASARKAN HALAMAN YANG SEDANG DIBUKA ----------------
+22291:    Alih-alih selalu menganalisis seluruh pabrik, Copilot sekarang membaca menu/halaman
+22292:    yang sedang aktif (PREVIOUS_ACTIVE_VIEW) dan hanya mengumpulkan + menampilkan data
+22293:    yang relevan dengan halaman tsb. Setiap item tetap wajib punya "sources" (data mentah)
+22294:    supaya bisa ditelusuri, sama seperti insight per-mesin. */
+22295: function copilotViewLabel(view){
+22296:   const map = {
+22297:     utama:'Logbook — Ringkasan', mesin:'Logbook — Per Mesin', tanggal:'Logbook — Per Tanggal',
+22298:     pelapor:'Logbook — Per Pelapor', group:'Logbook — Per Group Pekerjaan', dashboard:'Visual Dashboard',
+22299:     durasi:'Top Durasi Pekerjaan', analitik:'Dashboard Analitik', correlation:'Correlation Analysis', diagnostic:'Diagnostic Wizard', knowledge:'Knowledge Base',
+22300:     patrol:'Patrol Harian', sparepart:'Sparepart Management', database:'Database Mesin',
+22301:     input:'Input Logbook',
+22302:     report:'Input Report', 'report-hub':'Riwayat Laporan', 'project-report':'Laporan Proyek',
+22303:     'project-center':'Project Management Center', meeting:'Meeting Management',
+22304:     rca:'RCA', ipal:'IPAL', downtime:'Analisa Downtime E&M', ai:'Analisa AI', setting:'Setting', tema:'Tema Aplikasi',
+22305:     'expert-finder':'Expert Finder', 'knowledge-graph':'Knowledge Graph', wiki:'Maintenance Wikipedia',
+22306:     'insights-hub':'Insights Hub', 'people-hub':'People & Meetings',
+22307:     'pi-dashboard':'People Intelligence — Dashboard', 'pi-personnel':'People Intelligence — Personil',
+22308:     'pi-softskill':'People Intelligence — Soft Skill', 'pi-hardskill':'People Intelligence — Hard Skill',
+22309:     'pi-smart-resume':'Smart Recognition & Resume Personil'
+22310:   };
+22311:   return map[view] || 'Halaman Ini';
+22312: }
+22313: 
+22314: // Deskripsi singkat fungsi tiap menu — selalu ditampilkan sebagai item
+22315: // PERTAMA di resume Copilot, apapun kondisi datanya, supaya orang yang
+22316: // baru pertama buka menu tsb langsung tahu menu itu buat apa.
+22317: const COPILOT_PAGE_INFO = {
+22318:   utama: 'Daftar semua entri Logbook maintenance (Tanggal, Mesin, Status, Deskripsi Masalah, Tindakan Perbaikan, dll) — pusat pencatatan pekerjaan harian.',
+22319:   mesin: 'Logbook yang sama, difilter per Mesin — untuk melihat riwayat pekerjaan satu mesin tertentu secara berurutan.',
+22320:   tanggal: 'Logbook yang sama, difilter per Tanggal — untuk melihat semua pekerjaan yang terjadi di hari tertentu.',
+22321:   pelapor: 'Logbook yang sama, difilter per Nama Pelapor/Personil — untuk melihat riwayat pekerjaan satu orang.',
+22322:   group: 'Logbook yang sama, difilter per Grouping Pekerjaan (Electrical/Mechanical/Workshop/dll).',
+22323:   dashboard: 'Papan status real-time semua mesin (card berwarna sesuai status: normal/proses/emergency), diambil dari Logbook & Predictive Maintenance mana yang lebih terkini.',
+22324:   durasi: 'Daftar pekerjaan dengan durasi pengerjaan terlama, untuk menemukan pekerjaan yang paling menyita waktu.',
+22325:   analitik: 'Dashboard grafik: Pareto kerusakan per mesin, distribusi jam rawan breakdown, tren bulanan, dan metrik lain dari histori Logbook.',
+22326:   correlation: 'Analisis korelasi antar variabel: PM Compliance vs jumlah breakdown (koefisien Pearson), pola hari/shift rawan breakdown, durasi perbaikan per jenis pekerjaan, dan pasangan mesin+masalah yang paling sering berulang.',
+22327:   diagnostic: 'Diagnostic Wizard — masukkan gejala kerusakan, sistem mencari kasus mirip dari Logbook, Report RCA, dan Knowledge Base, lalu menyarankan kemungkinan penyebab & tindakan yang pernah berhasil dipakai.',
+22328:   knowledge: 'Basis pengetahuan (Knowledge Base) — kumpulan catatan solusi/SOP yang disimpan manual untuk referensi ke depan.',
+22329:   patrol: 'Checklist inspeksi harian mesin (Patrol Harian) — temuan & Machine Condition Score di sini ikut memengaruhi status card mesin di Visual Dashboard.',
+22330:   sparepart: 'Manajemen sparepart: status collect sparepart per pekerjaan Logbook, tracking ETA sparepart setelah PO, dan Stock Opname mandiri (target harian 30 item).',
+22331:   database: 'Master data seluruh mesin (spesifikasi, kategori, Manual Book PDF) — klik satu mesin untuk lihat Machine Health Score & Maintenance DNA-nya.',
+22332:   report: 'Form input laporan (IPAL, RCA, Laporan Proyek, dll) — titik masuk untuk membuat laporan baru di luar Logbook harian.',
+22333:   'report-hub': 'Riwayat semua laporan yang pernah dibuat (IPAL, RCA, Laporan Proyek), dikumpulkan jadi satu tempat per kategori.',
+22334:   'project-report': 'Input & pantau status/progress/timeline proyek yang sedang berjalan.',
+22335:   'project-center': 'Pusat manajemen improvement project department: Factory Project (skala besar), Kaizen (continuous improvement), dan SGA (Small Group Activity) — lengkap dengan dashboard, filter, dan histori progress.',
+22336:   meeting: 'Meeting Management — jadwal meeting (harian/mingguan/bulanan), notulen (Agenda/Diskusi/Keputusan), dan tracking Action Item per PIC lengkap dengan status & Due Date.',
+22337:   input: 'Form Input Logbook — titik masuk utama pencatatan pekerjaan maintenance harian (Mesin, Status, Deskripsi Masalah, Tindakan Perbaikan, dll).',
+22338:   tema: 'Pengaturan tampilan aplikasi: Theme Manager (palet warna) dan Style Manager (bentuk/gaya visual card, tombol, sidebar) — murni preferensi tampilan, tidak memengaruhi data.',
+22339:   'insights-hub': 'Pintu masuk cepat (satu tap) ke berbagai halaman analitik & laporan: Dashboard Analitik, Correlation Analysis, Diagnostic Wizard, Expert Finder, Knowledge Graph, dan lainnya.',
+22340:   'people-hub': 'Pintu masuk cepat ke modul People & Meetings: Meeting Management dan People Intelligence (Personil, Soft Skill, Hard Skill, Smart Resume).',
+22341:   'pi-dashboard': 'People Intelligence — Dashboard ringkasan kompetensi & performa seluruh personil, digabung dari Soft Skill Assessment, Hard Skill Assessment, dan histori Logbook.',
+22342:   'pi-personnel': 'People Intelligence — Daftar kartu personil beserta skor kompetensi masing-masing, klik satu personil untuk lihat profil lengkapnya.',
+22343:   'pi-softskill': 'People Intelligence — Form & riwayat penilaian Soft Skill Assessment personil oleh direct manager.',
+22344:   'pi-hardskill': 'People Intelligence — Form & riwayat penilaian Hard Skill Assessment (per Unit Kompetensi) personil oleh direct manager.',
+22345:   'pi-smart-resume': 'Smart Recognition & Resume Personil — rekomendasi & ringkasan tiap personil, dihasilkan otomatis 100% lokal dari gabungan data Logbook, Hard Skill/Soft Skill Assessment, Kaizen/Project Improvement, dan Meeting Action Item.',
+22346:   rca: 'Root Cause Analysis — form Why-Why & Fishbone Diagram untuk menganalisis akar masalah suatu kejadian.',
+22347:   ipal: 'Form & riwayat laporan pengelolaan IPAL (Instalasi Pengolahan Air Limbah) bulanan.',
+22348:   downtime: 'Analisa Downtime Elektrikal & Mekanikal — upload laporan bulanan, lihat rekap per bulan, dan histori/YTD.',
+22349:   ai: 'Halaman rekomendasi/analisa AI atas data maintenance yang sudah tercatat.',
+22350:   setting: 'Koneksi ke database SQLite (Web App URL) & master data (Mesin, Personil, Lokasi Sparepart) — pusat konfigurasi aplikasi.',
+22351:   'expert-finder': 'Ranking personil paling berpengalaman berdasarkan histori Logbook (jumlah kasus, breakdown, tingkat penyelesaian, lama pengalaman). Klik personil untuk lihat histori lengkapnya.',
+22352:   'knowledge-graph': 'Visualisasi hubungan antar Personil, Mesin, Sparepart, dan Masalah dalam bentuk graph interaktif (vis-network), dibangun otomatis dari Logbook.',
+22353:   wiki: 'Maintenance Wikipedia — halaman detail Mesin/Personil/Sparepart yang saling terhubung dua arah, semua nama di aplikasi bisa diklik untuk pindah ke sini.'
+22354: };
+22355: 
+22356: function copilotPageResume(view){
+22357:   const items = [];
+22358:   // [FIX SOT] Jendela 30/90 hari di-clamp ke SOT_CUTOFF_DATE supaya TIDAK
+22359:   // PERNAH mundur menyentuh data historis OneNote yang belum tervalidasi --
+22360:   // perubahan di sini otomatis berlaku untuk SEMUA cabang di bawah yang
+22361:   // memakai cutoff30/cutoff90 (Logbook, Home/Dashboard, Durasi, Analitik,
+22362:   // Knowledge, Patrol, Sparepart, dll), tidak perlu diubah satu-satu.
+22363:   const cutoff30 = new Date(clampToSot(Date.now() - 30*86400000));
+22364:   const cutoff90 = new Date(clampToSot(Date.now() - 90*86400000));
+~~~
+
+## sparePartDigunakan
+No match.
+
+## namaMaterial:
+### Around line 15238
+~~~text
+15226: 
+15227: loadSparepartEtaLocal();
+15228: async function syncSparepartEtaFromBackend(){
+15229:   if(!WEB_APP_URL) return SPAREPART_ETA;
+15230:   try{
+15231:     const remote = await apiGet('sparepartEta');
+15232:     if(Array.isArray(remote)){
+15233:       SPAREPART_ETA = remote.map(r=>{
+15234:         let status = r['Status']||'WAITING';
+15235:         if(status==='MENUNGGU') status='WAITING'; else if(status==='TERLAMBAT') status='WAITING'; else if(status==='TIBA') status='ARRIVED';
+15236:         return {
+15237:           id: r['ID']||('PO-'+Date.now()+Math.random()),
+15238:           namaMaterial: r['Nama Material']||'',
+15239:           sap: r['Material Number SAP']||'',
+15240:           noPO: r['Nomor PO']||'',
+15241:           vendor: r['Vendor']||'',
+15242:           qty: Number(r['Qty'])||1,
+15243:           tanggalPO: r['Tanggal PO']||'',
+15244:           estimasiEta: r['Estimasi ETA']||'',
+15245:           status,
+15246:           tanggalTiba: r['Tanggal Tiba']||'',
+15247:           catatan: r['Catatan']||'',
+15248:           createdAt: r['Timestamp']||new Date().toISOString()
+15249:         };
+15250:       });
+15251:       saveSparepartEtaLocal();
+15252:     }
+15253:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+15254:   return SPAREPART_ETA;
+15255: }
+15256: 
+15257: $('#btn-add-sparepart-eta').addEventListener('click', async ()=>{
+15258:   const nama = $('#sp-eta-nama').value.trim();
+15259:   const nopo = $('#sp-eta-nopo').value.trim();
+15260:   const eta = $('#sp-eta-tgletaeta').value;
+15261:   if(!nama || !nopo || !eta){ toast('Nama Material, Nomor PO, dan ETA wajib diisi.', true); return; }
+15262:   const item = {
+15263:     id: 'PO-' + Date.now(),
+15264:     namaMaterial: nama,
+15265:     sap: $('#sp-eta-sap').value.trim(),
+15266:     noPO: nopo,
+15267:     vendor: $('#sp-eta-vendor').value.trim(),
+15268:     qty: Number($('#sp-eta-qty').value) || 1,
+15269:     tanggalPO: $('#sp-eta-tglpo').value || '',
+15270:     estimasiEta: eta,
+15271:     catatan: $('#sp-eta-catatan').value.trim(),
+15272:     status: 'WAITING',
+15273:     tanggalTiba: '',
+15274:     createdAt: new Date().toISOString()
+15275:   };
+15276:   SPAREPART_ETA.push(item);
+15277:   saveSparepartEtaLocal();
+15278:   ['sp-eta-nama','sp-eta-sap','sp-eta-nopo','sp-eta-vendor','sp-eta-qty','sp-eta-tglpo','sp-eta-tgletaeta','sp-eta-catatan'].forEach(id=> { const el=$('#'+id); if(el) el.value=''; });
+15279:   toast('Purchase Order tersimpan.');
+15280:   renderSparepartPoDash();
+15281:   renderSparepartEtaList();
+15282:   try{ await apiPost({ action:'saveSparepartEta', ...item }); }
+15283:   catch(e){ /* backend mungkin belum mendukung action ini; data lokal tetap tersimpan */ }
+15284: });
+15285: 
+15286: function renderSparepartPoDash(){
+15287:   const holder = $('#sp-po-dash');
+15288:   if(!holder) return;
+15289:   const keys = SPAREPART_ETA.map(poStatusKey);
+15290:   const count = k => keys.filter(x=>x===k).length;
+15291:   const cards = [
+15292:     { ico:'ph-clock', n: count('waiting'), l:'Waiting' },
+15293:     { ico:'ph-truck', n: count('intransit'), l:'In Transit', accent:'accent-amber' },
+15294:     { ico:'ph-warning', n: count('overdue'), l:'Overdue', accent:'accent-red' },
+15295:     { ico:'ph-package', n: count('arrived'), l:'Arrived' },
+15296:     { ico:'ph-warehouse', n: count('warehouse'), l:'Warehouse', accent:'accent-green' }
+15297:   ];
+15298:   holder.innerHTML = cards.map(c=>`
+15299:     <div class="sp-dash-card ${c.accent||''}">
+15300:       <div class="ico"><i class="ph-bold ${c.ico}"></i></div>
+15301:       <div class="n">${c.n}</div>
+15302:       <div class="l">${c.l}</div>
+~~~
+
+### Around line 15264
+~~~text
+15252:     }
+15253:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+15254:   return SPAREPART_ETA;
+15255: }
+15256: 
+15257: $('#btn-add-sparepart-eta').addEventListener('click', async ()=>{
+15258:   const nama = $('#sp-eta-nama').value.trim();
+15259:   const nopo = $('#sp-eta-nopo').value.trim();
+15260:   const eta = $('#sp-eta-tgletaeta').value;
+15261:   if(!nama || !nopo || !eta){ toast('Nama Material, Nomor PO, dan ETA wajib diisi.', true); return; }
+15262:   const item = {
+15263:     id: 'PO-' + Date.now(),
+15264:     namaMaterial: nama,
+15265:     sap: $('#sp-eta-sap').value.trim(),
+15266:     noPO: nopo,
+15267:     vendor: $('#sp-eta-vendor').value.trim(),
+15268:     qty: Number($('#sp-eta-qty').value) || 1,
+15269:     tanggalPO: $('#sp-eta-tglpo').value || '',
+15270:     estimasiEta: eta,
+15271:     catatan: $('#sp-eta-catatan').value.trim(),
+15272:     status: 'WAITING',
+15273:     tanggalTiba: '',
+15274:     createdAt: new Date().toISOString()
+15275:   };
+15276:   SPAREPART_ETA.push(item);
+15277:   saveSparepartEtaLocal();
+15278:   ['sp-eta-nama','sp-eta-sap','sp-eta-nopo','sp-eta-vendor','sp-eta-qty','sp-eta-tglpo','sp-eta-tgletaeta','sp-eta-catatan'].forEach(id=> { const el=$('#'+id); if(el) el.value=''; });
+15279:   toast('Purchase Order tersimpan.');
+15280:   renderSparepartPoDash();
+15281:   renderSparepartEtaList();
+15282:   try{ await apiPost({ action:'saveSparepartEta', ...item }); }
+15283:   catch(e){ /* backend mungkin belum mendukung action ini; data lokal tetap tersimpan */ }
+15284: });
+15285: 
+15286: function renderSparepartPoDash(){
+15287:   const holder = $('#sp-po-dash');
+15288:   if(!holder) return;
+15289:   const keys = SPAREPART_ETA.map(poStatusKey);
+15290:   const count = k => keys.filter(x=>x===k).length;
+15291:   const cards = [
+15292:     { ico:'ph-clock', n: count('waiting'), l:'Waiting' },
+15293:     { ico:'ph-truck', n: count('intransit'), l:'In Transit', accent:'accent-amber' },
+15294:     { ico:'ph-warning', n: count('overdue'), l:'Overdue', accent:'accent-red' },
+15295:     { ico:'ph-package', n: count('arrived'), l:'Arrived' },
+15296:     { ico:'ph-warehouse', n: count('warehouse'), l:'Warehouse', accent:'accent-green' }
+15297:   ];
+15298:   holder.innerHTML = cards.map(c=>`
+15299:     <div class="sp-dash-card ${c.accent||''}">
+15300:       <div class="ico"><i class="ph-bold ${c.ico}"></i></div>
+15301:       <div class="n">${c.n}</div>
+15302:       <div class="l">${c.l}</div>
+15303:     </div>`).join('');
+15304: }
+15305: 
+15306: function renderSparepartEtaList(){
+15307:   const holder = $('#list-sparepart-eta');
+15308:   if(!holder) return;
+15309:   const q = ($('#search-sparepart-eta').value || '').toLowerCase();
+15310:   const stF = $('#filter-sparepart-eta-status').value;
+15311:   let rows = SPAREPART_ETA.map(item=> ({ item, key: poStatusKey(item) }));
+15312:   rows = rows.filter(({item,key})=>{
+15313:     if(stF && key !== stF) return false;
+15314:     if(q){
+15315:       const hay = [item.namaMaterial, item.sap, item.noPO, item.vendor, item.catatan].join(' ').toLowerCase();
+15316:       if(!hay.includes(q)) return false;
+15317:     }
+15318:     return true;
+15319:   });
+15320:   rows.sort((a,b)=>{
+15321:     const order = { overdue:0, intransit:1, waiting:2, arrived:3, warehouse:4 };
+15322:     if(order[a.key] !== order[b.key]) return order[a.key]-order[b.key];
+15323:     return new Date(a.item.estimasiEta||0) - new Date(b.item.estimasiEta||0);
+15324:   });
+15325: 
+15326:   if(!rows.length){
+15327:     holder.innerHTML = `<div class="empty-state"><div class="ico"><i class="ph-bold ph-truck"></i></div>Belum ada data PO yang cocok. Total tersimpan: ${SPAREPART_ETA.length}.</div>`;
+15328:     return;
+~~~
+
+### Around line 15396
+~~~text
+15384:   catch(e){ SPAREPART_WAREHOUSE = []; }
+15385: }
+15386: function saveSparepartWarehouseLocal(){ localStorage.setItem(LS_SPAREPART_WAREHOUSE_KEY, JSON.stringify(SPAREPART_WAREHOUSE)); }
+15387: loadSparepartWarehouseLocal();
+15388: async function syncSparepartWarehouseFromBackend(){
+15389:   if(!WEB_APP_URL) return SPAREPART_WAREHOUSE;
+15390:   try{
+15391:     const remote = await apiGet('sparepartWarehouse');
+15392:     if(Array.isArray(remote)){
+15393:       SPAREPART_WAREHOUSE = remote.map(r=>({
+15394:         poId: r['PO ID']||'',
+15395:         noPO: r['Nomor PO']||'',
+15396:         namaMaterial: r['Nama Material']||'',
+15397:         qtyMatch: r['Qty Match']||'',
+15398:         condition: r['Condition']||'',
+15399:         location: r['Warehouse Location']||'',
+15400:         sapUpdated: r['SAP Updated']==='YA',
+15401:         validator: r['Validator']||'',
+15402:         validationDate: r['Validation Date']||''
+15403:       }));
+15404:       saveSparepartWarehouseLocal();
+15405:     }
+15406:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+15407:   return SPAREPART_WAREHOUSE;
+15408: }
+15409: function findWarehouseValidation(poId){ return SPAREPART_WAREHOUSE.find(x=>x.poId===poId) || null; }
+15410: 
+15411: function renderSparepartWarehouseList(){
+15412:   const holder = $('#list-sparepart-warehouse');
+15413:   if(!holder) return;
+15414:   const q = ($('#search-sparepart-warehouse').value || '').toLowerCase();
+15415:   let rows = SPAREPART_ETA.filter(item=> poStatusKey(item)==='arrived');
+15416:   rows = rows.filter(item=>{
+15417:     if(q){
+15418:       const hay = [item.namaMaterial, item.sap, item.noPO].join(' ').toLowerCase();
+15419:       if(!hay.includes(q)) return false;
+15420:     }
+15421:     return true;
+15422:   });
+15423: 
+15424:   if(!rows.length){
+15425:     holder.innerHTML = `<div class="empty-state"><div class="ico"><i class="ph-bold ph-warehouse"></i></div>Tidak ada PO berstatus Arrived yang menunggu validasi.</div>`;
+15426:     return;
+15427:   }
+15428:   holder.innerHTML = rows.map(item=>{
+15429:     const existing = findWarehouseValidation(item.id) || {};
+15430:     return `
+15431:     <div class="sp-wh-row" data-id="${escapeHtml(item.id)}">
+15432:       <div class="body">
+15433:         <div class="material">${wikiLinkHtml("sparepart", item.namaMaterial, item.namaMaterial)}</div>
+15434:         <div class="meta">PO: ${escapeHtml(item.noPO)}${item.vendor?(' · Vendor: '+escapeHtml(item.vendor)):''} · Qty PO: ${item.qty} · Tiba: ${item.tanggalTiba?fmtDate(item.tanggalTiba):'-'}</div>
+15435:         <div class="sp-wh-form">
+15436:           <div class="field"><label>Qty Match</label>
+15437:             <select class="sp-inline-select sp-wh-qtymatch">
+15438:               <option value="Sesuai" ${existing.qtyMatch==='Sesuai'?'selected':''}>Sesuai</option>
+15439:               <option value="Kurang" ${existing.qtyMatch==='Kurang'?'selected':''}>Kurang</option>
+15440:               <option value="Lebih" ${existing.qtyMatch==='Lebih'?'selected':''}>Lebih</option>
+15441:             </select>
+15442:           </div>
+15443:           <div class="field"><label>Condition</label>
+15444:             <select class="sp-inline-select sp-wh-condition">
+15445:               <option value="Good" ${existing.condition==='Good'?'selected':''}>Good</option>
+15446:               <option value="Damaged" ${existing.condition==='Damaged'?'selected':''}>Damaged</option>
+15447:               <option value="Partial" ${existing.condition==='Partial'?'selected':''}>Partial</option>
+15448:             </select>
+15449:           </div>
+15450:           <div class="field"><label>Warehouse Location</label><input type="text" class="sp-inline-input sp-wh-location" value="${escapeHtml(existing.location||'')}" placeholder="mis. Rak A-3" style="width:100%;"></div>
+15451:           <div class="field"><label>SAP Updated</label>
+15452:             <select class="sp-inline-select sp-wh-sapupdated">
+15453:               <option value="0" ${!existing.sapUpdated?'selected':''}>Belum</option>
+15454:               <option value="1" ${existing.sapUpdated?'selected':''}>Sudah</option>
+15455:             </select>
+15456:           </div>
+15457:           <div class="field"><label>Validator</label><input type="text" class="sp-inline-input sp-wh-validator" value="${escapeHtml(existing.validator||'')}" placeholder="Nama validator" style="width:100%;"></div>
+15458:           <div class="field"><label>Validation Date</label><input type="date" class="sp-inline-input sp-wh-date" value="${escapeHtml(existing.validationDate||new Date().toISOString().slice(0,10))}" style="width:100%;"></div>
+15459:         </div>
+15460:       </div>
+~~~
+
+### Around line 15474
+~~~text
+15462:         <button type="button" class="btn btn-sm btn-primary sp-wh-validate" data-id="${escapeHtml(item.id)}"><i class="ph-bold ph-check-circle"></i> Validate</button>
+15463:       </div>
+15464:     </div>`;
+15465:   }).join('');
+15466: 
+15467:   $$('.sp-wh-validate', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+15468:     const row = btn.closest('.sp-wh-row');
+15469:     const id = btn.dataset.id;
+15470:     const item = SPAREPART_ETA.find(x=>x.id===id); if(!item) return;
+15471:     const validator = row.querySelector('.sp-wh-validator').value.trim();
+15472:     if(!validator){ toast('Nama Validator wajib diisi sebelum validasi.', true); return; }
+15473:     const payload = {
+15474:       poId: id, noPO: item.noPO, namaMaterial: item.namaMaterial,
+15475:       qtyMatch: row.querySelector('.sp-wh-qtymatch').value,
+15476:       condition: row.querySelector('.sp-wh-condition').value,
+15477:       location: row.querySelector('.sp-wh-location').value.trim(),
+15478:       sapUpdated: row.querySelector('.sp-wh-sapupdated').value === '1',
+15479:       validator,
+15480:       validationDate: row.querySelector('.sp-wh-date').value || new Date().toISOString().slice(0,10)
+15481:     };
+15482:     SPAREPART_WAREHOUSE = SPAREPART_WAREHOUSE.filter(x=>x.poId!==id);
+15483:     SPAREPART_WAREHOUSE.push(payload);
+15484:     saveSparepartWarehouseLocal();
+15485:     item.status = 'WAREHOUSE';
+15486:     saveSparepartEtaLocal();
+15487:     toast('Validasi tersimpan — status PO menjadi Warehouse Available.');
+15488:     renderSparepartPoDash(); renderSparepartEtaList(); renderSparepartWarehouseList();
+15489:     try{ await apiPost({ action:'saveSparepartWarehouse', ...payload }); }catch(e){}
+15490:     try{ await apiPost({ action:'updateSparepartEta', id, status:'WAREHOUSE' }); }catch(e){}
+15491:   }));
+15492: }
+15493: const searchWhEl = $('#search-sparepart-warehouse');
+15494: if(searchWhEl) searchWhEl.addEventListener('input', renderSparepartWarehouseList);
+15495: 
+15496: /* =========================================================
+15497:    TAB 4: DAILY STOCK OPNAME
+15498:    Pencatatan hasil hitung fisik stok gudang, dibandingkan dengan stok
+15499:    sistem (dicocokkan via SAP dari master Sparepart_Lokasi -- lihat
+15500:    findStockSistemBySap di bagian "MASTER SPAREPART" di atas).
+15501:    Checklist harian 20-30 item dibuat otomatis dari master Lokasi Sparepart.
+15502:    ========================================================= */
+15503: const SPAREPART_OPNAME_DAILY_TARGET = 30;
+15504: let SPAREPART_OPNAME = [];
+15505: function loadSparepartOpnameLocal(){
+15506:   try{ SPAREPART_OPNAME = JSON.parse(localStorage.getItem(LS_SPAREPART_OPNAME_KEY) || '[]'); }
+15507:   catch(e){ SPAREPART_OPNAME = []; }
+15508: }
+15509: function saveSparepartOpnameLocal(){ localStorage.setItem(LS_SPAREPART_OPNAME_KEY, JSON.stringify(SPAREPART_OPNAME)); }
+15510: loadSparepartOpnameLocal();
+15511: async function syncSparepartOpnameFromBackend(){
+15512:   if(!WEB_APP_URL) return SPAREPART_OPNAME;
+15513:   try{
+15514:     const remote = await apiGet('sparepartOpname');
+15515:     if(Array.isArray(remote)){
+15516:       SPAREPART_OPNAME = remote.map(r=>({
+15517:         id: r['ID']||('OP-'+Date.now()+Math.random()),
+15518:         tanggal: r['Tanggal']||'',
+15519:         partNo: r['Part No']||'',
+15520:         namaMaterial: r['Nama Material']||'',
+15521:         sap: r['Material Number SAP']||'',
+15522:         stockSistem: r['Stock Sistem']===''||r['Stock Sistem']==null ? null : Number(r['Stock Sistem']),
+15523:         stockFisik: Number(r['Stock Fisik'])||0,
+15524:         selisih: r['Selisih']===''||r['Selisih']==null ? null : Number(r['Selisih']),
+15525:         lokasi: r['Lokasi Rak']||'',
+15526:         catatan: r['Catatan']||'',
+15527:         createdAt: r['Timestamp']||new Date().toISOString()
+15528:       }));
+15529:       saveSparepartOpnameLocal();
+15530:     }
+15531:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+15532:   return SPAREPART_OPNAME;
+15533: }
+15534: 
+15535: $('#sp-opname-sap').addEventListener('change', ()=>{
+15536:   const auto = findStockSistemBySap($('#sp-opname-sap').value.trim());
+15537:   if(auto!=null) $('#sp-opname-sistem').value = auto;
+15538: });
+~~~
+
+### Around line 15520
+~~~text
+15508: }
+15509: function saveSparepartOpnameLocal(){ localStorage.setItem(LS_SPAREPART_OPNAME_KEY, JSON.stringify(SPAREPART_OPNAME)); }
+15510: loadSparepartOpnameLocal();
+15511: async function syncSparepartOpnameFromBackend(){
+15512:   if(!WEB_APP_URL) return SPAREPART_OPNAME;
+15513:   try{
+15514:     const remote = await apiGet('sparepartOpname');
+15515:     if(Array.isArray(remote)){
+15516:       SPAREPART_OPNAME = remote.map(r=>({
+15517:         id: r['ID']||('OP-'+Date.now()+Math.random()),
+15518:         tanggal: r['Tanggal']||'',
+15519:         partNo: r['Part No']||'',
+15520:         namaMaterial: r['Nama Material']||'',
+15521:         sap: r['Material Number SAP']||'',
+15522:         stockSistem: r['Stock Sistem']===''||r['Stock Sistem']==null ? null : Number(r['Stock Sistem']),
+15523:         stockFisik: Number(r['Stock Fisik'])||0,
+15524:         selisih: r['Selisih']===''||r['Selisih']==null ? null : Number(r['Selisih']),
+15525:         lokasi: r['Lokasi Rak']||'',
+15526:         catatan: r['Catatan']||'',
+15527:         createdAt: r['Timestamp']||new Date().toISOString()
+15528:       }));
+15529:       saveSparepartOpnameLocal();
+15530:     }
+15531:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+15532:   return SPAREPART_OPNAME;
+15533: }
+15534: 
+15535: $('#sp-opname-sap').addEventListener('change', ()=>{
+15536:   const auto = findStockSistemBySap($('#sp-opname-sap').value.trim());
+15537:   if(auto!=null) $('#sp-opname-sistem').value = auto;
+15538: });
+15539: 
+15540: $('#btn-add-sparepart-opname').addEventListener('click', async ()=>{
+15541:   const nama = $('#sp-opname-nama').value.trim();
+15542:   const fisikStr = $('#sp-opname-fisik').value;
+15543:   if(!nama || fisikStr===''){ toast('Nama Material dan Physical Stock wajib diisi.', true); return; }
+15544:   const sap = $('#sp-opname-sap').value.trim();
+15545:   const sistem = $('#sp-opname-sistem').value === '' ? null : Number($('#sp-opname-sistem').value);
+15546:   const fisik = Number(fisikStr);
+15547:   const item = {
+15548:     id: 'OP-' + Date.now(),
+15549:     tanggal: new Date().toISOString().slice(0,10),
+15550:     partNo: $('#sp-opname-partno').value.trim(),
+15551:     namaMaterial: nama,
+15552:     sap,
+15553:     stockSistem: sistem,
+15554:     stockFisik: fisik,
+15555:     selisih: sistem!=null ? (fisik - sistem) : null,
+15556:     lokasi: $('#sp-opname-lokasi').value.trim(),
+15557:     catatan: $('#sp-opname-catatan').value.trim(),
+15558:     createdAt: new Date().toISOString()
+15559:   };
+15560:   SPAREPART_OPNAME.push(item);
+15561:   saveSparepartOpnameLocal();
+15562:   ['sp-opname-partno','sp-opname-nama','sp-opname-sap','sp-opname-sistem','sp-opname-fisik','sp-opname-lokasi','sp-opname-catatan'].forEach(id=> { const el=$('#'+id); if(el) el.value=''; });
+15563:   toast('Hasil stock opname tersimpan.');
+15564:   renderSparepartOpnameList();
+15565:   renderSparepartTargetBanner();
+15566:   renderSparepartOpnameDash();
+15567:   renderSparepartOpnameChecklist();
+15568:   try{ await apiPost({ action:'saveSparepartOpname', ...item }); }
+15569:   catch(e){ /* backend mungkin belum mendukung action ini; data lokal tetap tersimpan */ }
+15570: });
+15571: 
+15572: function sparepartOpnameToday(){
+15573:   const today = new Date().toISOString().slice(0,10);
+15574:   return SPAREPART_OPNAME.filter(x=> String(x.createdAt||'').slice(0,10) === today);
+15575: }
+15576: 
+15577: function renderSparepartTargetBanner(){
+15578:   const todayCount = sparepartOpnameToday().length;
+15579:   const pct = Math.min(100, Math.round((todayCount/SPAREPART_OPNAME_DAILY_TARGET)*100));
+15580:   $('#sp-target-num').textContent = `${todayCount} / ${SPAREPART_OPNAME_DAILY_TARGET} item`;
+15581:   $('#sp-target-fill').style.width = pct + '%';
+15582:   $('#sp-target-sub').textContent = todayCount >= SPAREPART_OPNAME_DAILY_TARGET
+15583:     ? '🎉 Target harian tercapai — terima kasih sudah menyelesaikan stock opname hari ini.'
+15584:     : `Masih perlu ${SPAREPART_OPNAME_DAILY_TARGET - todayCount} item lagi untuk mencapai target harian.`;
+~~~
+
+### Around line 15551
+~~~text
+15539: 
+15540: $('#btn-add-sparepart-opname').addEventListener('click', async ()=>{
+15541:   const nama = $('#sp-opname-nama').value.trim();
+15542:   const fisikStr = $('#sp-opname-fisik').value;
+15543:   if(!nama || fisikStr===''){ toast('Nama Material dan Physical Stock wajib diisi.', true); return; }
+15544:   const sap = $('#sp-opname-sap').value.trim();
+15545:   const sistem = $('#sp-opname-sistem').value === '' ? null : Number($('#sp-opname-sistem').value);
+15546:   const fisik = Number(fisikStr);
+15547:   const item = {
+15548:     id: 'OP-' + Date.now(),
+15549:     tanggal: new Date().toISOString().slice(0,10),
+15550:     partNo: $('#sp-opname-partno').value.trim(),
+15551:     namaMaterial: nama,
+15552:     sap,
+15553:     stockSistem: sistem,
+15554:     stockFisik: fisik,
+15555:     selisih: sistem!=null ? (fisik - sistem) : null,
+15556:     lokasi: $('#sp-opname-lokasi').value.trim(),
+15557:     catatan: $('#sp-opname-catatan').value.trim(),
+15558:     createdAt: new Date().toISOString()
+15559:   };
+15560:   SPAREPART_OPNAME.push(item);
+15561:   saveSparepartOpnameLocal();
+15562:   ['sp-opname-partno','sp-opname-nama','sp-opname-sap','sp-opname-sistem','sp-opname-fisik','sp-opname-lokasi','sp-opname-catatan'].forEach(id=> { const el=$('#'+id); if(el) el.value=''; });
+15563:   toast('Hasil stock opname tersimpan.');
+15564:   renderSparepartOpnameList();
+15565:   renderSparepartTargetBanner();
+15566:   renderSparepartOpnameDash();
+15567:   renderSparepartOpnameChecklist();
+15568:   try{ await apiPost({ action:'saveSparepartOpname', ...item }); }
+15569:   catch(e){ /* backend mungkin belum mendukung action ini; data lokal tetap tersimpan */ }
+15570: });
+15571: 
+15572: function sparepartOpnameToday(){
+15573:   const today = new Date().toISOString().slice(0,10);
+15574:   return SPAREPART_OPNAME.filter(x=> String(x.createdAt||'').slice(0,10) === today);
+15575: }
+15576: 
+15577: function renderSparepartTargetBanner(){
+15578:   const todayCount = sparepartOpnameToday().length;
+15579:   const pct = Math.min(100, Math.round((todayCount/SPAREPART_OPNAME_DAILY_TARGET)*100));
+15580:   $('#sp-target-num').textContent = `${todayCount} / ${SPAREPART_OPNAME_DAILY_TARGET} item`;
+15581:   $('#sp-target-fill').style.width = pct + '%';
+15582:   $('#sp-target-sub').textContent = todayCount >= SPAREPART_OPNAME_DAILY_TARGET
+15583:     ? '🎉 Target harian tercapai — terima kasih sudah menyelesaikan stock opname hari ini.'
+15584:     : `Masih perlu ${SPAREPART_OPNAME_DAILY_TARGET - todayCount} item lagi untuk mencapai target harian.`;
+15585: }
+15586: 
+15587: function renderSparepartOpnameDash(){
+15588:   const holder = $('#sp-opname-dash');
+15589:   if(!holder) return;
+15590:   const today = sparepartOpnameToday();
+15591:   const completed = today.length;
+15592:   const remaining = Math.max(0, SPAREPART_OPNAME_DAILY_TARGET - completed);
+15593:   const withSistem = today.filter(x=>x.selisih!=null);
+15594:   const matched = withSistem.filter(x=>x.selisih===0).length;
+15595:   const accuracy = withSistem.length ? Math.round((matched/withSistem.length)*100) : 100;
+15596:   const cards = [
+15597:     { ico:'ph-target', n: SPAREPART_OPNAME_DAILY_TARGET, l:'Daily Target' },
+15598:     { ico:'ph-check-circle', n: completed, l:'Completed', accent:'accent-green' },
+15599:     { ico:'ph-hourglass', n: remaining, l:'Remaining', accent: remaining>0?'accent-amber':'accent-green' },
+15600:     { ico:'ph-percent', n: accuracy+'%', l:'Accuracy', accent: accuracy>=95?'accent-green':(accuracy>=80?'accent-amber':'accent-red') }
+15601:   ];
+15602:   holder.innerHTML = cards.map(c=>`
+15603:     <div class="sp-dash-card ${c.accent||''}">
+15604:       <div class="ico"><i class="ph-bold ${c.ico}"></i></div>
+15605:       <div class="n">${c.n}</div>
+15606:       <div class="l">${c.l}</div>
+15607:     </div>`).join('');
+15608: }
+15609: 
+15610: // Checklist harian 20-30 item, dibuat otomatis dari master Lokasi Sparepart
+15611: // (Setting > Lokasi Sparepart), memprioritaskan item yang belum di-opname hari ini.
+15612: function sparepartOpnameChecklistItems(){
+15613:   const todaySap = new Set(sparepartOpnameToday().map(x=>x.sap).filter(Boolean));
+15614:   const master = (SPAREPART_LOKASI||[]).slice();
+15615:   const size = Math.max(20, Math.min(30, master.length || 20));
+~~~
+
+## materialNumberSAP:
+No match.
+
+## formData.get("deskripsiMasalah")
+No match.
+
+## new FormData(formEntryForDraft)
+No match.
+
+## const payload =
+### Around line 67
+~~~text
+00055:   }
+00056:   if(e.target.closest('#btn-pi-hs-save-manual')){
+00057:     const resume = piComputeHardSkillResume(PI_HS_EDIT_ITEMS);
+00058:     const selectedNama = $('#pi-hs-employee').value;
+00059:     // Guard: nama HARUS berasal dari daftar karyawan master (dropdown), tidak
+00060:     // boleh string kosong/lain-lain yang bisa membuat "karyawan hantu" baru
+00061:     // ikut tersimpan ke database SQLite & muncul lagi di dropdown berikutnya.
+00062:     const validNames = piEmployeeList();
+00063:     if(!selectedNama || !validNames.includes(selectedNama)){
+00064:       toast('Nama karyawan tidak valid atau daftar karyawan belum termuat. Silakan tunggu data selesai dimuat lalu pilih ulang nama karyawan.', true);
+00065:       return;
+00066:     }
+00067:     const payload = {
+00068:       nama: selectedNama,
+00069:       posisi: $('#pi-hs-position').value.trim(),
+00070:       tahun: Number($('#pi-hs-year').value)||new Date().getFullYear(),
+00071:       assessor: $('#pi-hs-assessor').value.trim(),
+00072:       items: PI_HS_EDIT_ITEMS,
+00073:       kompeten: resume.kompeten,
+00074:       belumKompeten: resume.belumKompeten,
+00075:       // Penjelasan Belum Kompeten SELALU dihitung otomatis dari penjelasan
+00076:       // per unit kompetensi (satu penjelasan terikat ke satu unit) — tidak
+00077:       // ada lagi input manual terpisah di level resume agar tidak double input.
+00078:       penjelasanBelumKompeten: resume.penjelasanBelumKompeten,
+00079:       selfLearning: $('#pi-hs-resume-selflearning').value.trim(),
+00080:       mentoring: $('#pi-hs-resume-mentoring').value.trim(),
+00081:       coaching: $('#pi-hs-resume-coaching').value.trim()
+00082:     };
+00083:     if(!payload.nama || !payload.posisi || !payload.items.length){ toast('Lengkapi nama, posisi, dan minimal satu unit kompetensi hard skill.', true); return; }
+00084:     if(payload.items.some(it=>!it.unitKompetensi || !it.statusManager)){ toast('Lengkapi Unit Kompetensi dan status penilaian (Kompeten/Belum Kompeten) dari direct manager untuk setiap baris.', true); return; }
+00085:     if(payload.items.some(it=>it.statusManager==='Belum Kompeten' && !String(it.penjelasanBelumKompeten||'').trim())){ toast('Isi Penjelasan untuk setiap unit kompetensi berstatus Belum Kompeten.', true); return; }
+00086:     try{
+00087:       await apiPost({action:'savePiHardskill', assessment:payload});
+00088:       // Sinkronkan ulang dari backend lalu langsung dorong hasilnya ke Personnel
+00089:       // (card personil) dan PI Dashboard supaya kedua menu itu langsung
+00090:       // menampilkan hasil assessment terbaru tanpa perlu reload halaman.
+00091:       await piSyncHardSkillFromBackend();
+00092:       renderPiHardSkillHistory();
+00093:       if(typeof renderPiPersonnelView === 'function'){ try{ renderPiPersonnelView(); }catch(e){} }
+00094:       if(typeof renderPiDashboardView === 'function'){ try{ renderPiDashboardView(); }catch(e){} }
+00095:       toast('Hard skill assessment berhasil disimpan & tersinkron ke Personnel + PI Dashboard');
+00096:     }catch(err){ toast('Gagal menyimpan hard skill: ' + err.message, true); }
+00097:   }
+00098: });
+00099: 
+00100: const _oldCopilotPageResume =
+00101:   typeof window.copilotPageResume === 'function'
+00102:     ? window.copilotPageResume
+00103:     : function(){ return []; };
+00104: window.copilotPageResume = function(view){
+00105:   const items = _oldCopilotPageResume(view) || [];
+00106:   if(['pi-dashboard','pi-personnel','pi-softskill','pi-hardskill','pi-smart-resume'].includes(view)){
+00107:     const totalPersonil = (typeof piEmployeeList === 'function') ? piEmployeeList().length : 0;
+00108:     const totalSoft = (typeof loadPiSoftskill === 'function') ? loadPiSoftskill().length : 0;
+00109:     const totalHard = (typeof loadPiHardSkill === 'function')
+00110:       ? (((PI_HS_ASSESSMENTS && PI_HS_ASSESSMENTS.length) ? PI_HS_ASSESSMENTS.length : loadPiHardSkill().length) || 0)
+00111:       : 0;
+00112:     items.push({
+00113:       level:'info', icon:'🧠', title:'Ringkasan People Intelligence',
+00114:       text:`Total personil <b>${totalPersonil}</b>, soft skill assessment <b>${totalSoft}</b>, hard skill assessment <b>${totalHard}</b>.`,
+00115:       sub:'Copilot sudah ditautkan ke master personil, soft skill, hard skill, dan profil personil.',
+00116:       sources:[]
+00117:     });
+00118:   }
+00119:   return items;
+00120: };
+00121: 
+00122: </script>
+00123: <link rel="preconnect" href="https://fonts.googleapis.com">
+00124: <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Poppins:wght@500;600;700;800&family=VT323&family=Playfair+Display:wght@600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+00125: 
+00126: <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/regular/style.css">
+00127: <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/bold/style.css">
+00128: <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/fill/style.css">
+00129: <style>
+00130: :root{
+00131:   /* ==== TEMA DEFAULT: Merah-Hitam (WCAG 2.2 AA) ====
+~~~
+
+### Around line 12908
+~~~text
+12896:   KPI_KERJA = loadKpiKerjaLocal();
+12897:   if(!WEB_APP_URL) return KPI_KERJA;
+12898:   try{
+12899:     const remote = await apiGet('kpiKerjaList');
+12900:     if(Array.isArray(remote)) saveKpiKerjaLocal(remote);
+12901:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+12902:   return KPI_KERJA;
+12903: }
+12904: 
+12905: async function syncKpiDepartmentData(){
+12906:   if(!WEB_APP_URL) return {mtd:KPI_DEPARTMENT_MTD,ytd:KPI_DEPARTMENT_YTD,meta:KPI_DEPARTMENT_META};
+12907:   try{
+12908:     const payload = await apiGet('kpiDepartmentData');
+12909:     if(payload && typeof payload === 'object'){
+12910:       if(Array.isArray(payload.mtd)){
+12911:         KPI_DEPARTMENT_MTD = payload.mtd;
+12912:         const officialKeys = new Set(payload.mtd.map(r=>String(r['Tahun']||'')+'|'+String(r['KPI']||'')));
+12913:         const preserved = KPI_KERJA.filter(r=>!officialKeys.has(String(r['Tahun']||'')+'|'+String(r['KPI']||'')));
+12914:         saveKpiKerjaLocal([...preserved, ...payload.mtd]);
+12915:       }
+12916:       if(Array.isArray(payload.ytd)) KPI_DEPARTMENT_YTD = payload.ytd;
+12917:       if(payload.meta) KPI_DEPARTMENT_META = payload.meta;
+12918:     }
+12919:   }catch(e){ console.warn('KPI Department source sync gagal:', e); }
+12920:   return {mtd:KPI_DEPARTMENT_MTD,ytd:KPI_DEPARTMENT_YTD,meta:KPI_DEPARTMENT_META};
+12921: }
+12922: 
+12923: function kkPolaritasOk(polaritas, target, realisasi){
+12924:   if(target === '' || target === null || target === undefined) return null;
+12925:   if(realisasi === '' || realisasi === null || realisasi === undefined) return null;
+12926:   target = Number(target); realisasi = Number(realisasi);
+12927:   if(isNaN(target) || isNaN(realisasi)) return null;
+12928:   return polaritas === 'Maximized' ? (realisasi >= target) : (realisasi <= target);
+12929: }
+12930: 
+12931: function kkBuildBulanGrid(){
+12932:   const holder = $('#kk-bulan-grid');
+12933:   if(!holder) return;
+12934:   holder.innerHTML = KK_BULAN.map(b => `
+12935:     <div class="kk-bulan-cell">
+12936:       <div class="kk-bulan-lbl">${b}</div>
+12937:       <input type="number" step="0.01" placeholder="Target" data-kk-bulan="${b}" data-kk-type="target" title="Target ${b}">
+12938:       <input type="number" step="0.01" placeholder="Realisasi" data-kk-bulan="${b}" data-kk-type="realisasi" title="Realisasi ${b}">
+12939:     </div>
+12940:   `).join('');
+12941: }
+12942: 
+12943: function resetKpiKerjaForm(){
+12944:   KPI_KERJA_EDIT_ID = null;
+12945:   ['#kk-tahun','#kk-perspective','#kk-producer','#kk-divisi','#kk-kpi','#kk-satuan','#kk-rumus','#kk-periode','#kk-target-tahunan'].forEach(sel=>{ const el=$(sel); if(el) el.value=''; });
+12946:   const pol = $('#kk-polaritas'); if(pol) pol.value = 'Minimized';
+12947:   const yearField = $('#kk-tahun'); if(yearField && !yearField.value) yearField.value = new Date().getFullYear();
+12948:   kkBuildBulanGrid();
+12949:   const btnCancel = $('#btn-cancel-edit-kpi-kerja'); if(btnCancel) btnCancel.style.display = 'none';
+12950: }
+12951: 
+12952: function renderKpiKerjaTable(){
+12953:   kkBuildBulanGrid();
+12954:   const holder = $('#kpi-kerja-table');
+12955:   if(!holder) return;
+12956:   if(!KPI_KERJA.length){ holder.innerHTML = `<div style="color:var(--text-dim);font-size:13px;">Belum ada data KPI. Klik "Isi KPI Standar" atau tambah manual di atas.</div>`; return; }
+12957:   const rows = KPI_KERJA.slice().sort((a,b)=> String(b['Tahun']).localeCompare(String(a['Tahun'])) || String(a['Divisi']||'').localeCompare(String(b['Divisi']||'')) || String(a['KPI']||'').localeCompare(String(b['KPI']||'')));
+12958:   holder.innerHTML = `<div style="overflow-x:auto;"><table class="kk-table"><thead><tr>
+12959:       <th>Tahun</th><th>Divisi</th><th>KPI</th><th>Satuan</th><th>Polaritas</th><th>Target Tahunan</th><th>Aksi</th>
+12960:     </tr></thead><tbody>
+12961:     ${rows.map(r=>`<tr>
+12962:       <td>${escapeHtml(String(r['Tahun']||''))}</td>
+12963:       <td>${escapeHtml(r['Divisi']||'')}</td>
+12964:       <td>${escapeHtml(r['KPI']||'')}</td>
+12965:       <td>${escapeHtml(r['Satuan']||'')}</td>
+12966:       <td>${escapeHtml(r['Polaritas']||'')}</td>
+12967:       <td>${escapeHtml(String(r['Target Tahunan']!==undefined?r['Target Tahunan']:''))}</td>
+12968:       <td>
+12969:         <button class="btn btn-sm" data-kk-edit="${r['ID']}"><i class="ph-bold ph-pencil-simple"></i></button>
+12970:         <button class="btn btn-sm" data-kk-del="${r['ID']}"><i class="ph-bold ph-trash"></i></button>
+12971:       </td>
+12972:     </tr>`).join('')}
+~~~
+
+### Around line 15473
+~~~text
+15461:       <div class="actions">
+15462:         <button type="button" class="btn btn-sm btn-primary sp-wh-validate" data-id="${escapeHtml(item.id)}"><i class="ph-bold ph-check-circle"></i> Validate</button>
+15463:       </div>
+15464:     </div>`;
+15465:   }).join('');
+15466: 
+15467:   $$('.sp-wh-validate', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+15468:     const row = btn.closest('.sp-wh-row');
+15469:     const id = btn.dataset.id;
+15470:     const item = SPAREPART_ETA.find(x=>x.id===id); if(!item) return;
+15471:     const validator = row.querySelector('.sp-wh-validator').value.trim();
+15472:     if(!validator){ toast('Nama Validator wajib diisi sebelum validasi.', true); return; }
+15473:     const payload = {
+15474:       poId: id, noPO: item.noPO, namaMaterial: item.namaMaterial,
+15475:       qtyMatch: row.querySelector('.sp-wh-qtymatch').value,
+15476:       condition: row.querySelector('.sp-wh-condition').value,
+15477:       location: row.querySelector('.sp-wh-location').value.trim(),
+15478:       sapUpdated: row.querySelector('.sp-wh-sapupdated').value === '1',
+15479:       validator,
+15480:       validationDate: row.querySelector('.sp-wh-date').value || new Date().toISOString().slice(0,10)
+15481:     };
+15482:     SPAREPART_WAREHOUSE = SPAREPART_WAREHOUSE.filter(x=>x.poId!==id);
+15483:     SPAREPART_WAREHOUSE.push(payload);
+15484:     saveSparepartWarehouseLocal();
+15485:     item.status = 'WAREHOUSE';
+15486:     saveSparepartEtaLocal();
+15487:     toast('Validasi tersimpan — status PO menjadi Warehouse Available.');
+15488:     renderSparepartPoDash(); renderSparepartEtaList(); renderSparepartWarehouseList();
+15489:     try{ await apiPost({ action:'saveSparepartWarehouse', ...payload }); }catch(e){}
+15490:     try{ await apiPost({ action:'updateSparepartEta', id, status:'WAREHOUSE' }); }catch(e){}
+15491:   }));
+15492: }
+15493: const searchWhEl = $('#search-sparepart-warehouse');
+15494: if(searchWhEl) searchWhEl.addEventListener('input', renderSparepartWarehouseList);
+15495: 
+15496: /* =========================================================
+15497:    TAB 4: DAILY STOCK OPNAME
+15498:    Pencatatan hasil hitung fisik stok gudang, dibandingkan dengan stok
+15499:    sistem (dicocokkan via SAP dari master Sparepart_Lokasi -- lihat
+15500:    findStockSistemBySap di bagian "MASTER SPAREPART" di atas).
+15501:    Checklist harian 20-30 item dibuat otomatis dari master Lokasi Sparepart.
+15502:    ========================================================= */
+15503: const SPAREPART_OPNAME_DAILY_TARGET = 30;
+15504: let SPAREPART_OPNAME = [];
+15505: function loadSparepartOpnameLocal(){
+15506:   try{ SPAREPART_OPNAME = JSON.parse(localStorage.getItem(LS_SPAREPART_OPNAME_KEY) || '[]'); }
+15507:   catch(e){ SPAREPART_OPNAME = []; }
+15508: }
+15509: function saveSparepartOpnameLocal(){ localStorage.setItem(LS_SPAREPART_OPNAME_KEY, JSON.stringify(SPAREPART_OPNAME)); }
+15510: loadSparepartOpnameLocal();
+15511: async function syncSparepartOpnameFromBackend(){
+15512:   if(!WEB_APP_URL) return SPAREPART_OPNAME;
+15513:   try{
+15514:     const remote = await apiGet('sparepartOpname');
+15515:     if(Array.isArray(remote)){
+15516:       SPAREPART_OPNAME = remote.map(r=>({
+15517:         id: r['ID']||('OP-'+Date.now()+Math.random()),
+15518:         tanggal: r['Tanggal']||'',
+15519:         partNo: r['Part No']||'',
+15520:         namaMaterial: r['Nama Material']||'',
+15521:         sap: r['Material Number SAP']||'',
+15522:         stockSistem: r['Stock Sistem']===''||r['Stock Sistem']==null ? null : Number(r['Stock Sistem']),
+15523:         stockFisik: Number(r['Stock Fisik'])||0,
+15524:         selisih: r['Selisih']===''||r['Selisih']==null ? null : Number(r['Selisih']),
+15525:         lokasi: r['Lokasi Rak']||'',
+15526:         catatan: r['Catatan']||'',
+15527:         createdAt: r['Timestamp']||new Date().toISOString()
+15528:       }));
+15529:       saveSparepartOpnameLocal();
+15530:     }
+15531:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+15532:   return SPAREPART_OPNAME;
+15533: }
+15534: 
+15535: $('#sp-opname-sap').addEventListener('change', ()=>{
+15536:   const auto = findStockSistemBySap($('#sp-opname-sap').value.trim());
+15537:   if(auto!=null) $('#sp-opname-sistem').value = auto;
+~~~
+
+### Around line 27127
+~~~text
+27115:   const data = {};
+27116:   if(PMC_STATE.editId) data.ID = PMC_STATE.editId;
+27117:   let missingReq = false;
+27118:   meta.fields.forEach(f=>{
+27119:     const id = 'pmc-f-'+f.k.replace(/[^a-zA-Z0-9]/g,'_');
+27120:     const el = document.getElementById(id);
+27121:     const v = el ? el.value.trim() : '';
+27122:     if(f.req && !v) missingReq = true;
+27123:     data[f.k] = v;
+27124:   });
+27125:   if(missingReq){ toast('Lengkapi field wajib (*)', true); return; }
+27126: 
+27127:   const payload = {action: meta.saveAction, data: data};
+27128:   for(const ff of meta.fileFields){
+27129:     const files = pendingFiles[ff.key]||[];
+27130:     if(files.length){
+27131:       payload[ff.key] = (await Promise.all(files.map(f=>prepareUploadPayload_(f)))).map(({_blob,...x})=>x);
+27132:     }
+27133:   }
+27134:   const btn = $('#pmc-btn-save');
+27135:   btn.disabled = true; btn.innerHTML = '<i class="ph-bold ph-spinner"></i> Menyimpan...';
+27136:   try{
+27137:     await apiPost(payload);
+27138:     toast('Data '+meta.label+' tersimpan.');
+27139:     closeModal();
+27140:     await pmcLoadAll(true);
+27141:     pmcPopulateFilterOptions();
+27142:     pmcRenderDashboard();
+27143:     pmcRenderList();
+27144:   }catch(err){
+27145:     toast('Gagal menyimpan: '+err.message, true);
+27146:     btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-check-circle"></i> Simpan';
+27147:   }
+27148: }
+27149: 
+27150: async function pmcDeleteItem(type, id){
+27151:   if(!confirm('Hapus data ini? Tindakan tidak bisa dibatalkan.')) return;
+27152:   try{
+27153:     await apiPost({action: PMC_META[type].deleteAction, id: id});
+27154:     toast('Data dihapus.');
+27155:     closeModal();
+27156:     await pmcLoadAll(true);
+27157:     pmcPopulateFilterOptions();
+27158:     pmcRenderDashboard();
+27159:     pmcRenderList();
+27160:   }catch(err){
+27161:     toast('Gagal menghapus: '+err.message, true);
+27162:   }
+27163: }
+27164: 
+27165: function pmcOpenProgressLogForm(type, item){
+27166:   const meta = PMC_META[type];
+27167:   const history = (item['Progress Log (JSON)']||[]);
+27168:   const historyHtml = history.slice().reverse().map(h=>`
+27169:     <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12px;">
+27170:       <b>${escapeHtml(h.tanggal||'')}</b> — ${escapeHtml(h.pic||'')} — ${escapeHtml(String(h.persentase||''))}%<br>
+27171:       ${escapeHtml(h.keterangan||'')}
+27172:       ${h.kendala?`<div style="color:#ef4444;">Kendala: ${escapeHtml(h.kendala)}</div>`:''}
+27173:       ${h.rencanaBerikutnya?`<div style="color:var(--text-dim);">Rencana: ${escapeHtml(h.rencanaBerikutnya)}</div>`:''}
+27174:     </div>`).join('') || '<div class="pmc-empty">Belum ada histori update.</div>';
+27175: 
+27176:   $('#modal-content').innerHTML = `
+27177:     <div class="modal-head">
+27178:       <div><h2 style="font-family:var(--font-display);margin:0;"><i class="ph-bold ph-notepad"></i> Update Progress — ${escapeHtml(item[meta.title]||'')}</h2></div>
+27179:       <button class="modal-close" id="btn-close-modal">✕</button>
+27180:     </div>
+27181:     <div class="grid2">
+27182:       <div class="field"><label>Tanggal</label><input type="date" id="pmc-log-tanggal" value="${new Date().toISOString().slice(0,10)}"></div>
+27183:       <div class="field"><label>PIC</label><input type="text" id="pmc-log-pic" value="${escapeHtml(item[meta.pic]||'')}"></div>
+27184:       <div class="field"><label>Persentase (%)</label><input type="number" id="pmc-log-persen" min="0" max="100" value="${escapeHtml(String(item[meta.progress]||0))}"></div>
+27185:     </div>
+27186:     <div class="field"><label>Keterangan</label><textarea id="pmc-log-ket" rows="2"></textarea></div>
+27187:     <div class="field"><label>Kendala</label><textarea id="pmc-log-kendala" rows="2"></textarea></div>
+27188:     <div class="field"><label>Rencana Berikutnya</label><textarea id="pmc-log-rencana" rows="2"></textarea></div>
+27189:     <div class="field"><label>Foto (opsional)</label>
+27190:       <div class="file-drop" id="pmc-log-filedrop" style="padding:10px;"><i class="ph-bold ph-camera"></i> Klik untuk pilih foto
+27191:         <input type="file" id="pmc-log-fileinput" accept="image/*" multiple style="display:none;">
+~~~
+
