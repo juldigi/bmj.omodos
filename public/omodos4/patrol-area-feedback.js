@@ -186,9 +186,12 @@ ready(function(){
         if(status!=='warning'&&status!=='abnormal')return;
         injected.push({id:'CHK-'+Date.now()+'-'+Math.floor(Math.random()*100000),kategori:category,prioritas:status==='abnormal'?'Tinggi':'Sedang',deskripsi:'['+status.toUpperCase()+'] '+item, status:'Open',source:'checklist',checklistCategory:category,checklistIndex:index,checklistItem:item,checklistStatus:status,files:files.map(f=>({name:f.name,type:'image',mimeType:f.mimeType,base64:f.base64,viewUrl:f.viewUrl,previewUrl:f.previewUrl,thumbUrl:f.thumbUrl}))});
       });
-      if(injected.length) PATROL_STATE.findings = (PATROL_STATE.findings||[]).concat(injected);
+      if(injected.length) PATROL_STATE.findings = (PATROL_STATE.findings||[]).filter(f=>f.source!=='checklist').concat(injected);
     },true);
 
+    function clearCheckpointPhotos(){Object.keys(photos).forEach(key=>{(photos[key]||[]).forEach(f=>{try{if(String(f.viewUrl||'').startsWith('blob:'))URL.revokeObjectURL(f.viewUrl)}catch(e){}});delete photos[key];});document.querySelectorAll('[data-checkpoint-photo]').forEach(el=>el.remove());}
+    if(typeof patrolResetWizard==='function'){const originalReset=patrolResetWizard;patrolResetWizard=function(){clearCheckpointPhotos();originalReset();};}
+    if(typeof patrolSelectMachine==='function'){const originalSelectMachine=patrolSelectMachine;patrolSelectMachine=function(){clearCheckpointPhotos();originalSelectMachine.apply(this,arguments);};}
     const originalRender=renderPatrolChecklist;
     renderPatrolChecklist=function(){
       originalRender();
