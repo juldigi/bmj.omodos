@@ -86,7 +86,16 @@ jobs:
               "SPAREPART_ROWS.map",
               "sparepartData",
               "function submitEntry",
-              "form-entry"
+              "form-entry",
+              "const rows = SPAREPART_ROWS",
+              "Jumlah sparepart baris",
+              "sparePart:",
+              "sparePartDigunakan",
+              "namaMaterial:",
+              "materialNumberSAP:",
+              "formData.get(\"deskripsiMasalah\")",
+              "new FormData(formEntryForDraft)",
+              "const payload ="
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
