@@ -75,7 +75,18 @@ jobs:
               "data-sparepart",
               "select[name=\"material\"]",
               "sparepartSelect",
-              "function renderLogbookTable"
+              "function renderLogbookTable",
+              "function syncSparepartRowsFromDom",
+              "function handleSparepartLookupInput_(",
+              "function renderSparepartSuggestBox_(",
+              "function renderEntryEditForm(",
+              "data-edit-field",
+              "updateEntry",
+              "btn-save-entry-edit",
+              "SPAREPART_ROWS.map",
+              "sparepartData",
+              "function submitEntry",
+              "form-entry"
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
