@@ -3270,3 +3270,2223 @@ No match.
 23134:   if(!sections.length) sections.push({title:'Ringkasan',icon:'✨',tone:'summary',body:raw||'AI External tidak mengembalikan jawaban.'});
 ~~~
 
+## Deskripsi Pekerjaan
+### Around line 3584
+~~~text
+03572:           </div>
+03573:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-clipboard-text"></i> Detail Pekerjaan</div>
+03574:           <div class="field"><label>Jenis Pekerjaan</label>
+03575:             <select name="jenisPekerjaan" required>
+03576:               <option>Preventive Maintenance</option>
+03577:               <option>Corrective Maintenance</option>
+03578:               <option>Predictive Maintenance</option>
+03579:               <option>Emergency Repair</option>
+03580:               <option>Instalasi</option><option>Modifikasi</option><option>Pemindahan</option><option>Pelepasan / Dismantle / Uninstall</option>
+03581:               <option>Lainnya</option>
+03582:             </select>
+03583:           </div>
+03584:           <div class="field"><label>Deskripsi Pekerjaan / Masalah
+03585:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-deskripsiMasalah" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03586:           </label><textarea name="deskripsiMasalah" id="ta-deskripsiMasalah" rows="3" placeholder="Jelaskan pekerjaan, kebutuhan, atau masalah yang ditemukan..." required></textarea></div>
+03587:           <div class="field"><label>Tindakan Perbaikan yang Dilakukan
+03588:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-tindakanPerbaikan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03589:           </label><textarea name="tindakanPerbaikan" id="ta-tindakanPerbaikan" rows="3" placeholder="Jelaskan tindakan yang sudah/sedang dilakukan..." required></textarea></div>
+03590:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-wrench"></i> Sparepart yang Digunakan</div>
+03591:           <div id="sparepart-rows"></div>
+03592:           <button type="button" class="btn btn-ghost btn-sm" id="btn-add-sparepart-row" style="margin:4px 0 8px 0;"><i class="ph-bold ph-plus"></i> Tambah Sparepart Lain</button>
+03593: 
+03594:           <div class="grid3">
+03595:             <div class="field"><label>Status Pekerjaan</label>
+03596:               <select name="status" required><option>Proses</option><option>Selesai</option><option>Pending</option><option>Emergency</option></select>
+03597:             </div>
+03598:             <div class="field"><label>Jam Mulai</label><input type="time" name="jamMulai" id="input-jamMulai" required></div>
+03599:             <div class="field"><label>Jam Selesai</label><input type="time" name="jamSelesai" id="input-jamSelesai" required></div>
+03600:           </div>
+03601:           <div class="field"><label>Estimasi Pekerjaan (Otomatis)</label><input type="text" name="downtime" id="input-downtime" placeholder="Terisi otomatis dari Jam Mulai & Jam Selesai" readonly></div>
+03602:           <div class="field"><label>Catatan Tambahan
+03603:             <button type="button" class="btn-ai-fix" id="btn-ai-fix-catatan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
+03604:           </label><textarea name="catatan" id="ta-catatan" rows="2" placeholder="Rekomendasi tindak lanjut, kondisi khusus, dll." required></textarea></div>
+03605: 
+03606:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-paperclip"></i> Lampiran Foto / Video</div>
+03607:           <div class="file-drop" id="file-drop">
+03608:             <i class="ph-bold ph-upload-simple"></i> Klik atau tarik file ke sini (foto/video bukti pekerjaan) — opsional. Foto otomatis dikompres ke maks. 720px, video ke maks. 540p.
+03609:             <input type="file" id="file-input" accept="image/*,video/*" multiple style="display:none;">
+03610:           </div>
+03611:           <div class="file-preview-row" id="file-preview-row"></div>
+03612: 
+03613:           <div id="wizard-nav" style="display:none;margin-top:18px;"></div>
+03614: 
+03615:           <div style="margin-top:22px;display:flex;gap:10px;" id="entry-actions-bar">
+03616:             <button type="submit" class="btn btn-primary" id="btn-submit"><i class="ph-bold ph-check-circle"></i> Simpan Logbook</button>
+03617:             <button type="reset" class="btn btn-ghost">Bersihkan Form</button>
+03618:           </div>
+03619:         </form>
+03620:       </div>
+03621:     </section>
+03622: 
+03623:     <section class="view" id="view-report">
+03624:       <div class="topbar">
+03625:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+03626:         <div><h1>Approval Center</h1><div class="sub">Review item yang menunggu keputusan, sekaligus akses report terkait bila dibutuhkan.</div></div>
+03627:         <button class="btn btn-sm" id="btn-report-back-cat" style="display:none;"><i class="ph-bold ph-arrow-left"></i> Kembali ke Kategori</button>
+03628:       </div>
+03629: 
+03630:       <div id="report-cat-grid" class="report-cat-grid"></div>
+03631: 
+03632:       <div id="ipal-form-wrap" style="display:none;"></div>
+03633:     </section>
+03634: 
+03635:     <section class="view" id="view-report-hub">
+03636:       <button class="btn btn-sm btn-back-to-input-report" onclick="goToView('report')" style="margin-bottom:10px;"><i class="ph-bold ph-arrow-left"></i> Input Report</button>
+03637:       <div class="topbar">
+03638:         <div><h1>Riwayat Laporan</h1><div class="sub" id="report-hub-sub">Semua riwayat report — IPAL, RCA &amp; Laporan Proyek — dalam satu tempat, per kategori.</div></div>
+03639:         <div style="display:flex;gap:8px;">
+03640:           <button class="btn btn-sm" id="btn-report-hub-back-cat" style="display:none;"><i class="ph-bold ph-arrow-left"></i> Kembali ke Kategori</button>
+03641:           <button class="btn btn-sm" id="btn-report-hub-refresh"><i class="ph-bold ph-arrows-clockwise"></i> Muat Ulang</button>
+03642:         </div>
+03643:       </div>
+03644: 
+03645:       <div id="report-hub-cat-grid" class="report-cat-grid"></div>
+03646: 
+03647:       <div id="report-hub-detail" style="display:none;">
+03648:         <div class="filter-bar" id="report-hub-filterbar" style="display:none;">
+~~~
+
+### Around line 28856
+~~~text
+28844:     if(!ms) return '-';
+28845:     try{return new Date(ms).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});}catch(e){return new Date(ms).toLocaleString();}
+28846:   }
+28847: 
+28848:   function v4Escape(value){
+28849:     if(typeof escapeHtml === 'function') return escapeHtml(String(value==null?'':value));
+28850:     return String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+28851:   }
+28852: 
+28853:   function v4Describe(e){
+28854:     if(!e) return '-';
+28855:     return String(
+28856:       e['Deskripsi Pekerjaan'] || e['Deskripsi'] || e['Masalah'] ||
+28857:       e['Keterangan'] || e['Jenis Pekerjaan'] || 'Catatan maintenance'
+28858:     ).trim();
+28859:   }
+28860: 
+28861:   function v4TodayKey(){
+28862:     const d=new Date();
+28863:     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+28864:     return y+'-'+m+'-'+day;
+28865:   }
+28866: 
+28867:   function v4DateKey(e){
+28868:     const ms=v4DateValue(e);
+28869:     if(!ms) return '';
+28870:     const d=new Date(ms);
+28871:     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+28872:     return y+'-'+m+'-'+day;
+28873:   }
+28874: 
+28875:   function v4SparepartPending(){
+28876:     try{
+28877:       if(typeof sparepartRows !== 'function') return null;
+28878:       return sparepartRows().filter(r=>String((r.sap&&r.sap.status)||'PENDING').toUpperCase()!=='COMPLETED').length;
+28879:     }catch(e){ return null; }
+28880:   }
+28881: 
+28882:   function v4PatrolCount(){
+28883:     try{
+28884:       if(typeof PM_REPORTS !== 'undefined' && Array.isArray(PM_REPORTS)) return PM_REPORTS.length;
+28885:     }catch(e){}
+28886:     return null;
+28887:   }
+28888: 
+28889:   function v4Card(label,value,note,icon){
+28890:     return '<div class="v4-card"><div class="v4-k"><i class="ph-bold '+icon+'"></i> '+v4Escape(label)+'</div><div class="v4-v">'+v4Escape(value)+'</div><div class="v4-note">'+v4Escape(note)+'</div></div>';
+28891:   }
+28892: 
+28893:   function v4Row(e){
+28894:     const ms=v4DateValue(e);
+28895:     const machine=v4MachineName(e);
+28896:     const status=v4Status(e) || 'Tanpa status';
+28897:     return '<div class="v4-row"><div class="v4-meta">'+v4Escape(machine)+'<br>'+v4Escape(v4FmtDate(ms))+'</div><div class="v4-main">'+v4Escape(v4Describe(e))+'<div><span class="v4-chip">'+v4Escape(status)+'</span></div></div></div>';
+28898:   }
+28899: 
+28900:   function renderOmodos4(){
+28901:     if(!v4IsSuperadmin()){
+28902:       if(typeof showAccessDenied === 'function') showAccessDenied();
+28903:       return false;
+28904:     }
+28905: 
+28906:     const entries=v4Entries();
+28907:     const open=entries.filter(e=>!v4IsDone(e));
+28908:     const critical=open.filter(v4IsCritical);
+28909:     const criticalMachines=new Set(critical.map(v4MachineName).filter(x=>x&&x!=='-'));
+28910:     const machines=new Set(entries.map(v4MachineName).filter(x=>x&&x!=='-'));
+28911:     const todayKey=v4TodayKey();
+28912:     const today=entries.filter(e=>v4DateKey(e)===todayKey);
+28913:     const pendingSp=v4SparepartPending();
+28914:     const patrolCount=v4PatrolCount();
+28915: 
+28916:     const summary=document.getElementById('v4-summary');
+28917:     if(summary){
+28918:       summary.innerHTML=[
+28919:         v4Card('Critical Machines',criticalMachines.size,'Mesin dengan catatan aktif yang mengandung sinyal emergency/breakdown.','ph-warning'),
+28920:         v4Card('Open Logbook',open.length,'Record Logbook yang belum berstatus selesai/closed.','ph-list-checks'),
+~~~
+
+## Nama Material
+### Around line 5106
+~~~text
+05094:         </div>
+05095: 
+05096:         <div class="filter-bar sp-sticky-filter">
+05097:           <input class="grow" type="text" id="search-sparepart" placeholder="Cari material, SAP, mesin, logbook no, WO, PIC...">
+05098:           <select id="filter-sparepart-collection" aria-label="Filter status collection">
+05099:             <option value="">Semua Collection</option>
+05100:             <option value="PENDING">Belum Dicollect</option>
+05101:             <option value="COMPLETED">Sudah Dicollect + SAP</option>
+05102:           </select>
+05103:           <select id="sort-sparepart">
+05104:             <option value="date-desc">Tanggal Terbaru</option>
+05105:             <option value="date-asc">Tanggal Terlama</option>
+05106:             <option value="material-asc">Nama Material A-Z</option>
+05107:             <option value="qty-desc">Qty Terbesar</option>
+05108:           </select>
+05109:           <button class="btn btn-sm" id="btn-refresh-sparepart"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+05110:           <button class="btn btn-sm" id="btn-export-sparepart-collect"><i class="ph-bold ph-file-xls"></i> Export Excel</button>
+05111:         </div>
+05112: 
+05113:         <div class="sp-table-wrap card" style="padding:0;overflow:hidden;">
+05114:           <div style="max-width:100%;">
+05115:             <table class="sp-collect-table">
+05116:               <thead><tr>
+05117:                 <th style="width:120px;">Tandai</th>
+05118:                 <th>Date</th><th>Logbook No</th><th>Machine</th><th>WO</th><th>PIC</th>
+05119:                 <th>Spare Part</th><th>Qty</th><th>Lihat Detail</th>
+05120:               </tr></thead>
+05121:               <tbody id="sp-collect-tbody"></tbody>
+05122:             </table>
+05123:           </div>
+05124:           <div class="empty-state" id="sp-collect-empty" style="display:none;"><div class="ico"><i class="ph-bold ph-wrench"></i></div>Tidak ada data sparepart yang cocok.</div>
+05125:         </div>
+05126:         <div class="sp-pagination" id="sp-collect-pagination"></div>
+05127:       </div>
+05128: 
+05129:       <!-- ============ TAB 2: PO MONITORING ============ -->
+05130:       <div id="sp-tabPO" class="sp-tab-panel">
+05131:         <div class="sp-dash-grid" id="sp-po-dash"></div>
+05132: 
+05133:         <div class="card" style="margin-bottom:16px;">
+05134:           <div class="section-title"><i class="ph-bold ph-plus-circle"></i> Tambah Purchase Order</div>
+05135:           <div class="grid2">
+05136:             <div class="field"><label>Nama Material / Spare Part</label><input type="text" id="sp-eta-nama" placeholder="Nama material/sparepart"></div>
+05137:             <div class="field"><label>Material Number SAP (opsional)</label><input type="text" id="sp-eta-sap" placeholder="Nomor SAP"></div>
+05138:             <div class="field"><label>Nomor PO</label><input type="text" id="sp-eta-nopo" placeholder="Nomor Purchase Order"></div>
+05139:             <div class="field"><label>Vendor</label><input type="text" id="sp-eta-vendor" placeholder="Nama vendor/supplier"></div>
+05140:             <div class="field"><label>Qty PO</label><input type="number" id="sp-eta-qty" min="1" placeholder="1"></div>
+05141:             <div class="field"><label>Tanggal Order</label><input type="date" id="sp-eta-tglpo"></div>
+05142:             <div class="field"><label>ETA (Estimasi Tiba)</label><input type="date" id="sp-eta-tgletaeta"></div>
+05143:             <div class="field" style="grid-column:1/-1;"><label>Catatan (opsional)</label><input type="text" id="sp-eta-catatan" placeholder="Nomor tracking, dsb."></div>
+05144:           </div>
+05145:           <button type="button" class="btn btn-sm btn-primary" id="btn-add-sparepart-eta" style="margin-top:6px;"><i class="ph-bold ph-plus"></i> Simpan PO</button>
+05146:         </div>
+05147: 
+05148:         <div class="filter-bar sp-sticky-filter">
+05149:           <input class="grow" type="text" id="search-sparepart-eta" placeholder="Cari material, SAP, nomor PO, vendor...">
+05150:           <select id="filter-sparepart-eta-status">
+05151:             <option value="">Semua Status</option>
+05152:             <option value="waiting">Waiting</option>
+05153:             <option value="intransit">In Transit</option>
+05154:             <option value="overdue">Overdue</option>
+05155:             <option value="arrived">Arrived</option>
+05156:             <option value="warehouse">Warehouse</option>
+05157:           </select>
+05158:           <button class="btn btn-sm" id="btn-export-sparepart-po"><i class="ph-bold ph-file-xls"></i> Export Excel</button>
+05159:         </div>
+05160:         <div id="list-sparepart-eta"></div>
+05161:       </div>
+05162: 
+05163:       <!-- ============ TAB 3: WAREHOUSE VALIDATION ============ -->
+05164:       <div id="sp-tabWarehouse" class="sp-tab-panel">
+05165:         <div class="card" style="margin-bottom:16px;">
+05166:           <div class="section-title"><i class="ph-bold ph-warehouse"></i> Validasi PO yang Sudah Arrived</div>
+05167:           <div class="sub">Hanya menampilkan PO berstatus <b>Arrived</b> yang belum divalidasi. Setelah divalidasi, status PO otomatis berubah menjadi <b>Warehouse</b>.</div>
+05168:         </div>
+05169:         <div class="filter-bar sp-sticky-filter">
+05170:           <input class="grow" type="text" id="search-sparepart-warehouse" placeholder="Cari material, SAP, nomor PO...">
+~~~
+
+### Around line 5136
+~~~text
+05124:           <div class="empty-state" id="sp-collect-empty" style="display:none;"><div class="ico"><i class="ph-bold ph-wrench"></i></div>Tidak ada data sparepart yang cocok.</div>
+05125:         </div>
+05126:         <div class="sp-pagination" id="sp-collect-pagination"></div>
+05127:       </div>
+05128: 
+05129:       <!-- ============ TAB 2: PO MONITORING ============ -->
+05130:       <div id="sp-tabPO" class="sp-tab-panel">
+05131:         <div class="sp-dash-grid" id="sp-po-dash"></div>
+05132: 
+05133:         <div class="card" style="margin-bottom:16px;">
+05134:           <div class="section-title"><i class="ph-bold ph-plus-circle"></i> Tambah Purchase Order</div>
+05135:           <div class="grid2">
+05136:             <div class="field"><label>Nama Material / Spare Part</label><input type="text" id="sp-eta-nama" placeholder="Nama material/sparepart"></div>
+05137:             <div class="field"><label>Material Number SAP (opsional)</label><input type="text" id="sp-eta-sap" placeholder="Nomor SAP"></div>
+05138:             <div class="field"><label>Nomor PO</label><input type="text" id="sp-eta-nopo" placeholder="Nomor Purchase Order"></div>
+05139:             <div class="field"><label>Vendor</label><input type="text" id="sp-eta-vendor" placeholder="Nama vendor/supplier"></div>
+05140:             <div class="field"><label>Qty PO</label><input type="number" id="sp-eta-qty" min="1" placeholder="1"></div>
+05141:             <div class="field"><label>Tanggal Order</label><input type="date" id="sp-eta-tglpo"></div>
+05142:             <div class="field"><label>ETA (Estimasi Tiba)</label><input type="date" id="sp-eta-tgletaeta"></div>
+05143:             <div class="field" style="grid-column:1/-1;"><label>Catatan (opsional)</label><input type="text" id="sp-eta-catatan" placeholder="Nomor tracking, dsb."></div>
+05144:           </div>
+05145:           <button type="button" class="btn btn-sm btn-primary" id="btn-add-sparepart-eta" style="margin-top:6px;"><i class="ph-bold ph-plus"></i> Simpan PO</button>
+05146:         </div>
+05147: 
+05148:         <div class="filter-bar sp-sticky-filter">
+05149:           <input class="grow" type="text" id="search-sparepart-eta" placeholder="Cari material, SAP, nomor PO, vendor...">
+05150:           <select id="filter-sparepart-eta-status">
+05151:             <option value="">Semua Status</option>
+05152:             <option value="waiting">Waiting</option>
+05153:             <option value="intransit">In Transit</option>
+05154:             <option value="overdue">Overdue</option>
+05155:             <option value="arrived">Arrived</option>
+05156:             <option value="warehouse">Warehouse</option>
+05157:           </select>
+05158:           <button class="btn btn-sm" id="btn-export-sparepart-po"><i class="ph-bold ph-file-xls"></i> Export Excel</button>
+05159:         </div>
+05160:         <div id="list-sparepart-eta"></div>
+05161:       </div>
+05162: 
+05163:       <!-- ============ TAB 3: WAREHOUSE VALIDATION ============ -->
+05164:       <div id="sp-tabWarehouse" class="sp-tab-panel">
+05165:         <div class="card" style="margin-bottom:16px;">
+05166:           <div class="section-title"><i class="ph-bold ph-warehouse"></i> Validasi PO yang Sudah Arrived</div>
+05167:           <div class="sub">Hanya menampilkan PO berstatus <b>Arrived</b> yang belum divalidasi. Setelah divalidasi, status PO otomatis berubah menjadi <b>Warehouse</b>.</div>
+05168:         </div>
+05169:         <div class="filter-bar sp-sticky-filter">
+05170:           <input class="grow" type="text" id="search-sparepart-warehouse" placeholder="Cari material, SAP, nomor PO...">
+05171:         </div>
+05172:         <div id="list-sparepart-warehouse"></div>
+05173:       </div>
+05174: 
+05175:       <!-- ============ TAB 4: DAILY STOCK OPNAME ============ -->
+05176:       <div id="sp-tabOpname" class="sp-tab-panel">
+05177:         <div class="card sp-target-banner" id="sp-target-banner" style="margin-bottom:16px;">
+05178:           <div class="sp-target-top">
+05179:             <div><i class="ph-bold ph-target"></i> Target Harian Stock Opname</div>
+05180:             <div class="sp-target-num" id="sp-target-num">0 / 30 item</div>
+05181:           </div>
+05182:           <div class="hmi-bar"><div class="fill" id="sp-target-fill" style="width:0%;"></div></div>
+05183:           <div class="sp-target-sub" id="sp-target-sub">Belum ada item yang di-opname hari ini.</div>
+05184:         </div>
+05185: 
+05186:         <div class="sp-dash-grid" id="sp-opname-dash"></div>
+05187: 
+05188:         <div class="card" style="margin-bottom:16px;">
+05189:           <div class="section-title"><i class="ph-bold ph-list-checks"></i> Checklist Opname Hari Ini</div>
+05190:           <div class="sub" style="margin-bottom:10px;">Dibuat otomatis dari master Lokasi Sparepart (menu Setting), 20–30 item per hari agar seluruh rak tercover bertahap. Klik salah satu item untuk mengisi hasil hitung fisik.</div>
+05191:           <div id="sp-opname-checklist"></div>
+05192:         </div>
+05193: 
+05194:         <div class="card" style="margin-bottom:16px;">
+05195:           <div class="section-title"><i class="ph-bold ph-clipboard-text"></i> Input Manual Hasil Opname</div>
+05196:           <div class="grid2">
+05197:             <div class="field"><label>Part No (opsional)</label><input type="text" id="sp-opname-partno" placeholder="Part number internal"></div>
+05198:             <div class="field"><label>Nama Material</label><input type="text" id="sp-opname-nama" placeholder="Nama material/sparepart"></div>
+05199:             <div class="field"><label>Material Number SAP (opsional)</label><input type="text" id="sp-opname-sap" placeholder="Nomor SAP"></div>
+05200:             <div class="field"><label>SAP Stock (opsional, auto kalau SAP cocok)</label><input type="number" id="sp-opname-sistem" placeholder="0"></div>
+~~~
+
+### Around line 5198
+~~~text
+05186:         <div class="sp-dash-grid" id="sp-opname-dash"></div>
+05187: 
+05188:         <div class="card" style="margin-bottom:16px;">
+05189:           <div class="section-title"><i class="ph-bold ph-list-checks"></i> Checklist Opname Hari Ini</div>
+05190:           <div class="sub" style="margin-bottom:10px;">Dibuat otomatis dari master Lokasi Sparepart (menu Setting), 20–30 item per hari agar seluruh rak tercover bertahap. Klik salah satu item untuk mengisi hasil hitung fisik.</div>
+05191:           <div id="sp-opname-checklist"></div>
+05192:         </div>
+05193: 
+05194:         <div class="card" style="margin-bottom:16px;">
+05195:           <div class="section-title"><i class="ph-bold ph-clipboard-text"></i> Input Manual Hasil Opname</div>
+05196:           <div class="grid2">
+05197:             <div class="field"><label>Part No (opsional)</label><input type="text" id="sp-opname-partno" placeholder="Part number internal"></div>
+05198:             <div class="field"><label>Nama Material</label><input type="text" id="sp-opname-nama" placeholder="Nama material/sparepart"></div>
+05199:             <div class="field"><label>Material Number SAP (opsional)</label><input type="text" id="sp-opname-sap" placeholder="Nomor SAP"></div>
+05200:             <div class="field"><label>SAP Stock (opsional, auto kalau SAP cocok)</label><input type="number" id="sp-opname-sistem" placeholder="0"></div>
+05201:             <div class="field"><label>Physical Stock (hasil hitung)</label><input type="number" id="sp-opname-fisik" placeholder="0"></div>
+05202:             <div class="field"><label>Lokasi Rak (opsional)</label><input type="text" id="sp-opname-lokasi" placeholder="mis. Rak A-3"></div>
+05203:             <div class="field" style="grid-column:1/-1;"><label>Catatan (opsional)</label><input type="text" id="sp-opname-catatan" placeholder="Kondisi barang, alasan selisih, dsb."></div>
+05204:           </div>
+05205:           <button type="button" class="btn btn-sm btn-primary" id="btn-add-sparepart-opname" style="margin-top:6px;"><i class="ph-bold ph-plus"></i> Simpan Hasil Opname</button>
+05206:         </div>
+05207: 
+05208:         <div class="filter-bar sp-sticky-filter">
+05209:           <input class="grow" type="text" id="search-sparepart-opname" placeholder="Cari part no, nama material, SAP, lokasi rak...">
+05210:           <select id="filter-sparepart-opname-scope">
+05211:             <option value="today">Hari Ini</option>
+05212:             <option value="all">Semua Riwayat</option>
+05213:           </select>
+05214:           <button class="btn btn-sm" id="btn-export-sparepart-opname"><i class="ph-bold ph-file-xls"></i> Export Excel</button>
+05215:         </div>
+05216:         <div id="list-sparepart-opname"></div>
+05217:       </div>
+05218: 
+05219:       <!-- ============ TAB 5: MASTER SPAREPART (dipindah dari Master Koneksi) ============ -->
+05220:       <div id="sp-tabMaster" class="sp-tab-panel">
+05221:         <div class="card" style="margin-bottom:18px;">
+05222:           <div class="section-title"><i class="ph-bold ph-map-pin"></i> Master Sparepart — Lokasi, Harga &amp; Stock Gudang</div>
+05223:           <div class="sub" style="margin-bottom:12px;">
+05224:             Satu data master per Material Number SAP dipakai bersama oleh SELURUH fitur yang berhubungan dengan sparepart:
+05225:             kartu ringkasan &amp; grafik cost di menu Sparepart, kartu lokasi rak yang otomatis dicocokkan dari form input Logbook,
+05226:             dan Stock Sistem di checklist Stock Opname. Cukup diisi/diedit di satu tempat ini.
+05227:             <br>Sebelumnya ada di menu Master Koneksi, sekarang dipindah ke sini supaya 1 tempat dengan Daily Collection &amp; PO Monitoring.
+05228:           </div>
+05229:           <div class="grid3">
+05230:             <div class="field"><label>Material Number SAP</label><input type="text" id="sl-sap" placeholder="1000234567"></div>
+05231:             <div class="field"><label>Nama Material</label><input type="text" id="sl-nama" placeholder="Bearing 6205"></div>
+05232:             <div class="field"><label>Lokasi Gudang/Rak</label><input type="text" id="sl-lokasi" placeholder="Gudang A - Rak 3B"></div>
+05233:           </div>
+05234:           <div class="grid3">
+05235:             <div class="field"><label>Harga Satuan (Rp)</label><input type="number" id="sl-harga" min="0" step="100" placeholder="0"></div>
+05236:             <div class="field"><label>Stock Qty</label><input type="number" id="sl-stock" min="0" step="1" placeholder="0"></div>
+05237:             <div class="field"><label>Satuan</label><input type="text" id="sl-satuan" placeholder="cth: pcs, unit, set"></div>
+05238:           </div>
+05239:           <button class="btn btn-sm" id="btn-save-sparepart-lokasi">+ Simpan Data Sparepart</button>
+05240:           <button class="btn btn-sm" id="btn-cancel-edit-sparepart-lokasi" style="display:none;">Batal Edit</button>
+05241:           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+05242:             <div class="field" style="flex:1 1 280px;margin:0;">
+05243:               <label for="search-master-sparepart">Cari Sparepart</label>
+05244:               <div style="position:relative;">
+05245:                 <i class="ph-bold ph-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);"></i>
+05246:                 <input type="search" id="search-master-sparepart" placeholder="Cari Nama Material atau Material Number SAP..." autocomplete="off" style="padding-left:36px;">
+05247:               </div>
+05248:             </div>
+05249:             <button type="button" class="btn btn-sm" id="btn-reset-master-sparepart-search" style="margin-top:18px;"><i class="ph-bold ph-x"></i> Reset</button>
+05250:           </div>
+05251:           <div id="master-sparepart-search-info" style="font-size:12px;color:var(--text-dim);margin-top:6px;"></div>
+05252:           <div style="margin-top:10px;" id="sparepart-lokasi-table"></div>
+05253:         </div>
+05254:       </div>
+05255:     </section>
+05256: 
+05257:     <section class="view" id="view-expert-finder">
+05258:       <div class="topbar">
+05259:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05260:         <div><h1>People Intelligence</h1><div class="sub">Ranking personil paling berpengalaman, dihitung otomatis dari histori Logbook (Nama Pelapor, Status, Jenis Pekerjaan) yang sudah tersimpan — tidak ada data baru yang perlu diisi.</div></div>
+05261:         <div class="stat-strip" id="ef-stat-strip"></div>
+05262:       </div>
+~~~
+
+### Around line 5209
+~~~text
+05197:             <div class="field"><label>Part No (opsional)</label><input type="text" id="sp-opname-partno" placeholder="Part number internal"></div>
+05198:             <div class="field"><label>Nama Material</label><input type="text" id="sp-opname-nama" placeholder="Nama material/sparepart"></div>
+05199:             <div class="field"><label>Material Number SAP (opsional)</label><input type="text" id="sp-opname-sap" placeholder="Nomor SAP"></div>
+05200:             <div class="field"><label>SAP Stock (opsional, auto kalau SAP cocok)</label><input type="number" id="sp-opname-sistem" placeholder="0"></div>
+05201:             <div class="field"><label>Physical Stock (hasil hitung)</label><input type="number" id="sp-opname-fisik" placeholder="0"></div>
+05202:             <div class="field"><label>Lokasi Rak (opsional)</label><input type="text" id="sp-opname-lokasi" placeholder="mis. Rak A-3"></div>
+05203:             <div class="field" style="grid-column:1/-1;"><label>Catatan (opsional)</label><input type="text" id="sp-opname-catatan" placeholder="Kondisi barang, alasan selisih, dsb."></div>
+05204:           </div>
+05205:           <button type="button" class="btn btn-sm btn-primary" id="btn-add-sparepart-opname" style="margin-top:6px;"><i class="ph-bold ph-plus"></i> Simpan Hasil Opname</button>
+05206:         </div>
+05207: 
+05208:         <div class="filter-bar sp-sticky-filter">
+05209:           <input class="grow" type="text" id="search-sparepart-opname" placeholder="Cari part no, nama material, SAP, lokasi rak...">
+05210:           <select id="filter-sparepart-opname-scope">
+05211:             <option value="today">Hari Ini</option>
+05212:             <option value="all">Semua Riwayat</option>
+05213:           </select>
+05214:           <button class="btn btn-sm" id="btn-export-sparepart-opname"><i class="ph-bold ph-file-xls"></i> Export Excel</button>
+05215:         </div>
+05216:         <div id="list-sparepart-opname"></div>
+05217:       </div>
+05218: 
+05219:       <!-- ============ TAB 5: MASTER SPAREPART (dipindah dari Master Koneksi) ============ -->
+05220:       <div id="sp-tabMaster" class="sp-tab-panel">
+05221:         <div class="card" style="margin-bottom:18px;">
+05222:           <div class="section-title"><i class="ph-bold ph-map-pin"></i> Master Sparepart — Lokasi, Harga &amp; Stock Gudang</div>
+05223:           <div class="sub" style="margin-bottom:12px;">
+05224:             Satu data master per Material Number SAP dipakai bersama oleh SELURUH fitur yang berhubungan dengan sparepart:
+05225:             kartu ringkasan &amp; grafik cost di menu Sparepart, kartu lokasi rak yang otomatis dicocokkan dari form input Logbook,
+05226:             dan Stock Sistem di checklist Stock Opname. Cukup diisi/diedit di satu tempat ini.
+05227:             <br>Sebelumnya ada di menu Master Koneksi, sekarang dipindah ke sini supaya 1 tempat dengan Daily Collection &amp; PO Monitoring.
+05228:           </div>
+05229:           <div class="grid3">
+05230:             <div class="field"><label>Material Number SAP</label><input type="text" id="sl-sap" placeholder="1000234567"></div>
+05231:             <div class="field"><label>Nama Material</label><input type="text" id="sl-nama" placeholder="Bearing 6205"></div>
+05232:             <div class="field"><label>Lokasi Gudang/Rak</label><input type="text" id="sl-lokasi" placeholder="Gudang A - Rak 3B"></div>
+05233:           </div>
+05234:           <div class="grid3">
+05235:             <div class="field"><label>Harga Satuan (Rp)</label><input type="number" id="sl-harga" min="0" step="100" placeholder="0"></div>
+05236:             <div class="field"><label>Stock Qty</label><input type="number" id="sl-stock" min="0" step="1" placeholder="0"></div>
+05237:             <div class="field"><label>Satuan</label><input type="text" id="sl-satuan" placeholder="cth: pcs, unit, set"></div>
+05238:           </div>
+05239:           <button class="btn btn-sm" id="btn-save-sparepart-lokasi">+ Simpan Data Sparepart</button>
+05240:           <button class="btn btn-sm" id="btn-cancel-edit-sparepart-lokasi" style="display:none;">Batal Edit</button>
+05241:           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+05242:             <div class="field" style="flex:1 1 280px;margin:0;">
+05243:               <label for="search-master-sparepart">Cari Sparepart</label>
+05244:               <div style="position:relative;">
+05245:                 <i class="ph-bold ph-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);"></i>
+05246:                 <input type="search" id="search-master-sparepart" placeholder="Cari Nama Material atau Material Number SAP..." autocomplete="off" style="padding-left:36px;">
+05247:               </div>
+05248:             </div>
+05249:             <button type="button" class="btn btn-sm" id="btn-reset-master-sparepart-search" style="margin-top:18px;"><i class="ph-bold ph-x"></i> Reset</button>
+05250:           </div>
+05251:           <div id="master-sparepart-search-info" style="font-size:12px;color:var(--text-dim);margin-top:6px;"></div>
+05252:           <div style="margin-top:10px;" id="sparepart-lokasi-table"></div>
+05253:         </div>
+05254:       </div>
+05255:     </section>
+05256: 
+05257:     <section class="view" id="view-expert-finder">
+05258:       <div class="topbar">
+05259:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05260:         <div><h1>People Intelligence</h1><div class="sub">Ranking personil paling berpengalaman, dihitung otomatis dari histori Logbook (Nama Pelapor, Status, Jenis Pekerjaan) yang sudah tersimpan — tidak ada data baru yang perlu diisi.</div></div>
+05261:         <div class="stat-strip" id="ef-stat-strip"></div>
+05262:       </div>
+05263:       <div class="filter-bar">
+05264:         <input class="grow" type="text" id="search-expert-nama" placeholder="Cari nama personil...">
+05265:         <input class="grow" type="text" id="search-expert-konteks" placeholder="Ranking khusus untuk mesin/masalah tertentu (mis. nama mesin, kode mesin, atau kata kunci masalah)...">
+05266:         <button class="btn btn-sm" id="btn-reset-expert-konteks"><i class="ph-bold ph-x"></i> Reset Konteks</button>
+05267:       </div>
+05268:       <div class="sub" id="ef-konteks-info" style="margin:-6px 0 14px 2px;"></div>
+05269:       <div id="list-expert-finder"></div>
+05270:     </section>
+05271: 
+05272:     <section class="view" id="view-knowledge-graph">
+05273:       <div class="topbar">
+~~~
+
+### Around line 5231
+~~~text
+05219:       <!-- ============ TAB 5: MASTER SPAREPART (dipindah dari Master Koneksi) ============ -->
+05220:       <div id="sp-tabMaster" class="sp-tab-panel">
+05221:         <div class="card" style="margin-bottom:18px;">
+05222:           <div class="section-title"><i class="ph-bold ph-map-pin"></i> Master Sparepart — Lokasi, Harga &amp; Stock Gudang</div>
+05223:           <div class="sub" style="margin-bottom:12px;">
+05224:             Satu data master per Material Number SAP dipakai bersama oleh SELURUH fitur yang berhubungan dengan sparepart:
+05225:             kartu ringkasan &amp; grafik cost di menu Sparepart, kartu lokasi rak yang otomatis dicocokkan dari form input Logbook,
+05226:             dan Stock Sistem di checklist Stock Opname. Cukup diisi/diedit di satu tempat ini.
+05227:             <br>Sebelumnya ada di menu Master Koneksi, sekarang dipindah ke sini supaya 1 tempat dengan Daily Collection &amp; PO Monitoring.
+05228:           </div>
+05229:           <div class="grid3">
+05230:             <div class="field"><label>Material Number SAP</label><input type="text" id="sl-sap" placeholder="1000234567"></div>
+05231:             <div class="field"><label>Nama Material</label><input type="text" id="sl-nama" placeholder="Bearing 6205"></div>
+05232:             <div class="field"><label>Lokasi Gudang/Rak</label><input type="text" id="sl-lokasi" placeholder="Gudang A - Rak 3B"></div>
+05233:           </div>
+05234:           <div class="grid3">
+05235:             <div class="field"><label>Harga Satuan (Rp)</label><input type="number" id="sl-harga" min="0" step="100" placeholder="0"></div>
+05236:             <div class="field"><label>Stock Qty</label><input type="number" id="sl-stock" min="0" step="1" placeholder="0"></div>
+05237:             <div class="field"><label>Satuan</label><input type="text" id="sl-satuan" placeholder="cth: pcs, unit, set"></div>
+05238:           </div>
+05239:           <button class="btn btn-sm" id="btn-save-sparepart-lokasi">+ Simpan Data Sparepart</button>
+05240:           <button class="btn btn-sm" id="btn-cancel-edit-sparepart-lokasi" style="display:none;">Batal Edit</button>
+05241:           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+05242:             <div class="field" style="flex:1 1 280px;margin:0;">
+05243:               <label for="search-master-sparepart">Cari Sparepart</label>
+05244:               <div style="position:relative;">
+05245:                 <i class="ph-bold ph-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);"></i>
+05246:                 <input type="search" id="search-master-sparepart" placeholder="Cari Nama Material atau Material Number SAP..." autocomplete="off" style="padding-left:36px;">
+05247:               </div>
+05248:             </div>
+05249:             <button type="button" class="btn btn-sm" id="btn-reset-master-sparepart-search" style="margin-top:18px;"><i class="ph-bold ph-x"></i> Reset</button>
+05250:           </div>
+05251:           <div id="master-sparepart-search-info" style="font-size:12px;color:var(--text-dim);margin-top:6px;"></div>
+05252:           <div style="margin-top:10px;" id="sparepart-lokasi-table"></div>
+05253:         </div>
+05254:       </div>
+05255:     </section>
+05256: 
+05257:     <section class="view" id="view-expert-finder">
+05258:       <div class="topbar">
+05259:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05260:         <div><h1>People Intelligence</h1><div class="sub">Ranking personil paling berpengalaman, dihitung otomatis dari histori Logbook (Nama Pelapor, Status, Jenis Pekerjaan) yang sudah tersimpan — tidak ada data baru yang perlu diisi.</div></div>
+05261:         <div class="stat-strip" id="ef-stat-strip"></div>
+05262:       </div>
+05263:       <div class="filter-bar">
+05264:         <input class="grow" type="text" id="search-expert-nama" placeholder="Cari nama personil...">
+05265:         <input class="grow" type="text" id="search-expert-konteks" placeholder="Ranking khusus untuk mesin/masalah tertentu (mis. nama mesin, kode mesin, atau kata kunci masalah)...">
+05266:         <button class="btn btn-sm" id="btn-reset-expert-konteks"><i class="ph-bold ph-x"></i> Reset Konteks</button>
+05267:       </div>
+05268:       <div class="sub" id="ef-konteks-info" style="margin:-6px 0 14px 2px;"></div>
+05269:       <div id="list-expert-finder"></div>
+05270:     </section>
+05271: 
+05272:     <section class="view" id="view-knowledge-graph">
+05273:       <div class="topbar">
+05274:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05275:         <div><h1>Knowledge Graph</h1><div class="sub">Visualisasi hubungan antar Personil, Mesin, Sparepart/SAP, dan Masalah — dibangun otomatis dari data Logbook yang sudah ada (vis-network). Klik node untuk detail, drag untuk atur posisi, scroll untuk zoom.</div></div>
+05276:         <div class="stat-strip" id="kg-stat-strip"></div>
+05277:       </div>
+05278:       <div class="filter-bar">
+05279:         <input class="grow" type="text" id="search-kg" placeholder="Cari & sorot node (nama personil, mesin, sparepart, kata kunci masalah)...">
+05280:         <select id="filter-kg-type">
+05281:           <option value="">Semua Tipe Node</option>
+05282:           <option value="personil">Personil</option>
+05283:           <option value="mesin">Mesin</option>
+05284:           <option value="sparepart">Sparepart</option>
+05285:           <option value="masalah">Masalah</option>
+05286:         </select>
+05287:         <button class="btn btn-sm" id="btn-kg-reset-view"><i class="ph-bold ph-arrows-out-cardinal"></i> Reset Tampilan</button>
+05288:       </div>
+05289:       <div class="card" style="padding:0;overflow:hidden;">
+05290:         <div id="kg-network" style="width:100%;height:70vh;background:var(--panel-2);"></div>
+05291:       </div>
+05292:       <div class="card" id="kg-node-detail" style="margin-top:16px;display:none;"></div>
+05293:     </section>
+05294: 
+05295:     <section class="view" id="view-wiki">
+~~~
+
+### Around line 5246
+~~~text
+05234:           <div class="grid3">
+05235:             <div class="field"><label>Harga Satuan (Rp)</label><input type="number" id="sl-harga" min="0" step="100" placeholder="0"></div>
+05236:             <div class="field"><label>Stock Qty</label><input type="number" id="sl-stock" min="0" step="1" placeholder="0"></div>
+05237:             <div class="field"><label>Satuan</label><input type="text" id="sl-satuan" placeholder="cth: pcs, unit, set"></div>
+05238:           </div>
+05239:           <button class="btn btn-sm" id="btn-save-sparepart-lokasi">+ Simpan Data Sparepart</button>
+05240:           <button class="btn btn-sm" id="btn-cancel-edit-sparepart-lokasi" style="display:none;">Batal Edit</button>
+05241:           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+05242:             <div class="field" style="flex:1 1 280px;margin:0;">
+05243:               <label for="search-master-sparepart">Cari Sparepart</label>
+05244:               <div style="position:relative;">
+05245:                 <i class="ph-bold ph-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);"></i>
+05246:                 <input type="search" id="search-master-sparepart" placeholder="Cari Nama Material atau Material Number SAP..." autocomplete="off" style="padding-left:36px;">
+05247:               </div>
+05248:             </div>
+05249:             <button type="button" class="btn btn-sm" id="btn-reset-master-sparepart-search" style="margin-top:18px;"><i class="ph-bold ph-x"></i> Reset</button>
+05250:           </div>
+05251:           <div id="master-sparepart-search-info" style="font-size:12px;color:var(--text-dim);margin-top:6px;"></div>
+05252:           <div style="margin-top:10px;" id="sparepart-lokasi-table"></div>
+05253:         </div>
+05254:       </div>
+05255:     </section>
+05256: 
+05257:     <section class="view" id="view-expert-finder">
+05258:       <div class="topbar">
+05259:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05260:         <div><h1>People Intelligence</h1><div class="sub">Ranking personil paling berpengalaman, dihitung otomatis dari histori Logbook (Nama Pelapor, Status, Jenis Pekerjaan) yang sudah tersimpan — tidak ada data baru yang perlu diisi.</div></div>
+05261:         <div class="stat-strip" id="ef-stat-strip"></div>
+05262:       </div>
+05263:       <div class="filter-bar">
+05264:         <input class="grow" type="text" id="search-expert-nama" placeholder="Cari nama personil...">
+05265:         <input class="grow" type="text" id="search-expert-konteks" placeholder="Ranking khusus untuk mesin/masalah tertentu (mis. nama mesin, kode mesin, atau kata kunci masalah)...">
+05266:         <button class="btn btn-sm" id="btn-reset-expert-konteks"><i class="ph-bold ph-x"></i> Reset Konteks</button>
+05267:       </div>
+05268:       <div class="sub" id="ef-konteks-info" style="margin:-6px 0 14px 2px;"></div>
+05269:       <div id="list-expert-finder"></div>
+05270:     </section>
+05271: 
+05272:     <section class="view" id="view-knowledge-graph">
+05273:       <div class="topbar">
+05274:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05275:         <div><h1>Knowledge Graph</h1><div class="sub">Visualisasi hubungan antar Personil, Mesin, Sparepart/SAP, dan Masalah — dibangun otomatis dari data Logbook yang sudah ada (vis-network). Klik node untuk detail, drag untuk atur posisi, scroll untuk zoom.</div></div>
+05276:         <div class="stat-strip" id="kg-stat-strip"></div>
+05277:       </div>
+05278:       <div class="filter-bar">
+05279:         <input class="grow" type="text" id="search-kg" placeholder="Cari & sorot node (nama personil, mesin, sparepart, kata kunci masalah)...">
+05280:         <select id="filter-kg-type">
+05281:           <option value="">Semua Tipe Node</option>
+05282:           <option value="personil">Personil</option>
+05283:           <option value="mesin">Mesin</option>
+05284:           <option value="sparepart">Sparepart</option>
+05285:           <option value="masalah">Masalah</option>
+05286:         </select>
+05287:         <button class="btn btn-sm" id="btn-kg-reset-view"><i class="ph-bold ph-arrows-out-cardinal"></i> Reset Tampilan</button>
+05288:       </div>
+05289:       <div class="card" style="padding:0;overflow:hidden;">
+05290:         <div id="kg-network" style="width:100%;height:70vh;background:var(--panel-2);"></div>
+05291:       </div>
+05292:       <div class="card" id="kg-node-detail" style="margin-top:16px;display:none;"></div>
+05293:     </section>
+05294: 
+05295:     <section class="view" id="view-wiki">
+05296:       <style>
+05297:         .wiki-group-list{display:grid;gap:8px;margin-top:8px;}
+05298:         .wiki-group-card{border:1px solid var(--line);border-radius:10px;background:var(--panel-2);overflow:hidden;}
+05299:         .wiki-group-card>summary{cursor:pointer;list-style:none;padding:10px 12px;display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:700;}
+05300:         .wiki-group-card>summary::-webkit-details-marker{display:none;}
+05301:         .wiki-group-content{padding:10px 12px;border-top:1px solid var(--line-soft);}
+05302:         .wiki-group-count{font-size:10.5px;color:var(--text-dim);font-weight:500;}
+05303:       </style>
+05304:       <div class="topbar">
+05305:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05306:         <div><h1>Maintenance Wikipedia</h1><div class="sub">Semua data Mesin, Sparepart, Personil, dsb saling terhubung — klik nama di halaman mana pun untuk berpindah ke halaman terkait, seperti Wikipedia. Data diambil langsung dari Logbook &amp; Master yang sudah ada, otomatis sinkron.</div></div>
+05307:       </div>
+05308:       <div class="filter-bar">
+05309:         <button class="btn btn-sm" id="btn-wiki-back" disabled><i class="ph-bold ph-arrow-left"></i> Kembali</button>
+05310:         <input class="grow" type="text" id="search-wiki" placeholder="Cari mesin, sparepart, atau personil...">
+~~~
+
+### Around line 12763
+~~~text
+12751: let SPAREPART_LOKASI_EDIT_NAME = null;
+12752: 
+12753: function loadSparepartLokasiLocal(){ try{ return JSON.parse(localStorage.getItem(LS_SPAREPART_LOKASI_KEY)||'[]'); }catch(e){ return []; } }
+12754: function saveSparepartLokasiLocal(list){ localStorage.setItem(LS_SPAREPART_LOKASI_KEY, JSON.stringify(list)); SPAREPART_LOKASI = list; }
+12755: async function syncSparepartLokasiFromBackend(){
+12756:   SPAREPART_LOKASI = loadSparepartLokasiLocal();
+12757:   if(!WEB_APP_URL) return SPAREPART_LOKASI;
+12758:   try{
+12759:     const remote = await apiGet('sparepartLokasi');
+12760:     if(Array.isArray(remote)){
+12761:       const normalized = remote.map(r=>({
+12762:         sap: String(r['Material Number SAP']||'').trim(),
+12763:         nama: r['Nama Material']||'',
+12764:         lokasiGudang: r['Lokasi Gudang']||'',
+12765:         harga: Number(r['Harga Satuan']) || 0,
+12766:         stockQty: (r['Stock Qty']===''||r['Stock Qty']==null) ? null : Number(r['Stock Qty']),
+12767:         satuan: r['Satuan']||'',
+12768:         needsReview: r['Perlu Verifikasi']===true || String(r['Perlu Verifikasi']).toLowerCase()==='true',
+12769:         sourceLogbook: r['Sumber Logbook']||''
+12770:       }));
+12771:       saveSparepartLokasiLocal(normalized);
+12772:     }
+12773:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+12774:   return SPAREPART_LOKASI;
+12775: }
+12776: function findSparepartLokasiBySap(sap){
+12777:   const s = String(sap||'').trim();
+12778:   if(!s) return null;
+12779:   return SPAREPART_LOKASI.find(x=> x.sap === s) || null;
+12780: }
+12781: // [EDIT] Menggantikan findStockSistemBySap yang dulu baca dari STOCK_SPAREPART
+12782: // (sheet Stock_Sparepart terpisah, perlu tombol "Muat Ulang Stock" manual) --
+12783: // sekarang Stock Qty adalah bagian dari master SPAREPART_LOKASI yang sama,
+12784: // jadi otomatis tersedia begitu SPAREPART_LOKASI sudah dimuat (loadAll),
+12785: // tanpa perlu langkah muat ulang terpisah.
+12786: function findStockSistemBySap(sap){
+12787:   const r = findSparepartLokasiBySap(sap);
+12788:   return (r && r.stockQty != null) ? r.stockQty : null;
+12789: }
+12790: function resetSparepartLokasiForm(){
+12791:   SPAREPART_LOKASI_EDIT_SAP = null;
+12792:   SPAREPART_LOKASI_EDIT_NAME = null;
+12793:   $('#sl-sap').value=''; $('#sl-nama').value=''; $('#sl-lokasi').value=''; $('#sl-harga').value='';
+12794:   const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
+12795:   if(stockEl) stockEl.value=''; if(satuanEl) satuanEl.value='';
+12796:   $('#btn-save-sparepart-lokasi').innerHTML = '+ Simpan Data Sparepart';
+12797:   $('#btn-cancel-edit-sparepart-lokasi').style.display = 'none';
+12798: }
+12799: let SPAREPART_LOKASI_SEARCH = '';
+12800: function renderSparepartLokasiTable(){
+12801:   const holder = $('#sparepart-lokasi-table');
+12802:   if(!holder) return;
+12803:   const q = String(SPAREPART_LOKASI_SEARCH||'').trim().toLowerCase();
+12804:   const rows = !q ? SPAREPART_LOKASI : SPAREPART_LOKASI.filter(r=>
+12805:     String(r.nama||'').toLowerCase().includes(q) || String(r.sap||'').toLowerCase().includes(q)
+12806:   );
+12807:   const info = $('#master-sparepart-search-info');
+12808:   if(info) info.textContent = q ? `${rows.length} dari ${SPAREPART_LOKASI.length} sparepart ditemukan` : `${SPAREPART_LOKASI.length} sparepart tersedia`;
+12809:   if(!SPAREPART_LOKASI.length){ holder.innerHTML = `<div style="color:var(--text-dim);font-size:13px;">Belum ada data sparepart.</div>`; return; }
+12810:   if(!rows.length){ holder.innerHTML = `<div class="empty-state" style="padding:18px;"><div class="ico"><i class="ph-bold ph-magnifying-glass"></i></div>Tidak ada sparepart yang cocok dengan pencarian.</div>`; return; }
+12811:   holder.innerHTML = `<div class="sp-master-list">
+12812:     ${rows.map(r=>`
+12813:       <div class="sp-master-row">
+12814:         <div class="sp-master-sap" data-label="Material Number SAP">${escapeHtml(r.sap)}</div>
+12815:         <div class="sp-master-name" data-label="Nama Material">${escapeHtml(r.nama||'-')}</div>
+12816:         <div class="sp-master-location" data-label="Lokasi">${escapeHtml(r.lokasiGudang||'-')}</div>
+12817:         <div class="sp-master-price" data-label="Harga">Rp${Number(r.harga||0).toLocaleString('id-ID')}</div>
+12818:         <div class="sp-master-stock" data-label="Stock">${r.stockQty!=null ? r.stockQty : '-'} ${escapeHtml(r.satuan||'')}</div>
+12819:         <div class="sp-master-actions" data-label="Aksi">
+12820:           <button type="button" class="btn btn-sm sl-edit" data-sap="${escapeHtml(r.sap)}" data-name="${escapeHtml(r.nama)}" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
+12821:           <button type="button" class="btn btn-sm btn-danger sl-delete" data-sap="${escapeHtml(r.sap)}" ${r.sap?'':'disabled'} title="${r.sap?'Hapus':'Lengkapi nomor SAP sebelum menghapus'}"><i class="ph-bold ph-trash"></i></button>
+12822:         </div>
+12823:       </div>`).join('')}
+12824:   </div>`;
+12825:   $$('.sl-edit', holder).forEach(btn=> btn.addEventListener('click', ()=>{
+12826:     const r = SPAREPART_LOKASI.find(x=>btn.dataset.sap ? x.sap===btn.dataset.sap : x.nama===btn.dataset.name); if(!r) return;
+12827:     SPAREPART_LOKASI_EDIT_SAP = r.sap;
+~~~
+
+### Around line 12815
+~~~text
+12803:   const q = String(SPAREPART_LOKASI_SEARCH||'').trim().toLowerCase();
+12804:   const rows = !q ? SPAREPART_LOKASI : SPAREPART_LOKASI.filter(r=>
+12805:     String(r.nama||'').toLowerCase().includes(q) || String(r.sap||'').toLowerCase().includes(q)
+12806:   );
+12807:   const info = $('#master-sparepart-search-info');
+12808:   if(info) info.textContent = q ? `${rows.length} dari ${SPAREPART_LOKASI.length} sparepart ditemukan` : `${SPAREPART_LOKASI.length} sparepart tersedia`;
+12809:   if(!SPAREPART_LOKASI.length){ holder.innerHTML = `<div style="color:var(--text-dim);font-size:13px;">Belum ada data sparepart.</div>`; return; }
+12810:   if(!rows.length){ holder.innerHTML = `<div class="empty-state" style="padding:18px;"><div class="ico"><i class="ph-bold ph-magnifying-glass"></i></div>Tidak ada sparepart yang cocok dengan pencarian.</div>`; return; }
+12811:   holder.innerHTML = `<div class="sp-master-list">
+12812:     ${rows.map(r=>`
+12813:       <div class="sp-master-row">
+12814:         <div class="sp-master-sap" data-label="Material Number SAP">${escapeHtml(r.sap)}</div>
+12815:         <div class="sp-master-name" data-label="Nama Material">${escapeHtml(r.nama||'-')}</div>
+12816:         <div class="sp-master-location" data-label="Lokasi">${escapeHtml(r.lokasiGudang||'-')}</div>
+12817:         <div class="sp-master-price" data-label="Harga">Rp${Number(r.harga||0).toLocaleString('id-ID')}</div>
+12818:         <div class="sp-master-stock" data-label="Stock">${r.stockQty!=null ? r.stockQty : '-'} ${escapeHtml(r.satuan||'')}</div>
+12819:         <div class="sp-master-actions" data-label="Aksi">
+12820:           <button type="button" class="btn btn-sm sl-edit" data-sap="${escapeHtml(r.sap)}" data-name="${escapeHtml(r.nama)}" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
+12821:           <button type="button" class="btn btn-sm btn-danger sl-delete" data-sap="${escapeHtml(r.sap)}" ${r.sap?'':'disabled'} title="${r.sap?'Hapus':'Lengkapi nomor SAP sebelum menghapus'}"><i class="ph-bold ph-trash"></i></button>
+12822:         </div>
+12823:       </div>`).join('')}
+12824:   </div>`;
+12825:   $$('.sl-edit', holder).forEach(btn=> btn.addEventListener('click', ()=>{
+12826:     const r = SPAREPART_LOKASI.find(x=>btn.dataset.sap ? x.sap===btn.dataset.sap : x.nama===btn.dataset.name); if(!r) return;
+12827:     SPAREPART_LOKASI_EDIT_SAP = r.sap;
+12828:     SPAREPART_LOKASI_EDIT_NAME = r.nama;
+12829:     $('#sl-sap').value = r.sap; $('#sl-nama').value = r.nama||''; $('#sl-lokasi').value = r.lokasiGudang||''; $('#sl-harga').value = r.harga||'';
+12830:     const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
+12831:     if(stockEl) stockEl.value = r.stockQty!=null ? r.stockQty : '';
+12832:     if(satuanEl) satuanEl.value = r.satuan||'';
+12833:     $('#btn-save-sparepart-lokasi').innerHTML = '<i class="ph-bold ph-check-circle"></i> Simpan Perubahan';
+12834:     $('#btn-cancel-edit-sparepart-lokasi').style.display = 'inline-flex';
+12835:     $('#sl-sap').scrollIntoView({behavior:'smooth', block:'center'});
+12836:   }));
+12837:   $$('.sl-delete', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+12838:     if(!confirm(`Hapus data sparepart untuk SAP "${btn.dataset.sap}"?`)) return;
+12839:     const list = SPAREPART_LOKASI.filter(x=>x.sap!==btn.dataset.sap);
+12840:     saveSparepartLokasiLocal(list);
+12841:     renderSparepartLokasiTable();
+12842:     try{ await apiPost({ action:'deleteSparepartLokasi', sap: btn.dataset.sap }); }catch(e){ toast('Tersimpan lokal, gagal sinkron ke server: '+e.message, true); }
+12843:   }));
+12844: }
+12845: const btnSaveSparepartLokasi = $('#btn-save-sparepart-lokasi');
+12846: if(btnSaveSparepartLokasi) btnSaveSparepartLokasi.addEventListener('click', async ()=>{
+12847:   const sap = $('#sl-sap').value.trim();
+12848:   if(!sap){ toast('Material Number SAP wajib diisi.', true); return; }
+12849:   const stockVal = $('#sl-stock') ? $('#sl-stock').value : '';
+12850:   const data = {
+12851:     sap, originalName: SPAREPART_LOKASI_EDIT_NAME, nama: $('#sl-nama').value.trim(), lokasiGudang: $('#sl-lokasi').value.trim(),
+12852:     harga: Number($('#sl-harga').value)||0,
+12853:     stockQty: stockVal==='' ? null : Number(stockVal)||0,
+12854:     satuan: $('#sl-satuan') ? $('#sl-satuan').value.trim() : ''
+12855:   };
+12856:   const list = SPAREPART_LOKASI.filter(x=>x.sap!==sap && (SPAREPART_LOKASI_EDIT_SAP ? x.sap!==SPAREPART_LOKASI_EDIT_SAP : x.nama!==SPAREPART_LOKASI_EDIT_NAME));
+12857:   list.push(data);
+12858:   saveSparepartLokasiLocal(list);
+12859:   resetSparepartLokasiForm();
+12860:   renderSparepartLokasiTable();
+12861:   try{
+12862:     await apiPost({ action:'saveSparepartLokasi', lokasi: data });
+12863:     toast('✓ Data sparepart tersimpan di database SQLite (sheet Sparepart_Lokasi)');
+12864:   }catch(e){
+12865:     toast('✗ Tersimpan lokal, gagal sinkron ke database SQLite: '+e.message, true);
+12866:   }
+12867: });
+12868: const btnCancelSparepartLokasi = $('#btn-cancel-edit-sparepart-lokasi');
+12869: if(btnCancelSparepartLokasi) btnCancelSparepartLokasi.addEventListener('click', resetSparepartLokasiForm);
+12870: const searchMasterSparepart = $('#search-master-sparepart');
+12871: if(searchMasterSparepart) searchMasterSparepart.addEventListener('input', ()=>{
+12872:   SPAREPART_LOKASI_SEARCH = searchMasterSparepart.value || '';
+12873:   renderSparepartLokasiTable();
+12874: });
+12875: const resetMasterSparepartSearch = $('#btn-reset-master-sparepart-search');
+12876: if(resetMasterSparepartSearch) resetMasterSparepartSearch.addEventListener('click', ()=>{
+12877:   SPAREPART_LOKASI_SEARCH = '';
+12878:   if(searchMasterSparepart) searchMasterSparepart.value = '';
+12879:   renderSparepartLokasiTable();
+~~~
+
+### Around line 14783
+~~~text
+14771:     $('#analitik-config-status').textContent = '✓ Tersimpan di database SQLite (sheet Analitik_Config)';
+14772:     toast('Formula tersimpan di database SQLite ✓');
+14773:   }catch(e){
+14774:     $('#analitik-config-status').textContent = '✗ Gagal sinkron ke database SQLite: '+e.message+' (tersimpan lokal saja)';
+14775:     toast('Gagal simpan ke Sheets: '+e.message, true);
+14776:   }
+14777:   try{ if(typeof renderHomeSmartResume === 'function') renderHomeSmartResume(); }catch(e){}
+14778: });
+14779: 
+14780: /* ---------------- PARSING DETAIL SPAREPART DARI LOGBOOK ----------------
+14781:    Satu entri logbook bisa memuat beberapa material sekaligus, digabung
+14782:    jadi satu string dipisah "; " (lihat buildMaterialFieldsFromRows()):
+14783:    'Nama Material' = "Bearing 6205 (2 pcs); Seal XX (1 pcs)"
+14784:    'Material Number SAP' = "1000234; 1000235"
+14785:    Fungsi ini memecahnya kembali menjadi array {nama, sap, qty} per material,
+14786:    supaya bisa dicocokkan satu-satu dengan master Lokasi Sparepart. */
+14787: function parseSparepartDetail(entry){
+14788:   const saved=safeJsonParseClient_(entry['Sparepart Detail (JSON)'],null);
+14789:   if(Array.isArray(saved)) return saved.map(r=>({nama:r.nama||'',sap:r.sap||'',qty:Number(r.jumlah??r.qty)||0}));
+14790:   const namaList = String(entry['Nama Material']||'').split(';').map(s=>s.trim()).filter(Boolean);
+14791:   const sapList = String(entry['Material Number SAP']||'').split(';').map(s=>s.trim()).filter(Boolean);
+14792:   const len = Math.max(namaList.length, sapList.length) || (namaList.length || sapList.length ? 1 : 0);
+14793:   const out = [];
+14794:   for(let i=0;i<len;i++){
+14795:     const namaRaw = namaList[i] || '';
+14796:     const m = namaRaw.match(/^(.*?)\s*\((\d+(?:\.\d+)?)\s*pcs\)\s*$/i);
+14797:     out.push({ nama: m ? m[1].trim() : namaRaw, qty: m ? Number(m[2]) : 1, sap: sapList[i] || '' });
+14798:   }
+14799:   return out;
+14800: }
+14801: 
+14802: // Total qty pemakaian sparepart dalam satu entri (dijumlah dari semua detail material).
+14803: function sparepartEntryTotalQty(e){
+14804:   const detail = parseSparepartDetail(e);
+14805:   return detail.reduce((s,d)=> s + (d.qty||1), 0) || 1;
+14806: }
+14807: 
+14808: /* =========================================================
+14809:    Sumber data collection: SELALU dari ENTRIES (Logbook) — modul ini
+14810:    TIDAK PERNAH membuat record pemakaian sparepart sendiri. ID entri
+14811:    logbook dipakai apa adanya sebagai relational key ke SPAREPART_STATUS. */
+14812: // Menu Sparepart menampilkan seluruh data pengambilan valid dari Logbook,
+14813: // tanpa cutoff tersembunyi yang membuat data di Sheets hilang dari frontend.
+14814: function sparepartRows(){
+14815:   return sotEntries(ENTRIES)
+14816:     .filter(e => {
+14817:       const nama = norm_(e['Nama Material']);
+14818:       const sap = norm_(e['Material Number SAP']);
+14819:       return nama !== '' || sap !== '';
+14820:     })
+14821:     .map(e=>({ entry:e, sap: getSparepartSapEntry(e['ID']) }))
+14822:     // Laporan terbaru di atas. "Timestamp Input" (ISO string, diisi otomatis
+14823:     // saat entry disimpan) dipakai sebagai acuan utama karena paling presisi;
+14824:     // kalau kosong, fallback ke gabungan Tanggal+Waktu yang diisi manual.
+14825:     .sort((a,b)=> sparepartEntryTime(b.entry) - sparepartEntryTime(a.entry));
+14826: }
+14827: 
+14828: function sparepartEntryTime(e){
+14829:   const ts = e['Timestamp Input'];
+14830:   if(ts){
+14831:     const t = new Date(ts).getTime();
+14832:     if(!isNaN(t)) return t;
+14833:   }
+14834:   const t2 = new Date(`${e['Tanggal']||''}T${e['Waktu']||'00:00'}`).getTime();
+14835:   return isNaN(t2) ? 0 : t2;
+14836: }
+14837: 
+14838: function isSameLocalDate(dateLike, ref){
+14839:   const a = new Date(dateLike), b = ref || new Date();
+14840:   if(isNaN(a)) return false;
+14841:   return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+14842: }
+14843: 
+14844: let SP_COLLECT_PAGE = 1;
+14845: let SP_COLLECT_PAGE_SIZE = 10;
+14846: 
+14847: function renderTrainingSparepartNotice_(){
+~~~
+
+### Around line 14790
+~~~text
+14778: });
+14779: 
+14780: /* ---------------- PARSING DETAIL SPAREPART DARI LOGBOOK ----------------
+14781:    Satu entri logbook bisa memuat beberapa material sekaligus, digabung
+14782:    jadi satu string dipisah "; " (lihat buildMaterialFieldsFromRows()):
+14783:    'Nama Material' = "Bearing 6205 (2 pcs); Seal XX (1 pcs)"
+14784:    'Material Number SAP' = "1000234; 1000235"
+14785:    Fungsi ini memecahnya kembali menjadi array {nama, sap, qty} per material,
+14786:    supaya bisa dicocokkan satu-satu dengan master Lokasi Sparepart. */
+14787: function parseSparepartDetail(entry){
+14788:   const saved=safeJsonParseClient_(entry['Sparepart Detail (JSON)'],null);
+14789:   if(Array.isArray(saved)) return saved.map(r=>({nama:r.nama||'',sap:r.sap||'',qty:Number(r.jumlah??r.qty)||0}));
+14790:   const namaList = String(entry['Nama Material']||'').split(';').map(s=>s.trim()).filter(Boolean);
+14791:   const sapList = String(entry['Material Number SAP']||'').split(';').map(s=>s.trim()).filter(Boolean);
+14792:   const len = Math.max(namaList.length, sapList.length) || (namaList.length || sapList.length ? 1 : 0);
+14793:   const out = [];
+14794:   for(let i=0;i<len;i++){
+14795:     const namaRaw = namaList[i] || '';
+14796:     const m = namaRaw.match(/^(.*?)\s*\((\d+(?:\.\d+)?)\s*pcs\)\s*$/i);
+14797:     out.push({ nama: m ? m[1].trim() : namaRaw, qty: m ? Number(m[2]) : 1, sap: sapList[i] || '' });
+14798:   }
+14799:   return out;
+14800: }
+14801: 
+14802: // Total qty pemakaian sparepart dalam satu entri (dijumlah dari semua detail material).
+14803: function sparepartEntryTotalQty(e){
+14804:   const detail = parseSparepartDetail(e);
+14805:   return detail.reduce((s,d)=> s + (d.qty||1), 0) || 1;
+14806: }
+14807: 
+14808: /* =========================================================
+14809:    Sumber data collection: SELALU dari ENTRIES (Logbook) — modul ini
+14810:    TIDAK PERNAH membuat record pemakaian sparepart sendiri. ID entri
+14811:    logbook dipakai apa adanya sebagai relational key ke SPAREPART_STATUS. */
+14812: // Menu Sparepart menampilkan seluruh data pengambilan valid dari Logbook,
+14813: // tanpa cutoff tersembunyi yang membuat data di Sheets hilang dari frontend.
+14814: function sparepartRows(){
+14815:   return sotEntries(ENTRIES)
+14816:     .filter(e => {
+14817:       const nama = norm_(e['Nama Material']);
+14818:       const sap = norm_(e['Material Number SAP']);
+14819:       return nama !== '' || sap !== '';
+14820:     })
+14821:     .map(e=>({ entry:e, sap: getSparepartSapEntry(e['ID']) }))
+14822:     // Laporan terbaru di atas. "Timestamp Input" (ISO string, diisi otomatis
+14823:     // saat entry disimpan) dipakai sebagai acuan utama karena paling presisi;
+14824:     // kalau kosong, fallback ke gabungan Tanggal+Waktu yang diisi manual.
+14825:     .sort((a,b)=> sparepartEntryTime(b.entry) - sparepartEntryTime(a.entry));
+14826: }
+14827: 
+14828: function sparepartEntryTime(e){
+14829:   const ts = e['Timestamp Input'];
+14830:   if(ts){
+14831:     const t = new Date(ts).getTime();
+14832:     if(!isNaN(t)) return t;
+14833:   }
+14834:   const t2 = new Date(`${e['Tanggal']||''}T${e['Waktu']||'00:00'}`).getTime();
+14835:   return isNaN(t2) ? 0 : t2;
+14836: }
+14837: 
+14838: function isSameLocalDate(dateLike, ref){
+14839:   const a = new Date(dateLike), b = ref || new Date();
+14840:   if(isNaN(a)) return false;
+14841:   return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+14842: }
+14843: 
+14844: let SP_COLLECT_PAGE = 1;
+14845: let SP_COLLECT_PAGE_SIZE = 10;
+14846: 
+14847: function renderTrainingSparepartNotice_(){
+14848:   const pending=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview);
+14849:   [['view-sparepart','training-sparepart-notice']].forEach(([target,id])=>{
+14850:     const host=document.getElementById(target),old=document.getElementById(id);
+14851:     if(old) old.remove(); if(!host || !pending.length) return;
+14852:     const n=document.createElement('div');n.id=id;n.className='card';n.setAttribute('role','status');
+14853:     n.textContent=pending.length+' sparepart baru dari Logbook perlu dilengkapi di Master Sparepart: '+pending.map(r=>r.nama||r.sap).join(', ');
+14854:     if(target==='home-smart-resume') host.before(n); else host.prepend(n);
+~~~
+
+## Jumlah Material
+No match.
+
+## Satuan
+### Around line 1780
+~~~text
+01768:   /* [ADAPTIVE] Jadikan tiap card sebagai container query context sendiri,
+01769:      supaya ukuran teks di dalamnya menyesuaikan LEBAR CARD itu sendiri
+01770:      (bukan lebar layar/viewport) — card kecil di grid padat tetap dapat
+01771:      ukuran teks yang pas & tidak terpotong, card besar dapat teks lebih besar. */
+01772:   container-type:size;container-name:dashcard;
+01773: }
+01774: .dash-card:hover{transform:translateY(-3px);filter:brightness(1.1);}
+01775: /* [ADAPTIVE] dc-top pakai flex-wrap + min-width:0 supaya nama/kode mesin yang
+01776:    panjang tidak menumpuk (overlap) dengan LED indikator di layar sempit —
+01777:    kalau ruang tidak cukup, LED akan turun ke baris baru alih-alih menindih teks. */
+01778: .dash-card .dc-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:6px 10px;margin-bottom:10px;}
+01779: .dash-card .dc-top-text{min-width:0;flex:1 1 140px;}
+01780: /* [ADAPTIVE] Semua ukuran font kartu memakai satuan cqi (container query
+01781:    inline-size) dg clamp() sbg batas atas/bawah, jadi mengikuti lebar CARD,
+01782:    bukan viewport — teks tidak lagi kepotong/overflow di card sempit maupun
+01783:    kekecilan di card lebar. overflow-wrap+break-word tetap dipertahankan
+01784:    sbg jaring pengaman utk kata yg sangat panjang. */
+01785: .dash-card .dc-name{font-family:var(--font-display);font-weight:600;font-size:clamp(12px,6.2cqi,16px);color:#fff;line-height:1.3;overflow-wrap:anywhere;word-break:break-word;}
+01786: .dash-card .dc-kode{font-family:var(--font-mono);font-size:clamp(9.5px,4.6cqi,11.5px);opacity:.75;color:#fff;margin-top:2px;line-height:1.3;overflow-wrap:anywhere;word-break:break-word;}
+01787: .dash-card .dc-status{font-size:clamp(10px,4.8cqi,12px);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;color:#fff;overflow-wrap:anywhere;word-break:break-word;line-height:1.4;}
+01788: /* [FIX] Deskripsi TIDAK dipotong lagi (dulu line-clamp:2 + ellipsis bisa
+01789:    memotong kalimat penting). Sekarang teks dibiarkan turun baris sebanyak
+01790:    perlu; tinggi card menyesuaikan (grid tetap rapi krn dash-card pakai
+01791:    flex-direction:column & dc-recap didorong ke bawah via margin-top:auto). */
+01792: .dash-card .dc-desc{font-size:clamp(11px,4.4cqi,13px);opacity:.85;color:#fff;overflow-wrap:anywhere;word-break:break-word;flex:1 1 auto;}
+01793: /* [ADAPTIVE] dc-recap = baris Machine Score paling bawah, dipisah garis
+01794:    (border-top) dari konten di atasnya. flex-wrap + min-width:0 mencegah teks
+01795:    bintang/skor menumpuk kalau lebar card sangat sempit (mis. 1 kolom di HP kecil). */
+01796: .dash-card .dc-recap{
+01797:   display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;margin-top:auto;padding-top:8px;
+01798:   border-top:1px solid rgba(255,255,255,.15);font-size:11px;color:#fff;opacity:.85;font-family:var(--font-mono);
+01799: }
+01800: .dash-card .dc-recap span{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0;overflow-wrap:anywhere;word-break:break-word;}
+01801: .dash-card .dc-timer{
+01802:   margin-top:10px;font-family:var(--font-mono);font-size:13px;font-weight:700;
+01803:   padding:6px 10px;border-radius:7px;text-align:center;
+01804:   background:rgba(255,255,255,.18);color:#fff;overflow-wrap:anywhere;word-break:break-word;
+01805: }
+01806: 
+01807: /* [FIX] Card mesin di Home: HANYA menampilkan Kode Mesin + Status Mesin
+01808:    saat card-nya SENDIRI sempit (bukan lagi berdasarkan lebar LAYAR) —
+01809:    supaya konsisten baik di mode portrait (2 kolom, card lebar → info
+01810:    lengkap tetap muat) maupun landscape (6 kolom, card jadi sempit → info
+01811:    diringkas otomatis), tanpa perlu breakpoint terpisah untuk tiap
+01812:    kombinasi. Memakai @container (bukan @media) karena .dash-card sudah
+01813:    didaftarkan sebagai container query context sendiri (container-type:
+01814:    inline-size;container-name:dashcard) — jadi treshold-nya mengikuti
+01815:    lebar card actual, bukan lebar viewport. */
+01816: @container dashcard (max-width: 150px){
+01817:   .dash-card .dc-desc,
+01818:   .dash-card .dc-recap{ display:none; }
+01819:   /* Kode & status jadi info utama saat card sempit -> naikkan sedikit
+01820:      ukuran fontnya supaya tetap enak dibaca. */
+01821:   .dash-card .dc-kode{ font-size:clamp(12px,7cqi,14px); opacity:.9; }
+01822:   .dash-card .dc-status{ font-size:clamp(12px,7.2cqi,14px); margin-bottom:0; }
+01823:   .dash-card{ padding:12px; }
+01824: }
+01825: /* [ADAPTIF] Sekarang container-type:size (bukan cuma inline-size) di
+01826:    .dash-card, jadi bisa query TINGGI card juga -- dipakai supaya saat
+01827:    grid harus menampung banyak mesin di layar pendek (tanpa scroll,
+01828:    lihat #dash-grid di bawah) dan tiap baris jadi rendah, info sekunder
+01829:    otomatis disembunyikan bertahap alih-alih teks terpotong/overflow.
+01830:    Threshold bertingkat: makin pendek card, makin sedikit info yang
+01831:    ditampilkan, tapi Kode Mesin + Status (info paling penting) SELALU
+01832:    tampil di semua ukuran. */
+01833: @container dashcard (max-height: 130px){
+01834:   .dash-card{ padding:10px; }
+01835:   .dash-card .dc-recap{ display:none; }
+01836:   .dash-card .dc-desc{ -webkit-line-clamp:1;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden; }
+01837: }
+01838: @container dashcard (max-height: 90px){
+01839:   .dash-card .dc-desc{ display:none; }
+01840:   .dash-card .dc-top{ margin-bottom:4px; }
+01841: }
+01842: @container dashcard (max-height: 60px){
+01843:   .dash-card .dc-name{ display:block; }
+01844:   .dash-card{ padding:8px; justify-content:center; }
+~~~
+
+### Around line 4488
+~~~text
+04476: 
+04477:       <div class="card" style="margin-bottom:18px;">
+04478:         <div class="section-title"><i class="ph-bold ph-clipboard-text"></i> KPI Kertas Kerja — Target &amp; Realisasi per Bulan</div>
+04479:         <div class="sub" style="margin-bottom:12px;">
+04480:           Database KPI Department menggunakan workbook aktual sebagai source of truth. Data 2026 disinkronkan otomatis dari file sumber; form ini tetap tersedia untuk Admin/Supervisor jika perlu koreksi terkontrol atau menambah periode berikutnya.
+04481:         </div>
+04482:         <div class="grid3">
+04483:           <div class="field"><label>Tahun</label><input type="number" id="kk-tahun" step="1" placeholder="2026"></div>
+04484:           <div class="field"><label>Perspective</label><input type="text" id="kk-perspective" placeholder="INTERNAL BUSINESS PROCESS"></div>
+04485:           <div class="field"><label>Data Producer</label><input type="text" id="kk-producer" placeholder="Offset - Technical"></div>
+04486:           <div class="field"><label>Divisi / Lini</label><input type="text" id="kk-divisi" placeholder="Printing / Converting 01 Autoplaten / dst"></div>
+04487:           <div class="field"><label>Nama KPI</label><input type="text" id="kk-kpi" placeholder="Machine Loss Time - Printing (%)"></div>
+04488:           <div class="field"><label>Satuan</label><input type="text" id="kk-satuan" placeholder="%, Hours, Rp, dsb"></div>
+04489:           <div class="field"><label>Polaritas</label>
+04490:             <select id="kk-polaritas">
+04491:               <option value="Minimized">Minimized (makin kecil makin baik)</option>
+04492:               <option value="Maximized">Maximized (makin besar makin baik)</option>
+04493:             </select>
+04494:           </div>
+04495:           <div class="field"><label>Rumus</label><input type="text" id="kk-rumus" placeholder="(Losthrs/RunHrs)*100"></div>
+04496:           <div class="field"><label>Periode Perhitungan</label><input type="text" id="kk-periode" placeholder="Bulanan"></div>
+04497:           <div class="field"><label>Target Tahunan</label><input type="number" id="kk-target-tahunan" step="0.01" placeholder="0"></div>
+04498:         </div>
+04499:         <div class="sub" style="margin:10px 0 6px;">Target &amp; Realisasi per bulan</div>
+04500:         <div id="kk-bulan-grid" class="kk-bulan-grid"></div>
+04501:         <div style="margin-top:12px;">
+04502:           <button class="btn btn-sm btn-primary" id="btn-save-kpi-kerja">+ Simpan KPI</button>
+04503:           <button class="btn btn-sm" id="btn-cancel-edit-kpi-kerja" style="display:none;">Batal Edit</button>
+04504:           <button class="btn btn-sm" id="btn-seed-kpi-kerja"><i class="ph-bold ph-arrows-clockwise"></i> Sinkron Data Aktual KPI Department</button>
+04505:           <button class="btn btn-sm" id="btn-import-kpiKerja"><i class="ph-bold ph-file-xls"></i> Import Excel</button>
+04506:         </div>
+04507:         <div style="margin-top:18px;" id="kpi-kerja-table"></div>
+04508:       </div>
+04509:     </section>
+04510: 
+04511:     <section class="view" id="view-machine-breakdown">
+04512:       <div class="topbar">
+04513:         <div><h1>Breakdown Mesin (MTD/YTD)</h1><div class="sub">Data mentah sumber ODIN per mesin (El BD, Mech BD, Run Hrs, MTBF/MTTR) — bahan hitung Ringkasan KPI di atas. Input ulang kombinasi Tahun+Bulan+Periode+Mesin yang sama akan meng-update baris lama, bukan menambah baru.</div></div>
+04514:       </div>
+04515: 
+04516:       <div class="card" style="margin-bottom:16px;">
+04517:         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+04518:           <div>
+04519:             <label style="font-size:12px;color:var(--text-dim);">Tahun</label><br>
+04520:             <select id="mbd-tahun-filter" class="input" style="width:110px;"></select>
+04521:           </div>
+04522:           <div>
+04523:             <label style="font-size:12px;color:var(--text-dim);">Bulan</label><br>
+04524:             <select id="mbd-bulan-filter" class="input" style="width:120px;">
+04525:               <option value="">Semua</option>
+04526:               <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option><option>Mei</option><option>Jun</option>
+04527:               <option>Jul</option><option>Agust</option><option>Sep</option><option>Okt</option><option>Nop</option><option>Des</option>
+04528:             </select>
+04529:           </div>
+04530:           <div>
+04531:             <label style="font-size:12px;color:var(--text-dim);">Periode</label><br>
+04532:             <select id="mbd-periode-filter" class="input" style="width:100px;">
+04533:               <option value="">Semua</option>
+04534:               <option>MTD</option>
+04535:               <option>YTD</option>
+04536:             </select>
+04537:           </div>
+04538:           <button class="btn btn-sm btn-primary" id="btn-mbd-add" style="margin-left:auto;">
+04539:             <i class="ph-bold ph-plus"></i> Tambah / Update Data
+04540:           </button>
+04541:         </div>
+04542:       </div>
+04543: 
+04544:       <div id="mbd-form-card" class="card" style="display:none;margin-bottom:16px;">
+04545:         <div class="an-card-title" id="mbd-form-title"><i class="ph-bold ph-pencil-simple"></i> Input Breakdown Mesin</div>
+04546:         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px;">
+04547:           <div><label style="font-size:12px;color:var(--text-dim);">Tahun *</label><input type="number" id="mbd-f-tahun" class="input" placeholder="2026"></div>
+04548:           <div><label style="font-size:12px;color:var(--text-dim);">Bulan *</label>
+04549:             <select id="mbd-f-bulan" class="input">
+04550:               <option value="">Pilih</option>
+04551:               <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option><option>Mei</option><option>Jun</option>
+04552:               <option>Jul</option><option>Agust</option><option>Sep</option><option>Okt</option><option>Nop</option><option>Des</option>
+~~~
+
+### Around line 4924
+~~~text
+04912:             <label style="font-size:12px;color:var(--text-dim);">Nama Area (manual)</label>
+04913:             <input type="text" id="eng-f-area-manual" class="input" placeholder="cth. Compressor no.2, Offset Plant">
+04914:           </div>
+04915:           <div><label style="font-size:12px;color:var(--text-dim);">Jenis *</label>
+04916:             <select id="eng-f-jenis" class="input">
+04917:               <option value="">Pilih</option>
+04918:               <option>Listrik</option>
+04919:               <option>Water Consumption</option>
+04920:               <option>Compressed Air</option>
+04921:             </select>
+04922:           </div>
+04923:           <div><label style="font-size:12px;color:var(--text-dim);">Nilai (Konsumsi) *</label><input type="number" step="any" id="eng-f-nilai" class="input" placeholder="kWh atau m3"></div>
+04924:           <div><label style="font-size:12px;color:var(--text-dim);">Satuan</label><input type="text" id="eng-f-satuan" class="input" placeholder="kWh / m3" readonly></div>
+04925:           <div><label style="font-size:12px;color:var(--text-dim);">Output Produksi *</label><input type="number" step="any" id="eng-f-output" class="input" placeholder="Sheet atau M3"></div>
+04926:           <div><label style="font-size:12px;color:var(--text-dim);">Satuan Output</label><input type="text" id="eng-f-satuan-output" class="input" placeholder="Sheet / M3" readonly></div>
+04927:           <div>
+04928:             <label style="font-size:12px;color:var(--text-dim);">Rasio Efisiensi (auto)</label>
+04929:             <input type="text" id="eng-f-rasio" class="input" readonly style="background:var(--bg-alt,rgba(255,255,255,0.04));font-weight:600;">
+04930:           </div>
+04931:         </div>
+04932:         <div style="margin-top:10px;"><label style="font-size:12px;color:var(--text-dim);">Catatan</label><input type="text" id="eng-f-catatan" class="input" style="width:100%;"></div>
+04933:         <div style="display:flex;gap:8px;margin-top:12px;">
+04934:           <button class="btn btn-sm btn-primary" id="btn-eng-save"><i class="ph-bold ph-check"></i> Simpan</button>
+04935:           <button class="btn btn-sm" id="btn-eng-cancel">Batal</button>
+04936:         </div>
+04937:       </div>
+04938: 
+04939:       <div id="eng-empty" style="display:none;color:var(--text-dim);font-size:13px;padding:20px;text-align:center;"></div>
+04940:       <div class="card" style="overflow-x:auto;">
+04941:         <table class="data-table" id="eng-table" style="width:100%;font-size:12.5px;">
+04942:           <thead><tr><th>Bulan</th><th>Area/Mesin</th><th>Jenis</th><th>Nilai</th><th>Satuan</th><th>Output</th><th>Rasio Efisiensi</th><th>Catatan</th><th></th></tr></thead>
+04943:           <tbody id="eng-tbody"></tbody>
+04944:         </table>
+04945:       </div>
+04946:     </section>
+04947: 
+04948:     <section class="view" id="view-correlation">
+04949:       <div class="topbar">
+04950:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+04951:         <div><h1>Correlation Analysis</h1><div class="sub">Mencari keterkaitan/pola tersembunyi antar variabel dari data Logbook &amp; Project Improvement — mana yang benar-benar berkorelasi dengan breakdown, bukan cuma asumsi.</div></div>
+04952:         <div style="display:flex;gap:8px;align-items:center;">
+04953:           <select id="corr-periode" style="width:auto;">
+04954:             <option value="90">3 Bulan Terakhir</option>
+04955:             <option value="180">6 Bulan Terakhir</option>
+04956:             <option value="365">12 Bulan Terakhir</option>
+04957:             <option value="0" selected>Semua Data</option>
+04958:           </select>
+04959:           <button class="btn btn-sm" id="btn-refresh-correlation"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+04960:         </div>
+04961:       </div>
+04962: 
+04963:       <div class="an-card" id="corr-pm-card">
+04964:         <div class="an-card-title"><i class="ph-bold ph-shield-check"></i> Korelasi PM Compliance vs Jumlah Breakdown</div>
+04965:         <div class="sub" style="margin-bottom:10px;">Menghitung koefisien korelasi Pearson (r) antara jumlah pekerjaan Preventive Maintenance dan jumlah Breakdown/Emergency, per mesin per bulan. Nilai r mendekati -1 berarti makin rajin PM, makin sedikit breakdown (bagus). Mendekati 0 berarti tidak ada hubungan yang jelas.</div>
+04966:         <div id="corr-pm-result"></div>
+04967:       </div>
+04968: 
+04969:       <div class="an-section-grid">
+04970:         <div class="an-card">
+04971:           <div class="an-card-title"><i class="ph-bold ph-calendar-blank"></i> Breakdown per Hari dalam Seminggu</div>
+04972:           <canvas id="chart-corr-dow" height="230"></canvas>
+04973:         </div>
+04974:         <div class="an-card">
+04975:           <div class="an-card-title"><i class="ph-bold ph-sun"></i> Breakdown per Shift</div>
+04976:           <canvas id="chart-corr-shift" height="230"></canvas>
+04977:         </div>
+04978:       </div>
+04979: 
+04980:       <div class="an-card">
+04981:         <div class="an-card-title"><i class="ph-bold ph-hourglass-medium"></i> Rata-rata Durasi Perbaikan per Jenis Pekerjaan</div>
+04982:         <canvas id="chart-corr-durasi" height="240"></canvas>
+04983:       </div>
+04984: 
+04985:       <div class="an-card">
+04986:         <div class="an-card-title"><i class="ph-bold ph-grid-nine"></i> Heatmap Hari vs Shift (Jumlah Kejadian)</div>
+04987:         <div class="sub" style="margin-bottom:10px;">Semakin gelap warnanya, semakin sering kejadian terjadi pada kombinasi hari &amp; shift tersebut — untuk melihat apakah ada pola waktu tertentu yang rawan.</div>
+04988:         <div id="corr-heatmap"></div>
+~~~
+
+### Around line 4926
+~~~text
+04914:           </div>
+04915:           <div><label style="font-size:12px;color:var(--text-dim);">Jenis *</label>
+04916:             <select id="eng-f-jenis" class="input">
+04917:               <option value="">Pilih</option>
+04918:               <option>Listrik</option>
+04919:               <option>Water Consumption</option>
+04920:               <option>Compressed Air</option>
+04921:             </select>
+04922:           </div>
+04923:           <div><label style="font-size:12px;color:var(--text-dim);">Nilai (Konsumsi) *</label><input type="number" step="any" id="eng-f-nilai" class="input" placeholder="kWh atau m3"></div>
+04924:           <div><label style="font-size:12px;color:var(--text-dim);">Satuan</label><input type="text" id="eng-f-satuan" class="input" placeholder="kWh / m3" readonly></div>
+04925:           <div><label style="font-size:12px;color:var(--text-dim);">Output Produksi *</label><input type="number" step="any" id="eng-f-output" class="input" placeholder="Sheet atau M3"></div>
+04926:           <div><label style="font-size:12px;color:var(--text-dim);">Satuan Output</label><input type="text" id="eng-f-satuan-output" class="input" placeholder="Sheet / M3" readonly></div>
+04927:           <div>
+04928:             <label style="font-size:12px;color:var(--text-dim);">Rasio Efisiensi (auto)</label>
+04929:             <input type="text" id="eng-f-rasio" class="input" readonly style="background:var(--bg-alt,rgba(255,255,255,0.04));font-weight:600;">
+04930:           </div>
+04931:         </div>
+04932:         <div style="margin-top:10px;"><label style="font-size:12px;color:var(--text-dim);">Catatan</label><input type="text" id="eng-f-catatan" class="input" style="width:100%;"></div>
+04933:         <div style="display:flex;gap:8px;margin-top:12px;">
+04934:           <button class="btn btn-sm btn-primary" id="btn-eng-save"><i class="ph-bold ph-check"></i> Simpan</button>
+04935:           <button class="btn btn-sm" id="btn-eng-cancel">Batal</button>
+04936:         </div>
+04937:       </div>
+04938: 
+04939:       <div id="eng-empty" style="display:none;color:var(--text-dim);font-size:13px;padding:20px;text-align:center;"></div>
+04940:       <div class="card" style="overflow-x:auto;">
+04941:         <table class="data-table" id="eng-table" style="width:100%;font-size:12.5px;">
+04942:           <thead><tr><th>Bulan</th><th>Area/Mesin</th><th>Jenis</th><th>Nilai</th><th>Satuan</th><th>Output</th><th>Rasio Efisiensi</th><th>Catatan</th><th></th></tr></thead>
+04943:           <tbody id="eng-tbody"></tbody>
+04944:         </table>
+04945:       </div>
+04946:     </section>
+04947: 
+04948:     <section class="view" id="view-correlation">
+04949:       <div class="topbar">
+04950:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+04951:         <div><h1>Correlation Analysis</h1><div class="sub">Mencari keterkaitan/pola tersembunyi antar variabel dari data Logbook &amp; Project Improvement — mana yang benar-benar berkorelasi dengan breakdown, bukan cuma asumsi.</div></div>
+04952:         <div style="display:flex;gap:8px;align-items:center;">
+04953:           <select id="corr-periode" style="width:auto;">
+04954:             <option value="90">3 Bulan Terakhir</option>
+04955:             <option value="180">6 Bulan Terakhir</option>
+04956:             <option value="365">12 Bulan Terakhir</option>
+04957:             <option value="0" selected>Semua Data</option>
+04958:           </select>
+04959:           <button class="btn btn-sm" id="btn-refresh-correlation"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+04960:         </div>
+04961:       </div>
+04962: 
+04963:       <div class="an-card" id="corr-pm-card">
+04964:         <div class="an-card-title"><i class="ph-bold ph-shield-check"></i> Korelasi PM Compliance vs Jumlah Breakdown</div>
+04965:         <div class="sub" style="margin-bottom:10px;">Menghitung koefisien korelasi Pearson (r) antara jumlah pekerjaan Preventive Maintenance dan jumlah Breakdown/Emergency, per mesin per bulan. Nilai r mendekati -1 berarti makin rajin PM, makin sedikit breakdown (bagus). Mendekati 0 berarti tidak ada hubungan yang jelas.</div>
+04966:         <div id="corr-pm-result"></div>
+04967:       </div>
+04968: 
+04969:       <div class="an-section-grid">
+04970:         <div class="an-card">
+04971:           <div class="an-card-title"><i class="ph-bold ph-calendar-blank"></i> Breakdown per Hari dalam Seminggu</div>
+04972:           <canvas id="chart-corr-dow" height="230"></canvas>
+04973:         </div>
+04974:         <div class="an-card">
+04975:           <div class="an-card-title"><i class="ph-bold ph-sun"></i> Breakdown per Shift</div>
+04976:           <canvas id="chart-corr-shift" height="230"></canvas>
+04977:         </div>
+04978:       </div>
+04979: 
+04980:       <div class="an-card">
+04981:         <div class="an-card-title"><i class="ph-bold ph-hourglass-medium"></i> Rata-rata Durasi Perbaikan per Jenis Pekerjaan</div>
+04982:         <canvas id="chart-corr-durasi" height="240"></canvas>
+04983:       </div>
+04984: 
+04985:       <div class="an-card">
+04986:         <div class="an-card-title"><i class="ph-bold ph-grid-nine"></i> Heatmap Hari vs Shift (Jumlah Kejadian)</div>
+04987:         <div class="sub" style="margin-bottom:10px;">Semakin gelap warnanya, semakin sering kejadian terjadi pada kombinasi hari &amp; shift tersebut — untuk melihat apakah ada pola waktu tertentu yang rawan.</div>
+04988:         <div id="corr-heatmap"></div>
+04989:       </div>
+04990: 
+~~~
+
+### Around line 4942
+~~~text
+04930:           </div>
+04931:         </div>
+04932:         <div style="margin-top:10px;"><label style="font-size:12px;color:var(--text-dim);">Catatan</label><input type="text" id="eng-f-catatan" class="input" style="width:100%;"></div>
+04933:         <div style="display:flex;gap:8px;margin-top:12px;">
+04934:           <button class="btn btn-sm btn-primary" id="btn-eng-save"><i class="ph-bold ph-check"></i> Simpan</button>
+04935:           <button class="btn btn-sm" id="btn-eng-cancel">Batal</button>
+04936:         </div>
+04937:       </div>
+04938: 
+04939:       <div id="eng-empty" style="display:none;color:var(--text-dim);font-size:13px;padding:20px;text-align:center;"></div>
+04940:       <div class="card" style="overflow-x:auto;">
+04941:         <table class="data-table" id="eng-table" style="width:100%;font-size:12.5px;">
+04942:           <thead><tr><th>Bulan</th><th>Area/Mesin</th><th>Jenis</th><th>Nilai</th><th>Satuan</th><th>Output</th><th>Rasio Efisiensi</th><th>Catatan</th><th></th></tr></thead>
+04943:           <tbody id="eng-tbody"></tbody>
+04944:         </table>
+04945:       </div>
+04946:     </section>
+04947: 
+04948:     <section class="view" id="view-correlation">
+04949:       <div class="topbar">
+04950:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+04951:         <div><h1>Correlation Analysis</h1><div class="sub">Mencari keterkaitan/pola tersembunyi antar variabel dari data Logbook &amp; Project Improvement — mana yang benar-benar berkorelasi dengan breakdown, bukan cuma asumsi.</div></div>
+04952:         <div style="display:flex;gap:8px;align-items:center;">
+04953:           <select id="corr-periode" style="width:auto;">
+04954:             <option value="90">3 Bulan Terakhir</option>
+04955:             <option value="180">6 Bulan Terakhir</option>
+04956:             <option value="365">12 Bulan Terakhir</option>
+04957:             <option value="0" selected>Semua Data</option>
+04958:           </select>
+04959:           <button class="btn btn-sm" id="btn-refresh-correlation"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+04960:         </div>
+04961:       </div>
+04962: 
+04963:       <div class="an-card" id="corr-pm-card">
+04964:         <div class="an-card-title"><i class="ph-bold ph-shield-check"></i> Korelasi PM Compliance vs Jumlah Breakdown</div>
+04965:         <div class="sub" style="margin-bottom:10px;">Menghitung koefisien korelasi Pearson (r) antara jumlah pekerjaan Preventive Maintenance dan jumlah Breakdown/Emergency, per mesin per bulan. Nilai r mendekati -1 berarti makin rajin PM, makin sedikit breakdown (bagus). Mendekati 0 berarti tidak ada hubungan yang jelas.</div>
+04966:         <div id="corr-pm-result"></div>
+04967:       </div>
+04968: 
+04969:       <div class="an-section-grid">
+04970:         <div class="an-card">
+04971:           <div class="an-card-title"><i class="ph-bold ph-calendar-blank"></i> Breakdown per Hari dalam Seminggu</div>
+04972:           <canvas id="chart-corr-dow" height="230"></canvas>
+04973:         </div>
+04974:         <div class="an-card">
+04975:           <div class="an-card-title"><i class="ph-bold ph-sun"></i> Breakdown per Shift</div>
+04976:           <canvas id="chart-corr-shift" height="230"></canvas>
+04977:         </div>
+04978:       </div>
+04979: 
+04980:       <div class="an-card">
+04981:         <div class="an-card-title"><i class="ph-bold ph-hourglass-medium"></i> Rata-rata Durasi Perbaikan per Jenis Pekerjaan</div>
+04982:         <canvas id="chart-corr-durasi" height="240"></canvas>
+04983:       </div>
+04984: 
+04985:       <div class="an-card">
+04986:         <div class="an-card-title"><i class="ph-bold ph-grid-nine"></i> Heatmap Hari vs Shift (Jumlah Kejadian)</div>
+04987:         <div class="sub" style="margin-bottom:10px;">Semakin gelap warnanya, semakin sering kejadian terjadi pada kombinasi hari &amp; shift tersebut — untuk melihat apakah ada pola waktu tertentu yang rawan.</div>
+04988:         <div id="corr-heatmap"></div>
+04989:       </div>
+04990: 
+04991:       <div class="an-card">
+04992:         <div class="an-card-title"><i class="ph-bold ph-link"></i> Pasangan Mesin &amp; Jenis Masalah Paling Sering Berkorelasi</div>
+04993:         <div class="sub" style="margin-bottom:10px;">Kombinasi mesin + kata kunci masalah yang paling sering muncul bersamaan di Logbook — kandidat kuat untuk didokumentasikan di Knowledge Base sebagai Frequently Problem.</div>
+04994:         <div id="corr-pairs-table"></div>
+04995:       </div>
+04996:     </section>
+04997: 
+04998:     <section class="view" id="view-diagnostic">
+04999:       <div class="topbar">
+05000:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05001:         <div><h1>Diagnostic Wizard</h1><div class="sub">"Dokter mesin" berbasis data sendiri — masukkan gejala yang terlihat, sistem mencari kasus mirip dari Logbook, Report RCA, dan Knowledge Base, lalu menyarankan kemungkinan penyebab &amp; tindakan yang pernah berhasil.</div></div>
+05002:       </div>
+05003: 
+05004:       <div class="card" style="margin-bottom:16px;">
+05005:         <div class="section-title"><i class="ph-bold ph-stethoscope"></i> Langkah 1 — Pilih Mesin (opsional)</div>
+05006:         <div class="sub" style="margin-bottom:10px;">Kosongkan kalau gejalanya umum / belum tahu mesin mana yang bermasalah.</div>
+~~~
+
+### Around line 5092
+~~~text
+05080:         <button class="btn btn-ghost sp-tab-btn" data-sptab="sp-tabPO"><i class="ph-bold ph-truck"></i> PO Monitoring</button>
+05081:         <button class="btn btn-ghost sp-tab-btn" data-sptab="sp-tabWarehouse"><i class="ph-bold ph-warehouse"></i> Warehouse Validation</button>
+05082:         <button class="btn btn-ghost sp-tab-btn" data-sptab="sp-tabOpname"><i class="ph-bold ph-clipboard-text"></i> Stock Opname</button>
+05083:         <button class="btn btn-ghost sp-tab-btn" data-sptab="sp-tabMaster"><i class="ph-bold ph-database"></i> Master Sparepart</button>
+05084:       </div>
+05085: 
+05086:       <!-- ============ TAB 1: DAILY SPAREPART COLLECTION ============ -->
+05087:       <div id="sp-tabCollect" class="sp-tab-panel active">
+05088:         <div class="sp-dash-grid" id="sp-collect-dash"></div>
+05089: 
+05090:         <div class="card" style="margin-bottom:16px;">
+05091:           <div class="section-title"><i class="ph-bold ph-chart-bar"></i> Analisa Periodik Pengambilan Sparepart per Bulan</div>
+05092:           <div class="sub" style="margin-bottom:10px;">Jumlah pengambilan &amp; estimasi cost dihitung dari data logbook, dicocokkan dengan Harga Satuan di menu Setting &gt; Lokasi Sparepart.</div>
+05093:           <div style="height:260px;"><canvas id="chart-sparepart-periodik"></canvas></div>
+05094:         </div>
+05095: 
+05096:         <div class="filter-bar sp-sticky-filter">
+05097:           <input class="grow" type="text" id="search-sparepart" placeholder="Cari material, SAP, mesin, logbook no, WO, PIC...">
+05098:           <select id="filter-sparepart-collection" aria-label="Filter status collection">
+05099:             <option value="">Semua Collection</option>
+05100:             <option value="PENDING">Belum Dicollect</option>
+05101:             <option value="COMPLETED">Sudah Dicollect + SAP</option>
+05102:           </select>
+05103:           <select id="sort-sparepart">
+05104:             <option value="date-desc">Tanggal Terbaru</option>
+05105:             <option value="date-asc">Tanggal Terlama</option>
+05106:             <option value="material-asc">Nama Material A-Z</option>
+05107:             <option value="qty-desc">Qty Terbesar</option>
+05108:           </select>
+05109:           <button class="btn btn-sm" id="btn-refresh-sparepart"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+05110:           <button class="btn btn-sm" id="btn-export-sparepart-collect"><i class="ph-bold ph-file-xls"></i> Export Excel</button>
+05111:         </div>
+05112: 
+05113:         <div class="sp-table-wrap card" style="padding:0;overflow:hidden;">
+05114:           <div style="max-width:100%;">
+05115:             <table class="sp-collect-table">
+05116:               <thead><tr>
+05117:                 <th style="width:120px;">Tandai</th>
+05118:                 <th>Date</th><th>Logbook No</th><th>Machine</th><th>WO</th><th>PIC</th>
+05119:                 <th>Spare Part</th><th>Qty</th><th>Lihat Detail</th>
+05120:               </tr></thead>
+05121:               <tbody id="sp-collect-tbody"></tbody>
+05122:             </table>
+05123:           </div>
+05124:           <div class="empty-state" id="sp-collect-empty" style="display:none;"><div class="ico"><i class="ph-bold ph-wrench"></i></div>Tidak ada data sparepart yang cocok.</div>
+05125:         </div>
+05126:         <div class="sp-pagination" id="sp-collect-pagination"></div>
+05127:       </div>
+05128: 
+05129:       <!-- ============ TAB 2: PO MONITORING ============ -->
+05130:       <div id="sp-tabPO" class="sp-tab-panel">
+05131:         <div class="sp-dash-grid" id="sp-po-dash"></div>
+05132: 
+05133:         <div class="card" style="margin-bottom:16px;">
+05134:           <div class="section-title"><i class="ph-bold ph-plus-circle"></i> Tambah Purchase Order</div>
+05135:           <div class="grid2">
+05136:             <div class="field"><label>Nama Material / Spare Part</label><input type="text" id="sp-eta-nama" placeholder="Nama material/sparepart"></div>
+05137:             <div class="field"><label>Material Number SAP (opsional)</label><input type="text" id="sp-eta-sap" placeholder="Nomor SAP"></div>
+05138:             <div class="field"><label>Nomor PO</label><input type="text" id="sp-eta-nopo" placeholder="Nomor Purchase Order"></div>
+05139:             <div class="field"><label>Vendor</label><input type="text" id="sp-eta-vendor" placeholder="Nama vendor/supplier"></div>
+05140:             <div class="field"><label>Qty PO</label><input type="number" id="sp-eta-qty" min="1" placeholder="1"></div>
+05141:             <div class="field"><label>Tanggal Order</label><input type="date" id="sp-eta-tglpo"></div>
+05142:             <div class="field"><label>ETA (Estimasi Tiba)</label><input type="date" id="sp-eta-tgletaeta"></div>
+05143:             <div class="field" style="grid-column:1/-1;"><label>Catatan (opsional)</label><input type="text" id="sp-eta-catatan" placeholder="Nomor tracking, dsb."></div>
+05144:           </div>
+05145:           <button type="button" class="btn btn-sm btn-primary" id="btn-add-sparepart-eta" style="margin-top:6px;"><i class="ph-bold ph-plus"></i> Simpan PO</button>
+05146:         </div>
+05147: 
+05148:         <div class="filter-bar sp-sticky-filter">
+05149:           <input class="grow" type="text" id="search-sparepart-eta" placeholder="Cari material, SAP, nomor PO, vendor...">
+05150:           <select id="filter-sparepart-eta-status">
+05151:             <option value="">Semua Status</option>
+05152:             <option value="waiting">Waiting</option>
+05153:             <option value="intransit">In Transit</option>
+05154:             <option value="overdue">Overdue</option>
+05155:             <option value="arrived">Arrived</option>
+05156:             <option value="warehouse">Warehouse</option>
+~~~
+
+### Around line 5235
+~~~text
+05223:           <div class="sub" style="margin-bottom:12px;">
+05224:             Satu data master per Material Number SAP dipakai bersama oleh SELURUH fitur yang berhubungan dengan sparepart:
+05225:             kartu ringkasan &amp; grafik cost di menu Sparepart, kartu lokasi rak yang otomatis dicocokkan dari form input Logbook,
+05226:             dan Stock Sistem di checklist Stock Opname. Cukup diisi/diedit di satu tempat ini.
+05227:             <br>Sebelumnya ada di menu Master Koneksi, sekarang dipindah ke sini supaya 1 tempat dengan Daily Collection &amp; PO Monitoring.
+05228:           </div>
+05229:           <div class="grid3">
+05230:             <div class="field"><label>Material Number SAP</label><input type="text" id="sl-sap" placeholder="1000234567"></div>
+05231:             <div class="field"><label>Nama Material</label><input type="text" id="sl-nama" placeholder="Bearing 6205"></div>
+05232:             <div class="field"><label>Lokasi Gudang/Rak</label><input type="text" id="sl-lokasi" placeholder="Gudang A - Rak 3B"></div>
+05233:           </div>
+05234:           <div class="grid3">
+05235:             <div class="field"><label>Harga Satuan (Rp)</label><input type="number" id="sl-harga" min="0" step="100" placeholder="0"></div>
+05236:             <div class="field"><label>Stock Qty</label><input type="number" id="sl-stock" min="0" step="1" placeholder="0"></div>
+05237:             <div class="field"><label>Satuan</label><input type="text" id="sl-satuan" placeholder="cth: pcs, unit, set"></div>
+05238:           </div>
+05239:           <button class="btn btn-sm" id="btn-save-sparepart-lokasi">+ Simpan Data Sparepart</button>
+05240:           <button class="btn btn-sm" id="btn-cancel-edit-sparepart-lokasi" style="display:none;">Batal Edit</button>
+05241:           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+05242:             <div class="field" style="flex:1 1 280px;margin:0;">
+05243:               <label for="search-master-sparepart">Cari Sparepart</label>
+05244:               <div style="position:relative;">
+05245:                 <i class="ph-bold ph-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);"></i>
+05246:                 <input type="search" id="search-master-sparepart" placeholder="Cari Nama Material atau Material Number SAP..." autocomplete="off" style="padding-left:36px;">
+05247:               </div>
+05248:             </div>
+05249:             <button type="button" class="btn btn-sm" id="btn-reset-master-sparepart-search" style="margin-top:18px;"><i class="ph-bold ph-x"></i> Reset</button>
+05250:           </div>
+05251:           <div id="master-sparepart-search-info" style="font-size:12px;color:var(--text-dim);margin-top:6px;"></div>
+05252:           <div style="margin-top:10px;" id="sparepart-lokasi-table"></div>
+05253:         </div>
+05254:       </div>
+05255:     </section>
+05256: 
+05257:     <section class="view" id="view-expert-finder">
+05258:       <div class="topbar">
+05259:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05260:         <div><h1>People Intelligence</h1><div class="sub">Ranking personil paling berpengalaman, dihitung otomatis dari histori Logbook (Nama Pelapor, Status, Jenis Pekerjaan) yang sudah tersimpan — tidak ada data baru yang perlu diisi.</div></div>
+05261:         <div class="stat-strip" id="ef-stat-strip"></div>
+05262:       </div>
+05263:       <div class="filter-bar">
+05264:         <input class="grow" type="text" id="search-expert-nama" placeholder="Cari nama personil...">
+05265:         <input class="grow" type="text" id="search-expert-konteks" placeholder="Ranking khusus untuk mesin/masalah tertentu (mis. nama mesin, kode mesin, atau kata kunci masalah)...">
+05266:         <button class="btn btn-sm" id="btn-reset-expert-konteks"><i class="ph-bold ph-x"></i> Reset Konteks</button>
+05267:       </div>
+05268:       <div class="sub" id="ef-konteks-info" style="margin:-6px 0 14px 2px;"></div>
+05269:       <div id="list-expert-finder"></div>
+05270:     </section>
+05271: 
+05272:     <section class="view" id="view-knowledge-graph">
+05273:       <div class="topbar">
+05274:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05275:         <div><h1>Knowledge Graph</h1><div class="sub">Visualisasi hubungan antar Personil, Mesin, Sparepart/SAP, dan Masalah — dibangun otomatis dari data Logbook yang sudah ada (vis-network). Klik node untuk detail, drag untuk atur posisi, scroll untuk zoom.</div></div>
+05276:         <div class="stat-strip" id="kg-stat-strip"></div>
+05277:       </div>
+05278:       <div class="filter-bar">
+05279:         <input class="grow" type="text" id="search-kg" placeholder="Cari & sorot node (nama personil, mesin, sparepart, kata kunci masalah)...">
+05280:         <select id="filter-kg-type">
+05281:           <option value="">Semua Tipe Node</option>
+05282:           <option value="personil">Personil</option>
+05283:           <option value="mesin">Mesin</option>
+05284:           <option value="sparepart">Sparepart</option>
+05285:           <option value="masalah">Masalah</option>
+05286:         </select>
+05287:         <button class="btn btn-sm" id="btn-kg-reset-view"><i class="ph-bold ph-arrows-out-cardinal"></i> Reset Tampilan</button>
+05288:       </div>
+05289:       <div class="card" style="padding:0;overflow:hidden;">
+05290:         <div id="kg-network" style="width:100%;height:70vh;background:var(--panel-2);"></div>
+05291:       </div>
+05292:       <div class="card" id="kg-node-detail" style="margin-top:16px;display:none;"></div>
+05293:     </section>
+05294: 
+05295:     <section class="view" id="view-wiki">
+05296:       <style>
+05297:         .wiki-group-list{display:grid;gap:8px;margin-top:8px;}
+05298:         .wiki-group-card{border:1px solid var(--line);border-radius:10px;background:var(--panel-2);overflow:hidden;}
+05299:         .wiki-group-card>summary{cursor:pointer;list-style:none;padding:10px 12px;display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:700;}
+~~~
+
+### Around line 5237
+~~~text
+05225:             kartu ringkasan &amp; grafik cost di menu Sparepart, kartu lokasi rak yang otomatis dicocokkan dari form input Logbook,
+05226:             dan Stock Sistem di checklist Stock Opname. Cukup diisi/diedit di satu tempat ini.
+05227:             <br>Sebelumnya ada di menu Master Koneksi, sekarang dipindah ke sini supaya 1 tempat dengan Daily Collection &amp; PO Monitoring.
+05228:           </div>
+05229:           <div class="grid3">
+05230:             <div class="field"><label>Material Number SAP</label><input type="text" id="sl-sap" placeholder="1000234567"></div>
+05231:             <div class="field"><label>Nama Material</label><input type="text" id="sl-nama" placeholder="Bearing 6205"></div>
+05232:             <div class="field"><label>Lokasi Gudang/Rak</label><input type="text" id="sl-lokasi" placeholder="Gudang A - Rak 3B"></div>
+05233:           </div>
+05234:           <div class="grid3">
+05235:             <div class="field"><label>Harga Satuan (Rp)</label><input type="number" id="sl-harga" min="0" step="100" placeholder="0"></div>
+05236:             <div class="field"><label>Stock Qty</label><input type="number" id="sl-stock" min="0" step="1" placeholder="0"></div>
+05237:             <div class="field"><label>Satuan</label><input type="text" id="sl-satuan" placeholder="cth: pcs, unit, set"></div>
+05238:           </div>
+05239:           <button class="btn btn-sm" id="btn-save-sparepart-lokasi">+ Simpan Data Sparepart</button>
+05240:           <button class="btn btn-sm" id="btn-cancel-edit-sparepart-lokasi" style="display:none;">Batal Edit</button>
+05241:           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+05242:             <div class="field" style="flex:1 1 280px;margin:0;">
+05243:               <label for="search-master-sparepart">Cari Sparepart</label>
+05244:               <div style="position:relative;">
+05245:                 <i class="ph-bold ph-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);"></i>
+05246:                 <input type="search" id="search-master-sparepart" placeholder="Cari Nama Material atau Material Number SAP..." autocomplete="off" style="padding-left:36px;">
+05247:               </div>
+05248:             </div>
+05249:             <button type="button" class="btn btn-sm" id="btn-reset-master-sparepart-search" style="margin-top:18px;"><i class="ph-bold ph-x"></i> Reset</button>
+05250:           </div>
+05251:           <div id="master-sparepart-search-info" style="font-size:12px;color:var(--text-dim);margin-top:6px;"></div>
+05252:           <div style="margin-top:10px;" id="sparepart-lokasi-table"></div>
+05253:         </div>
+05254:       </div>
+05255:     </section>
+05256: 
+05257:     <section class="view" id="view-expert-finder">
+05258:       <div class="topbar">
+05259:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05260:         <div><h1>People Intelligence</h1><div class="sub">Ranking personil paling berpengalaman, dihitung otomatis dari histori Logbook (Nama Pelapor, Status, Jenis Pekerjaan) yang sudah tersimpan — tidak ada data baru yang perlu diisi.</div></div>
+05261:         <div class="stat-strip" id="ef-stat-strip"></div>
+05262:       </div>
+05263:       <div class="filter-bar">
+05264:         <input class="grow" type="text" id="search-expert-nama" placeholder="Cari nama personil...">
+05265:         <input class="grow" type="text" id="search-expert-konteks" placeholder="Ranking khusus untuk mesin/masalah tertentu (mis. nama mesin, kode mesin, atau kata kunci masalah)...">
+05266:         <button class="btn btn-sm" id="btn-reset-expert-konteks"><i class="ph-bold ph-x"></i> Reset Konteks</button>
+05267:       </div>
+05268:       <div class="sub" id="ef-konteks-info" style="margin:-6px 0 14px 2px;"></div>
+05269:       <div id="list-expert-finder"></div>
+05270:     </section>
+05271: 
+05272:     <section class="view" id="view-knowledge-graph">
+05273:       <div class="topbar">
+05274:         <button class="btn btn-sm btn-back-to-insights" onclick="goToView('insights-hub')" style="margin-right:8px;"><i class="ph-bold ph-arrow-left"></i></button>
+05275:         <div><h1>Knowledge Graph</h1><div class="sub">Visualisasi hubungan antar Personil, Mesin, Sparepart/SAP, dan Masalah — dibangun otomatis dari data Logbook yang sudah ada (vis-network). Klik node untuk detail, drag untuk atur posisi, scroll untuk zoom.</div></div>
+05276:         <div class="stat-strip" id="kg-stat-strip"></div>
+05277:       </div>
+05278:       <div class="filter-bar">
+05279:         <input class="grow" type="text" id="search-kg" placeholder="Cari & sorot node (nama personil, mesin, sparepart, kata kunci masalah)...">
+05280:         <select id="filter-kg-type">
+05281:           <option value="">Semua Tipe Node</option>
+05282:           <option value="personil">Personil</option>
+05283:           <option value="mesin">Mesin</option>
+05284:           <option value="sparepart">Sparepart</option>
+05285:           <option value="masalah">Masalah</option>
+05286:         </select>
+05287:         <button class="btn btn-sm" id="btn-kg-reset-view"><i class="ph-bold ph-arrows-out-cardinal"></i> Reset Tampilan</button>
+05288:       </div>
+05289:       <div class="card" style="padding:0;overflow:hidden;">
+05290:         <div id="kg-network" style="width:100%;height:70vh;background:var(--panel-2);"></div>
+05291:       </div>
+05292:       <div class="card" id="kg-node-detail" style="margin-top:16px;display:none;"></div>
+05293:     </section>
+05294: 
+05295:     <section class="view" id="view-wiki">
+05296:       <style>
+05297:         .wiki-group-list{display:grid;gap:8px;margin-top:8px;}
+05298:         .wiki-group-card{border:1px solid var(--line);border-radius:10px;background:var(--panel-2);overflow:hidden;}
+05299:         .wiki-group-card>summary{cursor:pointer;list-style:none;padding:10px 12px;display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:700;}
+05300:         .wiki-group-card>summary::-webkit-details-marker{display:none;}
+05301:         .wiki-group-content{padding:10px 12px;border-top:1px solid var(--line-soft);}
+~~~
+
+### Around line 12741
+~~~text
+12729:       saveSparepartStatusLocal();
+12730:       return true;
+12731:     }
+12732:   }catch(e){ /* backend tidak tersedia: pakai cache lokal yang sudah dimuat */ }
+12733:   return false;
+12734: }
+12735: 
+12736: /* ---------------- MASTER SPAREPART: LOKASI, HARGA & STOCK GUDANG (Setting) ----------------
+12737:    [EDIT] Sebelumnya "Stock Sparepart Gudang" (read-only, sheet terpisah
+12738:    Stock_Sparepart) dan "Lokasi & Harga Sparepart" (Sparepart_Lokasi, CRUD)
+12739:    adalah dua card & dua sumber data yang terpisah. Sekarang DIGABUNG jadi
+12740:    satu master (SPAREPART_LOKASI, dari sheet Sparepart_Lokasi yang sudah
+12741:    diperluas kolomnya: SAP, Nama, Lokasi Gudang, Harga Satuan, Stock Qty,
+12742:    Satuan) supaya SATU Material Number SAP = SATU baris data yang dipakai
+12743:    bersama oleh SELURUH fitur sparepart: kartu & grafik cost di menu
+12744:    Sparepart, kartu lokasi rak di form input Logbook, dan Stock Sistem di
+12745:    Stock Opname (dulu baca dari STOCK_SPAREPART terpisah, sekarang dari
+12746:    sini juga -- lihat findStockSistemBySap di bawah). Backend otomatis
+12747:    meng-impor sisa data dari sheet Stock_Sparepart lama (kalau ada) ke
+12748:    master ini sekali jalan, jadi tidak ada data yang hilang. */
+12749: let SPAREPART_LOKASI = [];
+12750: let SPAREPART_LOKASI_EDIT_SAP = null;
+12751: let SPAREPART_LOKASI_EDIT_NAME = null;
+12752: 
+12753: function loadSparepartLokasiLocal(){ try{ return JSON.parse(localStorage.getItem(LS_SPAREPART_LOKASI_KEY)||'[]'); }catch(e){ return []; } }
+12754: function saveSparepartLokasiLocal(list){ localStorage.setItem(LS_SPAREPART_LOKASI_KEY, JSON.stringify(list)); SPAREPART_LOKASI = list; }
+12755: async function syncSparepartLokasiFromBackend(){
+12756:   SPAREPART_LOKASI = loadSparepartLokasiLocal();
+12757:   if(!WEB_APP_URL) return SPAREPART_LOKASI;
+12758:   try{
+12759:     const remote = await apiGet('sparepartLokasi');
+12760:     if(Array.isArray(remote)){
+12761:       const normalized = remote.map(r=>({
+12762:         sap: String(r['Material Number SAP']||'').trim(),
+12763:         nama: r['Nama Material']||'',
+12764:         lokasiGudang: r['Lokasi Gudang']||'',
+12765:         harga: Number(r['Harga Satuan']) || 0,
+12766:         stockQty: (r['Stock Qty']===''||r['Stock Qty']==null) ? null : Number(r['Stock Qty']),
+12767:         satuan: r['Satuan']||'',
+12768:         needsReview: r['Perlu Verifikasi']===true || String(r['Perlu Verifikasi']).toLowerCase()==='true',
+12769:         sourceLogbook: r['Sumber Logbook']||''
+12770:       }));
+12771:       saveSparepartLokasiLocal(normalized);
+12772:     }
+12773:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+12774:   return SPAREPART_LOKASI;
+12775: }
+12776: function findSparepartLokasiBySap(sap){
+12777:   const s = String(sap||'').trim();
+12778:   if(!s) return null;
+12779:   return SPAREPART_LOKASI.find(x=> x.sap === s) || null;
+12780: }
+12781: // [EDIT] Menggantikan findStockSistemBySap yang dulu baca dari STOCK_SPAREPART
+12782: // (sheet Stock_Sparepart terpisah, perlu tombol "Muat Ulang Stock" manual) --
+12783: // sekarang Stock Qty adalah bagian dari master SPAREPART_LOKASI yang sama,
+12784: // jadi otomatis tersedia begitu SPAREPART_LOKASI sudah dimuat (loadAll),
+12785: // tanpa perlu langkah muat ulang terpisah.
+12786: function findStockSistemBySap(sap){
+12787:   const r = findSparepartLokasiBySap(sap);
+12788:   return (r && r.stockQty != null) ? r.stockQty : null;
+12789: }
+12790: function resetSparepartLokasiForm(){
+12791:   SPAREPART_LOKASI_EDIT_SAP = null;
+12792:   SPAREPART_LOKASI_EDIT_NAME = null;
+12793:   $('#sl-sap').value=''; $('#sl-nama').value=''; $('#sl-lokasi').value=''; $('#sl-harga').value='';
+12794:   const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
+12795:   if(stockEl) stockEl.value=''; if(satuanEl) satuanEl.value='';
+12796:   $('#btn-save-sparepart-lokasi').innerHTML = '+ Simpan Data Sparepart';
+12797:   $('#btn-cancel-edit-sparepart-lokasi').style.display = 'none';
+12798: }
+12799: let SPAREPART_LOKASI_SEARCH = '';
+12800: function renderSparepartLokasiTable(){
+12801:   const holder = $('#sparepart-lokasi-table');
+12802:   if(!holder) return;
+12803:   const q = String(SPAREPART_LOKASI_SEARCH||'').trim().toLowerCase();
+12804:   const rows = !q ? SPAREPART_LOKASI : SPAREPART_LOKASI.filter(r=>
+12805:     String(r.nama||'').toLowerCase().includes(q) || String(r.sap||'').toLowerCase().includes(q)
+~~~
+
+### Around line 12742
+~~~text
+12730:       return true;
+12731:     }
+12732:   }catch(e){ /* backend tidak tersedia: pakai cache lokal yang sudah dimuat */ }
+12733:   return false;
+12734: }
+12735: 
+12736: /* ---------------- MASTER SPAREPART: LOKASI, HARGA & STOCK GUDANG (Setting) ----------------
+12737:    [EDIT] Sebelumnya "Stock Sparepart Gudang" (read-only, sheet terpisah
+12738:    Stock_Sparepart) dan "Lokasi & Harga Sparepart" (Sparepart_Lokasi, CRUD)
+12739:    adalah dua card & dua sumber data yang terpisah. Sekarang DIGABUNG jadi
+12740:    satu master (SPAREPART_LOKASI, dari sheet Sparepart_Lokasi yang sudah
+12741:    diperluas kolomnya: SAP, Nama, Lokasi Gudang, Harga Satuan, Stock Qty,
+12742:    Satuan) supaya SATU Material Number SAP = SATU baris data yang dipakai
+12743:    bersama oleh SELURUH fitur sparepart: kartu & grafik cost di menu
+12744:    Sparepart, kartu lokasi rak di form input Logbook, dan Stock Sistem di
+12745:    Stock Opname (dulu baca dari STOCK_SPAREPART terpisah, sekarang dari
+12746:    sini juga -- lihat findStockSistemBySap di bawah). Backend otomatis
+12747:    meng-impor sisa data dari sheet Stock_Sparepart lama (kalau ada) ke
+12748:    master ini sekali jalan, jadi tidak ada data yang hilang. */
+12749: let SPAREPART_LOKASI = [];
+12750: let SPAREPART_LOKASI_EDIT_SAP = null;
+12751: let SPAREPART_LOKASI_EDIT_NAME = null;
+12752: 
+12753: function loadSparepartLokasiLocal(){ try{ return JSON.parse(localStorage.getItem(LS_SPAREPART_LOKASI_KEY)||'[]'); }catch(e){ return []; } }
+12754: function saveSparepartLokasiLocal(list){ localStorage.setItem(LS_SPAREPART_LOKASI_KEY, JSON.stringify(list)); SPAREPART_LOKASI = list; }
+12755: async function syncSparepartLokasiFromBackend(){
+12756:   SPAREPART_LOKASI = loadSparepartLokasiLocal();
+12757:   if(!WEB_APP_URL) return SPAREPART_LOKASI;
+12758:   try{
+12759:     const remote = await apiGet('sparepartLokasi');
+12760:     if(Array.isArray(remote)){
+12761:       const normalized = remote.map(r=>({
+12762:         sap: String(r['Material Number SAP']||'').trim(),
+12763:         nama: r['Nama Material']||'',
+12764:         lokasiGudang: r['Lokasi Gudang']||'',
+12765:         harga: Number(r['Harga Satuan']) || 0,
+12766:         stockQty: (r['Stock Qty']===''||r['Stock Qty']==null) ? null : Number(r['Stock Qty']),
+12767:         satuan: r['Satuan']||'',
+12768:         needsReview: r['Perlu Verifikasi']===true || String(r['Perlu Verifikasi']).toLowerCase()==='true',
+12769:         sourceLogbook: r['Sumber Logbook']||''
+12770:       }));
+12771:       saveSparepartLokasiLocal(normalized);
+12772:     }
+12773:   }catch(e){ /* action belum tersedia di backend; pakai cache lokal */ }
+12774:   return SPAREPART_LOKASI;
+12775: }
+12776: function findSparepartLokasiBySap(sap){
+12777:   const s = String(sap||'').trim();
+12778:   if(!s) return null;
+12779:   return SPAREPART_LOKASI.find(x=> x.sap === s) || null;
+12780: }
+12781: // [EDIT] Menggantikan findStockSistemBySap yang dulu baca dari STOCK_SPAREPART
+12782: // (sheet Stock_Sparepart terpisah, perlu tombol "Muat Ulang Stock" manual) --
+12783: // sekarang Stock Qty adalah bagian dari master SPAREPART_LOKASI yang sama,
+12784: // jadi otomatis tersedia begitu SPAREPART_LOKASI sudah dimuat (loadAll),
+12785: // tanpa perlu langkah muat ulang terpisah.
+12786: function findStockSistemBySap(sap){
+12787:   const r = findSparepartLokasiBySap(sap);
+12788:   return (r && r.stockQty != null) ? r.stockQty : null;
+12789: }
+12790: function resetSparepartLokasiForm(){
+12791:   SPAREPART_LOKASI_EDIT_SAP = null;
+12792:   SPAREPART_LOKASI_EDIT_NAME = null;
+12793:   $('#sl-sap').value=''; $('#sl-nama').value=''; $('#sl-lokasi').value=''; $('#sl-harga').value='';
+12794:   const stockEl = $('#sl-stock'), satuanEl = $('#sl-satuan');
+12795:   if(stockEl) stockEl.value=''; if(satuanEl) satuanEl.value='';
+12796:   $('#btn-save-sparepart-lokasi').innerHTML = '+ Simpan Data Sparepart';
+12797:   $('#btn-cancel-edit-sparepart-lokasi').style.display = 'none';
+12798: }
+12799: let SPAREPART_LOKASI_SEARCH = '';
+12800: function renderSparepartLokasiTable(){
+12801:   const holder = $('#sparepart-lokasi-table');
+12802:   if(!holder) return;
+12803:   const q = String(SPAREPART_LOKASI_SEARCH||'').trim().toLowerCase();
+12804:   const rows = !q ? SPAREPART_LOKASI : SPAREPART_LOKASI.filter(r=>
+12805:     String(r.nama||'').toLowerCase().includes(q) || String(r.sap||'').toLowerCase().includes(q)
+12806:   );
+~~~
+
+## editLogbook
+No match.
+
+## logbook-edit
+No match.
+
+## materialSelect
+No match.
+
+## addLogbookMaterial
+No match.
+
+## function renderLogbook
+No match.
+
+## function openEditLogbook
+No match.
+
+## function saveLogbook
+No match.
+
+## location.reload
+### Around line 8087
+~~~text
+08075:   }
+08076:   const form = document.getElementById('form-login');
+08077:   if(form) form.reset();
+08078:   const errEl = document.getElementById('login-err');
+08079:   if(errEl) errEl.textContent = '';
+08080:   const userField = document.getElementById('login-username');
+08081:   if(userField) setTimeout(()=> userField.focus(), 50);
+08082: 
+08083:   // Hapus state runtime akun lama lalu reload. Cache data/draft/offline
+08084:   // tidak dihapus: semuanya sudah dipindahkan ke namespace akun yang logout,
+08085:   // sehingga akun berikutnya tidak mewarisi cache tersebut.
+08086:   try{ READY_READS.clear(); ACTIVE_READS.clear(); READ_GENERATION++; }catch(e){}
+08087:   setTimeout(()=> location.reload(), 60);
+08088: }
+08089: document.addEventListener('click', (e)=>{
+08090:   if(e.target.closest('#btn-logout')){
+08091:     if(confirm('Keluar dari aplikasi? Anda perlu login lagi untuk melanjutkan.')) logoutUser();
+08092:   }
+08093: });
+08094: 
+08095: /* ---------------- OFFLINE MODE: ANTREAN SINKRON OTOMATIS ----------------
+08096:    Aplikasi ini SUDAH menyimpan semua data ke localStorage dulu sebelum
+08097:    mengirim ke backend (lihat pola persistPmReport, saveGrReportsLocal, dkk),
+08098:    jadi tetap bisa dipakai penuh tanpa internet. Yang ditambahkan di sini:
+08099:    setiap kali apiPost gagal karena masalah jaringan, payload-nya diantre;
+08100:    begitu koneksi kembali (event 'online' / polling berkala), antrean ini
+08101:    otomatis dikirim ulang ke backend tanpa perlu aksi manual dari pengguna. */
+08102: const LS_SYNC_QUEUE_KEY = 'logbook_pending_sync_queue';
+08103: let APP_ONLINE_STATUS = navigator.onLine;
+08104: 
+08105: function loadSyncQueue_(){ try{ return JSON.parse(localStorage.getItem(LS_SYNC_QUEUE_KEY) || '[]'); }catch(e){ return []; } }
+08106: function saveSyncQueue_(q){ localStorage.setItem(LS_SYNC_QUEUE_KEY, JSON.stringify(q)); renderOfflineBanner(); }
+08107: function isSecurityConfigAction_(action){
+08108:   return ['savePermissions','saveLcPermissions','saveRoleAccessConfig','createUser','updateUser','resetPassword','setUserActive','deleteUser'].includes(String(action||''));
+08109: }
+08110: function queueForSync_(payload){
+08111:   // Konfigurasi keamanan harus online-only. Jangan simpan request role/permission
+08112:   // ke antrean offline karena request lama dapat menimpa konfigurasi terbaru saat
+08113:   // koneksi pulih beberapa menit/jam kemudian.
+08114:   if(isSecurityConfigAction_(payload && payload.action)) return;
+08115:   const q = loadSyncQueue_();
+08116:   const queuedPayload = {...payload};
+08117:   delete queuedPayload.sessionToken;
+08118:   // Cegah item identik menumpuk jika pengguna menekan simpan lagi setelah
+08119:   // timeout. Payload berbeda tetap dipertahankan sebagai operasi terpisah.
+08120:   const signature = JSON.stringify(queuedPayload);
+08121:   if(q.some(item => JSON.stringify(item.payload) === signature)){
+08122:     renderOfflineBanner();
+08123:     return;
+08124:   }
+08125:   q.push({ id: 'sync_'+Date.now()+'_'+Math.random().toString(36).slice(2), payload:queuedPayload, ts: Date.now() });
+08126:   saveSyncQueue_(q);
+08127: }
+08128: 
+08129: async function flushSyncQueue_(){
+08130:   if(!WEB_APP_URL) return;
+08131:   const q = loadSyncQueue_();
+08132:   if(!q.length) return;
+08133:   const remaining = [];
+08134:   let discardedSecurityConfig = 0;
+08135:   for(const item of q){
+08136:     if(isSecurityConfigAction_(item && item.payload && item.payload.action)){ discardedSecurityConfig++; continue; }
+08137:     try{
+08138:       if(!SESSION_TOKEN) throw new Error('AUTH_REQUIRED');
+08139:       const requestToken = (SETTING_AUTH_OK && SETTING_SESSION_TOKEN) ? SETTING_SESSION_TOKEN : SESSION_TOKEN;
+08140:       const res = await fetchWithTimeout_(WEB_APP_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({...item.payload, sessionToken:requestToken}) }, 60000); // PATCHED 60s
+08141:       const json = await parseApiResponse_(res);
+08142:       if(!json.ok) throw new Error(json.error || 'gagal');
+08143:     }catch(e){
+08144:       remaining.push(item); // masih gagal, coba lagi di kesempatan berikutnya
+08145:     }
+08146:   }
+08147:   const successCount = q.length - remaining.length - discardedSecurityConfig;
+08148:   saveSyncQueue_(remaining);
+08149:   if(successCount > 0){
+08150:     setAppOnlineStatus(true);
+08151:     toast(`${successCount} data berhasil disinkron otomatis ke server.`);
+~~~
+
+### Around line 8373
+~~~text
+08361: function clearViewLocalCache(viewId){
+08362:   const cfg = getViewLocalStorageKeys()[viewId];
+08363:   if(!cfg) return;
+08364:   const ok = confirm(
+08365:     `Hapus cache lokal "${cfg.label}" di browser ini?\n\n`+
+08366:     `- Data yang SUDAH tersimpan di database SQLite TIDAK akan terhapus.\n`+
+08367:     `- Hanya salinan/cache di browser ini yang dibersihkan (berguna kalau ada data lama/rusak yang masih nyangkut).\n`+
+08368:     `- Halaman akan otomatis reload setelah ini.`
+08369:   );
+08370:   if(!ok) return;
+08371:   cfg.keys.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+08372:   toast('Cache lokal "'+cfg.label+'" berhasil dihapus. Memuat ulang halaman...');
+08373:   setTimeout(()=> location.reload(), 600);
+08374: }
+08375: function ensureClearLocalCacheButton(viewId){
+08376:   const cfg = getViewLocalStorageKeys()[viewId];
+08377:   const section = document.getElementById('view-' + viewId);
+08378:   if(!section) return;
+08379:   const topbar = section.querySelector('.topbar');
+08380:   if(!topbar) return;
+08381:   let btn = topbar.querySelector('.btn-clear-local-cache');
+08382:   if(!cfg){ if(btn) btn.remove(); return; }
+08383:   if(!btn){
+08384:     btn = document.createElement('button');
+08385:     btn.type = 'button';
+08386:     btn.className = 'btn btn-sm btn-clear-local-cache';
+08387:     btn.style.marginLeft = 'auto';
+08388:     btn.innerHTML = '<i class="ph-bold ph-trash"></i> Hapus Cache Lokal';
+08389:     btn.title = 'Hapus cache localStorage halaman ini di browser (tidak menghapus data di database SQLite)';
+08390:     btn.addEventListener('click', ()=> clearViewLocalCache(viewId));
+08391:     topbar.appendChild(btn);
+08392:   }
+08393: }
+08394: function openNavGroup(group){
+08395:   Array.from(document.querySelectorAll('.nav-parent-btn[data-group]')).forEach(b=>{
+08396:     const groupKey = b.dataset.group;
+08397:     const sub = document.querySelector(`.nav-submenu[data-submenu="${groupKey}"]`);
+08398:     if(!sub) return;
+08399:     if(groupKey === group){ b.classList.add('active','open'); sub.classList.add('open'); }
+08400:     else { b.classList.remove('active'); }
+08401:   });
+08402: }
+08403: Array.from(document.querySelectorAll('.nav-parent-btn[data-group]')).forEach(btn=>{
+08404:   btn.addEventListener('click', ()=>{
+08405:     const groupKey = btn.dataset.group;
+08406:     if(!groupKey) return;
+08407:     const sub = document.querySelector(`.nav-submenu[data-submenu="${groupKey}"]`);
+08408:     if(!sub) return;
+08409:     const willOpen = !sub.classList.contains('open');
+08410:     sub.classList.toggle('open', willOpen);
+08411:     btn.classList.toggle('open', willOpen);
+08412:   });
+08413: });
+08414: const VIEW_PERMISSION_PARENT = Object.freeze({
+08415:   mesin:'utama', tanggal:'utama', pelapor:'utama', group:'utama',
+08416:   rca:'report', 'report-hub':'report', 'project-report':'report', ai:'report'
+08417: });
+08418: function permissionViewFor_(view){
+08419:   view = String(view||'').trim();
+08420:   return VIEW_PERMISSION_PARENT[view] || view;
+08421: }
+08422: function canAccessView_(view){
+08423:   view = String(view||'').trim();
+08424:   if(!view) return false;
+08425:   if(view === 'omodos4' || view.startsWith('omodos4-')) return isSuperadmin();
+08426:   const permissionView = permissionViewFor_(view);
+08427:   if(permissionView === 'dashboard') return true;
+08428:   const permKey = 'view.' + permissionView;
+08429:   const knownFeature = FEATURE_REGISTRY.some(f => f.PermissionKey === permKey);
+08430:   return !knownFeature || hasPermission(permKey);
+08431: }
+08432: function canAccessAnyView_(views){
+08433:   return (views||[]).some(v=>canAccessView_(v));
+08434: }
+08435: function canAccessLogbookDetail_(){
+08436:   return canAccessAnyView_(['input','utama','mesin','tanggal','pelapor','group']);
+08437: }
+~~~
+
+## screen.orientation
+### Around line 21961
+~~~text
+21949:   const element = document.documentElement; // Mengambil seluruh halaman HTML
+21950: 
+21951:   if (element.requestFullscreen) {
+21952:     element.requestFullscreen().catch(()=>{});
+21953:   } else if (element.webkitRequestFullscreen) { /* Safari / iOS */
+21954:     element.webkitRequestFullscreen();
+21955:   } else if (element.msRequestFullscreen) { /* IE11 */
+21956:     element.msRequestFullscreen();
+21957:   }
+21958:   // Kunci ke orientasi landscape kalau tablet dipasang mendatar -- opsional,
+21959:   // browser yang tidak mendukung Screen Orientation API akan diam saja.
+21960:   try{
+21961:     if (screen.orientation && screen.orientation.lock) {
+21962:       screen.orientation.lock('landscape').catch(()=>{});
+21963:     }
+21964:   }catch(e){}
+21965: }
+21966: 
+21967: // Opsi A: Memicu fullscreen ketika tombol login ditekan (Direkomendasikan)
+21968: // Silakan sesuaikan ID/Class form login Anda. Contoh:
+21969: const loginForm = document.querySelector('.login-box form') || document.querySelector('form');
+21970: if (loginForm) {
+21971:   loginForm.addEventListener('submit', () => {
+21972:     aktifkanFullscreen();
+21973:   });
+21974: }
+21975: 
+21976: // Opsi B: Memicu fullscreen secara halus saat pengguna mengetuk bagian layar mana saja untuk pertama kalinya
+21977: document.addEventListener('click', () => {
+21978:   aktifkanFullscreen();
+21979: }, { once: true }); // 'once: true' memastikan ini hanya berjalan satu kali saat klik pertama
+21980: 
+21981: // Opsi C: coba lagi otomatis setiap kali user kembali ke tab ini (mis. tablet
+21982: // sempat dikunci lalu dibuka lagi) -- browser kadang keluar dari fullscreen
+21983: // API saat layar dikunci.
+21984: document.addEventListener('visibilitychange', () => {
+21985:   if (document.visibilityState === 'visible') aktifkanFullscreen();
+21986: });
+21987: 
+21988: /* =========================================================
+21989:    AI MAINTENANCE COPILOT
+21990:    Rule engine yang membaca ENTRIES/MACHINES/KB_ENTRIES yang sama
+21991:    dengan menu Analitik & Knowledge Base, lalu menyusun insight
+21992:    berbahasa natural. Tidak memanggil API eksternal apa pun — semua
+21993:    dihitung di browser sehingga gratis, instan, dan datanya konsisten
+21994:    dengan menu lain di aplikasi ini.
+21995:    ========================================================= */
+21996: 
+21997: // Interval default Preventive Maintenance (hari) dipakai untuk deteksi
+21998: // "PM terlambat". Bisa diubah pengguna lewat panel Copilot (disimpan di
+21999: // localStorage per-browser, tidak mengubah data di database SQLite).
+22000: function copilotPmIntervalDays(){
+22001:   return parseInt(localStorage.getItem('copilot_pm_interval') || '30', 10) || 30;
+22002: }
+22003: 
+22004: // [FIX SOT] Fungsi ini dipakai ~10 perhitungan Copilot berbeda (MTBF, rasio
+22005: // PM, breakdown bulan berjalan, dst) dan sengaja bersifat all-time (bukan
+22006: // cuma 90 hari) -- jadi paling berisiko mencampur data historis OneNote
+22007: // yang belum tervalidasi kalau tidak dibatasi di sini. Satu perbaikan di
+22008: // titik ini otomatis berlaku untuk seluruh pemanggilnya.
+22009: function copilotEntriesFor(kodeOrNama){
+22010:   if(!kodeOrNama || kodeOrNama === '__all__') return sotEntries();
+22011:   return sotEntries().filter(e=> machineRecordMatchesIdentity_(e,kodeOrNama));
+22012: }
+22013: 
+22014: // Total downtime (menit) dalam suatu bulan kalender (0-indexed month) utk scope tertentu
+22015: function copilotMonthDowntime(kodeOrNama, year, month){
+22016:   return copilotEntriesFor(kodeOrNama).filter(anIsBreakdown).reduce((sum,e)=>{
+22017:     const d = new Date(e['Tanggal']);
+22018:     if(isNaN(d) || d.getFullYear()!==year || d.getMonth()!==month) return sum;
+22019:     return sum + (parseDurationMinutes(e)||0);
+22020:   }, 0);
+22021: }
+22022: function copilotMonthBreakdownCount(kodeOrNama, year, month){
+22023:   return copilotEntriesFor(kodeOrNama).filter(anIsBreakdown).filter(e=>{
+22024:     const d = new Date(e['Tanggal']);
+22025:     return !isNaN(d) && d.getFullYear()===year && d.getMonth()===month;
+~~~
+
+### Around line 21962
+~~~text
+21950: 
+21951:   if (element.requestFullscreen) {
+21952:     element.requestFullscreen().catch(()=>{});
+21953:   } else if (element.webkitRequestFullscreen) { /* Safari / iOS */
+21954:     element.webkitRequestFullscreen();
+21955:   } else if (element.msRequestFullscreen) { /* IE11 */
+21956:     element.msRequestFullscreen();
+21957:   }
+21958:   // Kunci ke orientasi landscape kalau tablet dipasang mendatar -- opsional,
+21959:   // browser yang tidak mendukung Screen Orientation API akan diam saja.
+21960:   try{
+21961:     if (screen.orientation && screen.orientation.lock) {
+21962:       screen.orientation.lock('landscape').catch(()=>{});
+21963:     }
+21964:   }catch(e){}
+21965: }
+21966: 
+21967: // Opsi A: Memicu fullscreen ketika tombol login ditekan (Direkomendasikan)
+21968: // Silakan sesuaikan ID/Class form login Anda. Contoh:
+21969: const loginForm = document.querySelector('.login-box form') || document.querySelector('form');
+21970: if (loginForm) {
+21971:   loginForm.addEventListener('submit', () => {
+21972:     aktifkanFullscreen();
+21973:   });
+21974: }
+21975: 
+21976: // Opsi B: Memicu fullscreen secara halus saat pengguna mengetuk bagian layar mana saja untuk pertama kalinya
+21977: document.addEventListener('click', () => {
+21978:   aktifkanFullscreen();
+21979: }, { once: true }); // 'once: true' memastikan ini hanya berjalan satu kali saat klik pertama
+21980: 
+21981: // Opsi C: coba lagi otomatis setiap kali user kembali ke tab ini (mis. tablet
+21982: // sempat dikunci lalu dibuka lagi) -- browser kadang keluar dari fullscreen
+21983: // API saat layar dikunci.
+21984: document.addEventListener('visibilitychange', () => {
+21985:   if (document.visibilityState === 'visible') aktifkanFullscreen();
+21986: });
+21987: 
+21988: /* =========================================================
+21989:    AI MAINTENANCE COPILOT
+21990:    Rule engine yang membaca ENTRIES/MACHINES/KB_ENTRIES yang sama
+21991:    dengan menu Analitik & Knowledge Base, lalu menyusun insight
+21992:    berbahasa natural. Tidak memanggil API eksternal apa pun — semua
+21993:    dihitung di browser sehingga gratis, instan, dan datanya konsisten
+21994:    dengan menu lain di aplikasi ini.
+21995:    ========================================================= */
+21996: 
+21997: // Interval default Preventive Maintenance (hari) dipakai untuk deteksi
+21998: // "PM terlambat". Bisa diubah pengguna lewat panel Copilot (disimpan di
+21999: // localStorage per-browser, tidak mengubah data di database SQLite).
+22000: function copilotPmIntervalDays(){
+22001:   return parseInt(localStorage.getItem('copilot_pm_interval') || '30', 10) || 30;
+22002: }
+22003: 
+22004: // [FIX SOT] Fungsi ini dipakai ~10 perhitungan Copilot berbeda (MTBF, rasio
+22005: // PM, breakdown bulan berjalan, dst) dan sengaja bersifat all-time (bukan
+22006: // cuma 90 hari) -- jadi paling berisiko mencampur data historis OneNote
+22007: // yang belum tervalidasi kalau tidak dibatasi di sini. Satu perbaikan di
+22008: // titik ini otomatis berlaku untuk seluruh pemanggilnya.
+22009: function copilotEntriesFor(kodeOrNama){
+22010:   if(!kodeOrNama || kodeOrNama === '__all__') return sotEntries();
+22011:   return sotEntries().filter(e=> machineRecordMatchesIdentity_(e,kodeOrNama));
+22012: }
+22013: 
+22014: // Total downtime (menit) dalam suatu bulan kalender (0-indexed month) utk scope tertentu
+22015: function copilotMonthDowntime(kodeOrNama, year, month){
+22016:   return copilotEntriesFor(kodeOrNama).filter(anIsBreakdown).reduce((sum,e)=>{
+22017:     const d = new Date(e['Tanggal']);
+22018:     if(isNaN(d) || d.getFullYear()!==year || d.getMonth()!==month) return sum;
+22019:     return sum + (parseDurationMinutes(e)||0);
+22020:   }, 0);
+22021: }
+22022: function copilotMonthBreakdownCount(kodeOrNama, year, month){
+22023:   return copilotEntriesFor(kodeOrNama).filter(anIsBreakdown).filter(e=>{
+22024:     const d = new Date(e['Tanggal']);
+22025:     return !isNaN(d) && d.getFullYear()===year && d.getMonth()===month;
+22026:   }).length;
+~~~
+
+## orientationchange
+### Around line 16616
+~~~text
+16604:   const cols = colTemplate ? colTemplate.split(/\s+/).filter(Boolean).length : 1;
+16605:   const rows = Math.ceil(cards / Math.max(1, cols));
+16606:   holder.classList.toggle('scroll-mode', rows > 3);
+16607: }
+16608: let DASH_GRID_RESIZE_TO = null;
+16609: window.addEventListener('resize', ()=>{
+16610:   clearTimeout(DASH_GRID_RESIZE_TO);
+16611:   DASH_GRID_RESIZE_TO = setTimeout(()=>{
+16612:     const viewDash = document.getElementById('view-dashboard');
+16613:     if(viewDash && viewDash.classList.contains('active')) updateDashGridScrollMode();
+16614:   }, 150);
+16615: });
+16616: window.addEventListener('orientationchange', ()=>{
+16617:   setTimeout(()=>{
+16618:     const viewDash = document.getElementById('view-dashboard');
+16619:     if(viewDash && viewDash.classList.contains('active')) updateDashGridScrollMode();
+16620:   }, 250);
+16621: });
+16622: 
+16623: function startDashboardTimers(){
+16624:   if(DASHBOARD_TIMER_INTERVAL) clearInterval(DASHBOARD_TIMER_INTERVAL);
+16625:   updateDashboardTimers();
+16626:   DASHBOARD_TIMER_INTERVAL = setInterval(updateDashboardTimers, 1000);
+16627: }
+16628: function updateDashboardTimers(){
+16629:   $$('.dc-timer').forEach(el=>{
+16630:     const startIso = el.dataset.start;
+16631:     const start = startIso ? new Date(startIso) : null;
+16632:     if(!start || isNaN(start)){ el.textContent = '⏱ --:--:--'; return; }
+16633:     const diff = Math.max(0, Math.floor((Date.now() - start.getTime())/1000));
+16634:     const hh = String(Math.floor(diff/3600)).padStart(2,'0');
+16635:     const mm = String(Math.floor((diff%3600)/60)).padStart(2,'0');
+16636:     const ss = String(diff%60).padStart(2,'0');
+16637:     el.textContent = `⏱ ${hh}:${mm}:${ss} dari waktu kejadian.`;
+16638:   });
+16639: }
+16640: 
+16641: function openDashboardDetail(namaMesin, e){
+16642:   if(!e){
+16643:     $('#modal-content').innerHTML = `
+16644:       <div class="modal-head">
+16645:         <div><h2 style="font-family:var(--font-display);margin:0;">${escapeHtml(namaMesin)}</h2></div>
+16646:         <button class="modal-close" id="btn-close-modal">✕</button>
+16647:       </div>
+16648:       <div class="empty-state" style="padding:24px;"><div class="ico"><i class="ph-bold ph-notebook"></i></div>Belum ada riwayat pekerjaan untuk mesin ini.</div>
+16649:     `;
+16650:     $('#modal-bg').classList.add('active');
+16651:     $('#btn-close-modal').addEventListener('click', closeModal);
+16652:     return;
+16653:   }
+16654:   const key = dashStatusKey(e['Status']);
+16655:   const showTimer = key==='proses' || key==='emergency';
+16656:   const rows = [
+16657:     ['Nama Unit', e['Nama Unit']],
+16658:     ['Nama PIC / Pelapor', e['Nama Pelapor']],
+16659:     ['Deskripsi Masalah', e['Deskripsi Masalah']],
+16660:     ['Tindakan Perbaikan (Corrective Action)', e['Tindakan Perbaikan']],
+16661:     ['Tanggal Lapor', fmtDate(e['Tanggal'])],
+16662:     ['Waktu Lapor', fmtTime(e['Waktu'])],
+16663:   ];
+16664:   $('#modal-content').innerHTML = `
+16665:     <div class="modal-head">
+16666:       <div>
+16667:         <span class="badge badge-${statusClass(e['Status'])}"><span class="led led-${key}" style="margin-right:4px;vertical-align:middle;"></span>${escapeHtml(dashStatusLabel(key))}</span>
+16668:         <h2 style="font-family:var(--font-display);margin:8px 0 0 0;">${escapeHtml(namaMesin)}</h2>
+16669:       </div>
+16670:       <button class="modal-close" id="btn-close-modal">✕</button>
+16671:     </div>
+16672:     ${rows.filter(r=>r[1]).map(r=>`<div class="detail-row"><div class="k">${r[0]}</div><div class="v">${escapeHtml(r[1])}</div></div>`).join('')}
+16673:     ${showTimer ? `<div class="detail-row"><div class="k">Waktu Berjalan</div><div class="v" id="modal-timer-live">--:--:--</div></div>` : ''}
+16674:     <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+16675:       <select id="quick-status" style="width:auto;">
+16676:         <option value="">Update status...</option>
+16677:         <option>Proses</option><option>Selesai</option><option>Pending</option><option>Emergency</option>
+16678:       </select>
+16679:       <button class="btn btn-sm btn-primary" id="btn-quick-status">Terapkan</button>
+16680:       <button type="button" class="btn btn-sm btn-ghost" id="btn-dash-open-full">Buka Detail Lengkap Logbook</button>
+~~~
+
+## window.onresize
+No match.
+
