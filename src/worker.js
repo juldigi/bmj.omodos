@@ -7342,7 +7342,10 @@ function createBackend(services, env = {}) {
     }
     return jsonOut_({
       ok: true,
-      data: { summary: rawText.trim(), recommendations: [], structured: false, modelUsed: usedModel, sources: sources }
+      data: {
+        summary: rawText.trim() + (sources.length ? "\n\nSumber internet:\n" + sources.map(function(source, i) { return (i + 1) + ". " + source.title + " — " + source.url; }).join("\n") : ""),
+        recommendations: [], structured: false, modelUsed: usedModel, sources: sources
+      }
     });
   }
   __name(handleAiAnalyzeFreeform_, "handleAiAnalyzeFreeform_");
