@@ -4183,3 +4183,181 @@ function loadOffsetWaysModule(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',loadOffsetWaysModule,{once:true});
 else loadOffsetWaysModule();
 })();
+
+
+/* PATROL_CHECKLIST_PHOTOS_AND_LOGBOOK_OTHER_AREA_V1 */
+(function(){
+'use strict';
+function ready(fn){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fn,{once:true});else fn();}
+function byId(id){return document.getElementById(id);}
+function safeText(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+ready(function(){
+  /* Logbook: let users save an area that is not listed in the master area list. */
+  var category=byId('select-kategoriArea'), area=byId('select-namaArea');
+  if(category&&area&&!byId('input-namaArea-lainnya')){
+    var field=document.createElement('div');
+    field.className='field';
+    field.id='field-namaArea-lainnya';
+    field.hidden=true;
+    field.innerHTML='<label for="input-namaArea-lainnya">Nama area lainnya</label><input type="text" id="input-namaArea-lainnya" name="namaAreaLainnya" placeholder="Masukkan nama area..." autocomplete="off">';
+    area.closest('.field').insertAdjacentElement('afterend',field);
+  }
+  var customArea=byId('input-namaArea-lainnya');
+  var originalPopulate=window.populateWorkAreaOptions_;
+  if(category&&area&&typeof originalPopulate==='function'&&!window.__omodosOtherAreaPopulateWrapped){
+    window.__omodosOtherAreaPopulateWrapped=true;
+    window.populateWorkAreaOptions_=function(cat,select,value){
+      if(cat==='Lainnya'){
+        select.innerHTML='<option value="">Pilih area...</option><option value="Lainnya">Lainnya</option>';
+        select.value='Lainnya';
+        if(customArea)customArea.value=value&&value!=='Lainnya'?String(value):customArea.value;
+        return;
+      }
+      originalPopulate(cat,select,value);
+      if(cat&&cat!==''){
+        if(!Array.from(select.options).some(o=>o.value==='Lainnya'))select.insertAdjacentHTML('beforeend','<option value="Lainnya">Lainnya (isi nama area)</option>');
+        if(value&&!Array.from(select.options).some(o=>o.value===value)){
+          select.value='Lainnya';
+          if(customArea)customArea.value=String(value);
+        }
+      }
+    };
+    category.insertAdjacentHTML('beforeend','<option value="Lainnya">Lainnya</option>');
+  }
+  function syncOtherArea(){
+    if(!category||!area||!customArea)return;
+    var isArea=byId('select-lokasiPekerjaan')&&byId('select-lokasiPekerjaan').value==='Area';
+    var show=isArea&&(category.value==='Lainnya'||area.value==='Lainnya');
+    var field=byId('field-namaArea-lainnya');
+    if(field)field.hidden=!show;
+    customArea.required=!!show;
+    customArea.disabled=!show;
+    if(show&&category.value==='Lainnya'&&area.value!=='Lainnya'){
+      area.innerHTML='<option value="">Pilih area...</option><option value="Lainnya">Lainnya</option>';
+      area.value='Lainnya';
+    }
+  }
+  if(category&&area){
+    category.addEventListener('change',function(){setTimeout(syncOtherArea,0);});
+    area.addEventListener('change',syncOtherArea);
+    var loc=byId('select-lokasiPekerjaan');if(loc)loc.addEventListener('change',function(){setTimeout(syncOtherArea,0);});
+    var form=byId('form-entry');if(form)form.addEventListener('reset',function(){setTimeout(syncOtherArea,0);});
+    var originalSync=window.syncLogbookLocationForm_;
+    if(typeof originalSync==='function'&&!window.__omodosOtherAreaSyncWrapped){
+      window.__omodosOtherAreaSyncWrapped=true;
+      window.syncLogbookLocationForm_=function(){originalSync();syncOtherArea();};
+    }
+    var originalApply=window.applyLogbookLocationPayload_;
+    if(typeof originalApply==='function'&&!window.__omodosOtherAreaApplyWrapped){
+      window.__omodosOtherAreaApplyWrapped=true;
+      window.applyLogbookLocationPayload_=function(entry){
+        if(entry&&entry.lokasiPekerjaan==='Area'&&(entry.kategoriArea==='Lainnya'||entry.namaArea==='Lainnya')){
+          var typed=(customArea&&customArea.value||'').trim();
+          if(!typed)throw new Error('Masukkan nama area lainnya.');
+          entry.namaArea=typed;
+          entry.kodeMesin='-';entry.namaMesin='-';entry.namaUnit='-';
+          entry.lokasi=entry.kategoriArea===entry.namaArea?entry.kategoriArea:entry.kategoriArea+' · '+entry.namaArea;
+          return entry;
+        }
+        return originalApply(entry);
+      };
+    }
+    syncOtherArea();
+  }
+
+  /* Patrol: one shared picker offers Camera and Gallery. Checklist photos become
+     finding records tagged with the exact checklist category/index/item, so they
+     travel through the existing compressed-file and backend attachment pipeline. */
+  var checklistInput=byId('patrol-temuan-file-input');
+  var checklistPreview=byId('patrol-temuan-file-preview');
+  if(!checklistInput||window.__omodosChecklistPhotoPickerReady)return;
+  window.__omodosChecklistPhotoPickerReady=true;
+  var pendingCheckpoint=null;
+  var picker=document.createElement('div');
+  picker.id='omodos-patrol-photo-picker';
+  picker.hidden=true;
+  picker.innerHTML='<div class="omodos-patrol-picker-backdrop" data-picker-close></div><div class="omodos-patrol-picker-card" role="dialog" aria-modal="true" aria-labelledby="omodos-patrol-picker-title"><div id="omodos-patrol-picker-title" style="font-weight:700;font-size:16px;margin-bottom:6px">Tambah lampiran</div><div id="omodos-patrol-picker-sub" style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Pilih sumber foto atau video.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button type="button" class="btn btn-primary" data-picker-camera><i class="ph-bold ph-camera"></i> Kamera</button><button type="button" class="btn btn-ghost" data-picker-gallery><i class="ph-bold ph-images"></i> Galeri</button></div><button type="button" class="btn btn-ghost" data-picker-close style="width:100%;margin-top:10px">Batal</button></div>';
+  picker.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px';
+  picker.querySelector('.omodos-patrol-picker-backdrop').style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.58)';
+  picker.querySelector('.omodos-patrol-picker-card').style.cssText='position:relative;width:min(100%,380px);padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 60px rgba(0,0,0,.3)';
+  var cameraInput=document.createElement('input');cameraInput.type='file';cameraInput.accept='image/*';cameraInput.capture='environment';cameraInput.multiple=true;cameraInput.hidden=true;
+  var galleryInput=document.createElement('input');galleryInput.type='file';galleryInput.accept='image/*,video/*';galleryInput.multiple=true;galleryInput.hidden=true;
+  document.body.append(picker,cameraInput,galleryInput);
+  function closePicker(){picker.hidden=true;cameraInput.value='';galleryInput.value='';}
+  function openPicker(checkpoint){
+    pendingCheckpoint=checkpoint||null;
+    var sub=byId('omodos-patrol-picker-sub');
+    if(sub)sub.textContent=checkpoint?'Lampirkan bukti untuk: '+checkpoint.item:'Lampiran untuk temuan di luar checklist.';
+    picker.hidden=false;
+  }
+  picker.querySelectorAll('[data-picker-close]').forEach(function(b){b.addEventListener('click',closePicker);});
+  picker.querySelector('[data-picker-camera]').addEventListener('click',function(){closePicker();cameraInput.click();});
+  picker.querySelector('[data-picker-gallery]').addEventListener('click',function(){closePicker();galleryInput.click();});
+  function routeFiles(fileList){
+    var files=Array.from(fileList||[]);if(!files.length)return;
+    var checkpoint=pendingCheckpoint;pendingCheckpoint=null;
+    var transfer=new DataTransfer();files.forEach(function(f){transfer.items.add(f);});
+    checklistInput.value='';
+    checklistInput.files=transfer.files;
+    checklistInput.dispatchEvent(new Event('change',{bubbles:true}));
+    if(!checkpoint)return;
+    var expected=files.length,started=Date.now(),lastCount=-1,stable=0;
+    var poll=setInterval(function(){
+      var count=(typeof PATROL_FINDING_FILES!=='undefined'&&PATROL_FINDING_FILES)?PATROL_FINDING_FILES.length:0;
+      if(count===expected){stable++;if(stable>=2){clearInterval(poll);saveCheckpointFinding(checkpoint);return;}}
+      else stable=0;
+      if(count!==lastCount)lastCount=count;
+      if(Date.now()-started>30000){clearInterval(poll);if(typeof toast==='function')toast('Foto belum selesai diproses. Silakan coba lagi.',true);}
+    },150);
+  }
+  cameraInput.addEventListener('change',function(){routeFiles(cameraInput.files);});
+  galleryInput.addEventListener('change',function(){routeFiles(galleryInput.files);});
+  function checkpointBadge(checkpoint,files){
+    var rows=document.querySelectorAll('#patrol-checklist-groups [data-kategori][data-idx]');
+    rows.forEach(function(row){
+      if(row.dataset.kategori!==checkpoint.category||String(row.dataset.idx)!==String(checkpoint.index))return;
+      var outer=row.parentElement;
+      var old=outer.parentElement.querySelector(':scope > .omodos-checkpoint-photo-note[data-for="'+CSS.escape(checkpoint.category+'|'+checkpoint.index)+'"]');
+      if(old)old.remove();
+      var note=document.createElement('div');note.className='omodos-checkpoint-photo-note';note.dataset.for=checkpoint.category+'|'+checkpoint.index;
+      note.style.cssText='font-size:11px;color:var(--green);margin:-2px 0 9px 0;';
+      note.textContent='📎 '+files.length+' lampiran tersimpan untuk titik checklist ini';
+      outer.insertAdjacentElement('afterend',note);
+    });
+  }
+  function saveCheckpointFinding(cp){
+    var files=PATROL_FINDING_FILES.map(function(f){return {name:f.name,type:f._isVideo?'video':'image',viewUrl:f._localUrl,base64:f.base64,mimeType:f.mimeType};});
+    if(!files.length)return;
+    var existing=PATROL_STATE.findings.find(function(f){return f.source==='checklist'&&f.checklistCategory===cp.category&&String(f.checklistIndex)===String(cp.index);});
+    if(existing){existing.files=(existing.files||[]).concat(files);existing.prioritas=cp.status==='abnormal'?'Tinggi':'Sedang';existing.checklistStatus=cp.status;}
+    else PATROL_STATE.findings.push({id:'CHK-'+Date.now()+'-'+Math.floor(Math.random()*900+100),kategori:'Checklist Patrol',prioritas:cp.status==='abnormal'?'Tinggi':'Sedang',deskripsi:'Checklist '+cp.category+' — '+cp.item+' ('+(cp.status==='abnormal'?'Abnormal':'Warning')+')',status:'Open',source:'checklist',checklistCategory:cp.category,checklistIndex:cp.index,checklistItem:cp.item,checklistStatus:cp.status,files:files});
+    PATROL_FINDING_FILES=[];
+    if(checklistPreview)checklistPreview.innerHTML='';
+    var desc=byId('patrol-temuan-deskripsi');if(desc)desc.value='';
+    var yes=document.querySelector('[data-ada-temuan="ya"]');if(yes&&!yes.classList.contains('active'))yes.click();
+    if(typeof renderPatrolFindingsInputList==='function')renderPatrolFindingsInputList();
+    checkpointBadge(cp,files);
+    if(typeof toast==='function')toast('Lampiran ditautkan ke titik checklist: '+cp.item+'.');
+  }
+  document.addEventListener('click',function(ev){
+    var btn=ev.target.closest&&ev.target.closest('#patrol-checklist-groups .patrol-chk-btn');
+    if(!btn)return;
+    var status=btn.dataset.status;
+    if(status!=='warning'&&status!=='abnormal')return;
+    setTimeout(function(){
+      var row=btn.closest('[data-kategori][data-idx]');
+      if(!row)return;
+      var itemNode=row.parentElement&&row.parentElement.firstElementChild;
+      var item=itemNode?itemNode.textContent.trim():'Titik checklist';
+      openPicker({category:row.dataset.kategori,index:row.dataset.idx,item:item,status:status});
+    },0);
+  },true);
+  var bottomDrop=byId('patrol-temuan-file-drop');
+  if(bottomDrop)bottomDrop.addEventListener('click',function(ev){
+    if(ev.target===checklistInput)return;
+    ev.preventDefault();ev.stopImmediatePropagation();openPicker(null);
+  },true);
+  var style=document.createElement('style');style.textContent='#omodos-patrol-photo-picker[hidden]{display:none!important}.omodos-checkpoint-photo-note{overflow-wrap:anywhere}@media(max-width:520px){#omodos-patrol-photo-picker .omodos-patrol-picker-card{padding:15px}}';
+  document.head.appendChild(style);
+});
+})();
