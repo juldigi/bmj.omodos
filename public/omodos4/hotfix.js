@@ -4740,7 +4740,7 @@ function attachPicker(){
     input.addEventListener('blur',()=>setTimeout(()=>{if(!box.matches(':hover')){box.classList.remove('open');box.innerHTML='';}},250));
   });
 }
-const originalAttach=attachEditMaterialSuggestions;
+/* The legacy helper is scoped to the previous IIFE; do not reference it here. */
 function ensurePicker(){
   const holder=document.getElementById('entry-view-mode');
   if(!holder)return;
