@@ -7291,6 +7291,7 @@ function createBackend(services, env = {}) {
     const payload = {
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      tools: [{ googleSearch: {} }],
       generationConfig: {
         maxOutputTokens: 2048
         // thinkingConfig SENGAJA dihapus: parameternya berbeda antar generasi
@@ -7316,7 +7317,7 @@ function createBackend(services, env = {}) {
       if (groqResult) {
         return jsonOut_({
           ok: true,
-          data: { summary: groqResult.text.trim(), recommendations: [], structured: false, modelUsed: groqResult.modelUsed }
+          data: { summary: groqResult.text.trim(), recommendations: [], structured: false, modelUsed: groqResult.modelUsed, sources: [] }
         });
       }
       return jsonOut_({ ok: false, error: "Semua model Gemini (dan Groq jika dikonfigurasi) gagal dicoba. Detail: " + attemptErrors.join(" | ") });
@@ -7326,12 +7327,22 @@ function createBackend(services, env = {}) {
     const rawText = parts.map(function(p) {
       return p.text || "";
     }).join("");
+    const grounding = candidate && candidate.groundingMetadata || result.groundingMetadata || {};
+    const chunks = Array.isArray(grounding.groundingChunks) ? grounding.groundingChunks : [];
+    const sourceMap = new Map();
+    chunks.forEach(function(chunk) {
+      const web = chunk && (chunk.web || chunk.retrievedContext) || {};
+      const uri = String(web.uri || web.url || "").trim();
+      if (!/^https?:\/\//i.test(uri) || sourceMap.has(uri)) return;
+      sourceMap.set(uri, { title: String(web.title || web.name || uri).trim(), url: uri });
+    });
+    const sources = Array.from(sourceMap.values()).slice(0, 10);
     if (candidate && candidate.finishReason === "MAX_TOKENS") {
       return jsonOut_({ ok: false, error: "Jawaban AI terpotong. Kurangi jumlah kasus historis." });
     }
     return jsonOut_({
       ok: true,
-      data: { summary: rawText.trim(), recommendations: [], structured: false, modelUsed: usedModel }
+      data: { summary: rawText.trim(), recommendations: [], structured: false, modelUsed: usedModel, sources: sources }
     });
   }
   __name(handleAiAnalyzeFreeform_, "handleAiAnalyzeFreeform_");
@@ -9795,7 +9806,12 @@ function createBackend(services, env = {}) {
     if (body.action === "v4.aiAsk") return await executeV4Ai_(body);
     if (body.action === "groqFixTypo") return await handleGroqFixTypo_(body);
     if (body.action === "groqKbEnrich" || body.action === "aiKbEnrich") return await handleGroqKbEnrich_(body);
-    if (body.action === "aiInternetResearch") return await handleAiAnalyzeFreeform_(body, PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY"));
+    if (body.action === "aiInternetResearch") {
+      const geminiKey = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
+      const groqKey = PropertiesService.getScriptProperties().getProperty("GROQ_API_KEY");
+      if (!geminiKey && !groqKey) return jsonOut_({ ok: false, error: "AI External belum dikonfigurasi. Atur GEMINI_API_KEY atau GROQ_API_KEY pada Cloudflare Worker Secrets." });
+      return await handleAiAnalyzeFreeform_(body, geminiKey || "");
+    }
     return await handleAiAnalyze_(body);
   }
   __name(executeAI, "executeAI");
