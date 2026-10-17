@@ -4414,3 +4414,106 @@ style.textContent='.omodos-copilot-source-link{color:var(--primary,#2563eb);text
 document.head.appendChild(style);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
+
+
+/* COPILOT_RECORD_CARD_DETAIL_MODAL_V1: connect internal Copilot result cards to the full source record. */
+(function(){
+'use strict';
+var rows = window.__omodosCopilotDetailRows || (window.__omodosCopilotDetailRows = new Map());
+var nextId = Number(window.__omodosCopilotDetailNextId || 0);
+var installed = false;
+function esc(value){
+  return String(value==null?'':value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function installRenderer(){
+  if(typeof window.copilotRowCardHtml_!=='function'||window.copilotRowCardHtml_.__detailPatched)return false;
+  var original=window.copilotRowCardHtml_;
+  var wrapped=function(row,sourceName,index){
+    var html=original.apply(this,arguments);
+    nextId+=1; window.__omodosCopilotDetailNextId=nextId;
+    rows.set(String(nextId),{row:row,source:String(sourceName||'Data OMODOS'),index:Number(index||0)});
+    return html.replace('<article class="copilot-data-record"','<article tabindex="0" role="button" aria-label="Buka detail pekerjaan" data-copilot-detail-id="'+nextId+'" class="copilot-data-record copilot-detail-clickable"');
+  };
+  wrapped.__detailPatched=true;
+  window.copilotRowCardHtml_=wrapped;
+  return true;
+}
+function ensureModal(){
+  var el=document.getElementById('copilot-record-detail-modal');
+  if(el)return el;
+  el=document.createElement('div');
+  el.id='copilot-record-detail-modal';
+  el.className='copilot-detail-modal';
+  el.hidden=true;
+  el.innerHTML='<div class="copilot-detail-backdrop" data-detail-close></div><section class="copilot-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="copilot-detail-title"><header class="copilot-detail-header"><div><div class="copilot-detail-eyebrow">COPILOT · DATA INTERNAL</div><h2 id="copilot-detail-title">Detail Pekerjaan</h2><div id="copilot-detail-source" class="copilot-detail-source"></div></div><button type="button" class="copilot-detail-close" aria-label="Tutup detail" data-detail-close>×</button></header><div id="copilot-detail-content" class="copilot-detail-content"></div><footer class="copilot-detail-footer"><button type="button" class="btn btn-sm" data-detail-close>Tutup</button></footer></section>';
+  document.body.appendChild(el);
+  el.addEventListener('click',function(ev){if(ev.target&&ev.target.closest('[data-detail-close]'))closeModal();});
+  document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&!el.hidden)closeModal();});
+  return el;
+}
+function isSensitive(key){
+  return /password|token|base64|attachment.*data|file.*data|session|authorization|secret|api.?key/i.test(String(key||''));
+}
+function showDetail(id){
+  var item=rows.get(String(id));
+  if(!item||!item.row)return;
+  var modal=ensureModal(),row=item.row;
+  var title='';
+  try{title=typeof window.copilotRowLabel_==='function'?window.copilotRowLabel_(row):'';}catch(_){}
+  document.getElementById('copilot-detail-title').textContent=title||'Detail Pekerjaan';
+  document.getElementById('copilot-detail-source').textContent=item.source+(Number.isFinite(item.index)?' · Hasil #'+(item.index+1):'');
+  var content=document.getElementById('copilot-detail-content');
+  content.replaceChildren();
+  var entries=Object.entries(row).filter(function(pair){return !isSensitive(pair[0])&&pair[1]!==null&&pair[1]!==undefined&&pair[1]!=='';});
+  entries.sort(function(a,b){
+    var preferred=['ID','Tanggal','Waktu','Nama Mesin','Kode Mesin','Status','Status Pekerjaan','Deskripsi Masalah','Deskripsi','Tindakan Perbaikan','Penyebab','PIC','Pelapor'];
+    var ai=preferred.findIndex(function(k){return k.toLowerCase()===a[0].toLowerCase();});
+    var bi=preferred.findIndex(function(k){return k.toLowerCase()===b[0].toLowerCase();});
+    return (ai<0?999:ai)-(bi<0?999:bi);
+  });
+  if(!entries.length){var empty=document.createElement('p');empty.className='copilot-detail-empty';empty.textContent='Detail record tidak tersedia.';content.appendChild(empty);}
+  entries.forEach(function(pair){
+    var value=pair[1];
+    if(typeof value==='object'){
+      try{value=JSON.stringify(value,null,2);}catch(_){value=String(value);}
+    }
+    var field=document.createElement('div');field.className='copilot-detail-field';
+    var label=document.createElement('div');label.className='copilot-detail-label';label.textContent=String(pair[0]).replace(/([a-z])([A-Z])/g,'$1 $2').replace(/[_\.]/g,' ');
+    var val=document.createElement('div');val.className='copilot-detail-value';val.textContent=String(value);
+    field.append(label,val);content.appendChild(field);
+  });
+  modal.hidden=false;
+  document.body.classList.add('copilot-detail-open');
+  var close=modal.querySelector('.copilot-detail-close');if(close)close.focus();
+}
+function closeModal(){
+  var modal=document.getElementById('copilot-record-detail-modal');
+  if(!modal)return;
+  modal.hidden=true;document.body.classList.remove('copilot-detail-open');
+}
+function installEvents(){
+  if(installed||!document.body)return;
+  installed=true;
+  document.addEventListener('click',function(ev){
+    var card=ev.target&&ev.target.closest&&ev.target.closest('.copilot-data-record[data-copilot-detail-id]');
+    if(!card)return;
+    if(ev.target.closest('a,button,input,select,textarea'))return;
+    ev.preventDefault();showDetail(card.getAttribute('data-copilot-detail-id'));
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ')return;
+    var card=ev.target&&ev.target.closest&&ev.target.closest('.copilot-data-record[data-copilot-detail-id]');
+    if(!card)return;
+    ev.preventDefault();showDetail(card.getAttribute('data-copilot-detail-id'));
+  });
+  var style=document.createElement('style');
+  style.textContent='.copilot-detail-clickable{cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}.copilot-detail-clickable:hover,.copilot-detail-clickable:focus-visible{border-color:var(--blue,#5b9dff);box-shadow:0 0 0 2px color-mix(in srgb,var(--blue,#5b9dff) 20%,transparent);outline:none}.copilot-detail-clickable:after{content:"Ketuk untuk melihat detail";display:block;margin-top:7px;font-size:10px;color:var(--blue,#5b9dff)}.copilot-detail-modal[hidden]{display:none!important}.copilot-detail-modal{position:fixed;inset:0;z-index:12000;display:grid;place-items:center;padding:16px;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}.copilot-detail-backdrop{position:absolute;inset:0;background:rgba(4,10,20,.72);backdrop-filter:blur(3px)}.copilot-detail-dialog{position:relative;display:flex;flex-direction:column;width:min(720px,100%);max-height:100%;background:var(--panel,#fff);color:var(--text,#111827);border:1px solid var(--line,#d1d5db);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden}.copilot-detail-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:17px;border-bottom:1px solid var(--line,#d1d5db)}.copilot-detail-eyebrow{font-size:10px;letter-spacing:.09em;font-weight:800;color:var(--blue,#2563eb)}.copilot-detail-header h2{font-size:17px;line-height:1.35;margin:5px 0 3px;overflow-wrap:anywhere}.copilot-detail-source{font-size:11px;color:var(--text-dim,#64748b)}.copilot-detail-close{width:34px;height:34px;border:1px solid var(--line,#d1d5db);border-radius:9px;background:var(--panel-2,#f3f4f6);color:inherit;font-size:24px;line-height:1;cursor:pointer}.copilot-detail-content{padding:14px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:9px}.copilot-detail-field{min-width:0;border:1px solid var(--line,#d1d5db);border-radius:10px;padding:10px;background:var(--panel-2,rgba(128,128,128,.06))}.copilot-detail-label{font-size:10px;line-height:1.35;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim,#64748b);margin-bottom:5px;overflow-wrap:anywhere}.copilot-detail-value{font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.copilot-detail-empty{grid-column:1/-1;color:var(--text-dim,#64748b)}.copilot-detail-footer{display:flex;justify-content:flex-end;padding:12px 14px;border-top:1px solid var(--line,#d1d5db)}@media(max-width:520px){.copilot-detail-modal{padding:8px;padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}.copilot-detail-dialog{border-radius:13px}.copilot-detail-header{padding:13px}.copilot-detail-content{padding:10px;grid-template-columns:1fr;gap:7px}}';
+  document.head.appendChild(style);
+}
+function boot(){
+  installEvents();installRenderer();
+  var attempts=0;
+  var timer=setInterval(function(){attempts++;if(installRenderer()||attempts>=40)clearInterval(timer);},100);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
