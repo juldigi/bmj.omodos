@@ -95,7 +95,20 @@ jobs:
               "materialNumberSAP:",
               "formData.get(\"deskripsiMasalah\")",
               "new FormData(formEntryForDraft)",
-              "const payload ="
+              "const payload =",
+              "function logoutUser(",
+              "const logoutUser =",
+              "logoutUser = function",
+              "handleApiAuthFailure_(",
+              "function resetSettingAuth(",
+              "function apiGet(",
+              "function apiPost(",
+              "location.href",
+              "session expired",
+              "SESSION_INVALID",
+              "APP_SESSION",
+              "SESSION_TOKEN = null",
+              "SESSION_TOKEN = ''"
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
