@@ -108,7 +108,18 @@ jobs:
               "SESSION_INVALID",
               "APP_SESSION",
               "SESSION_TOKEN = null",
-              "SESSION_TOKEN = ''"
+              "SESSION_TOKEN = ''",
+              "action:'login', username",
+              "action: 'login', username",
+              "login-gate",
+              "app-root.classList.add('unlocked'",
+              "async function loadAll(",
+              "function loadAll(",
+              "function refreshRbacFromServer_(",
+              "function activateAccountDataCaches_(",
+              "function stashAccountDataCachesById_(",
+              "function loadCached",
+              "function hydrate"
           ]
 
           out = ["# OMODOS Focused Code Context", ""]
