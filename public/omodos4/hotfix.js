@@ -4544,7 +4544,8 @@ function addUnits(){
     let data=null;
     try{ data=(typeof SPAREPART_ROWS!=='undefined' ? SPAREPART_ROWS.find(r=>Number(r.id)===id) : null); }catch(e){}
     const unit=String(data?.unit||'pcs');
-    const options=['pcs','unit','set','kg','g','ml','L','mL','meter','cm','roll','botol','kaleng','pack','lembar'];
+    const options=['pcs','unit','set','kg','g','mg','ml','mL','L','liter','meter','m','cm','roll','botol','kaleng','pack','lembar','tube','drum','galon','box','pair','sachet'];
+    if(unit && !options.includes(unit)) options.unshift(unit);
     const html='<div class="field sp-unit-field"><label>Satuan</label><select class="sp-unit" aria-label="Satuan jumlah material">'+options.map(o=>'<option value="'+o+'" '+(o===unit?'selected':'')+'>'+o+'</option>').join('')+'</select></div>';
     qtyField.insertAdjacentHTML('afterend',html);
     const select=row.querySelector('.sp-unit');
@@ -4650,7 +4651,8 @@ if(typeof oldEdit==='function'){
 }
 const style=document.createElement('style');
 style.textContent=
-  '.detail-row .v{white-space:pre-line;overflow-wrap:anywhere}'+
+  '.detail-row .v{white-space:pre-wrap;overflow-wrap:anywhere}'+
+  '#entry-view-mode .detail-row .v,#modal-content .detail-row .v{white-space:pre-wrap;overflow-wrap:anywhere}'+
   '#entry-view-mode [data-edit-field="Deskripsi Masalah"],#entry-view-mode [data-edit-field="Tindakan Perbaikan"],#entry-view-mode [data-edit-field="Catatan Tambahan"]{white-space:pre-wrap;min-height:100px}'+
   '#sparepart-rows .sparepart-row{align-items:end}'+
   '#sparepart-rows .sp-unit-field{min-width:90px}'+
@@ -4767,6 +4769,51 @@ if(typeof previousRender==='function'&&!previousRender.__materialPickerV2){
   wrapped.__materialPickerV2=true;window.renderEntryEditForm=wrapped;
 }
 function boot(){ensurePicker();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
+})();
+
+
+/* OMODOS_REVIEW_FIXES_20261017_V3
+   Preserve multiline job descriptions and protect an in-progress logbook form
+   against accidental browser navigation/reload. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261017_V3__)return;
+window.__OMODOS_REVIEW_FIXES_20261017_V3__=true;
+function isMobile(){try{return window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;}catch(e){return window.innerWidth<768;}}
+/* The original login helper calls screen.orientation.lock('landscape'). Prevent
+   that lock on touch/mobile devices even if another legacy listener calls it. */
+try{
+  const orientation=screen.orientation;
+  if(orientation&&typeof orientation.lock==='function'&&!orientation.lock.__omodosMobileGuard){
+    const originalLock=orientation.lock.bind(orientation);
+    const guarded=function(value){if(isMobile()&&String(value||'').toLowerCase().includes('landscape'))return Promise.resolve();return originalLock(value);};
+    guarded.__omodosMobileGuard=true;
+    orientation.lock=guarded;
+  }
+}catch(e){}
+/* Let Enter create a real new line in logbook textareas, without parent form
+   shortcuts intercepting the key; line breaks are retained in detail views. */
+function bindMultiline(){
+  document.querySelectorAll('#form-entry textarea[name="deskripsiMasalah"],#form-entry textarea[name="tindakanPerbaikan"],#form-entry textarea[name="catatan"],#entry-view-mode textarea[data-edit-field="Deskripsi Masalah"],#entry-view-mode textarea[data-edit-field="Tindakan Perbaikan"],#entry-view-mode textarea[data-edit-field="Catatan Tambahan"]').forEach(el=>{
+    if(el.dataset.multilineEnterGuard==='1')return;
+    el.dataset.multilineEnterGuard='1';
+    el.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.isComposing){ev.stopPropagation();}},true);
+  });
+}
+/* Warn only when a user has actually changed logbook fields and is about to
+   leave/reload. This does not silently reload or discard the entered text. */
+function bindDirtyGuard(){
+  const form=document.getElementById('form-entry');if(!form||form.dataset.dirtyGuard==='1')return;
+  form.dataset.dirtyGuard='1';let dirty=false;
+  form.addEventListener('input',()=>{dirty=true;});
+  form.addEventListener('change',()=>{dirty=true;});
+  form.addEventListener('reset',()=>{dirty=false;});
+  form.addEventListener('submit',()=>{dirty=false;});
+  window.addEventListener('beforeunload',ev=>{if(!dirty)return;ev.preventDefault();ev.returnValue='';});
+}
+function boot(){bindMultiline();bindDirtyGuard();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
 })();
