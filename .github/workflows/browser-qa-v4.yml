@@ -303,6 +303,18 @@ jobs:
             }
             result.phases.push('source-truth-machine-selectors');
 
+            const startupError = await page.evaluate(() => {
+              const bg = document.getElementById('app-error-modal-bg');
+              const message = document.getElementById('app-error-modal-message')?.textContent || '';
+              const detail = document.getElementById('app-error-modal-detail')?.textContent || '';
+              if (bg?.classList.contains('active')) {
+                const close = document.getElementById('app-error-modal-close') || document.getElementById('app-error-modal-ok');
+                close?.click();
+              }
+              return { active: !!bg?.classList.contains('active'), message, detail: detail.slice(0, 1200) };
+            });
+            if (startupError.message || startupError.detail) console.log('[QA_STARTUP_ERROR_MODAL] ' + JSON.stringify(startupError));
+            
             console.log('[QA] physical OMODOS 4 sidebar module clicks');
             await page.evaluate(() => {
               CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
