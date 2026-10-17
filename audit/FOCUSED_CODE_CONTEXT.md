@@ -6329,3 +6329,2286 @@ No match.
 ## function renderLogbookTable
 No match.
 
+## function syncSparepartRowsFromDom
+### Around line 17378
+~~~text
+17366: function renderSparepartSuggestBox_(box, results, onPick, mainFn, subFn){
+17367:   if(!results.length){ box.classList.remove('open'); box.innerHTML=''; return; }
+17368:   box.innerHTML = results.map((x,idx)=>`
+17369:     <div class="sp-suggest-item" data-idx="${idx}">
+17370:       <span class="sp-suggest-main">${escapeHtml(mainFn(x)||'-')}</span>
+17371:       <span class="sp-suggest-sub">${escapeHtml(subFn(x)||'')}</span>
+17372:     </div>`).join('');
+17373:   box.classList.add('open');
+17374:   $$('.sp-suggest-item', box).forEach(el=>{
+17375:     el.addEventListener('mousedown', (ev)=>{ ev.preventDefault(); onPick(results[Number(el.dataset.idx)]); });
+17376:   });
+17377: }
+17378: function syncSparepartRowsFromDom(){
+17379:   $$('.sparepart-row', $('#sparepart-rows')).forEach(rowEl=>{
+17380:     const id = Number(rowEl.dataset.id);
+17381:     const row = SPAREPART_ROWS.find(r=>r.id===id);
+17382:     if(!row) return;
+17383:     row.nama = $('.sp-nama', rowEl).value;
+17384:     row.sap = $('.sp-sap', rowEl).value;
+17385:     row.jumlah = $('.sp-jumlah', rowEl).value;
+17386:     const hintEl = $('.sp-lokasi-hint', rowEl);
+17387:     if(hintEl){
+17388:       const l = findSparepartLokasiBySap(row.sap);
+17389:       hintEl.innerHTML = l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : '';
+17390:     }
+17391:   });
+17392: }
+17393: function resetSparepartRows(){
+17394:   SPAREPART_ROWS = [];
+17395:   addSparepartRow();
+17396: }
+17397: resetSparepartRows();
+17398: const btnAddSparepartRow = $('#btn-add-sparepart-row');
+17399: if(btnAddSparepartRow) btnAddSparepartRow.addEventListener('click', addSparepartRow);
+17400: 
+17401: /* ---------------- PERSONIL TAMBAHAN (INPUT LOGBOOK) ----------------
+17402:    Baris opsional untuk menambahkan personil lain selain Nama Pelapor /
+17403:    Teknisi Utama. Polanya disamakan dengan SPAREPART ROWS di atas supaya
+17404:    konsisten: array state + render ulang ke dalam container setiap ada
+17405:    perubahan (tambah/hapus/pilih nama). */
+17406: let ADDITIONAL_PERSONIL_ID = 0;
+17407: let ADDITIONAL_PERSONIL_ROWS = [];
+17408: function addAdditionalPersonilRow(){
+17409:   ADDITIONAL_PERSONIL_ROWS.push({ id: ++ADDITIONAL_PERSONIL_ID, nama:'' });
+17410:   renderAdditionalPersonil();
+17411: }
+17412: function removeAdditionalPersonilRow(id){
+17413:   ADDITIONAL_PERSONIL_ROWS = ADDITIONAL_PERSONIL_ROWS.filter(r=>r.id!==id);
+17414:   renderAdditionalPersonil();
+17415: }
+17416: function renderAdditionalPersonil(){
+17417:   const holder = $('#additional-personil-container');
+17418:   if(!holder) return;
+17419:   const mainName = ($('#select-namaPelapor') && $('#select-namaPelapor').value) || '';
+17420:   const names = (typeof PERSONIL !== 'undefined' ? PERSONIL : [])
+17421:     .map(p=>p['Nama Personil']).filter(Boolean).sort();
+17422:   holder.innerHTML = ADDITIONAL_PERSONIL_ROWS.map(r=>`
+17423:     <div class="additional-personil-row" data-id="${r.id}" style="display:flex; gap:8px; align-items:center;">
+17424:       <select class="ap-nama" style="flex:1;">
+17425:         <option value="">Pilih personil...</option>
+17426:         ${names.map(n=>`<option value="${escapeHtml(n)}" ${r.nama===n?'selected':''} ${n===mainName?'disabled':''}>${escapeHtml(n)}</option>`).join('')}
+17427:       </select>
+17428:       <button type="button" class="btn btn-ghost btn-sm additional-personil-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>
+17429:     </div>`).join('');
+17430:   $$('.ap-nama', holder).forEach(el=> el.addEventListener('change', ()=>{
+17431:     const id = Number(el.closest('.additional-personil-row').dataset.id);
+17432:     const row = ADDITIONAL_PERSONIL_ROWS.find(r=>r.id===id);
+17433:     if(row) row.nama = el.value;
+17434:   }));
+17435:   $$('.additional-personil-remove', holder).forEach(btn=>{
+17436:     btn.addEventListener('click', ()=> removeAdditionalPersonilRow(Number(btn.dataset.id)));
+17437:   });
+17438: }
+17439: function getAdditionalPersonilNames(){
+17440:   return ADDITIONAL_PERSONIL_ROWS.map(r=>r.nama).filter(Boolean);
+17441: }
+17442: function resetAdditionalPersonil(){
+~~~
+
+## function handleSparepartLookupInput_(
+### Around line 17320
+~~~text
+17308:     btn.addEventListener('click', ()=> removeSparepartRow(Number(btn.dataset.id)));
+17309:   });
+17310: }
+17311: function closeSparepartSuggestBox_(rowEl){
+17312:   if(!rowEl) return;
+17313:   $$('.sp-suggest-box', rowEl).forEach(box=>{ box.classList.remove('open'); box.innerHTML=''; });
+17314: }
+17315: /* Menampilkan suggestion KHUSUS berdasarkan field yang sedang diketik:
+17316:    - field Nama Material -> filter & cocokkan HANYA terhadap x.nama
+17317:    - field Material Number SAP -> filter & cocokkan HANYA terhadap x.sap
+17318:    Dibuat custom (bukan <datalist> bawaan browser) supaya suggestion tidak
+17319:    pernah "ketuker" antara nama & nomor material seperti pada native datalist. */
+17320: function handleSparepartLookupInput_(rowEl, source){
+17321:   if(!rowEl) return;
+17322:   const namaEl = $('.sp-nama', rowEl);
+17323:   const sapEl = $('.sp-sap', rowEl);
+17324:   const master = Array.isArray(SPAREPART_LOKASI) ? SPAREPART_LOKASI : [];
+17325:   const normalize = v=>String(v||'').trim().toLowerCase();
+17326: 
+17327:   if(source === 'nama'){
+17328:     const box = $('.sp-nama-suggest', rowEl);
+17329:     const q = normalize(namaEl.value);
+17330:     if(box){
+17331:       const seen = new Set();
+17332:       const results = q ? master.filter(x=>{
+17333:         const key = normalize(x.nama);
+17334:         if(!key || !key.includes(q) || seen.has(key)) return false;
+17335:         seen.add(key); return true;
+17336:       }).slice(0,30) : [];
+17337:       renderSparepartSuggestBox_(box, results, (item)=>{
+17338:         namaEl.value = item.nama || '';
+17339:         sapEl.value = item.sap || '';
+17340:         closeSparepartSuggestBox_(rowEl);
+17341:         syncSparepartRowsFromDom();
+17342:       }, x=>x.nama, x=> x.sap ? `SAP: ${x.sap}` : 'Belum ada nomor material');
+17343:     }
+17344:     // Preserve manual edits; fill the paired field only after an explicit suggestion selection.
+17345:   }else if(source === 'sap'){
+17346:     const box = $('.sp-sap-suggest', rowEl);
+17347:     const q = normalize(sapEl.value);
+17348:     if(box){
+17349:       const seen = new Set();
+17350:       const results = q ? master.filter(x=>{
+17351:         const key = normalize(x.sap);
+17352:         if(!key || !key.includes(q) || seen.has(key)) return false;
+17353:         seen.add(key); return true;
+17354:       }).slice(0,30) : [];
+17355:       renderSparepartSuggestBox_(box, results, (item)=>{
+17356:         sapEl.value = item.sap || '';
+17357:         namaEl.value = item.nama || '';
+17358:         closeSparepartSuggestBox_(rowEl);
+17359:         syncSparepartRowsFromDom();
+17360:       }, x=>x.sap, x=> x.nama ? x.nama : 'Nama material belum tersedia');
+17361:     }
+17362:     // Preserve manual edits; fill the paired field only after an explicit suggestion selection.
+17363:   }
+17364:   syncSparepartRowsFromDom();
+17365: }
+17366: function renderSparepartSuggestBox_(box, results, onPick, mainFn, subFn){
+17367:   if(!results.length){ box.classList.remove('open'); box.innerHTML=''; return; }
+17368:   box.innerHTML = results.map((x,idx)=>`
+17369:     <div class="sp-suggest-item" data-idx="${idx}">
+17370:       <span class="sp-suggest-main">${escapeHtml(mainFn(x)||'-')}</span>
+17371:       <span class="sp-suggest-sub">${escapeHtml(subFn(x)||'')}</span>
+17372:     </div>`).join('');
+17373:   box.classList.add('open');
+17374:   $$('.sp-suggest-item', box).forEach(el=>{
+17375:     el.addEventListener('mousedown', (ev)=>{ ev.preventDefault(); onPick(results[Number(el.dataset.idx)]); });
+17376:   });
+17377: }
+17378: function syncSparepartRowsFromDom(){
+17379:   $$('.sparepart-row', $('#sparepart-rows')).forEach(rowEl=>{
+17380:     const id = Number(rowEl.dataset.id);
+17381:     const row = SPAREPART_ROWS.find(r=>r.id===id);
+17382:     if(!row) return;
+17383:     row.nama = $('.sp-nama', rowEl).value;
+17384:     row.sap = $('.sp-sap', rowEl).value;
+~~~
+
+## function renderSparepartSuggestBox_(
+### Around line 17366
+~~~text
+17354:       }).slice(0,30) : [];
+17355:       renderSparepartSuggestBox_(box, results, (item)=>{
+17356:         sapEl.value = item.sap || '';
+17357:         namaEl.value = item.nama || '';
+17358:         closeSparepartSuggestBox_(rowEl);
+17359:         syncSparepartRowsFromDom();
+17360:       }, x=>x.sap, x=> x.nama ? x.nama : 'Nama material belum tersedia');
+17361:     }
+17362:     // Preserve manual edits; fill the paired field only after an explicit suggestion selection.
+17363:   }
+17364:   syncSparepartRowsFromDom();
+17365: }
+17366: function renderSparepartSuggestBox_(box, results, onPick, mainFn, subFn){
+17367:   if(!results.length){ box.classList.remove('open'); box.innerHTML=''; return; }
+17368:   box.innerHTML = results.map((x,idx)=>`
+17369:     <div class="sp-suggest-item" data-idx="${idx}">
+17370:       <span class="sp-suggest-main">${escapeHtml(mainFn(x)||'-')}</span>
+17371:       <span class="sp-suggest-sub">${escapeHtml(subFn(x)||'')}</span>
+17372:     </div>`).join('');
+17373:   box.classList.add('open');
+17374:   $$('.sp-suggest-item', box).forEach(el=>{
+17375:     el.addEventListener('mousedown', (ev)=>{ ev.preventDefault(); onPick(results[Number(el.dataset.idx)]); });
+17376:   });
+17377: }
+17378: function syncSparepartRowsFromDom(){
+17379:   $$('.sparepart-row', $('#sparepart-rows')).forEach(rowEl=>{
+17380:     const id = Number(rowEl.dataset.id);
+17381:     const row = SPAREPART_ROWS.find(r=>r.id===id);
+17382:     if(!row) return;
+17383:     row.nama = $('.sp-nama', rowEl).value;
+17384:     row.sap = $('.sp-sap', rowEl).value;
+17385:     row.jumlah = $('.sp-jumlah', rowEl).value;
+17386:     const hintEl = $('.sp-lokasi-hint', rowEl);
+17387:     if(hintEl){
+17388:       const l = findSparepartLokasiBySap(row.sap);
+17389:       hintEl.innerHTML = l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : '';
+17390:     }
+17391:   });
+17392: }
+17393: function resetSparepartRows(){
+17394:   SPAREPART_ROWS = [];
+17395:   addSparepartRow();
+17396: }
+17397: resetSparepartRows();
+17398: const btnAddSparepartRow = $('#btn-add-sparepart-row');
+17399: if(btnAddSparepartRow) btnAddSparepartRow.addEventListener('click', addSparepartRow);
+17400: 
+17401: /* ---------------- PERSONIL TAMBAHAN (INPUT LOGBOOK) ----------------
+17402:    Baris opsional untuk menambahkan personil lain selain Nama Pelapor /
+17403:    Teknisi Utama. Polanya disamakan dengan SPAREPART ROWS di atas supaya
+17404:    konsisten: array state + render ulang ke dalam container setiap ada
+17405:    perubahan (tambah/hapus/pilih nama). */
+17406: let ADDITIONAL_PERSONIL_ID = 0;
+17407: let ADDITIONAL_PERSONIL_ROWS = [];
+17408: function addAdditionalPersonilRow(){
+17409:   ADDITIONAL_PERSONIL_ROWS.push({ id: ++ADDITIONAL_PERSONIL_ID, nama:'' });
+17410:   renderAdditionalPersonil();
+17411: }
+17412: function removeAdditionalPersonilRow(id){
+17413:   ADDITIONAL_PERSONIL_ROWS = ADDITIONAL_PERSONIL_ROWS.filter(r=>r.id!==id);
+17414:   renderAdditionalPersonil();
+17415: }
+17416: function renderAdditionalPersonil(){
+17417:   const holder = $('#additional-personil-container');
+17418:   if(!holder) return;
+17419:   const mainName = ($('#select-namaPelapor') && $('#select-namaPelapor').value) || '';
+17420:   const names = (typeof PERSONIL !== 'undefined' ? PERSONIL : [])
+17421:     .map(p=>p['Nama Personil']).filter(Boolean).sort();
+17422:   holder.innerHTML = ADDITIONAL_PERSONIL_ROWS.map(r=>`
+17423:     <div class="additional-personil-row" data-id="${r.id}" style="display:flex; gap:8px; align-items:center;">
+17424:       <select class="ap-nama" style="flex:1;">
+17425:         <option value="">Pilih personil...</option>
+17426:         ${names.map(n=>`<option value="${escapeHtml(n)}" ${r.nama===n?'selected':''} ${n===mainName?'disabled':''}>${escapeHtml(n)}</option>`).join('')}
+17427:       </select>
+17428:       <button type="button" class="btn btn-ghost btn-sm additional-personil-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>
+17429:     </div>`).join('');
+17430:   $$('.ap-nama', holder).forEach(el=> el.addEventListener('change', ()=>{
+~~~
+
+## function renderEntryEditForm(
+### Around line 16824
+~~~text
+16812:   { key:'Prioritas', label:'Prioritas', type:'select', options:['Low','Medium','High','Urgent'] },
+16813:   { key:'Status', label:'Status', type:'select', options:['Proses','Selesai','Pending','Emergency'] },
+16814:   { key:'Deskripsi Masalah', label:'Deskripsi Masalah', type:'textarea' },
+16815:   { key:'Tindakan Perbaikan', label:'Tindakan Perbaikan', type:'textarea' },
+16816:   { key:'Nama Material', label:'Nama Material', type:'text' },
+16817:   { key:'Material Number SAP', label:'Material Number SAP', type:'text' },
+16818:   { key:'Spare Part Digunakan', label:'Spare Part (catatan)', type:'text' },
+16819:   { key:'Jam Mulai', label:'Jam Mulai', type:'time' },
+16820:   { key:'Jam Selesai', label:'Jam Selesai', type:'time' },
+16821:   { key:'Downtime (menit)', label:'Estimasi Pekerjaan (menit)', type:'number' },
+16822:   { key:'Catatan Tambahan', label:'Catatan', type:'textarea' }
+16823: ];
+16824: function renderEntryEditForm(e){
+16825:   const holder = $('#entry-view-mode');
+16826:   if(!holder) return;
+16827:   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
+16828:     const raw = e[f.key] || '';
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+~~~
+
+## data-edit-field
+### Around line 16831
+~~~text
+16819:   { key:'Jam Mulai', label:'Jam Mulai', type:'time' },
+16820:   { key:'Jam Selesai', label:'Jam Selesai', type:'time' },
+16821:   { key:'Downtime (menit)', label:'Estimasi Pekerjaan (menit)', type:'number' },
+16822:   { key:'Catatan Tambahan', label:'Catatan', type:'textarea' }
+16823: ];
+16824: function renderEntryEditForm(e){
+16825:   const holder = $('#entry-view-mode');
+16826:   if(!holder) return;
+16827:   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
+16828:     const raw = e[f.key] || '';
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+~~~
+
+### Around line 16835
+~~~text
+16823: ];
+16824: function renderEntryEditForm(e){
+16825:   const holder = $('#entry-view-mode');
+16826:   if(!holder) return;
+16827:   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
+16828:     const raw = e[f.key] || '';
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+~~~
+
+### Around line 16837
+~~~text
+16825:   const holder = $('#entry-view-mode');
+16826:   if(!holder) return;
+16827:   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
+16828:     const raw = e[f.key] || '';
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+~~~
+
+### Around line 16841
+~~~text
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+~~~
+
+### Around line 16842
+~~~text
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+16906: $('#modal-bg').addEventListener('click', (ev)=>{ if(ev.target.id==='modal-bg') closeModal(); });
+~~~
+
+### Around line 16843
+~~~text
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+16906: $('#modal-bg').addEventListener('click', (ev)=>{ if(ev.target.id==='modal-bg') closeModal(); });
+16907: 
+~~~
+
+### Around line 16864
+~~~text
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+16906: $('#modal-bg').addEventListener('click', (ev)=>{ if(ev.target.id==='modal-bg') closeModal(); });
+16907: 
+16908: async function quickUpdateStatus(id){
+16909:   const val = $('#quick-status').value;
+16910:   if(!val) return;
+16911:   try{
+16912:     await apiPost({action:'updateStatus', id, status: val});
+16913:     toast('Status diperbarui');
+16914:     closeModal();
+16915:     await loadAll();
+16916:     refreshCurrentView();
+16917:   }catch(err){ toast('Gagal update status: ' + err.message, true); }
+16918: }
+16919: async function deleteEntry(id){
+16920:   if(!confirm('Hapus entri logbook ini? Tindakan ini tidak bisa dibatalkan.')) return;
+16921:   try{
+16922:     await apiPost({action:'deleteEntry', id});
+16923:     toast('Entri dihapus');
+16924:     closeModal();
+16925:     await loadAll();
+16926:     refreshCurrentView();
+16927:   }catch(err){ toast('Gagal menghapus: ' + err.message, true); }
+16928: }
+~~~
+
+## updateEntry
+### Around line 16798
+~~~text
+16786:       </div>
+16787:     </div>
+16788:   `;
+16789:   $('#modal-bg').classList.add('active');
+16790:   $('#btn-close-modal').addEventListener('click', closeModal);
+16791:   $('#btn-delete-entry').addEventListener('click', ()=> deleteEntry(id));
+16792:   $('#btn-edit-entry').addEventListener('click', ()=> renderEntryEditForm(e));
+16793:   $('#btn-quick-status').addEventListener('click', ()=> quickUpdateStatus(id));
+16794:   bindAttachGridClicks($('#modal-content'));
+16795: }
+16796: // [FITUR EDIT LOGBOOK] Ganti tampilan detail (read-only) di dalam modal yang sama
+16797: // menjadi form yang bisa diedit langsung, lalu kirim ke backend lewat action
+16798: // 'updateEntry' (meng-update baris yang sudah ada di Sheet, bukan menambah baris baru).
+16799: const ENTRY_EDIT_FIELDS = [
+16800:   { key:'Tanggal', label:'Tanggal', type:'date', toInput:v=>v?String(v).slice(0,10):'' },
+16801:   { key:'Waktu', label:'Waktu Lapor', type:'time' },
+16802:   { key:'Shift', label:'Shift', type:'select', options:['Pagi','Siang','Malam'] },
+16803:   { key:'Grouping Pekerjaan', label:'Grouping Pekerjaan', type:'text' },
+16804:   { key:'Grouping Team', label:'Grouping Team', type:'text' },
+16805:   { key:'Nama Pelapor', label:'Nama Pelapor', type:'text' },
+16806:   { key:'Personil Tambahan', label:'Personil Tambahan (pisah koma)', type:'text' },
+16807:   { key:'Nomor Notifikasi Pekerjaan', label:'Nomor Notifikasi Pekerjaan', type:'text' },
+16808:   { key:'Kode Mesin', label:'Kode Mesin', type:'text' },
+16809:   { key:'Nama Mesin', label:'Nama Mesin', type:'text' },
+16810:   { key:'Nama Unit', label:'Nama Unit (Sub-Mesin)', type:'text' },
+16811:   { key:'Jenis Pekerjaan', label:'Jenis Pekerjaan', type:'text' },
+16812:   { key:'Prioritas', label:'Prioritas', type:'select', options:['Low','Medium','High','Urgent'] },
+16813:   { key:'Status', label:'Status', type:'select', options:['Proses','Selesai','Pending','Emergency'] },
+16814:   { key:'Deskripsi Masalah', label:'Deskripsi Masalah', type:'textarea' },
+16815:   { key:'Tindakan Perbaikan', label:'Tindakan Perbaikan', type:'textarea' },
+16816:   { key:'Nama Material', label:'Nama Material', type:'text' },
+16817:   { key:'Material Number SAP', label:'Material Number SAP', type:'text' },
+16818:   { key:'Spare Part Digunakan', label:'Spare Part (catatan)', type:'text' },
+16819:   { key:'Jam Mulai', label:'Jam Mulai', type:'time' },
+16820:   { key:'Jam Selesai', label:'Jam Selesai', type:'time' },
+16821:   { key:'Downtime (menit)', label:'Estimasi Pekerjaan (menit)', type:'number' },
+16822:   { key:'Catatan Tambahan', label:'Catatan', type:'textarea' }
+16823: ];
+16824: function renderEntryEditForm(e){
+16825:   const holder = $('#entry-view-mode');
+16826:   if(!holder) return;
+16827:   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
+16828:     const raw = e[f.key] || '';
+16829:     const val = f.toInput ? f.toInput(raw) : raw;
+16830:     if(f.type === 'textarea'){
+16831:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
+16832:     }
+16833:     if(f.type === 'select'){
+16834:       const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+~~~
+
+### Around line 16895
+~~~text
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+16906: $('#modal-bg').addEventListener('click', (ev)=>{ if(ev.target.id==='modal-bg') closeModal(); });
+16907: 
+16908: async function quickUpdateStatus(id){
+16909:   const val = $('#quick-status').value;
+16910:   if(!val) return;
+16911:   try{
+16912:     await apiPost({action:'updateStatus', id, status: val});
+16913:     toast('Status diperbarui');
+16914:     closeModal();
+16915:     await loadAll();
+16916:     refreshCurrentView();
+16917:   }catch(err){ toast('Gagal update status: ' + err.message, true); }
+16918: }
+16919: async function deleteEntry(id){
+16920:   if(!confirm('Hapus entri logbook ini? Tindakan ini tidak bisa dibatalkan.')) return;
+16921:   try{
+16922:     await apiPost({action:'deleteEntry', id});
+16923:     toast('Entri dihapus');
+16924:     closeModal();
+16925:     await loadAll();
+16926:     refreshCurrentView();
+16927:   }catch(err){ toast('Gagal menghapus: ' + err.message, true); }
+16928: }
+16929: function refreshCurrentView(){
+16930:   const navActive = $('.nav-btn.active');
+16931:   const activeSection = document.querySelector('.view.active');
+16932:   const active = (navActive && navActive.dataset.view)
+16933:     || (activeSection && String(activeSection.id||'').replace(/^view-/,''))
+16934:     || PREVIOUS_ACTIVE_VIEW
+16935:     || 'dashboard';
+16936:   const renderers = {
+16937:     utama:renderUtama, mesin:renderMesinView, tanggal:renderTanggalView,
+16938:     pelapor:renderPelaporView, group:renderGroupView, durasi:renderDurasiView,
+16939:     correlation:renderCorrelationView, diagnostic:renderDiagnosticView,
+16940:     dashboard:renderDashboardView
+16941:   };
+16942:   if(renderers[active]){
+16943:     try{
+16944:       const result = renderers[active]();
+16945:       if(result && typeof result.then === 'function'){
+16946:         result.catch(err=>{
+16947:           console.error('[OMODOS] refreshCurrentView gagal:', active, err);
+16948:           toast('Gagal memperbarui halaman: ' + (err&&err.message?err.message:String(err)), true);
+16949:         });
+16950:       }
+16951:     }catch(err){
+16952:       console.error('[OMODOS] refreshCurrentView gagal:', active, err);
+16953:       toast('Gagal memperbarui halaman: ' + (err&&err.message?err.message:String(err)), true);
+16954:     }
+16955:   }
+16956: }
+16957: 
+16958: /* ---------------- ESTIMASI PEKERJAAN (AUTO-CALCULATED) ---------------- */
+16959: function computeEstimasi(){
+~~~
+
+## btn-save-entry-edit
+### Around line 16847
+~~~text
+16835:       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+16836:     }
+16837:     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
+16838:   }).join('');
+16839:   holder.innerHTML = `
+16840:     <div class="grid3">
+16841:       <div class="field"><label>Lokasi Pekerjaan</label><select data-edit-field="Lokasi Pekerjaan" id="edit-location-kind"><option>Mesin</option><option>Area</option></select></div>
+16842:       <div class="field" id="edit-area-category-wrap"><label>Kategori Area</label><select data-edit-field="Kategori Area" id="edit-area-category"><option value="">Pilih kategori...</option>${Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('')}</select></div>
+16843:       <div class="field" id="edit-area-name-wrap"><label>Area</label><select data-edit-field="Nama Area" id="edit-area-name"></select></div>
+16844:     </div>
+16845:     <div class="grid2">${fieldHtml}</div>
+16846:     <div style="margin-top:16px;display:flex;gap:10px;">
+16847:       <button class="btn btn-primary btn-sm" id="btn-save-entry-edit"><i class="ph-bold ph-floppy-disk"></i> Simpan Perubahan</button>
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+16906: $('#modal-bg').addEventListener('click', (ev)=>{ if(ev.target.id==='modal-bg') closeModal(); });
+16907: 
+16908: async function quickUpdateStatus(id){
+16909:   const val = $('#quick-status').value;
+16910:   if(!val) return;
+16911:   try{
+~~~
+
+### Around line 16860
+~~~text
+16848:       <button class="btn btn-ghost btn-sm" id="btn-cancel-entry-edit">Batal</button>
+16849:     </div>
+16850:   `;
+16851:   const kind=$('#edit-location-kind'),category=$('#edit-area-category'),name=$('#edit-area-name');
+16852:   kind.value=isAreaEntry_(e)?'Area':'Mesin';category.value=e['Kategori Area']||'';
+16853:   populateWorkAreaOptions_(category.value,name,e['Nama Area']);
+16854:   const sync=()=>{const area=kind.value==='Area';
+16855:     $('#edit-area-category-wrap').hidden=!area;$('#edit-area-name-wrap').hidden=!area;
+16856:     ['Kode Mesin','Nama Mesin','Nama Unit'].forEach(key=>{const wrap=holder.querySelector('[data-edit-wrap="'+key+'"]');if(wrap)wrap.hidden=area;});
+16857:   };
+16858:   kind.addEventListener('change',sync);category.addEventListener('change',()=>populateWorkAreaOptions_(category.value,name,''));sync();
+16859:   $('#btn-cancel-entry-edit').addEventListener('click', ()=> openDetail(e['ID']));
+16860:   $('#btn-save-entry-edit').addEventListener('click', ()=> saveEntryEdit(e['ID']));
+16861: }
+16862: async function saveEntryEdit(id){
+16863:   const holder = $('#entry-view-mode');
+16864:   const fieldEls = $$('[data-edit-field]', holder);
+16865:   const entry = { ID: id };
+16866:   const keyToPayload = {
+16867:     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
+16868:     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
+16869:     'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+16870:     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
+16871:     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
+16872:     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
+16873:     'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+16874:   };
+16875:   fieldEls.forEach(el=>{
+16876:     const key = el.dataset.editField;
+16877:     const val = el.value;
+16878:     if(key === 'Personil Tambahan'){
+16879:       const arr = val.split(',').map(s=>s.trim()).filter(Boolean);
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+16906: $('#modal-bg').addEventListener('click', (ev)=>{ if(ev.target.id==='modal-bg') closeModal(); });
+16907: 
+16908: async function quickUpdateStatus(id){
+16909:   const val = $('#quick-status').value;
+16910:   if(!val) return;
+16911:   try{
+16912:     await apiPost({action:'updateStatus', id, status: val});
+16913:     toast('Status diperbarui');
+16914:     closeModal();
+16915:     await loadAll();
+16916:     refreshCurrentView();
+16917:   }catch(err){ toast('Gagal update status: ' + err.message, true); }
+16918: }
+16919: async function deleteEntry(id){
+16920:   if(!confirm('Hapus entri logbook ini? Tindakan ini tidak bisa dibatalkan.')) return;
+16921:   try{
+16922:     await apiPost({action:'deleteEntry', id});
+16923:     toast('Entri dihapus');
+16924:     closeModal();
+~~~
+
+### Around line 16892
+~~~text
+16880:       entry.personilTambahan = arr;
+16881:       entry.personilTambahanStr = arr.join(', ');
+16882:       return;
+16883:     }
+16884:     const payloadKey = keyToPayload[key];
+16885:     if(payloadKey) entry[payloadKey] = val;
+16886:   });
+16887:   try{applyLogbookLocationPayload_(entry);}catch(err){toast(err.message,true);return;}
+16888:   if(!entry.tanggal || !entry.shift || !entry.namaPelapor || !entry.kodeMesin || !entry.namaMesin || !entry.jenisPekerjaan || !entry.prioritas || !entry.deskripsiMasalah || !entry.tindakanPerbaikan || !entry.status){
+16889:     toast('Lengkapi semua field wajib (Tanggal, Shift, Nama Pelapor, Mesin, Jenis Pekerjaan, Prioritas, Status, Deskripsi Masalah, Tindakan Perbaikan).', true);
+16890:     return;
+16891:   }
+16892:   const btn = $('#btn-save-entry-edit');
+16893:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+16894:   try{
+16895:     await apiPost({ action:'updateEntry', entry });
+16896:     toast('Perubahan Logbook tersimpan ✓');
+16897:     closeModal();
+16898:     await loadAll();
+16899:     refreshCurrentView();
+16900:   }catch(err){
+16901:     toast('Gagal menyimpan perubahan: ' + err.message, true);
+16902:     btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+16903:   }
+16904: }
+16905: function closeModal(){ $('#modal-bg').classList.remove('active'); COPILOT_LAST_MACHINE = null; }
+16906: $('#modal-bg').addEventListener('click', (ev)=>{ if(ev.target.id==='modal-bg') closeModal(); });
+16907: 
+16908: async function quickUpdateStatus(id){
+16909:   const val = $('#quick-status').value;
+16910:   if(!val) return;
+16911:   try{
+16912:     await apiPost({action:'updateStatus', id, status: val});
+16913:     toast('Status diperbarui');
+16914:     closeModal();
+16915:     await loadAll();
+16916:     refreshCurrentView();
+16917:   }catch(err){ toast('Gagal update status: ' + err.message, true); }
+16918: }
+16919: async function deleteEntry(id){
+16920:   if(!confirm('Hapus entri logbook ini? Tindakan ini tidak bisa dibatalkan.')) return;
+16921:   try{
+16922:     await apiPost({action:'deleteEntry', id});
+16923:     toast('Entri dihapus');
+16924:     closeModal();
+16925:     await loadAll();
+16926:     refreshCurrentView();
+16927:   }catch(err){ toast('Gagal menghapus: ' + err.message, true); }
+16928: }
+16929: function refreshCurrentView(){
+16930:   const navActive = $('.nav-btn.active');
+16931:   const activeSection = document.querySelector('.view.active');
+16932:   const active = (navActive && navActive.dataset.view)
+16933:     || (activeSection && String(activeSection.id||'').replace(/^view-/,''))
+16934:     || PREVIOUS_ACTIVE_VIEW
+16935:     || 'dashboard';
+16936:   const renderers = {
+16937:     utama:renderUtama, mesin:renderMesinView, tanggal:renderTanggalView,
+16938:     pelapor:renderPelaporView, group:renderGroupView, durasi:renderDurasiView,
+16939:     correlation:renderCorrelationView, diagnostic:renderDiagnosticView,
+16940:     dashboard:renderDashboardView
+16941:   };
+16942:   if(renderers[active]){
+16943:     try{
+16944:       const result = renderers[active]();
+16945:       if(result && typeof result.then === 'function'){
+16946:         result.catch(err=>{
+16947:           console.error('[OMODOS] refreshCurrentView gagal:', active, err);
+16948:           toast('Gagal memperbarui halaman: ' + (err&&err.message?err.message:String(err)), true);
+16949:         });
+16950:       }
+16951:     }catch(err){
+16952:       console.error('[OMODOS] refreshCurrentView gagal:', active, err);
+16953:       toast('Gagal memperbarui halaman: ' + (err&&err.message?err.message:String(err)), true);
+16954:     }
+16955:   }
+16956: }
+~~~
+
+## SPAREPART_ROWS.map
+### Around line 7755
+~~~text
+07743:       if(typeof RadioNodeList !== 'undefined' && el instanceof RadioNodeList){
+07744:         Array.from(el).forEach(radio=>{ radio.checked = (radio.value === value); });
+07745:       }else{
+07746:         el.value = value;
+07747:       }
+07748:     });
+07749:     if(draft.kodeMesinLainnya && $('#input-kodeMesin-lainnya')) $('#input-kodeMesin-lainnya').value = draft.kodeMesinLainnya;
+07750:     if(draft.namaMesinLainnya && $('#input-namaMesin-lainnya')) $('#input-namaMesin-lainnya').value = draft.namaMesinLainnya;
+07751:     syncLogbookLocationForm_();
+07752: 
+07753:     if(Array.isArray(draft.spareparts) && draft.spareparts.length && typeof renderSparepartRows === 'function'){
+07754:       SPAREPART_ROWS = draft.spareparts;
+07755:       SPAREPART_ROW_ID = Math.max(0, ...SPAREPART_ROWS.map(r=>r.id||0));
+07756:       renderSparepartRows();
+07757:     }
+07758:     if(Array.isArray(draft.additionalPersonil) && typeof ADDITIONAL_PERSONIL_ROWS !== 'undefined'){
+07759:       ADDITIONAL_PERSONIL_ROWS = draft.additionalPersonil;
+07760:       if(ADDITIONAL_PERSONIL_ROWS.length){
+07761:         ADDITIONAL_PERSONIL_ID = Math.max(0, ...ADDITIONAL_PERSONIL_ROWS.map(r=>r.id||0));
+07762:       }
+07763:       if(typeof renderAdditionalPersonil==='function') renderAdditionalPersonil();
+07764:   if(typeof renderPatrolAdditionalPersonil_==='function') renderPatrolAdditionalPersonil_();
+07765:     }
+07766:     if(typeof computeEstimasi === 'function') computeEstimasi();
+07767:   }finally{
+07768:     FORM_ENTRY_DRAFT_RESTORING = false;
+07769:   }
+07770: 
+07771:   toast('Draft Input Logbook sebelumnya berhasil dipulihkan.');
+07772: 
+07773:   if(document.body.classList.contains('low-cognitive')){
+07774:     initLowCognitiveWizard();
+07775:     lcWizardGoToStep(draft.step || 0);
+07776:   }
+07777: }
+07778: 
+07779: const formEntryForDraft = $('#form-entry');
+07780: if(formEntryForDraft){
+07781:   formEntryForDraft.addEventListener('input', saveFormEntryDraftDebounced);
+07782:   formEntryForDraft.addEventListener('change', saveFormEntryDraftDebounced);
+07783:   formEntryForDraft.addEventListener('reset', ()=>{
+07784:     clearFormEntryDraft();
+07785:     setTimeout(()=>{ if(document.body.classList.contains('low-cognitive')) lcWizardGoToStep(0); }, 0);
+07786:   });
+07787: }
+07788: 
+07789: // Terapkan langsung saat halaman dimuat (sebelum interaksi apapun) supaya
+07790: // tidak ada "flash" tampilan normal kalau user sudah pernah mengaktifkannya.
+07791: setLowCognitiveMode(isLowCognitiveActive(), { announce:false });
+07792: 
+07793: const lcModeToggle = $('#lc-mode-toggle');
+07794: if(lcModeToggle) lcModeToggle.addEventListener('change', ()=> setLowCognitiveMode(lcModeToggle.checked));
+07795: 
+07796: const lcQuickBtn = $('#btn-lc-quick-toggle');
+07797: if(lcQuickBtn) lcQuickBtn.addEventListener('click', ()=> setLowCognitiveMode(!isLowCognitiveActive()));
+07798: 
+07799: 
+07800: /* ---------------- TOAST ---------------- */
+07801: function toast(msg, isError=false){
+07802:   const t = $('#toast');
+07803:   t.textContent = msg;
+07804:   t.className = 'toast active' + (isError ? ' error' : '');
+07805:   clearTimeout(t._timer);
+07806:   t._timer = setTimeout(()=> t.classList.remove('active'), 3800);
+07807: }
+07808: 
+07809: /* ---------------- API ---------------- */
+07810: async function parseApiResponse_(res){
+07811:   const raw = await res.text();
+07812:   try{
+07813:     return JSON.parse(raw);
+07814:   }catch(err){
+07815:     const looksHtml = /^\s*</.test(raw) || /<!doctype|<html/i.test(raw);
+07816:     if(looksHtml){
+07817:       throw new Error('Backend mengirim halaman HTML, bukan JSON. Pastikan Cloudflare sudah di-deploy sebagai Web App versi terbaru, akses deployment diizinkan, dan endpoint /api tersedia.');
+07818:     }
+07819:     throw new Error('Respons backend bukan JSON yang valid. HTTP ' + res.status + '.');
+~~~
+
+### Around line 17282
+~~~text
+17270: let SPAREPART_ROWS = [];
+17271: function addSparepartRow(){
+17272:   SPAREPART_ROWS.push({ id: ++SPAREPART_ROW_ID, nama:'', sap:'', jumlah:'' });
+17273:   renderSparepartRows();
+17274: }
+17275: function removeSparepartRow(id){
+17276:   SPAREPART_ROWS = SPAREPART_ROWS.filter(r=>r.id!==id);
+17277:   if(!SPAREPART_ROWS.length) addSparepartRow(); else renderSparepartRows();
+17278: }
+17279: function renderSparepartRows(){
+17280:   const holder = $('#sparepart-rows');
+17281:   if(!holder) return;
+17282:   holder.innerHTML = SPAREPART_ROWS.map((r,i)=>`
+17283:     <div class="sparepart-row" data-id="${r.id}">
+17284:       <div class="field"><label>${i===0?'Nama Material yang Digunakan (opsional)':'Nama Material (opsional)'}</label>
+17285:         <div class="sp-suggest-wrap">
+17286:           <input type="text" class="sp-nama" autocomplete="off" placeholder="Ketik nama material untuk melihat suggestion" value="${escapeHtml(r.nama)}">
+17287:           <div class="sp-suggest-box sp-nama-suggest"></div>
+17288:         </div>
+17289:       </div>
+17290:       <div class="field"><label><span>Material Number SAP (opsional)</span><span class="sp-lokasi-hint" style="font-size:11px;font-weight:400;color:var(--amber);">${(()=>{ const l=findSparepartLokasiBySap(r.sap); return l ? `<i class="ph-bold ph-map-pin"></i> Lokasi: ${escapeHtml(l.lokasiGudang||'-')}` : ''; })()}</span></label>
+17291:         <div class="sp-suggest-wrap">
+17292:           <input type="text" class="sp-sap" autocomplete="off" placeholder="Ketik nomor material untuk melihat suggestion" value="${escapeHtml(r.sap)}">
+17293:           <div class="sp-suggest-box sp-sap-suggest"></div>
+17294:         </div>
+17295:       </div>
+17296:       <div class="field"><label>Jumlah (wajib jika menggunakan sparepart)</label>
+17297:         <input type="number" class="sp-jumlah" min="1" step="1" inputmode="numeric" placeholder="Masukkan jumlah pemakaian jika menggunakan sparepart" value="${escapeHtml(r.jumlah)}">
+17298:       </div>
+17299:       ${SPAREPART_ROWS.length>1 ? `<button type="button" class="sparepart-row-remove" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button>` : `<span></span>`}
+17300:     </div>`).join('');
+17301:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17302:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('input', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17303:   $$('.sp-nama', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'nama')));
+17304:   $$('.sp-sap', holder).forEach(el=> el.addEventListener('focus', ()=> handleSparepartLookupInput_(el.closest('.sparepart-row'), 'sap')));
+17305:   $$('.sp-nama, .sp-sap', holder).forEach(el=> el.addEventListener('blur', ()=> setTimeout(()=> closeSparepartSuggestBox_(el.closest('.sparepart-row')), 150)));
+17306:   $$('.sp-jumlah', holder).forEach(el=> el.addEventListener('input', syncSparepartRowsFromDom));
+17307:   $$('.sparepart-row-remove', holder).forEach(btn=>{
+17308:     btn.addEventListener('click', ()=> removeSparepartRow(Number(btn.dataset.id)));
+17309:   });
+17310: }
+17311: function closeSparepartSuggestBox_(rowEl){
+17312:   if(!rowEl) return;
+17313:   $$('.sp-suggest-box', rowEl).forEach(box=>{ box.classList.remove('open'); box.innerHTML=''; });
+17314: }
+17315: /* Menampilkan suggestion KHUSUS berdasarkan field yang sedang diketik:
+17316:    - field Nama Material -> filter & cocokkan HANYA terhadap x.nama
+17317:    - field Material Number SAP -> filter & cocokkan HANYA terhadap x.sap
+17318:    Dibuat custom (bukan <datalist> bawaan browser) supaya suggestion tidak
+17319:    pernah "ketuker" antara nama & nomor material seperti pada native datalist. */
+17320: function handleSparepartLookupInput_(rowEl, source){
+17321:   if(!rowEl) return;
+17322:   const namaEl = $('.sp-nama', rowEl);
+17323:   const sapEl = $('.sp-sap', rowEl);
+17324:   const master = Array.isArray(SPAREPART_LOKASI) ? SPAREPART_LOKASI : [];
+17325:   const normalize = v=>String(v||'').trim().toLowerCase();
+17326: 
+17327:   if(source === 'nama'){
+17328:     const box = $('.sp-nama-suggest', rowEl);
+17329:     const q = normalize(namaEl.value);
+17330:     if(box){
+17331:       const seen = new Set();
+17332:       const results = q ? master.filter(x=>{
+17333:         const key = normalize(x.nama);
+17334:         if(!key || !key.includes(q) || seen.has(key)) return false;
+17335:         seen.add(key); return true;
+17336:       }).slice(0,30) : [];
+17337:       renderSparepartSuggestBox_(box, results, (item)=>{
+17338:         namaEl.value = item.nama || '';
+17339:         sapEl.value = item.sap || '';
+17340:         closeSparepartSuggestBox_(rowEl);
+17341:         syncSparepartRowsFromDom();
+17342:       }, x=>x.nama, x=> x.sap ? `SAP: ${x.sap}` : 'Belum ada nomor material');
+17343:     }
+17344:     // Preserve manual edits; fill the paired field only after an explicit suggestion selection.
+17345:   }else if(source === 'sap'){
+17346:     const box = $('.sp-sap-suggest', rowEl);
+~~~
+
+## sparepartData
+No match.
+
+## function submitEntry
+No match.
+
+## form-entry
+### Around line 2791
+~~~text
+02779: 
+02780: /* --- Switch component (dipakai di Settings & Quick Settings) --- */
+02781: .lc-switch{position:relative;display:inline-flex;align-items:center;gap:12px;cursor:pointer;user-select:none;}
+02782: .lc-switch input{position:absolute;opacity:0;width:1px;height:1px;}
+02783: .lc-switch .lc-track{width:52px;height:30px;background:var(--line);border-radius:999px;position:relative;transition:background var(--trans);flex-shrink:0;}
+02784: .lc-switch .lc-track::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;background:#fff;border-radius:50%;transition:transform var(--trans);box-shadow:0 1px 3px rgba(0,0,0,.35);}
+02785: .lc-switch input:checked + .lc-track{background:var(--red);}
+02786: .lc-switch input:checked + .lc-track::after{transform:translateX(22px);}
+02787: .lc-switch input:focus-visible + .lc-track{outline:2px solid var(--red);outline-offset:2px;}
+02788: .lc-switch .lc-switch-label{font-size:13.5px;font-weight:600;color:var(--text);}
+02789: 
+02790: /* ---------------- FORM WIZARD MODE ----------------
+02791:    Dipakai di form panjang (mis. #form-entry). Saat mode wizard aktif,
+02792:    form diberi class "wizard-mode" dan setiap section (dibungkus otomatis
+02793:    oleh initFormWizard() jadi .wizard-step) disembunyikan kecuali step
+02794:    yang sedang aktif (.wizard-step.active). Mode standar = default,
+02795:    semua step tampil sekaligus seperti form biasa (tanpa class tambahan). */
+02796: form.wizard-mode .wizard-step{ display:none; }
+02797: form.wizard-mode .wizard-step.active{ display:block; animation:wizardStepIn .18s ease; }
+02798: @keyframes wizardStepIn{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:translateY(0);} }
+02799: .wizard-progress{ display:flex; align-items:center; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+02800: .wizard-progress .wp-dot{ flex:1; min-width:18px; height:6px; border-radius:4px; background:var(--line); transition:background var(--trans); }
+02801: .wizard-progress .wp-dot.done, .wizard-progress .wp-dot.current{ background:var(--red); }
+02802: .wizard-stepinfo{ font-size:12.5px; color:var(--text-dim); margin-bottom:14px; }
+02803: .wizard-stepinfo b{ color:var(--text); }
+02804: .wizard-nav-btns{ display:flex; gap:10px; }
+02805: 
+02806: .topbar-menu-btn.lc-quick-btn{position:relative;}
+02807: .topbar-menu-btn.lc-quick-btn[aria-pressed="true"]{color:var(--red);border-color:var(--red);}
+02808: .topbar-menu-btn.lc-quick-btn[aria-pressed="true"]::after{content:'';position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);}
+02809: 
+02810: /* --- Mode aktif: body.low-cognitive --- */
+02811: body.low-cognitive{ font-size:16.5px; }
+02812: body.low-cognitive [data-lc-hide]{ display:none !important; }
+02813: 
+02814: /* Kurangi animasi & efek visual berlebih */
+02815: body.low-cognitive *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; }
+02816: body.low-cognitive .card, body.low-cognitive .dash-card, body.low-cognitive .an-card,
+02817: body.low-cognitive .sidebar, body.low-cognitive .modal, body.low-cognitive .btn{ box-shadow:none !important; }
+02818: body.low-cognitive .dash-card:hover{ transform:none !important; filter:none !important; }
+02819: /* Pengecualian: kedip status Normal/Perlu Perhatian/Kritikal di card mesin Home BUKAN
+02820:    animasi dekoratif — ini sinyal status mesin (aman/butuh perhatian/breakdown)
+02821:    yang wajib tetap terlihat berkedip walau Mode Low-Cognitive aktif.
+02822:    Frekuensi sengaja beda per status (lihat dashPulseGreen/Amber/Red di atas). */
+02823: body.low-cognitive .dash-card.status-normal{ animation-duration:2.6s !important; animation-iteration-count:infinite !important; }
+02824: body.low-cognitive .dash-card.status-perhatian{ animation-duration:1.6s !important; animation-iteration-count:infinite !important; }
+02825: body.low-cognitive .dash-card.status-kritikal{ animation-duration:.6s !important; animation-iteration-count:infinite !important; }
+02826: 
+02827: /* Whitespace lebih lega + card lebih sederhana */
+02828: body.low-cognitive .card{ padding:22px !important; margin-bottom:22px !important; border-width:1px !important; }
+02829: body.low-cognitive .topbar{ margin-bottom:20px !important; }
+02830: body.low-cognitive .i40-banner{ display:none !important; }
+02831: 
+02832: /* Font & tap target lebih besar, kontras lebih tinggi */
+02833: body.low-cognitive h1{ font-size:22px !important; }
+02834: body.low-cognitive .sub{ font-size:14px !important; opacity:1 !important; }
+02835: body.low-cognitive label{ font-size:14px !important; font-weight:700 !important; }
+02836: body.low-cognitive .section-title{ font-size:15px !important; }
+02837: body.low-cognitive .btn{ min-height:48px !important; padding:12px 20px !important; font-size:15px !important; }
+02838: /* Home controls share compact dimensions, including mobile low cognitive mode. */
+02839: body.low-cognitive #home-mesin-filter .machine-chip,
+02840: body.low-cognitive #btn-lc-priority-only,
+02841: body.low-cognitive #btn-refresh-dashboard{
+02842:   display:inline-flex;align-items:center;justify-content:center;gap:6px;
+02843:   min-height:30px !important;padding:5px 11px !important;font-size:12px !important;
+02844:   line-height:18px !important;border-radius:8px !important;
+02845: }
+02846: 
+02847: body.low-cognitive input, body.low-cognitive select, body.low-cognitive textarea{ min-height:48px !important; font-size:15.5px !important; padding:12px 14px !important; }
+02848: body.low-cognitive .nav-btn, body.low-cognitive .nav-parent-btn{ min-height:48px !important; font-size:15px !important; }
+02849: body.low-cognitive .bottom-nav-btn{ min-height:52px !important; }
+02850: 
+02851: /* Form: paksa satu kolom supaya fokus pada satu input sekaligus */
+02852: body.low-cognitive .grid2, body.low-cognitive .grid3, body.low-cognitive .grid4{ display:grid !important; grid-template-columns:1fr !important; }
+02853: 
+02854: /* Sidebar: otomatis collapse submenu selain yang sedang aktif supaya menu tidak penuh */
+02855: body.low-cognitive .nav-submenu:not(.open){ display:none !important; }
+~~~
+
+### Around line 3495
+~~~text
+03483:           <h1>Input Logbook Harian</h1>
+03484:           <div class="sub">Catat pekerjaan maintenance yang baru dikerjakan atau sedang berjalan.</div>
+03485:         </div>
+03486:         <label class="lc-switch" id="form-wizard-toggle-wrap" title="Ubah cara mengisi form: sekaligus (Standar) atau bertahap per langkah (Wizard)">
+03487:           <input type="checkbox" id="form-wizard-toggle" aria-label="Aktifkan Mode Wizard">
+03488:           <span class="lc-track" aria-hidden="true"></span>
+03489:           <span class="lc-switch-label" id="form-wizard-toggle-label">Mode Wizard</span>
+03490:         </label>
+03491:       </div>
+03492: 
+03493:       <div class="card">
+03494:         <div class="sub" role="note">Jika data pada field teks tidak tersedia, isi dengan simbol <b>-</b>. Jumlah sparepart wajib diisi jika menggunakan sparepart.</div>
+03495: <form id="form-entry" novalidate>
+03496:           <div class="section-title"><i class="ph-bold ph-info"></i> Informasi Umum</div>
+03497:           <div class="grid2">
+03498:             <div class="field"><label>Tanggal</label><input type="date" name="tanggal" required></div>
+03499:             <div class="field"><label>Shift</label>
+03500:               <select name="shift" required><option>Shift 1</option><option>Shift 2</option><option>Shift 3</option><option>Non-Shift</option></select>
+03501:             </div>
+03502:           </div>
+03503:           <div class="grid3">
+03504:             <div class="field"><label>Grouping Pekerjaan</label>
+03505:               <select name="groupingPekerjaan" required>
+03506:                 <option>Electrical</option>
+03507:                 <option>Mechanical</option>
+03508:                 <option>Workshop</option>
+03509:                 <option>Project</option>
+03510:                 <option>Warehouse</option>
+03511:                 <option>Planning</option>
+03512:                 <option>IPAL</option>
+03513:               </select>
+03514:             </div>
+03515:             <div class="field"><label>Grouping Team</label>
+03516:               <select name="groupingTeam" required>
+03517:                 <option>A</option><option>B</option><option>C</option><option>D</option><option>Non-Shift</option>
+03518:               </select>
+03519:             </div>
+03520:             <div class="field"><label>Prioritas</label>
+03521:               <select name="prioritas" required><option>Rendah</option><option selected>Sedang</option><option>Tinggi</option><option>Emergency</option></select>
+03522:             </div>
+03523:           </div>
+03524:           <div class="grid2">
+03525:             <div class="field"><label>Nama Pelapor / Teknisi Utama <span style="color:var(--red);">*</span></label>
+03526:               <select name="namaPelapor" id="select-namaPelapor" required>
+03527:                 <option value="">Pilih personil...</option>
+03528:               </select>
+03529:               <div class="sub" style="margin-top:4px;">Teknisi utama. Jika tim, tambah personil lain di bawah (opsional).</div>
+03530:             </div>
+03531:             <div class="field"><label>Nomor Notifikasi Pekerjaan</label><input type="text" name="nomorNotifikasi" placeholder="Contoh: 10023456" required></div>
+03532:           </div>
+03533:           <div class="field" id="field-additional-personil" style="margin-top:10px;">
+03534:             <label>Personil Tambahan (Opsional - tidak wajib)</label>
+03535:             <div class="sub" style="margin-bottom:8px;">Klik tombol di bawah jika pekerjaan dikerjakan lebih dari 1 orang. Bisa kosong.</div>
+03536:             <div id="additional-personil-container" style="display:flex; flex-direction:column; gap:8px;"></div>
+03537:             <button type="button" class="btn btn-ghost btn-sm" id="btn-add-personil-tambahan" style="margin-top:8px;"><i class="ph-bold ph-users-three"></i> Tambah Personil Lain</button>
+03538:           </div>
+03539: 
+03540:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-map-pin"></i> Lokasi Pekerjaan</div>
+03541:           <div class="field"><label for="select-lokasiPekerjaan">Pekerjaan di</label><select name="lokasiPekerjaan" id="select-lokasiPekerjaan"><option value="Mesin">Mesin / Peralatan</option><option value="Area">Area</option></select></div>
+03542:           <div id="entry-area-fields" class="grid2" hidden>
+03543:             <div class="field"><label for="select-kategoriArea">Kategori Area</label><select name="kategoriArea" id="select-kategoriArea" disabled><option value="">Pilih kategori...</option></select></div>
+03544:             <div class="field"><label for="select-namaArea">Area</label><select name="namaArea" id="select-namaArea" disabled><option value="">Pilih area...</option></select></div>
+03545:           </div>
+03546:           <div id="entry-machine-fields">
+03547:           <div class="section-title" style="margin-top:6px;"><i class="ph-bold ph-gear-six"></i> Mesin / Peralatan</div>
+03548:           <div class="grid3">
+03549:             <div class="field"><label>Kode Mesin</label>
+03550: 		<select name="kodeMesin" id="select-kodeMesin" required>
+03551:               <option value="">Pilih kode mesin...</option>
+03552:             </select>
+03553: 	</div>
+03554: 
+03555: 
+03556:             <div class="field"><label>Nama Mesin</label>
+03557: 	<select name="namaMesin" id="select-namaMesin" required>
+03558:               <option value="">Pilih nama mesin...</option>
+03559:             </select>
+~~~
+
+### Around line 7690
+~~~text
+07678: );
+07679: 
+07680: /* ---- Draft otomatis untuk form Input Logbook ----
+07681:    Menyimpan progres pengisian (nilai field + baris sparepart + langkah
+07682:    wizard aktif) ke localStorage supaya tidak hilang kalau user pindah
+07683:    halaman/menutup app sebelum menekan Simpan. Key baru, terpisah dari
+07684:    seluruh key LocalStorage yang sudah ada, dan tidak mengubah struktur
+07685:    `entry` yang dikirim ke server (hanya dibaca ulang untuk mengisi form). */
+07686: let FORM_ENTRY_DRAFT_RESTORING = false;
+07687: let formEntryDraftSaveTimer = null;
+07688: 
+07689: function collectFormEntryDraft(){
+07690:   const form = $('#form-entry');
+07691:   if(!form) return null;
+07692:   const fd = new FormData(form);
+07693:   const fields = Object.fromEntries(fd.entries());
+07694:   const kodeLainnya = $('#input-kodeMesin-lainnya');
+07695:   const namaLainnya = $('#input-namaMesin-lainnya');
+07696:   return {
+07697:     fields,
+07698:     kodeMesinLainnya: kodeLainnya ? kodeLainnya.value : '',
+07699:     namaMesinLainnya: namaLainnya ? namaLainnya.value : '',
+07700:     spareparts: (typeof SPAREPART_ROWS !== 'undefined') ? SPAREPART_ROWS : [],
+07701:     additionalPersonil: (typeof ADDITIONAL_PERSONIL_ROWS !== 'undefined') ? ADDITIONAL_PERSONIL_ROWS : [],
+07702:     step: LC_WIZARD_INDEX,
+07703:     ts: Date.now()
+07704:   };
+07705: }
+07706: 
+07707: function saveFormEntryDraft(){
+07708:   if(FORM_ENTRY_DRAFT_RESTORING) return;
+07709:   try{
+07710:     const draft = collectFormEntryDraft();
+07711:     if(!draft) return;
+07712:     localStorage.setItem(LS_FORM_ENTRY_DRAFT_KEY, JSON.stringify(draft));
+07713:   }catch(e){}
+07714: }
+07715: function saveFormEntryDraftDebounced(){
+07716:   clearTimeout(formEntryDraftSaveTimer);
+07717:   formEntryDraftSaveTimer = setTimeout(saveFormEntryDraft, 500);
+07718: }
+07719: function clearFormEntryDraft(){
+07720:   try{ localStorage.removeItem(LS_FORM_ENTRY_DRAFT_KEY); }catch(e){}
+07721: }
+07722: function loadFormEntryDraft(){
+07723:   try{ return JSON.parse(localStorage.getItem(LS_FORM_ENTRY_DRAFT_KEY) || 'null'); }catch(e){ return null; }
+07724: }
+07725: 
+07726: function restoreFormEntryDraft(){
+07727:   const draft = loadFormEntryDraft();
+07728:   if(!draft || !draft.fields) return;
+07729:   const form = $('#form-entry');
+07730:   if(!form) return;
+07731:   // Draft cuma dianggap relevan kalau ada isian nyata (bukan form kosong).
+07732:   const hasContent = Object.values(draft.fields).some(v => v && String(v).trim());
+07733:   if(!hasContent) return;
+07734: 
+07735:   FORM_ENTRY_DRAFT_RESTORING = true;
+07736:   try{
+07737:     if(draft.fields.lokasiPekerjaan) $('#select-lokasiPekerjaan').value=draft.fields.lokasiPekerjaan;
+07738:     $('#select-kategoriArea').value=draft.fields.kategoriArea||'';
+07739:     populateWorkAreaOptions_($('#select-kategoriArea').value,$('#select-namaArea'),draft.fields.namaArea);
+07740:     Object.entries(draft.fields).forEach(([name, value])=>{
+07741:       const el = form.elements.namedItem(name);
+07742:       if(!el || value === undefined) return;
+07743:       if(typeof RadioNodeList !== 'undefined' && el instanceof RadioNodeList){
+07744:         Array.from(el).forEach(radio=>{ radio.checked = (radio.value === value); });
+07745:       }else{
+07746:         el.value = value;
+07747:       }
+07748:     });
+07749:     if(draft.kodeMesinLainnya && $('#input-kodeMesin-lainnya')) $('#input-kodeMesin-lainnya').value = draft.kodeMesinLainnya;
+07750:     if(draft.namaMesinLainnya && $('#input-namaMesin-lainnya')) $('#input-namaMesin-lainnya').value = draft.namaMesinLainnya;
+07751:     syncLogbookLocationForm_();
+07752: 
+07753:     if(Array.isArray(draft.spareparts) && draft.spareparts.length && typeof renderSparepartRows === 'function'){
+07754:       SPAREPART_ROWS = draft.spareparts;
+~~~
+
+### Around line 7729
+~~~text
+07717:   formEntryDraftSaveTimer = setTimeout(saveFormEntryDraft, 500);
+07718: }
+07719: function clearFormEntryDraft(){
+07720:   try{ localStorage.removeItem(LS_FORM_ENTRY_DRAFT_KEY); }catch(e){}
+07721: }
+07722: function loadFormEntryDraft(){
+07723:   try{ return JSON.parse(localStorage.getItem(LS_FORM_ENTRY_DRAFT_KEY) || 'null'); }catch(e){ return null; }
+07724: }
+07725: 
+07726: function restoreFormEntryDraft(){
+07727:   const draft = loadFormEntryDraft();
+07728:   if(!draft || !draft.fields) return;
+07729:   const form = $('#form-entry');
+07730:   if(!form) return;
+07731:   // Draft cuma dianggap relevan kalau ada isian nyata (bukan form kosong).
+07732:   const hasContent = Object.values(draft.fields).some(v => v && String(v).trim());
+07733:   if(!hasContent) return;
+07734: 
+07735:   FORM_ENTRY_DRAFT_RESTORING = true;
+07736:   try{
+07737:     if(draft.fields.lokasiPekerjaan) $('#select-lokasiPekerjaan').value=draft.fields.lokasiPekerjaan;
+07738:     $('#select-kategoriArea').value=draft.fields.kategoriArea||'';
+07739:     populateWorkAreaOptions_($('#select-kategoriArea').value,$('#select-namaArea'),draft.fields.namaArea);
+07740:     Object.entries(draft.fields).forEach(([name, value])=>{
+07741:       const el = form.elements.namedItem(name);
+07742:       if(!el || value === undefined) return;
+07743:       if(typeof RadioNodeList !== 'undefined' && el instanceof RadioNodeList){
+07744:         Array.from(el).forEach(radio=>{ radio.checked = (radio.value === value); });
+07745:       }else{
+07746:         el.value = value;
+07747:       }
+07748:     });
+07749:     if(draft.kodeMesinLainnya && $('#input-kodeMesin-lainnya')) $('#input-kodeMesin-lainnya').value = draft.kodeMesinLainnya;
+07750:     if(draft.namaMesinLainnya && $('#input-namaMesin-lainnya')) $('#input-namaMesin-lainnya').value = draft.namaMesinLainnya;
+07751:     syncLogbookLocationForm_();
+07752: 
+07753:     if(Array.isArray(draft.spareparts) && draft.spareparts.length && typeof renderSparepartRows === 'function'){
+07754:       SPAREPART_ROWS = draft.spareparts;
+07755:       SPAREPART_ROW_ID = Math.max(0, ...SPAREPART_ROWS.map(r=>r.id||0));
+07756:       renderSparepartRows();
+07757:     }
+07758:     if(Array.isArray(draft.additionalPersonil) && typeof ADDITIONAL_PERSONIL_ROWS !== 'undefined'){
+07759:       ADDITIONAL_PERSONIL_ROWS = draft.additionalPersonil;
+07760:       if(ADDITIONAL_PERSONIL_ROWS.length){
+07761:         ADDITIONAL_PERSONIL_ID = Math.max(0, ...ADDITIONAL_PERSONIL_ROWS.map(r=>r.id||0));
+07762:       }
+07763:       if(typeof renderAdditionalPersonil==='function') renderAdditionalPersonil();
+07764:   if(typeof renderPatrolAdditionalPersonil_==='function') renderPatrolAdditionalPersonil_();
+07765:     }
+07766:     if(typeof computeEstimasi === 'function') computeEstimasi();
+07767:   }finally{
+07768:     FORM_ENTRY_DRAFT_RESTORING = false;
+07769:   }
+07770: 
+07771:   toast('Draft Input Logbook sebelumnya berhasil dipulihkan.');
+07772: 
+07773:   if(document.body.classList.contains('low-cognitive')){
+07774:     initLowCognitiveWizard();
+07775:     lcWizardGoToStep(draft.step || 0);
+07776:   }
+07777: }
+07778: 
+07779: const formEntryForDraft = $('#form-entry');
+07780: if(formEntryForDraft){
+07781:   formEntryForDraft.addEventListener('input', saveFormEntryDraftDebounced);
+07782:   formEntryForDraft.addEventListener('change', saveFormEntryDraftDebounced);
+07783:   formEntryForDraft.addEventListener('reset', ()=>{
+07784:     clearFormEntryDraft();
+07785:     setTimeout(()=>{ if(document.body.classList.contains('low-cognitive')) lcWizardGoToStep(0); }, 0);
+07786:   });
+07787: }
+07788: 
+07789: // Terapkan langsung saat halaman dimuat (sebelum interaksi apapun) supaya
+07790: // tidak ada "flash" tampilan normal kalau user sudah pernah mengaktifkannya.
+07791: setLowCognitiveMode(isLowCognitiveActive(), { announce:false });
+07792: 
+07793: const lcModeToggle = $('#lc-mode-toggle');
+~~~
+
+### Around line 7779
+~~~text
+07767:   }finally{
+07768:     FORM_ENTRY_DRAFT_RESTORING = false;
+07769:   }
+07770: 
+07771:   toast('Draft Input Logbook sebelumnya berhasil dipulihkan.');
+07772: 
+07773:   if(document.body.classList.contains('low-cognitive')){
+07774:     initLowCognitiveWizard();
+07775:     lcWizardGoToStep(draft.step || 0);
+07776:   }
+07777: }
+07778: 
+07779: const formEntryForDraft = $('#form-entry');
+07780: if(formEntryForDraft){
+07781:   formEntryForDraft.addEventListener('input', saveFormEntryDraftDebounced);
+07782:   formEntryForDraft.addEventListener('change', saveFormEntryDraftDebounced);
+07783:   formEntryForDraft.addEventListener('reset', ()=>{
+07784:     clearFormEntryDraft();
+07785:     setTimeout(()=>{ if(document.body.classList.contains('low-cognitive')) lcWizardGoToStep(0); }, 0);
+07786:   });
+07787: }
+07788: 
+07789: // Terapkan langsung saat halaman dimuat (sebelum interaksi apapun) supaya
+07790: // tidak ada "flash" tampilan normal kalau user sudah pernah mengaktifkannya.
+07791: setLowCognitiveMode(isLowCognitiveActive(), { announce:false });
+07792: 
+07793: const lcModeToggle = $('#lc-mode-toggle');
+07794: if(lcModeToggle) lcModeToggle.addEventListener('change', ()=> setLowCognitiveMode(lcModeToggle.checked));
+07795: 
+07796: const lcQuickBtn = $('#btn-lc-quick-toggle');
+07797: if(lcQuickBtn) lcQuickBtn.addEventListener('click', ()=> setLowCognitiveMode(!isLowCognitiveActive()));
+07798: 
+07799: 
+07800: /* ---------------- TOAST ---------------- */
+07801: function toast(msg, isError=false){
+07802:   const t = $('#toast');
+07803:   t.textContent = msg;
+07804:   t.className = 'toast active' + (isError ? ' error' : '');
+07805:   clearTimeout(t._timer);
+07806:   t._timer = setTimeout(()=> t.classList.remove('active'), 3800);
+07807: }
+07808: 
+07809: /* ---------------- API ---------------- */
+07810: async function parseApiResponse_(res){
+07811:   const raw = await res.text();
+07812:   try{
+07813:     return JSON.parse(raw);
+07814:   }catch(err){
+07815:     const looksHtml = /^\s*</.test(raw) || /<!doctype|<html/i.test(raw);
+07816:     if(looksHtml){
+07817:       throw new Error('Backend mengirim halaman HTML, bukan JSON. Pastikan Cloudflare sudah di-deploy sebagai Web App versi terbaru, akses deployment diizinkan, dan endpoint /api tersedia.');
+07818:     }
+07819:     throw new Error('Respons backend bukan JSON yang valid. HTTP ' + res.status + '.');
+07820:   }
+07821: }
+07822: async function fetchWithTimeout_(url, options={}, timeoutMs=45000){
+07823:   // PATCHED v2.1 - timeout 45s default + pesan cold start
+07824:   const controller = new AbortController();
+07825:   const timer = setTimeout(()=>controller.abort(), timeoutMs);
+07826:   try{ return await fetch(url, {...options, signal:controller.signal}); }
+07827:   catch(err){
+07828:     if(err && err.name==='AbortError') throw new Error('Backend timeout setelah '+Math.round(timeoutMs/1000)+' detik. Periksa koneksi internet lalu coba kembali.');
+07829:     throw err;
+07830:   }finally{ clearTimeout(timer); }
+07831: }
+07832: function handleApiAuthFailure_(message, requestToken){
+07833:   const msg = String(message || '');
+07834:   if(!/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(msg)) return;
+07835:   if(SETTING_AUTH_OK && SETTING_SESSION_TOKEN && requestToken === SETTING_SESSION_TOKEN){
+07836:     resetSettingAuth();
+07837:     return;
+07838:   }
+07839:   logoutUser();
+07840: }
+07841: // Session-only read cache; isolated by backend, token and parameters.
+07842: const READY_READS = new Map();
+07843: const ACTIVE_READS = new Map();
+~~~
+
+### Around line 8831
+~~~text
+08819:   entry.lokasiPekerjaan='Mesin';entry.kategoriArea='-';entry.namaArea='-';
+08820:   if(entry.kodeMesin===MACHINE_LAINNYA_VALUE)entry.kodeMesin=$('#input-kodeMesin-lainnya').value.trim();
+08821:   if(entry.namaMesin===MACHINE_LAINNYA_VALUE)entry.namaMesin=$('#input-namaMesin-lainnya').value.trim();
+08822:   if(!entry.kodeMesin||!entry.namaMesin)throw new Error('Kode Mesin dan Nama Mesin wajib diisi.');
+08823:   const machine=MACHINES.find(m=>String(m['Kode Mesin']||'').trim()===entry.kodeMesin||String(m['Nama Mesin']||'').trim()===entry.namaMesin);
+08824:   entry.lokasi=machine?String(machine['Lokasi/Area']||'').trim():'-';
+08825:  }
+08826:  return entry;
+08827: }
+08828: $('#select-kategoriArea').innerHTML='<option value="">Pilih kategori...</option>'+Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('');
+08829: $('#select-lokasiPekerjaan').addEventListener('change',syncLogbookLocationForm_);
+08830: $('#select-kategoriArea').addEventListener('change',()=>populateWorkAreaOptions_($('#select-kategoriArea').value,$('#select-namaArea'),''));
+08831: $('#form-entry').addEventListener('reset',()=>setTimeout(syncLogbookLocationForm_,0));
+08832: syncLogbookLocationForm_();
+08833: 
+08834: function updateSidebarCounts(){
+08835:   $('#cnt-utama').textContent = ENTRIES.length;
+08836: }
+08837: 
+08838: /* ---------------- HELPERS ---------------- */
+08839: function escapeHtml(s){
+08840:   if(s===undefined || s===null) return '';
+08841:   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+08842: }
+08843: function statusClass(status){
+08844:   const s = String(status||'').toLowerCase();
+08845:   if(s.includes('selesai')) return 'selesai';
+08846:   if(s.includes('proses')) return 'proses';
+08847:   if(s.includes('emergency')) return 'emergency';
+08848:   return 'pending';
+08849: }
+08850: function prioClass(p){
+08851:   const s = String(p||'').toLowerCase();
+08852:   if(s.includes('tinggi')||s.includes('emergency')) return 'tinggi';
+08853:   if(s.includes('sedang')) return 'sedang';
+08854:   return 'rendah';
+08855: }
+08856: function fmtDate(d){
+08857:   if(!d) return '-';
+08858:   const dt = new Date(d);
+08859:   if(isNaN(dt)) return d;
+08860:   return dt.toLocaleDateString('id-ID', {weekday:'short', day:'2-digit', month:'short', year:'numeric'});
+08861: }
+08862: 
+08863: /* Kunci tanggal ternormalisasi (YYYY-MM-DD) dipakai untuk mengelompokkan & mengurutkan
+08864:    entri per tanggal. Backend database SQLite kadang mengembalikan nilai tanggal sebagai
+08865:    objek Date (bukan string), yang kalau dipakai langsung sebagai key object akan
+08866:    di-toString() otomatis (mis. "Fri Aug 07 2026 00:00:00 GMT+0700...") — kalau key
+08867:    seperti itu diurutkan dengan .sort() biasa, urutannya jadi alfabetis per nama bulan/hari,
+08868:    BUKAN kronologis, sehingga sortir "Terbaru"/"Terlama" jadi kacau. Fungsi ini memastikan
+08869:    key selalu format ISO yyyy-mm-dd yang urut secara leksikografis = urut secara kronologis.*/
+08870: function dateKeyOf(tgl){
+08871:   if(!tgl) return null;
+08872:   const dt = new Date(tgl);
+08873:   if(isNaN(dt)) return null;
+08874:   const y = dt.getFullYear();
+08875:   const m = String(dt.getMonth()+1).padStart(2,'0');
+08876:   const d = String(dt.getDate()).padStart(2,'0');
+08877:   return `${y}-${m}-${d}`;
+08878: }
+08879: 
+08880: function isFutureDate(tgl){
+08881:   if(!tgl) return false;
+08882:   const d = new Date(tgl);
+08883:   if(isNaN(d)) return false;
+08884:   const today = new Date(); today.setHours(23,59,59,999);
+08885:   return d.getTime() > today.getTime();
+08886: }
+08887: 
+08888: /* Laporan logbook dengan Tanggal sebelum 15 Agustus 2026 adalah hasil
+08889:    migrasi data lama dari OneNote (sebelum aplikasi ini dipakai), jadi
+08890:    diberi keterangan "Import dari OneNote" di kartu logbook-nya. */
+08891: const ONENOTE_IMPORT_CUTOFF = new Date('2026-08-15T00:00:00');
+08892: function isOneNoteImport(tgl){
+08893:   if(!tgl) return false;
+08894:   const d = new Date(tgl);
+08895:   if(isNaN(d)) return false;
+~~~
+
+### Around line 17527
+~~~text
+17515: [['ta-deskripsiMasalah','btn-ai-fix-deskripsiMasalah','Deskripsi Masalah / Kerusakan'],
+17516:  ['ta-tindakanPerbaikan','btn-ai-fix-tindakanPerbaikan','Tindakan Perbaikan yang Dilakukan'],
+17517:  ['input-namaUnit','btn-ai-fix-namaUnit','Nama Unit (Sub-Mesin)'],
+17518:  ['ta-catatan','btn-ai-fix-catatan','Catatan Tambahan']]
+17519:   .forEach(([taId,btnId,label])=>{
+17520:     const b = document.getElementById(btnId);
+17521:     if(b) b.addEventListener('click', ()=> groqFixTextareaTypo(taId, btnId, label));
+17522:   });
+17523: 
+17524: // [FITUR BARU] Koreksi typo OTOMATIS untuk seluruh field manual/prose di
+17525: // form Input Logbook, dijalankan otomatis saat "Simpan Logbook" diklik --
+17526: // SEBELUM data dikirim ke Sheets (lihat pemanggilannya di
+17527: // $('#form-entry').addEventListener('submit', ...) di bawah). User tidak
+17528: // perlu klik tombol AI satu-satu lagi (tombol manual di atas tetap ada
+17529: // untuk yang mau intip hasilnya sebelum submit).
+17530: //
+17531: // Field yang di-cover: Deskripsi Masalah, Tindakan Perbaikan, Nama Unit,
+17532: // dan Catatan -- semuanya teks bebas yang diketik manual.
+17533: // SENGAJA TIDAK termasuk: Nomor Notifikasi Pekerjaan (nomor/ID kerja dari
+17534: // SAP -- kalau AI "membetulkan" satu digit angka ID, nomor itu jadi salah
+17535: // total dan sulit dilacak/dibetulkan lagi setelah tersimpan). Field selain
+17536: // itu semua <select> (Shift, Mesin, Jenis Pekerjaan, Status, dst) yang
+17537: // memang sudah dipilih dari daftar, bukan diketik bebas, jadi tidak perlu
+17538: // dikoreksi ejaan.
+17539: const GROQ_AUTOFIX_ENTRY_FIELDS = [
+17540:   { key:'deskripsiMasalah', label:'Deskripsi Masalah / Kerusakan' },
+17541:   { key:'tindakanPerbaikan', label:'Tindakan Perbaikan yang Dilakukan' },
+17542:   { key:'namaUnit', label:'Nama Unit (Sub-Mesin)' },
+17543:   { key:'catatan', label:'Catatan' }
+17544: ];
+17545: async function groqAutoFixEntryFields(entry){
+17546:   let changedCount = 0;
+17547:   // Paralel (Promise.all), bukan sequential, supaya total tambahan waktu
+17548:   // sebelum simpan cuma sekitar 1 request Groq, bukan 4x berturut-turut.
+17549:   await Promise.all(GROQ_AUTOFIX_ENTRY_FIELDS.map(async ({key,label})=>{
+17550:     if(!entry[key]) return;
+17551:     const corrected = await groqFixTextRaw(entry[key], label, {failOpen:true});
+17552:     if(corrected){ entry[key] = corrected; changedCount++; }
+17553:   }));
+17554:   return changedCount;
+17555: }
+17556: 
+17557: function buildMaterialFieldsFromRows(){
+17558:   syncSparepartRowsFromDom();
+17559:   // Seluruh field sparepart bersifat opsional. Simpan setiap nilai yang
+17560:   // memang diisi tanpa memaksa kelengkapan field lain pada baris yang sama.
+17561:   const rows = SPAREPART_ROWS
+17562:     .map(r=>({...r,nama:norm_(r.nama)?String(r.nama).trim():'',sap:norm_(r.sap)?String(r.sap).trim():'',jumlah:norm_(r.jumlah)?r.jumlah:''}))
+17563:     .filter(r=>r.nama.trim() || r.sap.trim() || String(r.jumlah).trim())
+17564:     .map(r=>{
+17565:       const master = r.sap.trim() ? findSparepartLokasiBySap(r.sap.trim()) : null;
+17566:       return { ...r, lokasiSparepart: master ? String(master.lokasiGudang||'').trim() : '' };
+17567:     });
+17568:   rows.forEach((r,i)=>{ if(!(Number(r.jumlah)>0) || !Number.isFinite(Number(r.jumlah))) throw new Error('Jumlah sparepart baris '+(i+1)+' wajib diisi dengan angka lebih dari 0.'); if(!r.nama.trim() && !r.sap.trim()) throw new Error('Isi nama atau nomor SAP sparepart baris '+(i+1)+'.'); });
+17569:   const namaMaterial = rows.map(r=> r.jumlah ? `${r.nama.trim()} (${r.jumlah} pcs)` : r.nama.trim()).filter(Boolean).join('; ');
+17570:   const materialNumberSAP = rows.map(r=> r.sap.trim()).filter(Boolean).join('; ');
+17571:   // Backend lama mewajibkan kolom Lokasi Sparepart. Nilai fallback ini
+17572:   // menjaga kompatibilitas tanpa menjadikan input sparepart wajib bagi user.
+17573:   const lokasiSparepart = rows.length
+17574:     ? rows.map(r=>r.lokasiSparepart || 'Belum terdaftar').join('; ')
+17575:     : 'Tidak menggunakan sparepart';
+17576:   return { namaMaterial, materialNumberSAP, lokasiSparepart, detail: rows };
+17577: }
+17578: 
+17579: /* ---------------- FILE UPLOAD (FORM) ---------------- */
+17580: const fileDrop = $('#file-drop');
+17581: const fileInput = $('#file-input');
+17582: fileDrop.addEventListener('click', ()=> fileInput.click());
+17583: fileDrop.addEventListener('dragover', ev=>{ ev.preventDefault(); fileDrop.style.borderColor='var(--red)'; });
+17584: fileDrop.addEventListener('dragleave', ()=>{ fileDrop.style.borderColor='var(--line)'; });
+17585: fileDrop.addEventListener('drop', ev=>{
+17586:   ev.preventDefault(); fileDrop.style.borderColor='var(--line)';
+17587:   handleFiles(ev.dataTransfer.files);
+17588: });
+17589: fileInput.addEventListener('change', ()=> { handleFiles(fileInput.files); fileInput.value=''; });
+17590: 
+17591: async function handleFiles(fileList){
+~~~
+
+### Around line 17671
+~~~text
+17659:     });
+17660:   });
+17661: }
+17662: 
+17663: /* ---------------- FORM WIZARD MODE (Mode Standar <-> Mode Wizard) ----------------
+17664:    Toggle switch (reuse komponen .lc-switch) untuk mengubah form panjang jadi
+17665:    alur step-by-step. Section form yang sudah ada (dipisah oleh .section-title)
+17666:    otomatis dibungkus jadi .wizard-step tanpa perlu ubah markup satu-satu, jadi
+17667:    struktur & handler input yang sudah ada (file-drop, sparepart-rows, dst) tetap
+17668:    utuh — cuma direparent ke wrapper step-nya. Kalau user klik Submit padahal
+17669:    step wizard belum lengkap, submit dicegah + toast peringatan + lompat ke
+17670:    step yang belum lengkap (lihat form._wizardGuardSubmit, dipanggil di
+17671:    handler submit form-entry di bawah). */
+17672: function initFormWizard(formSel, toggleSel, labelSel, navSel){
+17673:   const form = $(formSel), toggle = $(toggleSel), label = $(labelSel), nav = $(navSel);
+17674:   if(!form || !toggle || !nav || form.dataset.wizardReady) return;
+17675:   form.dataset.wizardReady = '1';
+17676: 
+17677:   const actionsBar = form.querySelector('#entry-actions-bar');
+17678:   const kids = Array.from(form.children).filter(el=> el !== actionsBar && el !== nav);
+17679:   const groups = [];
+17680:   kids.forEach(el=>{
+17681:     if(el.classList.contains('section-title') || !groups.length){
+17682:       groups.push({ title: el.classList.contains('section-title') ? el.textContent.trim() : 'Data', els: [] });
+17683:     }
+17684:     groups[groups.length-1].els.push(el);
+17685:   });
+17686:   const steps = groups.map((g, i)=>{
+17687:     const wrap = document.createElement('div');
+17688:     wrap.className = 'wizard-step';
+17689:     wrap.dataset.step = i;
+17690:     wrap.dataset.title = g.title;
+17691:     g.els[0].parentNode.insertBefore(wrap, g.els[0]);
+17692:     g.els.forEach(el=> wrap.appendChild(el));
+17693:     return wrap;
+17694:   });
+17695:   let current = 0;
+17696: 
+17697:   const requiredFieldsIn = stepEl => $$('input[required], select[required], textarea[required]', stepEl);
+17698:   // PENTING: pakai `f.validity.valid`, BUKAN `f.checkValidity()`/`reportValidity()`.
+17699:   // Field yang berada di step non-aktif punya `display:none` (lewat CSS
+17700:   // `form.wizard-mode .wizard-step{display:none}`), dan elemen yang tidak
+17701:   // dirender otomatis "barred from constraint validation" oleh browser —
+17702:   // artinya checkValidity() SELALU return true untuknya walau kosong.
+17703:   // Sebelumnya ini membuat validasi step tersembunyi lolos begitu saja.
+17704:   // `.validity.valid` tetap mencerminkan constraint sebenarnya terlepas
+17705:   // dari status render, jadi baris kosong di step manapun tetap terdeteksi.
+17706:   const stepIsValid = stepEl => requiredFieldsIn(stepEl).every(f=> f.validity.valid);
+17707:   const firstInvalidStepIndex = () => steps.findIndex(s=> !stepIsValid(s));
+17708:   // Fokuskan & tampilkan pesan validasi native untuk field tertentu, meski
+17709:   // field itu ada di step yang sedang disembunyikan (harus dipindah ke
+17710:   // step aktif dulu supaya reportValidity() punya efek visual).
+17711:   function focusInvalidField(f){
+17712:     const stepEl = f.closest('.wizard-step');
+17713:     if(stepEl){ const idx = steps.indexOf(stepEl); if(idx !== -1) goToStep(idx); }
+17714:     setTimeout(()=>{ f.reportValidity(); f.focus({preventScroll:false}); }, 0);
+17715:   }
+17716: 
+17717:   function renderNav(){
+17718:     if(!form.classList.contains('wizard-mode')){ nav.style.display='none'; nav.innerHTML=''; return; }
+17719:     nav.style.display = '';
+17720:     nav.innerHTML = `
+17721:       <div class="wizard-progress">${steps.map((s,i)=>`<span class="wp-dot ${i<current?'done':(i===current?'current':'')}"></span>`).join('')}</div>
+17722:       <div class="wizard-stepinfo">Langkah <b>${current+1}</b> dari <b>${steps.length}</b>: <b>${escapeHtml(steps[current].dataset.title||'')}</b></div>
+17723:       <div class="wizard-nav-btns">
+17724:         ${current>0 ? `<button type="button" class="btn btn-ghost btn-sm" id="wizard-btn-prev"><i class="ph-bold ph-arrow-left"></i> Sebelumnya</button>` : ''}
+17725:         ${current<steps.length-1 ? `<button type="button" class="btn btn-primary btn-sm" id="wizard-btn-next">Lanjut <i class="ph-bold ph-arrow-right"></i></button>` : ''}
+17726:       </div>`;
+17727:     const btnPrev = $('#wizard-btn-prev', nav), btnNext = $('#wizard-btn-next', nav);
+17728:     if(btnPrev) btnPrev.addEventListener('click', ()=> goToStep(current-1));
+17729:     // Sengaja TIDAK ada validasi wajib di sini untuk pindah "Lanjut" antar
+17730:     // langkah — konsisten dengan aturan "validasi hanya sekali, di tombol
+17731:     // Simpan akhir" (lihat form._wizardGuardSubmit / validateFormEntryOnce
+17732:     // di handler submit). Wizard boleh dijelajah bebas maju-mundur.
+17733:     if(btnNext) btnNext.addEventListener('click', ()=> goToStep(current+1));
+17734:   }
+17735:   function goToStep(i){
+~~~
+
+### Around line 17765
+~~~text
+17753:   toggle.addEventListener('change', ()=> setWizardMode(toggle.checked));
+17754:   // Default: Mode Wizard AKTIF untuk first-time user / non-teknis (aturan
+17755:   // "default to wizard mode"). Kalau user pernah pilih manual sebelumnya,
+17756:   // preferensi itu dihormati (localStorage).
+17757:   let savedRaw = null;
+17758:   try{ savedRaw = localStorage.getItem('form_wizard_' + form.id); }catch(e){}
+17759:   const saved = savedRaw === null ? true : savedRaw === '1';
+17760:   toggle.checked = saved;
+17761:   setWizardMode(saved);
+17762: 
+17763:   // Satu-satunya titik validasi sebelum data benar-benar dikirim ke server —
+17764:   // dipakai sama persis oleh Mode Standar maupun Mode Wizard (lihat handler
+17765:   // submit #form-entry). Karena form diberi atribut `novalidate`, browser
+17766:   // TIDAK melakukan validasi otomatis apa pun sendiri (yang sebelumnya
+17767:   // berperilaku beda antar mode: di Mode Standar auto-divalidasi browser
+17768:   // sebelum event submit sempat berjalan, sementara di Mode Wizard field di
+17769:   // step tersembunyi malah dilewati) — sekarang satu fungsi ini yang jadi
+17770:   // sumber kebenaran tunggal untuk kedua mode.
+17771:   form._wizardGuardSubmit = function(){
+17772:     const idx = firstInvalidStepIndex();
+17773:     if(idx === -1) return true;
+17774:     goToStep(idx);
+17775:     const firstInvalid = steps[idx].querySelector('input, select, textarea');
+17776:     const invalidField = requiredFieldsIn(steps[idx]).find(f=> !f.validity.valid) || firstInvalid;
+17777:     if(invalidField) focusInvalidField(invalidField);
+17778:     toast(form.classList.contains('wizard-mode')
+17779:       ? `Lengkapi dulu langkah "${steps[idx].dataset.title||('Langkah '+(idx+1))}" sebelum menyimpan.`
+17780:       : `Lengkapi field yang wajib diisi di bagian "${steps[idx].dataset.title||('Langkah '+(idx+1))}".`, true);
+17781:     return false;
+17782:   };
+17783: }
+17784: initFormWizard('#form-entry', '#form-wizard-toggle', '#form-wizard-toggle-label', '#wizard-nav');
+17785: // [FIX WIZARD] Toggle "Mode Wizard" di halaman Soft Skill Assessment & Hard Skill Assessment
+17786: // sudah ada di HTML (#pi-ss-wizard-toggle / #pi-hs-wizard-toggle) tapi sebelumnya TIDAK PERNAH
+17787: // disambungkan ke initFormWizard() -- hanya #form-entry (Input Logbook) yang diaktifkan.
+17788: // Akibatnya toggle di dua halaman itu tidak melakukan apa-apa saat diklik.
+17789: // initFormWizard tidak mensyaratkan elemen <form> asli, jadi aman dipakai pada <div class="card">.
+17790: initFormWizard('#pi-ss-form-card', '#pi-ss-wizard-toggle', '#pi-ss-wizard-toggle-label', '#pi-ss-wizard-nav');
+17791: initFormWizard('#pi-hs-form-card', '#pi-hs-wizard-toggle', '#pi-hs-wizard-toggle-label', '#pi-hs-wizard-nav');
+17792: 
+17793: /* ---------------- FORM SUBMIT ---------------- */
+17794: $('#form-entry').addEventListener('submit', async (ev)=>{
+17795:   ev.preventDefault();
+17796:   if(ev.target._wizardGuardSubmit && !ev.target._wizardGuardSubmit()) return;
+17797:   if(!WEB_APP_URL){ toast('Hubungkan aplikasi ke database SQLite dulu (menu Master Mesin & Koneksi).', true); return; }
+17798:   const btn = $('#btn-submit');
+17799:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+17800:   try{
+17801:     const fd = new FormData(ev.target);
+17802:     const entry = Object.fromEntries(fd.entries());
+17803:     applyLogbookLocationPayload_(entry);
+17804:     const additionalNames = (typeof getAdditionalPersonilNames === 'function') ? getAdditionalPersonilNames() : [];
+17805:     entry.personilTambahan = additionalNames;
+17806:     entry.personilTambahanStr = additionalNames.join(', ');
+17807:     entry.semuaPersonil = [entry.namaPelapor, ...additionalNames].filter(Boolean).join(', ');
+17808:     const jenisLower = String(entry.jenisPekerjaan||'').toLowerCase();
+17809:     entry.isPreventive = jenisLower.includes('preventive');
+17810:     const sparepartFields = buildMaterialFieldsFromRows();
+17811:     entry.namaMaterial = sparepartFields.namaMaterial;
+17812:     entry.materialNumberSAP = sparepartFields.materialNumberSAP;
+17813:     entry.lokasiSparepart = sparepartFields.lokasiSparepart;
+17814:     entry.sparepartDetail = sparepartFields.detail;
+17815:     const now = new Date();
+17816:     entry.waktu = now.toTimeString().slice(0,5);
+17817:     // [FITUR BARU] Koreksi typo otomatis (Groq) untuk field manual/prose --
+17818:     // dijalankan di sini: SETELAH validasi lolos (jadi tidak ada percobaan
+17819:     // koreksi kalau datanya sendiri belum valid), tapi SEBELUM apiPost ke
+17820:     // Sheets, sesuai permintaan. Fail-open: kalau backend/koneksi Groq
+17821:     // bermasalah, groqFixTextRaw() di dalamnya sudah menangkap error sendiri
+17822:     // dan mengembalikan teks asli -- proses simpan TETAP lanjut.
+17823:     btn.innerHTML = '<span class="ai-spinner" style="width:12px;height:12px;"></span> Memeriksa ejaan (AI)...';
+17824:     const groqChangedCount = await groqAutoFixEntryFields(entry);
+17825:     btn.disabled = true; btn.textContent = 'Menyimpan...';
+17826:     ['namaUnit','tindakanPerbaikan','catatan','nomorNotifikasi'].forEach(k=>{ if(!String(entry[k]||'').trim()) entry[k]='-'; });
+17827:     const files = PENDING_FILES.map(f=>({name:f.name, mimeType:f.mimeType, base64:f.base64}));
+17828:     const saved = await apiPost({action:'addEntry', entry, files});
+17829:     if(saved.newSpareparts && saved.newSpareparts.length) toast(saved.newSpareparts.length+' sparepart baru ditambahkan. Lengkapi datanya di menu Sparepart.');
+~~~
+
+### Around line 17784
+~~~text
+17772:     const idx = firstInvalidStepIndex();
+17773:     if(idx === -1) return true;
+17774:     goToStep(idx);
+17775:     const firstInvalid = steps[idx].querySelector('input, select, textarea');
+17776:     const invalidField = requiredFieldsIn(steps[idx]).find(f=> !f.validity.valid) || firstInvalid;
+17777:     if(invalidField) focusInvalidField(invalidField);
+17778:     toast(form.classList.contains('wizard-mode')
+17779:       ? `Lengkapi dulu langkah "${steps[idx].dataset.title||('Langkah '+(idx+1))}" sebelum menyimpan.`
+17780:       : `Lengkapi field yang wajib diisi di bagian "${steps[idx].dataset.title||('Langkah '+(idx+1))}".`, true);
+17781:     return false;
+17782:   };
+17783: }
+17784: initFormWizard('#form-entry', '#form-wizard-toggle', '#form-wizard-toggle-label', '#wizard-nav');
+17785: // [FIX WIZARD] Toggle "Mode Wizard" di halaman Soft Skill Assessment & Hard Skill Assessment
+17786: // sudah ada di HTML (#pi-ss-wizard-toggle / #pi-hs-wizard-toggle) tapi sebelumnya TIDAK PERNAH
+17787: // disambungkan ke initFormWizard() -- hanya #form-entry (Input Logbook) yang diaktifkan.
+17788: // Akibatnya toggle di dua halaman itu tidak melakukan apa-apa saat diklik.
+17789: // initFormWizard tidak mensyaratkan elemen <form> asli, jadi aman dipakai pada <div class="card">.
+17790: initFormWizard('#pi-ss-form-card', '#pi-ss-wizard-toggle', '#pi-ss-wizard-toggle-label', '#pi-ss-wizard-nav');
+17791: initFormWizard('#pi-hs-form-card', '#pi-hs-wizard-toggle', '#pi-hs-wizard-toggle-label', '#pi-hs-wizard-nav');
+17792: 
+17793: /* ---------------- FORM SUBMIT ---------------- */
+17794: $('#form-entry').addEventListener('submit', async (ev)=>{
+17795:   ev.preventDefault();
+17796:   if(ev.target._wizardGuardSubmit && !ev.target._wizardGuardSubmit()) return;
+17797:   if(!WEB_APP_URL){ toast('Hubungkan aplikasi ke database SQLite dulu (menu Master Mesin & Koneksi).', true); return; }
+17798:   const btn = $('#btn-submit');
+17799:   btn.disabled = true; btn.textContent = 'Menyimpan...';
+17800:   try{
+17801:     const fd = new FormData(ev.target);
+17802:     const entry = Object.fromEntries(fd.entries());
+17803:     applyLogbookLocationPayload_(entry);
+17804:     const additionalNames = (typeof getAdditionalPersonilNames === 'function') ? getAdditionalPersonilNames() : [];
+17805:     entry.personilTambahan = additionalNames;
+17806:     entry.personilTambahanStr = additionalNames.join(', ');
+17807:     entry.semuaPersonil = [entry.namaPelapor, ...additionalNames].filter(Boolean).join(', ');
+17808:     const jenisLower = String(entry.jenisPekerjaan||'').toLowerCase();
+17809:     entry.isPreventive = jenisLower.includes('preventive');
+17810:     const sparepartFields = buildMaterialFieldsFromRows();
+17811:     entry.namaMaterial = sparepartFields.namaMaterial;
+17812:     entry.materialNumberSAP = sparepartFields.materialNumberSAP;
+17813:     entry.lokasiSparepart = sparepartFields.lokasiSparepart;
+17814:     entry.sparepartDetail = sparepartFields.detail;
+17815:     const now = new Date();
+17816:     entry.waktu = now.toTimeString().slice(0,5);
+17817:     // [FITUR BARU] Koreksi typo otomatis (Groq) untuk field manual/prose --
+17818:     // dijalankan di sini: SETELAH validasi lolos (jadi tidak ada percobaan
+17819:     // koreksi kalau datanya sendiri belum valid), tapi SEBELUM apiPost ke
+17820:     // Sheets, sesuai permintaan. Fail-open: kalau backend/koneksi Groq
+17821:     // bermasalah, groqFixTextRaw() di dalamnya sudah menangkap error sendiri
+17822:     // dan mengembalikan teks asli -- proses simpan TETAP lanjut.
+17823:     btn.innerHTML = '<span class="ai-spinner" style="width:12px;height:12px;"></span> Memeriksa ejaan (AI)...';
+17824:     const groqChangedCount = await groqAutoFixEntryFields(entry);
+17825:     btn.disabled = true; btn.textContent = 'Menyimpan...';
+17826:     ['namaUnit','tindakanPerbaikan','catatan','nomorNotifikasi'].forEach(k=>{ if(!String(entry[k]||'').trim()) entry[k]='-'; });
+17827:     const files = PENDING_FILES.map(f=>({name:f.name, mimeType:f.mimeType, base64:f.base64}));
+17828:     const saved = await apiPost({action:'addEntry', entry, files});
+17829:     if(saved.newSpareparts && saved.newSpareparts.length) toast(saved.newSpareparts.length+' sparepart baru ditambahkan. Lengkapi datanya di menu Sparepart.');
+17830:     toast(groqChangedCount ? `Logbook berhasil disimpan ✓ (${groqChangedCount} field ejaan diperbaiki otomatis)` : 'Logbook berhasil disimpan ✓');
+17831:     clearFormEntryDraft();
+17832:     ev.target.reset();
+17833:     PENDING_FILES = [];
+17834:     renderFilePreviews();
+17835:     resetSparepartRows();
+17836:     if(typeof resetAdditionalPersonil === 'function') resetAdditionalPersonil();
+17837:     // Penyimpanan sudah sukses; refresh seluruh modul berjalan di background
+17838:     // agar satu endpoint lambat tidak mengunci tombol/form tanpa batas.
+17839:     loadAll().catch(()=>{});
+17840:     syncLogbookLocationForm_();
+17841:   }catch(err){
+17842:     toast('Gagal menyimpan: ' + err.message, true);
+17843:   }finally{
+17844:     btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-check-circle"></i> Simpan Logbook';
+17845:   }
+17846: });
+17847: 
+17848: /* ---------------- SETTING VIEW: KONEKSI & MASTER MESIN ---------------- */
+~~~
+
