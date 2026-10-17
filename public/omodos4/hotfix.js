@@ -4396,7 +4396,7 @@ function linkifyTextNode(node){
 function scan(root){
   if(!root)return;
   var containers=[];
-  if(root.nodeType===1&&/copilot|ai-internet|internet-research|external-ai/i.test(String(root.id||'')+' '+String(root.className||'')))containers.push(root);
+  if(root.nodeType===1&&(/copilot|ai-internet|internet-research|external-ai/i.test(String(root.id||'')+' '+String(root.className||''))||inCopilot(root)))containers.push(root);
   if(root.querySelectorAll)containers=containers.concat(Array.from(root.querySelectorAll('[id*="copilot" i],[class*="copilot" i],[id*="internet-research" i],[class*="internet-research" i],[id*="external-ai" i],[class*="external-ai" i]')));
   containers.forEach(function(container){
     var walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT),nodes=[],n;
