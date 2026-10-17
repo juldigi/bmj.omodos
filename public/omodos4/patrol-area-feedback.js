@@ -161,6 +161,37 @@ ready(function(){
     picker.addEventListener('change',()=>handleFiles(picker));
     cameraPicker.addEventListener('change',()=>handleFiles(cameraPicker));
 
+    /* The free-form finding attachment area also offers explicit Camera/Gallery choices. */
+    const bottomDrop=$('#patrol-temuan-file-drop'), bottomInput=$('#patrol-temuan-file-input');
+    const bottomCamera=document.createElement('input');
+    bottomCamera.type='file';bottomCamera.accept='image/*,video/*';bottomCamera.capture='environment';bottomCamera.multiple=true;bottomCamera.style.display='none';bottomCamera.id='omodos-patrol-extra-camera-input';
+    document.body.appendChild(bottomCamera);
+    function openBottomChoice(){
+      const old=document.querySelector('.omodos-photo-choice');if(old)old.remove();
+      const modal=document.createElement('div');modal.className='omodos-photo-choice';
+      modal.innerHTML='<div class="omodos-photo-choice-card" role="dialog" aria-modal="true"><h3>Lampiran tambahan</h3><p>Untuk temuan di luar daftar tasklist.</p><div class="omodos-photo-choice-actions"><button type="button" class="btn btn-primary" data-bottom-source="camera"><i class="ph-bold ph-camera"></i> Kamera</button><button type="button" class="btn btn-ghost" data-bottom-source="gallery"><i class="ph-bold ph-images"></i> Galeri</button></div><button type="button" class="btn btn-ghost" data-bottom-cancel style="width:100%;margin-top:8px">Batal</button></div>';
+      document.body.appendChild(modal);
+      modal.querySelector('[data-bottom-source="camera"]').addEventListener('click',()=>{modal.remove();bottomCamera.value='';bottomCamera.click();});
+      modal.querySelector('[data-bottom-source="gallery"]').addEventListener('click',()=>{modal.remove();bottomInput.value='';bottomInput.click();});
+      modal.querySelector('[data-bottom-cancel]').addEventListener('click',()=>modal.remove());
+      modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+    }
+    if(bottomDrop&&bottomInput&&!bottomDrop.dataset.sourceChoiceBound){
+      bottomDrop.dataset.sourceChoiceBound='1';
+      bottomDrop.addEventListener('click',function(ev){ev.preventDefault();ev.stopImmediatePropagation();openBottomChoice();},true);
+    }
+    bottomCamera.addEventListener('change',function(){
+      if(!bottomCamera.files||!bottomCamera.files.length)return;
+      try{
+        const transfer=new DataTransfer();
+        Array.from(bottomInput.files||[]).forEach(f=>transfer.items.add(f));
+        Array.from(bottomCamera.files).forEach(f=>transfer.items.add(f));
+        bottomInput.files=transfer.files;
+        bottomInput.dispatchEvent(new Event('change',{bubbles:true}));
+      }catch(e){toastSafe('Tidak dapat memasukkan foto kamera. Coba pilih Galeri.',true);}
+      bottomCamera.value='';
+    });
+
     const holder=$('#patrol-checklist-groups');
     holder.addEventListener('click',function(ev){
       const btn=ev.target.closest('.patrol-chk-btn');
