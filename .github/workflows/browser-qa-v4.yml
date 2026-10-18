@@ -124,7 +124,7 @@ jobs:
             "OMODOS_FACTORY_STATUS_READY",
             "homeView.classList.contains('active')",
             "view-dashboard",
-            "view.remove()"
+            "mount.remove()"
           ];
           const missing = required.filter(fragment => !mod.includes(fragment));
           if (missing.length) throw new Error('Missing integration contract: ' + missing.join(' | '));
