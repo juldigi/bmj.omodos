@@ -50,7 +50,6 @@ function latestStatuses(){
    statusLabel:text(statusLabel||(key==='normal'?'Normal':key==='perhatian'?'Perlu Perhatian':key==='kritikal'?'Kritis':'Belum Ada Data'),60),
    sourceLabel:text(snap&&snap.sourceLabel||'',40),
    updatedAt:Number.isFinite(ts)&&ts>0?new Date(ts).toISOString():'',
-   description:text(snap&&snap.description||'',350)
   };
  }).filter(row=>row.code||row.name);
 }
