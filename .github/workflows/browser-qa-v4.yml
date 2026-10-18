@@ -104,6 +104,36 @@ jobs:
           grep -Fq 'const SOURCE_TRUTH_START_MS = Date.parse(SOURCE_TRUTH_START_ISO);' src/worker.js
           grep -Fq 'return data.filter((r) => sourceTimestamp(r) >= SOURCE_TRUTH_START_MS);' src/worker.js
 
+      - name: Validate Superadmin DigitalTwin integration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const source = fs.readFileSync('public/omodos4/hotfix.js', 'utf8');
+          const start = source.indexOf('/* OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1');
+          if (start < 0) throw new Error('Superadmin factory Twin integration is missing');
+          const mod = source.slice(start);
+          const required = [
+            "location.hostname === 'omodos.juldigi.workers.dev'",
+            "typeof isSuperadmin === 'function' && isSuperadmin() === true",
+            "https://digitaltwin.juldigi.workers.dev/?embed=omodos-status",
+            "var TWIN_ORIGIN = 'https://digitaltwin.juldigi.workers.dev'",
+            "machineLatestStatusSnapshot_",
+            "OMODOS_FACTORY_STATUS",
+            "OMODOS_FACTORY_STATUS_READY",
+            "homeView.classList.contains('active')",
+            "view-dashboard",
+            "view.remove()"
+          ];
+          const missing = required.filter(fragment => !mod.includes(fragment));
+          if (missing.length) throw new Error('Missing integration contract: ' + missing.join(' | '));
+          if (mod.includes('juldigi0107.github.io/digitaltwin')) {
+            throw new Error('The obsolete GitHub Pages viewer URL must not be used by the OMODOS embed');
+          }
+          console.log('Superadmin DigitalTwin integration contract OK');
+          NODE
+
       - name: Install Playwright Chromium
         run: |
           npm init -y >/dev/null 2>&1
