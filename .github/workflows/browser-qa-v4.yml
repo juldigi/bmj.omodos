@@ -124,6 +124,8 @@ jobs:
             "OMODOS_FACTORY_STATUS_READY",
             "homeView.classList.contains('active')",
             "view-dashboard",
+            "#view-dashboard.omodos-superadmin-twin #home-mesin-filter",
+            "#view-dashboard.omodos-superadmin-twin #btn-refresh-dashboard",
             "mount.remove()"
           ];
           const missing = required.filter(fragment => !mod.includes(fragment));
