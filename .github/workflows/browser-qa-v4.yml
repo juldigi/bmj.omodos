@@ -28,6 +28,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate Superadmin factory status data source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/omodos4/factory-home-superadmin.js
+          node <<'NODE'
+          const fs=require('fs');
+          const home=fs.readFileSync('public/omodos4/factory-home-superadmin.js','utf8');
+          const gate=fs.readFileSync('public/omodos4/hotfix.js','utf8');
+          const required=[
+            ['existing Home status snapshot', /machineLatestStatusSnapshot_\(\{kode:code,nama:name\}\)/],
+            ['Patrol and Logbook merged status', /Prefer the same authoritative machine status calculation as the regular OMODOS Home/],
+            ['embed-only viewer route', /\?embed=omodos-status/],
+            ['status message contract', /type:'OMODOS_FACTORY_STATUS',version:1,sentAt:/],
+            ['regular dashboard is restored for other roles', /if\(!isSuperadmin\(\)\)\{cleanup\(\);return;\}/],
+            ['dynamic factory view is gated at Superadmin entry', /role==='superadmin'/]
+          ];
+          const failures=required.filter(([name,pattern])=>!pattern.test(name==='dynamic factory view is gated at Superadmin entry'?gate:home));
+          if(failures.length){console.error('Superadmin factory status validation failed:',failures.map(x=>x[0]).join(', '));process.exit(1);}
+          console.log('Superadmin factory status source/gate checks passed:',required.length);
+          NODE
+
       - name: Validate OMODOS 4 Worker
         shell: bash
         run: |
