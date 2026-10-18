@@ -17,7 +17,7 @@ function parseDate(value){
   return Number.isNaN(date.getTime())?'':date.toISOString();
 }
 function readEntries(){try{if(typeof ENTRIES!=='undefined'&&Array.isArray(ENTRIES))return ENTRIES;}catch(e){}return Array.isArray(window.ENTRIES)?window.ENTRIES:[];}
-function latestRecords(){
+function latestRecordsFromEntries_(){
   const rows=readEntries(),byKey=new Map();
   rows.forEach((row,index)=>{
     const location=String(pick(row,['Lokasi Pekerjaan','LokasiPekerjaan','Work Location'])||'').trim().toLowerCase();if(location==='area')return;
@@ -32,6 +32,34 @@ function latestRecords(){
   });
   const result=[...byKey.values()].sort((a,b)=>(Date.parse(b.date||'')||b.index)-(Date.parse(a.date||'')||a.index));
   return result.slice(0,1200).map((row,index)=>({...row,index}));
+}
+/* Prefer the same authoritative machine status calculation as the regular OMODOS Home.
+   It combines the newest eligible Logbook and Patrol record instead of maintaining
+   a second, Logbook-only interpretation for the 3D overlay. */
+function latestRecords(){
+  let machines=[];
+  try{if(typeof MACHINES!=='undefined'&&Array.isArray(MACHINES))machines=MACHINES;}catch(e){}
+  if(machines.length&&typeof machineLatestStatusSnapshot_==='function'){
+    const labels={normal:'Normal',perhatian:'Perlu Perhatian',kritikal:'Kritikal',none:'Belum Ada Data'};
+    const records=machines.map((row,index)=>{
+      const code=validCode(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode','SAP Code']));
+      let name=String(pick(row,['Nama Mesin','NamaMesin','Machine Name','MachineName','Machine','Mesin','Nama Aset'])||'').trim();
+      if(!name||name==='-'||name==='—')name='';
+      if(!code&&!name)return null;
+      let snapshot;
+      try{snapshot=machineLatestStatusSnapshot_({kode:code,nama:name});}catch(e){return null;}
+      if(!snapshot)return null;
+      const key=Object.prototype.hasOwnProperty.call(labels,snapshot.key)?snapshot.key:'none';
+      let status=labels[key];
+      try{if(typeof dashStatusLabel==='function')status=dashStatusLabel(key)||status;}catch(e){}
+      const ts=Number(snapshot.ts);
+      const date=Number.isFinite(ts)&&ts>0?new Date(ts).toISOString():'';
+      return {code,name,status,date,index,source:String(snapshot.sourceLabel||snapshot.source||'')};
+    }).filter(row=>row&&(row.code||row.name));
+    if(records.length)return records.slice(0,1200).map((row,index)=>({...row,index}));
+  }
+  // Early loading/offline fallback: preserve the original existing-data reader.
+  return latestRecordsFromEntries_();
 }
 function makeStyles(){
   if(styleNode)return;
@@ -63,7 +91,7 @@ function cleanup(){document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.rem
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
-  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status bersumber dari catatan logbook terakhir yang tersimpan di OMODOS, bukan telemetry sensor secara langsung.</p>';
+  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status memakai catatan terakhir Logbook atau Patrol yang sudah tersimpan di OMODOS, bukan telemetry sensor secara langsung.</p>';
   view.prepend(root);return root;
 }
 function sendStatuses(force){
