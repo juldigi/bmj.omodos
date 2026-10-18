@@ -5130,3 +5130,175 @@ if(typeof originalAuthFailure==='function'){
   };
 }
 })();
+
+/* OMODOS_SUPERADMIN_DIGITALTWIN_LITE_HOME_V1
+   Visual-only home replacement for Superadmin. Statuses are read from the
+   existing OMODOS machine/logbook/patrol functions; no duplicate data store. */
+(function(){
+'use strict';
+if(window.__OMODOS_SUPERADMIN_DIGITALTWIN_LITE_HOME_V1__)return;
+window.__OMODOS_SUPERADMIN_DIGITALTWIN_LITE_HOME_V1__=true;
+
+const TWIN_ORIGIN='https://digitaltwin.offsetbmj.workers.dev';
+const TWIN_URL=TWIN_ORIGIN+'/?mode=omodos-lite';
+const STATUS_TYPE='OMODOS_TWIN_LITE_STATUSES_V1';
+const READY_TYPE='BMJ_DTW_LITE_READY_V1';
+const MAPPING_TYPE='BMJ_DTW_LITE_MAPPING_V1';
+let panel=null,frame=null,note=null,home=null,topbar=null;
+let originalTitle=null,originalSubtitle=null,lastStatusSignature='',statusTimer=null,roleObserver=null;
+let lastFrameSrc='',lastMappedSummary='';
+
+function superadmin_(){
+ try{return typeof isSuperadmin==='function'&&isSuperadmin()===true;}catch(e){return false;}
+}
+function activeHome_(){return !!(home&&home.classList.contains('active'));}
+function getHomeMachineRows_(){
+ let rows=[];
+ try{if(typeof MACHINES!=='undefined'&&Array.isArray(MACHINES))rows=MACHINES;}catch(e){}
+ return rows.map(m=>({code:String(m&&m['Kode Mesin']||'').trim(),name:String(m&&m['Nama Mesin']||'').trim()})).filter(m=>m.name||m.code);
+}
+function statusLabel_(key){
+ const labels={normal:'Normal',perhatian:'Perlu Perhatian',kritikal:'Kritikal',none:'Belum Ada Data'};
+ return labels[key]||labels.none;
+}
+function statusItems_(){
+ const rows=getHomeMachineRows_();
+ return rows.map(m=>{
+  let snap={key:'none',ts:null};
+  try{if(typeof machineLatestStatusSnapshot_==='function')snap=machineLatestStatusSnapshot_(m)||snap;}catch(e){}
+  const key=['normal','perhatian','kritikal','none'].includes(snap.key)?snap.key:'none';
+  const ts=Number.isFinite(snap.ts)&&snap.ts>0?snap.ts:null;
+  return {code:m.code,name:m.name,status:key,statusLabel:statusLabel_(key),updatedAt:ts};
+ });
+}
+function safeSendStatuses_(){
+ if(!superadmin_()||!activeHome_()||!frame||!frame.contentWindow||lastFrameSrc!==TWIN_URL)return;
+ const items=statusItems_();
+ if(!items.length){if(note)note.textContent='Menunggu master mesin dan status OMODOS dimuat…';return;}
+ const signature=JSON.stringify(items.map(x=>[x.code,x.name,x.status,x.updatedAt]));
+ if(signature===lastStatusSignature)return;
+ lastStatusSignature=signature;
+ try{frame.contentWindow.postMessage({type:STATUS_TYPE,version:1,items:items},TWIN_ORIGIN);}catch(e){}
+}
+function scheduleStatusSync_(delay){
+ if(statusTimer)clearTimeout(statusTimer);
+ statusTimer=setTimeout(()=>{statusTimer=null;safeSendStatuses_();},Math.max(0,Number(delay)||0));
+}
+function ensurePanel_(){
+ if(!home)return;
+ if(panel&&panel.isConnected)return;
+ panel=document.createElement('section');
+ panel.id='omodos-superadmin-digitaltwin-lite';
+ panel.setAttribute('aria-label','Digital Twin pabrik khusus Superadmin');
+ panel.innerHTML='<div class="omodos-dtl-head"><div><strong>Factory Digital Twin</strong><small>Visualisasi 3D statis · status dari Logbook dan Patrol OMODOS</small></div><span class="omodos-dtl-chip">SUPERADMIN</span></div><div class="omodos-dtl-frame"><iframe title="Visualisasi 3D pabrik dan status mesin OMODOS" loading="eager" referrerpolicy="no-referrer" allow="fullscreen"></iframe></div><div class="omodos-dtl-footer"><span id="omodos-dtl-status-note">Menyiapkan visualisasi 3D…</span><span class="omodos-dtl-hint">Geser untuk memutar · cubit atau gulir untuk memperbesar · detail mesin dinonaktifkan</span></div>';
+ const css=document.createElement('style');
+ css.id='omodos-superadmin-digitaltwin-lite-css';
+ css.textContent=[
+ '#view-dashboard.superadmin-digitaltwin-active .home-status-title,#view-dashboard.superadmin-digitaltwin-active #dash-grid,#view-dashboard.superadmin-digitaltwin-active #home-below{display:none!important}',
+ '#omodos-superadmin-digitaltwin-lite{margin:10px 0 18px;border:1px solid var(--line,#d9e2ea);border-radius:15px;overflow:hidden;background:var(--panel,#fff);box-shadow:0 8px 26px rgba(18,46,67,.07);color:var(--text,#1c2b39)}',
+ '#omodos-superadmin-digitaltwin-lite .omodos-dtl-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;background:var(--surface-2,#f3f7fa);border-bottom:1px solid var(--line,#d9e2ea)}',
+ '#omodos-superadmin-digitaltwin-lite .omodos-dtl-head strong{display:block;font-size:14px;line-height:1.3;font-weight:800;letter-spacing:.01em}',
+ '#omodos-superadmin-digitaltwin-lite .omodos-dtl-head small{display:block;margin-top:3px;font-size:11px;line-height:1.35;color:var(--muted,#64748b)}',
+ '#omodos-superadmin-digitaltwin-lite .omodos-dtl-chip{flex:0 0 auto;border:1px solid var(--line,#cbd5e1);border-radius:999px;padding:5px 8px;font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--muted,#64748b);background:var(--panel,#fff)}',
+ '#omodos-superadmin-digitaltwin-lite .omodos-dtl-frame{height:min(790px,72vh);min-height:450px;background:#e8eef2;position:relative}',
+ '#omodos-superadmin-digitaltwin-lite iframe{display:block;width:100%;height:100%;border:0;background:#e8eef2}',
+ '#omodos-superadmin-digitaltwin-lite .omodos-dtl-footer{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 13px;border-top:1px solid var(--line,#d9e2ea);font-size:10px;line-height:1.45;color:var(--muted,#64748b)}',
+ '#omodos-superadmin-digitaltwin-lite #omodos-dtl-status-note{font-weight:750;color:var(--text,#243849)}',
+ '#view-dashboard.superadmin-digitaltwin-active .topbar .sub{max-width:700px}',
+ '@media(max-width:767px){#omodos-superadmin-digitaltwin-lite{margin:8px 0 12px;border-radius:11px}#omodos-superadmin-digitaltwin-lite .omodos-dtl-head{padding:10px 11px;gap:6px}#omodos-superadmin-digitaltwin-lite .omodos-dtl-head strong{font-size:13px}#omodos-superadmin-digitaltwin-lite .omodos-dtl-head small{font-size:10px}#omodos-superadmin-digitaltwin-lite .omodos-dtl-chip{font-size:8px;padding:4px 6px}#omodos-superadmin-digitaltwin-lite .omodos-dtl-frame{height:min(720px,68vh);min-height:360px}#omodos-superadmin-digitaltwin-lite .omodos-dtl-footer{padding:8px 10px;font-size:9px}}'
+ ].join('');
+ if(!document.getElementById(css.id))document.head.appendChild(css);
+ topbar=home.querySelector(':scope > .topbar');
+ const statusTitle=home.querySelector('.home-status-title');
+ if(topbar&&topbar.parentNode)topbar.parentNode.insertBefore(panel,topbar.nextSibling);
+ else if(statusTitle&&statusTitle.parentNode)statusTitle.parentNode.insertBefore(panel,statusTitle);
+ else home.appendChild(panel);
+ frame=panel.querySelector('iframe');
+ note=panel.querySelector('#omodos-dtl-status-note');
+ frame.addEventListener('load',()=>{if(superadmin_()&&activeHome_()&&lastFrameSrc===TWIN_URL){if(note)note.textContent='Menunggu kesiapan scene dan pemetaan status mesin…';scheduleStatusSync_(350);}});
+ frame.addEventListener('error',()=>{if(note)note.textContent='Tampilan 3D belum dapat dimuat. Periksa deployment DigitalTwin.';});
+}
+function setFrameActive_(active){
+ if(!frame)return;
+ if(active&&superadmin_()){
+  if(lastFrameSrc!==TWIN_URL){
+   lastFrameSrc=TWIN_URL;
+   lastStatusSignature='';
+   lastMappedSummary='';
+   frame.src=TWIN_URL;
+   if(note)note.textContent='Memuat model pabrik dan menyiapkan status mesin…';
+   setTimeout(()=>{if(lastFrameSrc===TWIN_URL&&note&&note.textContent==='Memuat model pabrik dan menyiapkan status mesin…')note.textContent='Masih memuat DigitalTwin. Pastikan rilis mode OMODOS Lite sudah aktif.';},25000);
+  }else scheduleStatusSync_(100);
+ }else if(lastFrameSrc){
+  lastFrameSrc='';
+  lastStatusSignature='';
+  frame.removeAttribute('src');
+  if(note)note.textContent=superadmin_()?'Tampilan 3D dijeda saat meninggalkan beranda.':'';
+ }
+}
+function applyHomeMode_(){
+ if(!home)return;
+ const allowed=superadmin_();
+ ensurePanel_();
+ if(!panel)return;
+ home.classList.toggle('superadmin-digitaltwin-active',allowed);
+ if(topbar){
+  const h1=topbar.querySelector('h1'),sub=topbar.querySelector('.sub');
+  if(h1){if(!originalTitle)originalTitle=h1.textContent;h1.textContent=allowed?'Factory Digital Twin':originalTitle;}
+  if(sub){if(!originalSubtitle)originalSubtitle=sub.textContent;sub.textContent=allowed?'Seluruh mesin dan area pabrik dalam tampilan 3D statis; status memakai data OMODOS yang sedang tersedia.':originalSubtitle;}
+ }
+ setFrameActive_(allowed&&activeHome_());
+ if(allowed&&activeHome_)scheduleStatusSync_(180);
+}
+function onTwinMessage_(event){
+ if(!frame||event.source!==frame.contentWindow||event.origin!==TWIN_ORIGIN||!superadmin_())return;
+ const data=event.data;if(!data||typeof data.type!=='string'||data.version!==1)return;
+ if(data.type===READY_TYPE){
+  lastStatusSignature='';
+  if(note)note.textContent='Visualisasi 3D siap · menyinkronkan status mesin…';
+  scheduleStatusSync_(100);
+ }else if(data.type===MAPPING_TYPE){
+  const total=Number(data.total)||0,mapped=Number(data.mapped)||0,unmapped=Array.isArray(data.unmapped)?data.unmapped:[];
+  const summary=mapped+'/'+total+' status mesin terpasang pada model 3D';
+  if(summary!==lastMappedSummary){
+   lastMappedSummary=summary;
+   if(note)note.textContent=total?summary+(unmapped.length?' · '+Math.max(0,total-mapped)+' belum dapat dipetakan tanpa menebak.':' · semua terpetakan.'):'Menunggu data status mesin…';
+   if(note)note.title=unmapped.slice(0,16).map(x=>(x.code||'-')+' — '+(x.name||'-')+': '+(x.reason||'')).join('\n');
+  }
+ }
+}
+function watchHome_(){
+ home=document.getElementById('view-dashboard');
+ if(!home)return;
+ ensurePanel_();
+ const base=window.renderDashboardView;
+ if(typeof base==='function'&&!base.__omodosTwinLiteSync){
+  const wrapped=function(){
+   const result=base.apply(this,arguments);
+   scheduleStatusSync_(120);
+   if(!applyHomeMode_.__scheduled)applyHomeMode_();
+   return result;
+  };
+  wrapped.__omodosTwinLiteSync=true;
+  window.renderDashboardView=wrapped;
+ }
+ if(!window.__omodosTwinLiteMessageBound){
+  window.__omodosTwinLiteMessageBound=true;
+  window.addEventListener('message',onTwinMessage_);
+ }
+ if(!roleObserver){
+  roleObserver=new MutationObserver(()=>{applyHomeMode_();});
+  roleObserver.observe(home,{attributes:true,attributeFilter:['class']});
+ }
+ applyHomeMode_();
+}
+function statusHeartbeat_(){
+ try{
+  if(superadmin_()&&activeHome_()){safeSendStatuses_();}
+  applyHomeMode_();
+ }catch(e){}
+ setTimeout(statusHeartbeat_,9000);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watchHome_,{once:true});else watchHome_();
+setTimeout(statusHeartbeat_,900);
+})();
