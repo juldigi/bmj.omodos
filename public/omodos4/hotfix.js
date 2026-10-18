@@ -5368,6 +5368,7 @@ if(typeof originalAuthFailure==='function'){
     style.id = 'omodos-dt-lite-css';
     style.textContent = [
       '#view-dashboard.omodos-superadmin-twin .home-status-title,#view-dashboard.omodos-superadmin-twin #dash-grid,#view-dashboard.omodos-superadmin-twin #home-below{display:none!important}',
+      '#view-dashboard.omodos-superadmin-twin #home-mesin-filter,#view-dashboard.omodos-superadmin-twin #btn-lc-priority-only,#view-dashboard.omodos-superadmin-twin #btn-refresh-dashboard{display:none!important}',
       '#view-dashboard.omodos-superadmin-twin{box-sizing:border-box}',
       '#view-dashboard.omodos-superadmin-twin .topbar{margin-bottom:8px}',
       '.omodos-dt-lite-shell{display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 136px);min-height:390px;max-height:1000px;box-sizing:border-box;overflow:hidden}',
