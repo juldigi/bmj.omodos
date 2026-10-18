@@ -4977,3 +4977,51 @@ function guardForm(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',guardForm,{once:true});else guardForm();
 new MutationObserver(guardForm).observe(document.documentElement,{subtree:true,childList:true});
 })();
+
+
+/* OMODOS_REVIEW_FIXES_20261018_V7
+   Hard block legacy landscape/fullscreen requests on mobile at the browser API
+   boundary. The old visibilitychange and first-click listeners call a lexical
+   helper, so replacing only window.aktifkanFullscreen is not sufficient. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261018_V7__)return;
+window.__OMODOS_REVIEW_FIXES_20261018_V7__=true;
+function isMobile(){
+  try{return matchMedia('(max-width: 767px), (pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);}
+  catch(e){return innerWidth<768;}
+}
+try{
+  const orientation=screen.orientation;
+  if(orientation&&typeof orientation.lock==='function'&&!orientation.lock.__omodosOrientationGuardV7){
+    const original=orientation.lock.bind(orientation);
+    const guarded=function(value){
+      if(isMobile()&&/landscape/i.test(String(value||'')))return Promise.resolve();
+      return original(value);
+    };
+    guarded.__omodosOrientationGuardV7=true;
+    try{Object.defineProperty(orientation,'lock',{configurable:true,writable:true,value:guarded});}
+    catch(e){try{orientation.lock=guarded;}catch(ignore){}}
+  }
+}catch(e){}
+try{
+  const proto=Element.prototype;
+  const original=proto.requestFullscreen;
+  if(typeof original==='function'&&!original.__omodosFullscreenGuardV7){
+    const guarded=function(){
+      if(isMobile())return Promise.resolve();
+      return original.apply(this,arguments);
+    };
+    guarded.__omodosFullscreenGuardV7=true;
+    Object.defineProperty(proto,'requestFullscreen',{configurable:true,writable:true,value:guarded});
+  }
+}catch(e){}
+function unlockMobile(){
+  if(!isMobile())return;
+  try{if(screen.orientation&&typeof screen.orientation.unlock==='function')screen.orientation.unlock();}catch(e){}
+}
+unlockMobile();
+window.addEventListener('pageshow',unlockMobile,{passive:true});
+window.addEventListener('orientationchange',unlockMobile,{passive:true});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')unlockMobile();},{passive:true});
+})();
