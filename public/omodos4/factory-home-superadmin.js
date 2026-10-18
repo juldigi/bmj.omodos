@@ -85,7 +85,7 @@ function cleanup(){document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.rem
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
-  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><p class="ofh-footnote">Status bersumber dari catatan logbook terakhir yang tersimpan di OMODOS, bukan telemetry sensor secara langsung.</p>';
+  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><p class="ofh-footnote">Status memakai catatan terakhir Logbook atau Patrol yang sudah tersimpan di OMODOS, bukan telemetry sensor secara langsung.</p>';
   view.prepend(root);return root;
 }
 function sendStatuses(force){
