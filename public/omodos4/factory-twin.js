@@ -16,8 +16,10 @@ const STYLE_HREF='/omodos4/factory-twin.css';
 let panel=null,frame=null,loaded=false,lastEligible=false,lastPush=0,observer=null;
 
 function allowed(){
- try{return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed()===true);}
- catch(e){return false;}
+ try{
+  if(window.location.origin!=='https://omodos.juldigi.workers.dev')return false;
+  return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed()===true);
+ }catch(e){return false;}
 }
 function homeVisible(){
  const home=document.getElementById('view-dashboard');
