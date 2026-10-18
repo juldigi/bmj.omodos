@@ -828,7 +828,7 @@ jobs:
 
                 PENDING_FILES = [];
                 let form = fillRequired();
-                form.dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+                form.dispatchEvent(new SubmitEvent('submit', { bubbles:true, cancelable:true, submitter:document.getElementById('btn-submit') }));
                 await waitForCalls(1);
 
                 PENDING_FILES = [{
