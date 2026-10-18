@@ -77,8 +77,14 @@ function sendStatus(force){
 function onMessage(event){
  if(event.origin!==TWIN_ORIGIN||!iframe||event.source!==iframe.contentWindow)return;
  const data=event.data;
- if(!data||data.type!==READY_MESSAGE)return;
- sendStatus(true);
+ if(!data)return;
+ if(data.type==='BMJ_TWIN_LITE_AUTH_REQUEST_V1'){
+  if(!allowed())return;
+  try{iframe.contentWindow.postMessage({type:'BMJ_TWIN_LITE_AUTHORIZED_V1'},TWIN_ORIGIN);}catch(_){}
+  sendStatus(true);
+  return;
+ }
+ if(data.type===READY_MESSAGE)sendStatus(true);
 }
 function mount(){
  if(!allowed())return false;
