@@ -122,8 +122,10 @@ function unmount(){
 function checkPermissionAndMount(){
  if(!allowed()){unmount();return;}
  const active=document.getElementById('view-dashboard')?.classList.contains('active');
- if(active&&!document.getElementById(WRAP_ID))mount();
- else if(document.getElementById(WRAP_ID))sendStatus(false);
+ const mounted=!!document.getElementById(WRAP_ID);
+ if(active&&!mounted)mount();
+ else if(active&&mounted)sendStatus(false);
+ else if(!active&&mounted)unmount();
 }
 function boot(){
  window.addEventListener('message',onMessage);
