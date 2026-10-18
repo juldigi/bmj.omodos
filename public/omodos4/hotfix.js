@@ -4944,3 +4944,36 @@ window.addEventListener('pagehide',flushLogbookDraft,{capture:true});
 window.addEventListener('beforeunload',flushLogbookDraft,{capture:true});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushLogbookDraft();},{capture:true});
 })();
+
+
+/* OMODOS_REVIEW_FIXES_20261018_V6
+   Prevent accidental native form submission from helper buttons.
+   Only the explicit "Simpan Logbook" control may submit the logbook form.
+   Draft persistence remains handled by the existing draft system and V5. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261018_V6__)return;
+window.__OMODOS_REVIEW_FIXES_20261018_V6__=true;
+function guardForm(){
+  const form=document.getElementById('form-entry');
+  if(!form)return;
+  form.querySelectorAll('button:not([type])').forEach(button=>{
+    if(button.id==='btn-submit')return;
+    button.type='button';
+    button.dataset.omodosExplicitButtonType='1';
+  });
+  if(form.dataset.omodosSubmitGuard!=='1'){
+    form.dataset.omodosSubmitGuard='1';
+    form.addEventListener('submit',function(ev){
+      const submitter=ev.submitter;
+      if(submitter && submitter.id!=='btn-submit'){
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        if(typeof window.toast==='function')window.toast('Pengiriman form dibatalkan untuk mencegah submit tidak sengaja. Gunakan tombol Simpan Logbook.',true);
+      }
+    },true);
+  }
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',guardForm,{once:true});else guardForm();
+new MutationObserver(guardForm).observe(document.documentElement,{subtree:true,childList:true});
+})();
