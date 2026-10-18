@@ -1255,6 +1255,11 @@ jobs:
             console.log('[QA] training findings mobile + navigation');
             await page.setViewportSize({width:390,height:844});
             const training = await page.evaluate(() => {
+              /* The training/dashboard mobile check belongs to an ordinary account. */
+              CURRENT_USER = { username: 'qa-training-user', displayName: 'QA Training User', role: 'Admin' };
+              try { window.OMODOS_FACTORY_HOME_SYNC?.(); } catch (e) {}
+              document.querySelectorAll('#omodos-superadmin-factory-home').forEach(node => { const view=node.closest('.view'); node.remove(); if(view)view.classList.remove('omodos-superadmin-factory-home'); });
+              document.documentElement.classList.remove('omodos-superadmin-factory-home');
               document.getElementById('app-root').classList.add('unlocked');
               document.getElementById('login-gate').style.display='none';
               document.getElementById('app-splash').classList.remove('show','visible');
