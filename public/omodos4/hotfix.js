@@ -5130,3 +5130,16 @@ if(typeof originalAuthFailure==='function'){
   };
 }
 })();
+
+
+/* OMODOS_SUPERADMIN_DIGITALTWIN_LITE_LOADER_V1
+   Entry point is deliberately additive and permission enforcement lives in the module. */
+(function(){
+ 'use strict';
+ if(window.__OMODOS_DIGITALTWIN_LITE_SCRIPT_V1__)return;
+ window.__OMODOS_DIGITALTWIN_LITE_SCRIPT_V1__=true;
+ const script=document.createElement('script');
+ script.src='/omodos4/digitaltwin-lite.js?v=1';
+ script.defer=true;
+ document.head.appendChild(script);
+})();
