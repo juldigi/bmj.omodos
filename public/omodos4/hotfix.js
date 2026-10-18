@@ -5156,7 +5156,7 @@ function syncLoader(){
  script.src='/omodos4/factory-twin.js';
  script.defer=true;
  script.dataset.omodosFactoryTwin='1';
- script.onerror=()=>{scriptStarted=false;try{if(typeof toast==='function')toast('Modul Factory Status Twin belum dapat dimuat.',true);}catch(e){}};
+ script.onerror=()=>{script.remove();scriptStarted=false;try{if(typeof toast==='function')toast('Modul Factory Status Twin belum dapat dimuat.',true);}catch(e){}};
  script.onload=()=>{scriptStarted=true;};
  scriptStarted=true;
  (document.body||document.head||document.documentElement).appendChild(script);
