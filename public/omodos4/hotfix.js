@@ -5143,8 +5143,10 @@ if(window.__OMODOS_FACTORY_TWIN_LOADER_V1__)return;
 window.__OMODOS_FACTORY_TWIN_LOADER_V1__=true;
 let scriptStarted=false,observer=null;
 function superadmin(){
- try{return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed()===true);}
- catch(e){return false;}
+ try{
+  if(window.location.origin!=='https://omodos.juldigi.workers.dev')return false;
+  return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed()===true);
+ }catch(e){return false;}
 }
 function syncLoader(){
  if(!superadmin()){
