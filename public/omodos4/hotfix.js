@@ -5160,7 +5160,7 @@ if(typeof originalAuthFailure==='function'){
   if(window.__OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1__) return;
   window.__OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1__ = true;
 
-  var TWIN_URL = 'https://juldigi0107.github.io/digitaltwin/?mode=omodos-lite&embed=omodos&release=1';
+  var TWIN_URL = 'https://juldigi0107.github.io/digitaltwin/?embed=omodos-status&release=2';
   var TWIN_ORIGIN = 'https://juldigi0107.github.io';
   var REFRESH_MS = 12000;
   var homeView = null;
@@ -5220,15 +5220,23 @@ if(typeof originalAuthFailure==='function'){
   }
 
   function postStatuses(force){
-    if(!frame || !frame.contentWindow || !ready || !isAdmin()) return;
+    if(!frame || !frame.contentWindow || !isAdmin()) return;
     if(!homeView || !homeView.classList.contains('active')) return;
     var machines = currentMachinePayload();
+    var records = machines.map(function(machine,index){
+      var label = machine.status === 'kritikal' ? 'Kritikal' :
+        machine.status === 'perhatian' ? 'Perlu Perhatian' :
+        machine.status === 'normal' ? 'Normal' : 'Belum Ada Data';
+      return {code:machine.code,name:machine.name,status:label,
+        date:machine.timestamp ? new Date(machine.timestamp).toISOString() : '',
+        index:index,source:machine.source||''};
+    });
     var serialized;
-    try { serialized = JSON.stringify(machines); } catch(e) { return; }
+    try { serialized = JSON.stringify(records); } catch(e) { return; }
     if(!force && serialized === previousSignature) return;
     previousSignature = serialized;
     try {
-      frame.contentWindow.postMessage({type:'OMODOS_MACHINE_STATUS_V1',machines:machines}, TWIN_ORIGIN);
+      frame.contentWindow.postMessage({type:'OMODOS_FACTORY_STATUS',version:1,records:records}, TWIN_ORIGIN);
     } catch(e) {}
   }
 
@@ -5386,7 +5394,7 @@ if(typeof originalAuthFailure==='function'){
   window.addEventListener('message',function(event){
     if(event.origin !== TWIN_ORIGIN || !frame || event.source !== frame.contentWindow) return;
     var data = event.data;
-    if(!data || data.type !== 'OMODOS_LITE_READY_V1') return;
+    if(!data || data.type !== 'OMODOS_FACTORY_STATUS_READY' || data.version !== 1) return;
     ready = true;
     lastErrorShown = false;
     if(failureTimer){clearTimeout(failureTimer);failureTimer=null;}
