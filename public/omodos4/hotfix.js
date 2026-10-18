@@ -5063,7 +5063,7 @@ const originalLogout=window.logoutUser;
 if(typeof originalLogout==='function'){
   window.logoutUser=function(options){
     options=options||{};
-    if(options.reload!==false)return originalLogout.apply(this,arguments);
+    if(options.reload !== false)return originalLogout.apply(this,arguments);
     try{
       if(typeof deactivateAccountDataCaches_==='function')
         deactivateAccountDataCaches_(CURRENT_USER&&CURRENT_USER.username);
