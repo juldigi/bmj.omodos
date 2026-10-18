@@ -5049,3 +5049,84 @@ function bind(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
 new MutationObserver(bind).observe(document.documentElement,{subtree:true,childList:true});
 })();
+
+
+/* OMODOS_REVIEW_FIXES_20261018_V9
+   Ignore stale auth failures and avoid forced reload when the current session
+   expires. Explicit user logout retains the original reload behavior. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261018_V9__)return;
+window.__OMODOS_REVIEW_FIXES_20261018_V9__=true;
+
+const originalLogout=window.logoutUser;
+if(typeof originalLogout==='function'){
+  window.logoutUser=function(options){
+    options=options||{};
+    if(options.reload!==false)return originalLogout.apply(this,arguments);
+    try{
+      if(typeof deactivateAccountDataCaches_==='function')
+        deactivateAccountDataCaches_(CURRENT_USER&&CURRENT_USER.username);
+    }catch(e){
+      if(typeof toast==='function')toast('Sesi belum dapat ditutup dengan aman karena cache lokal gagal diamankan. Coba lagi.',true);
+      return;
+    }
+    const tokenToRevoke=SESSION_TOKEN;
+    if(tokenToRevoke&&WEB_APP_URL){
+      fetch(WEB_APP_URL,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({action:'logout',sessionToken:tokenToRevoke}),
+        keepalive:true
+      }).catch(()=>{});
+    }
+    CURRENT_USER=null;
+    SESSION_TOKEN='';
+    SESSION_EXPIRES_AT='';
+    PERMISSIONS={};
+    FEATURE_REGISTRY=[];
+    try{
+      localStorage.removeItem(SS_USER_KEY);
+      localStorage.removeItem(SS_TOKEN_KEY);
+      localStorage.removeItem(SS_TOKEN_EXP_KEY);
+      localStorage.removeItem(LS_PERM_KEY);
+      localStorage.removeItem(LS_FEATURES_KEY);
+    }catch(e){}
+    try{if(typeof resetSettingAuth==='function')resetSettingAuth();}catch(e){}
+    const gate=document.getElementById('login-gate');
+    const appRoot=document.getElementById('app-root');
+    if(appRoot)appRoot.classList.remove('unlocked','dash-mode','menu-visible');
+    if(gate){gate.style.display='';gate.style.opacity='1';}
+    const form=document.getElementById('form-login');
+    if(form)form.reset();
+    const errEl=document.getElementById('login-err');
+    if(errEl)errEl.textContent='';
+    const userField=document.getElementById('login-username');
+    if(userField)setTimeout(()=>userField.focus(),50);
+    try{READY_READS.clear();ACTIVE_READS.clear();READ_GENERATION++;}catch(e){}
+    /* No location.reload(): show the login gate in the current document. */
+  };
+}
+
+const originalAuthFailure=window.handleApiAuthFailure_;
+if(typeof originalAuthFailure==='function'){
+  window.handleApiAuthFailure_=function(message,requestToken){
+    const msg=String(message||'');
+    if(!/AUTH_REQUIRED|SESSION_INVALID|SESSION_EXPIRED|ACCOUNT_INACTIVE/.test(msg))
+      return originalAuthFailure.apply(this,arguments);
+
+    const activeToken=(SETTING_AUTH_OK&&SETTING_SESSION_TOKEN)?SETTING_SESSION_TOKEN:SESSION_TOKEN;
+    /* Ignore late failures from a request made under an older session. */
+    if(requestToken && requestToken !== SESSION_TOKEN && requestToken !== SETTING_SESSION_TOKEN)return;
+
+    if(SETTING_AUTH_OK&&SETTING_SESSION_TOKEN&&requestToken===SETTING_SESSION_TOKEN){
+      resetSettingAuth();
+      return;
+    }
+    if(requestToken && requestToken !== activeToken)return;
+    if(typeof window.logoutUser==='function')
+      return window.logoutUser({reload:false,reason:'session-expired'});
+    return originalAuthFailure.apply(this,arguments);
+  };
+}
+})();
