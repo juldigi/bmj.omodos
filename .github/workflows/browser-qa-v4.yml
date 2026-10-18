@@ -1571,6 +1571,12 @@ jobs:
                 if (!out.unsavedDraftGuard.prevented || !out.unsavedDraftGuard.listenerInstalled) {
                   throw new Error('Unsaved logbook draft navigation guard did not fire');
                 }
+                const implicitSubmit = new SubmitEvent('submit', { bubbles: true, cancelable: true, submitter: null });
+                form.dispatchEvent(implicitSubmit);
+                out.implicitSubmitGuard = { prevented: implicitSubmit.defaultPrevented, submitter: implicitSubmit.submitter };
+                if (!out.implicitSubmitGuard.prevented) {
+                  throw new Error('Implicit form submit without explicit button was not blocked');
+                }
                 form.dispatchEvent(new Event('reset', { bubbles: true }));
                 return out;
               } finally {
