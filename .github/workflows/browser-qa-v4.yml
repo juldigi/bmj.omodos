@@ -40,6 +40,7 @@ jobs:
           grep -Fq "window.location.origin!=='https://omodos.juldigi.workers.dev'" public/omodos4/factory-twin.js
           grep -Fq "window.location.origin!=='https://omodos.juldigi.workers.dev'" public/omodos4/hotfix.js
           grep -Fq 'machineLatestStatusSnapshot_' public/omodos4/factory-twin.js
+          ! grep -Fq 'snap&&snap.description' public/omodos4/factory-twin.js
 
           node <<'NODE'
           const fs=require('fs');
