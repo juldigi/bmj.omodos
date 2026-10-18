@@ -5158,8 +5158,11 @@ if(typeof originalAuthFailure==='function'){
   var lastErrorShown = false;
 
   function isAdmin(){
-    try { return typeof isSuperadmin === 'function' && isSuperadmin() === true; }
-    catch(e) { return false; }
+    try {
+      // Do not activate this production-only iframe during local browser QA or previews.
+      return location.protocol === 'https:' && location.hostname === 'omodos.juldigi.workers.dev' &&
+        typeof isSuperadmin === 'function' && isSuperadmin() === true;
+    } catch(e) { return false; }
   }
 
   function statusKey(value){
@@ -5352,7 +5355,7 @@ if(typeof originalAuthFailure==='function'){
       '.omodos-dt-lite-loading strong{font-size:14px;font-weight:800}',
       '.omodos-dt-lite-load-detail{max-width:460px;font-size:12px;line-height:1.5;color:#526879}',
       '.omodos-dt-lite-spinner{width:26px;height:26px;border:3px solid #c7d8e4;border-top-color:#1683b8;border-radius:50%;animation:omodosDtLiteSpin .9s linear infinite}',
-      '.omodos-dt-lite-retry{margin-top:4px;padding:9px 12px;border:1px solid #b7d2e4;border-radius:8px;background:white;color:#174565;font:700 12px inherit;cursor:pointer}',
+      '.omodos-dt-lite-retry{margin-top:4px;padding:9px 12px;border:1px solid #b7d2e4;border-radius:8px;background:white;color:#174565;font:700 12px system-ui,sans-serif;cursor:pointer}',
       '@keyframes omodosDtLiteSpin{to{transform:rotate(360deg)}}',
       '@media(max-width:767px){.omodos-dt-lite-shell{height:calc(100dvh - 132px);min-height:350px;gap:5px}.omodos-dt-lite-heading{min-height:30px}.omodos-dt-lite-copy strong{font-size:12px}.omodos-dt-lite-copy span{font-size:10px}.omodos-dt-lite-readonly{font-size:8px;padding:4px 6px}.omodos-dt-lite-stage{border-radius:10px}}',
       '@media(prefers-reduced-motion:reduce){.omodos-dt-lite-spinner{animation:none}}'
