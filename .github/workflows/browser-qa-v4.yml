@@ -1518,7 +1518,7 @@ jobs:
                 });
                 form.querySelector('[name="jenisPekerjaan"]').value='Instalasi';
                 WEB_APP_URL='https://qa.invalid';apiPost=async p=>{calls.push(JSON.parse(JSON.stringify(p)));return {ok:true,id:'QA-AREA'};};loadAll=async()=>({ok:true});groqAutoFixEntryFields=async()=>0;
-                form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+                form.dispatchEvent(new SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:document.getElementById('btn-submit')}));
                 for(let i=0;i<50&&!calls.length;i++)await new Promise(r=>setTimeout(r,10));
                 if(!calls.length)throw new Error('Area submit blocked by validation');
                 const e=calls[0].entry;
