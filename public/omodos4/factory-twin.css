@@ -1,0 +1,24 @@
+/* OMODOS Factory Status Twin — only mounted for verified Superadmin sessions. */
+#omodos-factory-twin{display:none;flex-direction:column;gap:10px;width:100%;height:calc(100dvh - 112px);min-height:480px;max-height:1100px;padding:0;margin:0;overflow:hidden;color:var(--text,#eaf0f4)}
+body.omodos-factory-twin-active #view-dashboard>:not(#omodos-factory-twin){display:none!important}
+body.omodos-factory-twin-active #omodos-factory-twin{display:flex!important}
+#omodos-factory-twin .oft-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;padding:3px 2px}
+#omodos-factory-twin .oft-title{display:flex;align-items:center;gap:10px;min-width:0}
+#omodos-factory-twin .oft-mark{display:grid;place-items:center;width:36px;height:36px;flex:0 0 36px;border-radius:10px;background:#dce9e7;color:#17383a;font-size:11px;font-weight:900;letter-spacing:.03em}
+#omodos-factory-twin h2{font-size:clamp(16px,2vw,21px);font-weight:750;letter-spacing:-.025em;line-height:1.2;margin:0;color:var(--text,#eaf0f4)}
+#omodos-factory-twin .oft-sub{font-size:11px;line-height:1.4;color:var(--muted,#91a0aa);margin-top:4px}
+#omodos-factory-twin .oft-role{flex:0 0 auto;border:1px solid rgba(74,163,132,.35);background:rgba(74,163,132,.12);color:#4fc29a;padding:6px 9px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.06em}
+#omodos-factory-twin .oft-frame-wrap{position:relative;display:flex;flex:1 1 auto;min-height:0;border:1px solid var(--line,#2b3b45);border-radius:14px;overflow:hidden;background:#10181e;box-shadow:0 8px 24px rgba(0,0,0,.10)}
+#omodos-factory-twin .oft-frame{display:block;border:0;width:100%;height:100%;min-height:0;background:#10181e}
+#omodos-factory-twin .oft-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;background:var(--surface,#162129);color:var(--muted,#9fb0b9);padding:22px;font-size:12px;pointer-events:none}
+#omodos-factory-twin .oft-loading[hidden]{display:none}
+@media(max-width:767px){
+ #omodos-factory-twin{height:calc(100dvh - 104px);min-height:390px;gap:7px}
+ #omodos-factory-twin .oft-head{gap:8px}
+ #omodos-factory-twin .oft-mark{width:30px;height:30px;flex-basis:30px;border-radius:8px;font-size:9px}
+ #omodos-factory-twin h2{font-size:15px}
+ #omodos-factory-twin .oft-sub{font-size:9px;max-width:245px}
+ #omodos-factory-twin .oft-role{font-size:9px;padding:5px 7px}
+ #omodos-factory-twin .oft-frame-wrap{border-radius:10px}
+}
+@media(prefers-reduced-motion:reduce){#omodos-factory-twin *{scroll-behavior:auto!important}}
