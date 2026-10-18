@@ -32,15 +32,26 @@ function latestRecords(){
     normal:'Normal',
     none:'Belum Ada Data'
   }[key]||'Belum Ada Data');
+  const codeCounts=new Map();
+  master.forEach(row=>{
+    const code=validCode(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode']));
+    if(!code)return;
+    const key=normalizeKey(code);
+    codeCounts.set(key,(codeCounts.get(key)||0)+1);
+  });
   const records=[];
   master.forEach((row,index)=>{
     const code=validCode(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode']));
     const name=String(pick(row,['Nama Mesin','NamaMesin','Machine Name','MachineName','Machine','Mesin','Nama Aset'])||'').trim();
     if(!code&&!name)return;
+    // The OMODOS status helper gives code matches precedence over name. When a
+    // master code is duplicated, force exact machine-name matching so two
+    // different assets do not inherit the same machine's latest status.
+    const snapshotCode=code&&codeCounts.get(normalizeKey(code))===1?code:'';
     let snapshot=null;
     try{
       if(typeof machineLatestStatusSnapshot_==='function')
-        snapshot=machineLatestStatusSnapshot_({kode:code,nama:name});
+        snapshot=machineLatestStatusSnapshot_({kode:snapshotCode,nama:name});
     }catch(e){}
     const key=String(snapshot?.key||'none');
     const timestamp=Number(snapshot?.ts);
