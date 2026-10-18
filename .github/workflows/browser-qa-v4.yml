@@ -847,7 +847,7 @@ jobs:
                   _isVideo:false
                 }];
                 form = fillRequired();
-                form.dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+                form.dispatchEvent(new SubmitEvent('submit', { bubbles:true, cancelable:true, submitter:document.getElementById('btn-submit') }));
                 await waitForCalls(2);
 
                 const noPhoto = calls[0] || null;
