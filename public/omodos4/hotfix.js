@@ -5130,3 +5130,259 @@ if(typeof originalAuthFailure==='function'){
   };
 }
 })();
+
+
+/* OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1
+   Superadmin-only home visualization. OMODOS remains the source of status data;
+   DigitalTwin is used only as a read-only 3D scene, not as a second data store. */
+(function(){
+  'use strict';
+  if(window.__OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1__) return;
+  window.__OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1__ = true;
+
+  var TWIN_URL = 'https://juldigi0107.github.io/digitaltwin/?mode=omodos-lite&embed=omodos&release=1';
+  var TWIN_ORIGIN = 'https://juldigi0107.github.io';
+  var REFRESH_MS = 12000;
+  var homeView = null;
+  var mount = null;
+  var frame = null;
+  var loading = null;
+  var loadState = 'idle';
+  var ready = false;
+  var previousSignature = '';
+  var previousHeading = null;
+  var previousSubheading = null;
+  var refreshTimer = null;
+  var accessTimer = null;
+  var failureTimer = null;
+  var lastErrorShown = false;
+
+  function isAdmin(){
+    try { return typeof isSuperadmin === 'function' && isSuperadmin() === true; }
+    catch(e) { return false; }
+  }
+
+  function statusKey(value){
+    return ['kritikal','perhatian','normal'].indexOf(String(value||'').toLowerCase()) >= 0
+      ? String(value).toLowerCase() : 'none';
+  }
+
+  function asMachineRecord(row){
+    if(!row || typeof row !== 'object') return null;
+    var code = String(row['Kode Mesin'] || row.kode || '').trim();
+    var name = String(row['Nama Mesin'] || row.nama || '').trim();
+    if(!code && !name) return null;
+    var snap = {key:'none',source:'none',sourceLabel:'Belum ada sumber terbaru',ts:null};
+    try {
+      if(typeof machineLatestStatusSnapshot_ === 'function')
+        snap = machineLatestStatusSnapshot_({kode:code,nama:name}) || snap;
+    } catch(e) {}
+    var ts = Number(snap.ts);
+    return {
+      code: code,
+      name: name || code,
+      status: statusKey(snap.key),
+      source: String(snap.sourceLabel || (snap.source === 'none' ? '' : snap.source) || ''),
+      timestamp: Number.isFinite(ts) && ts > 0 ? ts : null
+    };
+  }
+
+  function currentMachinePayload(){
+    try {
+      if(typeof MACHINES === 'undefined' || !Array.isArray(MACHINES)) return [];
+      return MACHINES.map(asMachineRecord).filter(Boolean);
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function postStatuses(force){
+    if(!frame || !frame.contentWindow || !ready || !isAdmin()) return;
+    if(!homeView || !homeView.classList.contains('active')) return;
+    var machines = currentMachinePayload();
+    var serialized;
+    try { serialized = JSON.stringify(machines); } catch(e) { return; }
+    if(!force && serialized === previousSignature) return;
+    previousSignature = serialized;
+    try {
+      frame.contentWindow.postMessage({type:'OMODOS_MACHINE_STATUS_V1',machines:machines}, TWIN_ORIGIN);
+    } catch(e) {}
+  }
+
+  function setLoadState(state,message){
+    loadState = state;
+    if(!loading) return;
+    loading.dataset.state = state;
+    var title = loading.querySelector('.omodos-dt-lite-load-title');
+    var detail = loading.querySelector('.omodos-dt-lite-load-detail');
+    var retry = loading.querySelector('.omodos-dt-lite-retry');
+    if(title) title.textContent = state === 'failed' ? 'Tampilan 3D belum siap' : 'Menyiapkan tampilan 3D pabrik';
+    if(detail) detail.textContent = message || (state === 'failed'
+      ? 'Modul DigitalTwin belum mengirim sinyal siap. Periksa deployment GitHub Pages atau muat ulang tampilan.'
+      : 'Memuat mesin, mematikan lapisan bangunan, lalu memasang status OMODOS.');
+    if(retry) retry.hidden = state !== 'failed';
+    loading.hidden = state === 'ready';
+    if(mount) mount.dataset.twinState = state;
+  }
+
+  function restoreHome(){
+    if(homeView) homeView.classList.remove('omodos-superadmin-twin');
+    if(mount) mount.remove();
+    mount = null; frame = null; loading = null;
+    ready = false; loadState = 'idle'; previousSignature = '';
+    if(failureTimer){ clearTimeout(failureTimer); failureTimer = null; }
+    if(homeView) {
+      var h1 = homeView.querySelector('.topbar h1');
+      var sub = homeView.querySelector('.topbar .sub');
+      if(h1 && previousHeading !== null) h1.textContent = previousHeading;
+      if(sub && previousSubheading !== null) sub.textContent = previousSubheading;
+    }
+    previousHeading = null; previousSubheading = null;
+  }
+
+  function createHomeTwin(){
+    if(!homeView || mount) return;
+    var topbar = homeView.querySelector('.topbar');
+    if(!topbar) return;
+
+    var h1 = topbar.querySelector('h1');
+    var sub = topbar.querySelector('.sub');
+    previousHeading = h1 ? h1.textContent : null;
+    previousSubheading = sub ? sub.textContent : null;
+
+    mount = document.createElement('section');
+    mount.className = 'omodos-dt-lite-shell';
+    mount.id = 'omodos-dt-lite-shell';
+    mount.setAttribute('aria-label','Visualisasi 3D statis pabrik dan status mesin');
+
+    var header = document.createElement('div');
+    header.className = 'omodos-dt-lite-heading';
+    var copy = document.createElement('div');
+    copy.className = 'omodos-dt-lite-copy';
+    var title = document.createElement('strong');
+    title.textContent = 'Pabrik · 3D Status Mesin';
+    var description = document.createElement('span');
+    description.textContent = 'Status dibaca dari Logbook dan Patrol OMODOS. Tampilan 3D hanya untuk pemantauan.';
+    copy.appendChild(title); copy.appendChild(description);
+    var badge = document.createElement('span');
+    badge.className = 'omodos-dt-lite-readonly';
+    badge.textContent = 'READ-ONLY';
+    header.appendChild(copy); header.appendChild(badge);
+
+    var stage = document.createElement('div');
+    stage.className = 'omodos-dt-lite-stage';
+    frame = document.createElement('iframe');
+    frame.title = 'Tampilan 3D statis pabrik BMJ dengan status mesin OMODOS';
+    frame.src = TWIN_URL;
+    frame.loading = 'eager';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    frame.allow = 'fullscreen';
+    frame.setAttribute('aria-label','Model 3D statis tanpa struktur bangunan, dengan status di atas mesin');
+    frame.addEventListener('load',function(){
+      if(!ready) setLoadState('loading','Aset halaman diterima. Menunggu mesin 3D dan data status siap.');
+      postStatuses(true);
+      if(failureTimer) clearTimeout(failureTimer);
+      failureTimer = setTimeout(function(){
+        if(!ready && mount && isAdmin() && homeView && homeView.classList.contains('active'))
+          setLoadState('failed');
+      },25000);
+    });
+    frame.addEventListener('error',function(){ if(!ready) setLoadState('failed','Halaman DigitalTwin gagal dimuat dari GitHub Pages.'); });
+
+    loading = document.createElement('div');
+    loading.className = 'omodos-dt-lite-loading';
+    loading.setAttribute('role','status');
+    var spinner = document.createElement('span');
+    spinner.className = 'omodos-dt-lite-spinner';
+    spinner.setAttribute('aria-hidden','true');
+    var loadTitle = document.createElement('strong');
+    loadTitle.className = 'omodos-dt-lite-load-title';
+    var loadDetail = document.createElement('span');
+    loadDetail.className = 'omodos-dt-lite-load-detail';
+    var retry = document.createElement('button');
+    retry.className = 'omodos-dt-lite-retry';
+    retry.type = 'button';
+    retry.textContent = 'Muat ulang tampilan 3D';
+    retry.hidden = true;
+    retry.addEventListener('click',function(){
+      ready = false; previousSignature = '';
+      setLoadState('loading','Mencoba memuat ulang halaman DigitalTwin.');
+      frame.src = TWIN_URL + '&retry=' + Date.now();
+    });
+    loading.appendChild(spinner); loading.appendChild(loadTitle); loading.appendChild(loadDetail); loading.appendChild(retry);
+    stage.appendChild(frame); stage.appendChild(loading);
+    mount.appendChild(header); mount.appendChild(stage);
+    topbar.insertAdjacentElement('afterend',mount);
+    homeView.classList.add('omodos-superadmin-twin');
+    if(h1) h1.textContent = 'Factory Digital Twin';
+    if(sub) sub.textContent = 'Pantau 3D statis dan status seluruh mesin BMJ dalam satu tampilan.';
+    setLoadState('loading');
+  }
+
+  function syncAccess(){
+    homeView = document.getElementById('view-dashboard');
+    if(!homeView) return;
+    var active = homeView.classList.contains('active');
+    if(!isAdmin() || !active){
+      if(mount) restoreHome();
+      return;
+    }
+    if(!mount) createHomeTwin();
+    if(mount && ready) postStatuses(false);
+  }
+
+  function addStyles(){
+    if(document.getElementById('omodos-dt-lite-css')) return;
+    var style = document.createElement('style');
+    style.id = 'omodos-dt-lite-css';
+    style.textContent = [
+      '#view-dashboard.omodos-superadmin-twin .home-status-title,#view-dashboard.omodos-superadmin-twin #dash-grid,#view-dashboard.omodos-superadmin-twin #home-below{display:none!important}',
+      '#view-dashboard.omodos-superadmin-twin{box-sizing:border-box}',
+      '#view-dashboard.omodos-superadmin-twin .topbar{margin-bottom:8px}',
+      '.omodos-dt-lite-shell{display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 136px);min-height:390px;max-height:1000px;box-sizing:border-box;overflow:hidden}',
+      '.omodos-dt-lite-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;min-height:32px;padding:2px 3px}',
+      '.omodos-dt-lite-copy{display:flex;flex-direction:column;gap:2px;min-width:0}',
+      '.omodos-dt-lite-copy strong{font-size:13px;font-weight:800;letter-spacing:.01em}',
+      '.omodos-dt-lite-copy span{font-size:11px;line-height:1.4;color:var(--text-dim,#718096)}',
+      '.omodos-dt-lite-readonly{flex:0 0 auto;padding:5px 8px;border:1px solid var(--line,#dce4ec);border-radius:7px;font-size:9px;line-height:1;font-weight:800;letter-spacing:.08em;color:var(--text-dim,#64748b)}',
+      '.omodos-dt-lite-stage{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid var(--line,#dce4ec);border-radius:14px;background:#e8eef2;box-shadow:0 6px 22px rgba(15,23,42,.08)}',
+      '.omodos-dt-lite-stage iframe{display:block;position:absolute;inset:0;width:100%;height:100%;border:0;background:#e8eef2}',
+      '.omodos-dt-lite-loading{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;color:#143044;background:rgba(239,245,249,.96);box-sizing:border-box}',
+      '.omodos-dt-lite-loading[hidden]{display:none!important}',
+      '.omodos-dt-lite-loading strong{font-size:14px;font-weight:800}',
+      '.omodos-dt-lite-load-detail{max-width:460px;font-size:12px;line-height:1.5;color:#526879}',
+      '.omodos-dt-lite-spinner{width:26px;height:26px;border:3px solid #c7d8e4;border-top-color:#1683b8;border-radius:50%;animation:omodosDtLiteSpin .9s linear infinite}',
+      '.omodos-dt-lite-retry{margin-top:4px;padding:9px 12px;border:1px solid #b7d2e4;border-radius:8px;background:white;color:#174565;font:700 12px inherit;cursor:pointer}',
+      '@keyframes omodosDtLiteSpin{to{transform:rotate(360deg)}}',
+      '@media(max-width:767px){.omodos-dt-lite-shell{height:calc(100dvh - 132px);min-height:350px;gap:5px}.omodos-dt-lite-heading{min-height:30px}.omodos-dt-lite-copy strong{font-size:12px}.omodos-dt-lite-copy span{font-size:10px}.omodos-dt-lite-readonly{font-size:8px;padding:4px 6px}.omodos-dt-lite-stage{border-radius:10px}}',
+      '@media(prefers-reduced-motion:reduce){.omodos-dt-lite-spinner{animation:none}}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  window.addEventListener('message',function(event){
+    if(event.origin !== TWIN_ORIGIN || !frame || event.source !== frame.contentWindow) return;
+    var data = event.data;
+    if(!data || data.type !== 'OMODOS_LITE_READY_V1') return;
+    ready = true;
+    lastErrorShown = false;
+    if(failureTimer){clearTimeout(failureTimer);failureTimer=null;}
+    setLoadState('ready');
+    postStatuses(true);
+  });
+
+  addStyles();
+  syncAccess();
+  accessTimer = setInterval(syncAccess,1500);
+  refreshTimer = setInterval(function(){ if(mount && ready) postStatuses(false); },REFRESH_MS);
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden && mount && ready) postStatuses(true);
+  });
+
+  window.OMODOSFactoryTwinLite = {
+    version:'1.0.0',
+    allowed:isAdmin,
+    refresh:function(){ postStatuses(true); },
+    state:function(){return {mounted:Boolean(mount),ready:ready,loadState:loadState};}
+  };
+})();
