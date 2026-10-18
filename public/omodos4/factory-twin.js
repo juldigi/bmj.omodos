@@ -77,7 +77,7 @@ function ensurePanel(){
  const title=document.createElement('div');title.className='oft-title';
  const mark=document.createElement('div');mark.className='oft-mark';mark.textContent='BMJ';mark.setAttribute('aria-hidden','true');
  const copy=document.createElement('div');const h=document.createElement('h2');h.textContent='Factory Status Twin';
- const sub=document.createElement('div');sub.className='oft-sub';sub.textContent='Seluruh area pabrik · kartu status dari catatan terbaru Logbook/Patrol';
+ const sub=document.createElement('div');sub.className='oft-sub';sub.textContent='Status terakhir Logbook/Patrol · bukan data sensor real-time';
  copy.append(h,sub);title.append(mark,copy);
  const role=document.createElement('span');role.className='oft-role';role.textContent='SUPERADMIN';
  head.append(title,role);
