@@ -38,6 +38,8 @@ jobs:
           assert.ok(start >= 0 && end > start, 'latestRecords function is present');
           const latest = source.slice(start, end);
           assert.ok(latest.includes('MACHINES'));
+          assert.ok(latest.includes('const codeCounts=new Map()'));
+          assert.ok(latest.includes("const snapshotCode=code&&codeCounts.get(normalizeKey(code))===1?code:'';"));
           assert.ok(latest.includes('machineLatestStatusSnapshot_({kode:code,nama:name})'));
           for (const key of ['kritikal', 'perhatian', 'normal', 'none']) {
             assert.ok(latest.includes(key), 'status severity is mapped: ' + key);
