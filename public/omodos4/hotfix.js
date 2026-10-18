@@ -5160,8 +5160,8 @@ if(typeof originalAuthFailure==='function'){
   if(window.__OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1__) return;
   window.__OMODOS_FACTORY_DIGITAL_TWIN_LITE_V1__ = true;
 
-  var TWIN_URL = 'https://juldigi0107.github.io/digitaltwin/?embed=omodos-status&release=2';
-  var TWIN_ORIGIN = 'https://juldigi0107.github.io';
+  var TWIN_URL = 'https://digitaltwin.juldigi.workers.dev/?embed=omodos-status';
+  var TWIN_ORIGIN = 'https://digitaltwin.juldigi.workers.dev';
   var REFRESH_MS = 12000;
   var homeView = null;
   var mount = null;
