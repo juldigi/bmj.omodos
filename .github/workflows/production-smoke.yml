@@ -46,6 +46,8 @@ jobs:
           test -s public/omodos4/factory-twin.css
           grep -Fq 'OMODOS_FACTORY_TWIN_SUPERADMIN_V1' public/omodos4/factory-twin.js
           grep -Fq 'machineLatestStatusSnapshot_' public/omodos4/factory-twin.js
+          grep -Fq "window.location.origin!=='https://omodos.juldigi.workers.dev'" public/omodos4/factory-twin.js
+          grep -Fq "window.location.origin!=='https://omodos.juldigi.workers.dev'" public/omodos4/hotfix.js
           test -s public/omodos4/hotfix.css
           test -s public/omodos4/offset-ways.css
           grep -Fq "X-OMODOS-Build: omodos-20261001-r1" public/_headers
