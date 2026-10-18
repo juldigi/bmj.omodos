@@ -5130,3 +5130,46 @@ if(typeof originalAuthFailure==='function'){
   };
 }
 })();
+
+
+/* OMODOS_FACTORY_TWIN_LOADER_V1
+ * The asset is loaded only after the existing OMODOS Superadmin gate passes.
+ * factory-twin.js re-checks the same gate whenever session/navigation changes.
+ */
+(function(){
+'use strict';
+const marker='OMODOS_FACTORY_TWIN_LOADER_V1';
+if(window.__OMODOS_FACTORY_TWIN_LOADER_V1__)return;
+window.__OMODOS_FACTORY_TWIN_LOADER_V1__=true;
+let scriptStarted=false,observer=null;
+function superadmin(){
+ try{return !!(window.OMODOS4&&typeof window.OMODOS4.isAllowed==='function'&&window.OMODOS4.isAllowed()===true);}
+ catch(e){return false;}
+}
+function syncLoader(){
+ if(!superadmin()){
+  document.body?.classList.remove('omodos-factory-twin-active');
+  return;
+ }
+ if(scriptStarted||document.querySelector('script[data-omodos-factory-twin]'))return;
+ const script=document.createElement('script');
+ script.src='/omodos4/factory-twin.js';
+ script.defer=true;
+ script.dataset.omodosFactoryTwin='1';
+ script.onerror=()=>{scriptStarted=false;try{if(typeof toast==='function')toast('Modul Factory Status Twin belum dapat dimuat.',true);}catch(e){}};
+ script.onload=()=>{scriptStarted=true;};
+ scriptStarted=true;
+ (document.body||document.head||document.documentElement).appendChild(script);
+}
+function boot(){
+ syncLoader();
+ if(!observer&&document.body){
+  observer=new MutationObserver(()=>syncLoader());
+  observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden','style']});
+ }
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.addEventListener('pageshow',boot);
+window.addEventListener('focus',boot);
+setInterval(syncLoader,2500);
+})();
