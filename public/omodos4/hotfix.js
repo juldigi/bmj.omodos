@@ -5130,3 +5130,23 @@ if(typeof originalAuthFailure==='function'){
   };
 }
 })();
+
+
+/* OMODOS Superadmin-only embedded factory status home.
+   Ordinary roles keep their existing homepage. */
+(function(){
+  'use strict';
+  if(window.__OMODOS_FACTORY_HOME_GUARD__)return;
+  window.__OMODOS_FACTORY_HOME_GUARD__=true;
+  function user(){try{if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)return CURRENT_USER;}catch(e){}return window.CURRENT_USER||window.currentUser||null;}
+  function allowed(){const u=user(),role=String(u&&(u.role||u.Role||u.roleName||u.role_name||u.level)||'').toLowerCase().replace(/[\s_-]+/g,'');return role==='superadmin';}
+  function removeView(){document.querySelectorAll('#omodos-superadmin-factory-home').forEach(node=>{const view=node.closest('.view');node.remove();if(view)view.classList.remove('omodos-superadmin-factory-home');});document.documentElement.classList.remove('omodos-superadmin-factory-home');}
+  function sync(){
+    if(!allowed()){removeView();return;}
+    if(typeof window.OMODOS_FACTORY_HOME_SYNC==='function'){window.OMODOS_FACTORY_HOME_SYNC();return;}
+    if(document.querySelector('script[data-omodos-factory-home-script]'))return;
+    const script=document.createElement('script');script.src='/omodos4/factory-home-superadmin.js';script.async=true;script.dataset.omodosFactoryHomeScript='1';
+    script.onload=()=>{try{window.OMODOS_FACTORY_HOME_SYNC?.();}catch(e){}};script.onerror=()=>{script.remove();};(document.head||document.documentElement).appendChild(script);
+  }
+  document.addEventListener('DOMContentLoaded',sync);window.addEventListener('pageshow',sync);window.addEventListener('focus',sync);setInterval(sync,1200);sync();
+})();
