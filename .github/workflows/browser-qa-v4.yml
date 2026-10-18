@@ -1419,6 +1419,29 @@ jobs:
             result.patrolRevisions=patrolRevisions;
             result.phases.push('patrol-team-pending-finding');
 
+            console.log('[QA] accidental form submit / reload guard');
+            const submitGuard = await page.evaluate(() => {
+              const form = document.getElementById('form-entry');
+              if (!form) throw new Error('Logbook form unavailable');
+              const buttons = [...form.querySelectorAll('button')];
+              const missingTypes = buttons.filter(button => !button.hasAttribute('type')).map(button => button.id || button.textContent.trim());
+              const helper = buttons.find(button => button.id !== 'btn-submit' && button.type === 'button');
+              if (helper) {
+                let prevented = false;
+                const capture = event => { if (event.submitter === helper) prevented = event.defaultPrevented; };
+                form.addEventListener('submit', capture, true);
+                const event = new SubmitEvent('submit', { bubbles: true, cancelable: true, submitter: helper });
+                form.dispatchEvent(event);
+                form.removeEventListener('submit', capture, true);
+                return { missingTypes, helperId: helper.id, submitPrevented: event.defaultPrevented, defaultActionPrevented: prevented };
+              }
+              return { missingTypes, submitPrevented: null, helperId: null };
+            });
+            result.submitGuard = submitGuard;
+            if (submitGuard.missingTypes.length || submitGuard.submitPrevented !== true) {
+              throw new Error('Accidental form submit guard failed: ' + JSON.stringify(submitGuard));
+            }
+
             console.log('[QA] requested mobile/material/multiline regressions');
             await page.setViewportSize({ width: 390, height: 844 });
             const requestedFixes = await page.evaluate(async () => {
