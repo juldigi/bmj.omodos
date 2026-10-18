@@ -4966,7 +4966,7 @@ function guardForm(){
     form.dataset.omodosSubmitGuard='1';
     form.addEventListener('submit',function(ev){
       const submitter=ev.submitter;
-      if(submitter && submitter.id!=='btn-submit'){
+      if(!submitter || submitter.id!=='btn-submit'){
         ev.preventDefault();
         ev.stopImmediatePropagation();
         if(typeof window.toast==='function')window.toast('Pengiriman form dibatalkan untuk mencegah submit tidak sengaja. Gunakan tombol Simpan Logbook.',true);
@@ -5024,4 +5024,28 @@ unlockMobile();
 window.addEventListener('pageshow',unlockMobile,{passive:true});
 window.addEventListener('orientationchange',unlockMobile,{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')unlockMobile();},{passive:true});
+})();
+
+
+/* OMODOS_REVIEW_FIXES_20261018_V8
+   Prevent implicit Enter/native form submits with no explicit submitter. Those
+   can navigate to the form action and look like an unexpected application reload. */
+(function(){
+'use strict';
+if(window.__OMODOS_REVIEW_FIXES_20261018_V8__)return;
+window.__OMODOS_REVIEW_FIXES_20261018_V8__=true;
+function bind(){
+  const form=document.getElementById('form-entry');
+  if(!form || form.dataset.omodosImplicitSubmitGuard==='1')return;
+  form.dataset.omodosImplicitSubmitGuard='1';
+  form.addEventListener('submit',function(ev){
+    if(!ev.submitter || ev.submitter.id!=='btn-submit'){
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      if(typeof window.toast==='function')window.toast('Form tidak dikirim otomatis. Gunakan tombol Simpan Logbook.',true);
+    }
+  },true);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+new MutationObserver(bind).observe(document.documentElement,{subtree:true,childList:true});
 })();
