@@ -33,6 +33,11 @@ jobs:
         run: |
           set -euo pipefail
           node --check src/worker.js
+          node --check public/omodos4/factory-twin.js
+          test -s public/omodos4/factory-twin.css
+          grep -Fq 'OMODOS_FACTORY_TWIN_SUPERADMIN_V1' public/omodos4/factory-twin.js
+          grep -Fq 'window.OMODOS4.isAllowed' public/omodos4/factory-twin.js
+          grep -Fq 'machineLatestStatusSnapshot_' public/omodos4/factory-twin.js
 
           node <<'NODE'
           const fs=require('fs');
