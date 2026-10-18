@@ -1,0 +1,55 @@
+name: OMODOS Superadmin Factory Overview QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "public/omodos4/factory-home-superadmin.js"
+      - ".github/workflows/omodos-factory-home-qa.yml"
+  push:
+    branches: [main]
+    paths:
+      - "public/omodos4/factory-home-superadmin.js"
+      - ".github/workflows/omodos-factory-home-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        run: node --check public/omodos4/factory-home-superadmin.js
+
+      - name: Validate Superadmin and source-of-truth contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const source = fs.readFileSync('public/omodos4/factory-home-superadmin.js', 'utf8');
+          const start = source.indexOf('function latestRecords(){');
+          const end = source.indexOf('\nfunction makeStyles(){', start);
+          assert.ok(start >= 0 && end > start, 'latestRecords function is present');
+          const latest = source.slice(start, end);
+          assert.ok(latest.includes('MACHINES'));
+          assert.ok(latest.includes('const codeCounts=new Map()'));
+          assert.ok(latest.includes("const snapshotCode=code&&codeCounts.get(normalizeKey(code))===1?code:'';"));
+          assert.ok(latest.includes('machineLatestStatusSnapshot_({kode:snapshotCode,nama:name})'));
+          for (const key of ['kritikal', 'perhatian', 'normal', 'none']) {
+            assert.ok(latest.includes(key), 'status severity is mapped: ' + key);
+          }
+          assert.ok(latest.includes('date,'));
+          assert.ok(source.includes('if(!isSuperadmin())return'));
+          assert.ok(source.includes('if(!isSuperadmin()){cleanup();return;}'));
+          assert.ok(source.includes("type:'OMODOS_FACTORY_STATUS'"));
+          assert.ok(source.includes('event.origin!==TWIN_ORIGIN'));
+          assert.ok(source.includes('event.source!==iframe.contentWindow'));
+          assert.ok(!latest.includes('readEntries('), 'viewer must reuse dashboard status calculations instead of inferring raw Logbook status');
+          console.log('OMODOS Superadmin factory viewer contract OK');
+          NODE

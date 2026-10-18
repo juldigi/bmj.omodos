@@ -18,20 +18,53 @@ function parseDate(value){
 }
 function readEntries(){try{if(typeof ENTRIES!=='undefined'&&Array.isArray(ENTRIES))return ENTRIES;}catch(e){}return Array.isArray(window.ENTRIES)?window.ENTRIES:[];}
 function latestRecords(){
-  const rows=readEntries(),byKey=new Map();
-  rows.forEach((row,index)=>{
-    const location=String(pick(row,['Lokasi Pekerjaan','LokasiPekerjaan','Work Location'])||'').trim().toLowerCase();if(location==='area')return;
-    const code=validCode(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode','Functional Loc','Functional Location','SAP Code']));
-    let name=String(pick(row,['Nama Mesin','NamaMesin','Machine Name','MachineName','Machine','Mesin','Nama Aset'])||'').trim();if(!name||name==='-'||name==='—')name='';
-    if(!code&&!name)return;
-    const status=String(pick(row,['Status','Status Pekerjaan','Status Mesin','Kondisi Mesin','Kondisi','State'])||'').trim();
-    const date=parseDate(pick(row,['Timestamp Input','Timestamp','Waktu Input','Tanggal Input','Tanggal','Date','Created At','CreatedAt']));
-    const key=code?'code:'+normalizeKey(code):'name:'+normalizeKey(name),record={code,name,status:status||'Status belum diisi',date,index},current=byKey.get(key);
-    const currentTime=Date.parse(current?.date||'')||Number(current?.index)||0,nextTime=Date.parse(date||'')||index;
-    if(!current||nextTime>=currentTime)byKey.set(key,record);
+  // Reuse the exact machine-status calculation shown on OMODOS Home so this
+  // viewer includes the latest Logbook OR Patrol record and cannot drift from
+  // the dashboard's severity rules. Only send machine-level status fields;
+  // never send free-text descriptions, employee names, photos, or RCA notes.
+  let master=[];
+  try{if(typeof MACHINES!=='undefined'&&Array.isArray(MACHINES))master=MACHINES;}catch(e){}
+  if(!master.length&&Array.isArray(window.MACHINES))master=window.MACHINES;
+  if(!master.length)return [];
+  const labelFor=key=>({
+    kritikal:'Kritikal',
+    perhatian:'Perlu Perhatian',
+    normal:'Normal',
+    none:'Belum Ada Data'
+  }[key]||'Belum Ada Data');
+  const codeCounts=new Map();
+  master.forEach(row=>{
+    const code=validCode(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode']));
+    if(!code)return;
+    const key=normalizeKey(code);
+    codeCounts.set(key,(codeCounts.get(key)||0)+1);
   });
-  const result=[...byKey.values()].sort((a,b)=>(Date.parse(b.date||'')||b.index)-(Date.parse(a.date||'')||a.index));
-  return result.slice(0,1200).map((row,index)=>({...row,index}));
+  const records=[];
+  master.forEach((row,index)=>{
+    const code=validCode(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode']));
+    const name=String(pick(row,['Nama Mesin','NamaMesin','Machine Name','MachineName','Machine','Mesin','Nama Aset'])||'').trim();
+    if(!code&&!name)return;
+    // The OMODOS status helper gives code matches precedence over name. When a
+    // master code is duplicated, force exact machine-name matching so two
+    // different assets do not inherit the same machine's latest status.
+    const snapshotCode=code&&codeCounts.get(normalizeKey(code))===1?code:'';
+    let snapshot=null;
+    try{
+      if(typeof machineLatestStatusSnapshot_==='function')
+        snapshot=machineLatestStatusSnapshot_({kode:snapshotCode,nama:name});
+    }catch(e){}
+    const key=String(snapshot?.key||'none');
+    const timestamp=Number(snapshot?.ts);
+    const date=Number.isFinite(timestamp)&&timestamp>0?new Date(timestamp).toISOString():'';
+    records.push({
+      code,
+      name,
+      status:labelFor(key),
+      date,
+      index
+    });
+  });
+  return records;
 }
 function makeStyles(){
   if(styleNode)return;
@@ -63,7 +96,7 @@ function cleanup(){document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.rem
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
-  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status bersumber dari catatan logbook terakhir yang tersimpan di OMODOS, bukan telemetry sensor secara langsung.</p>';
+  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
   view.prepend(root);return root;
 }
 function sendStatuses(force){
