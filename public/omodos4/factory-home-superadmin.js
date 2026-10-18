@@ -17,7 +17,7 @@ function parseDate(value){
   return Number.isNaN(date.getTime())?'':date.toISOString();
 }
 function readEntries(){try{if(typeof ENTRIES!=='undefined'&&Array.isArray(ENTRIES))return ENTRIES;}catch(e){}return Array.isArray(window.ENTRIES)?window.ENTRIES:[];}
-function latestRecords(){
+function latestRecordsFromEntries_(){
   const rows=readEntries(),byKey=new Map();
   rows.forEach((row,index)=>{
     const location=String(pick(row,['Lokasi Pekerjaan','LokasiPekerjaan','Work Location'])||'').trim().toLowerCase();if(location==='area')return;
@@ -32,6 +32,34 @@ function latestRecords(){
   });
   const result=[...byKey.values()].sort((a,b)=>(Date.parse(b.date||'')||b.index)-(Date.parse(a.date||'')||a.index));
   return result.slice(0,1200).map((row,index)=>({...row,index}));
+}
+/* Prefer the same authoritative machine status calculation as the regular OMODOS Home.
+   It combines the newest eligible Logbook and Patrol record instead of maintaining
+   a second, Logbook-only interpretation for the 3D overlay. */
+function latestRecords(){
+  let machines=[];
+  try{if(typeof MACHINES!=='undefined'&&Array.isArray(MACHINES))machines=MACHINES;}catch(e){}
+  if(machines.length&&typeof machineLatestStatusSnapshot_==='function'){
+    const labels={normal:'Normal',perhatian:'Perlu Perhatian',kritikal:'Kritikal',none:'Belum Ada Data'};
+    const records=machines.map((row,index)=>{
+      const code=validCode(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode','SAP Code']));
+      let name=String(pick(row,['Nama Mesin','NamaMesin','Machine Name','MachineName','Machine','Mesin','Nama Aset'])||'').trim();
+      if(!name||name==='-'||name==='—')name='';
+      if(!code&&!name)return null;
+      let snapshot;
+      try{snapshot=machineLatestStatusSnapshot_({kode:code,nama:name});}catch(e){return null;}
+      if(!snapshot)return null;
+      const key=Object.prototype.hasOwnProperty.call(labels,snapshot.key)?snapshot.key:'none';
+      let status=labels[key];
+      try{if(typeof dashStatusLabel==='function')status=dashStatusLabel(key)||status;}catch(e){}
+      const ts=Number(snapshot.ts);
+      const date=Number.isFinite(ts)&&ts>0?new Date(ts).toISOString():'';
+      return {code,name,status,date,index,source:String(snapshot.sourceLabel||snapshot.source||'')};
+    }).filter(row=>row&&(row.code||row.name));
+    if(records.length)return records.slice(0,1200).map((row,index)=>({...row,index}));
+  }
+  // Early loading/offline fallback: preserve the original existing-data reader.
+  return latestRecordsFromEntries_();
 }
 function makeStyles(){
   if(styleNode)return;
