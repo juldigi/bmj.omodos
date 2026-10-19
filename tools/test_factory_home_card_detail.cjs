@@ -15,7 +15,7 @@ assert.match(home, /const byName=master\.filter\(row=>normalizeKey\(machineName\
 assert.match(home, /if\(byCode\.length===1\)selected=byCode\[0\]/);
 assert.match(home, /window\.openMachineCurrentStatus\(identity\)/);
 assert.match(home, /OMODOS_FACTORY_STATUS_READY/);
-assert.match(hotfix, /factory-home-superadmin\.js\?v=layout-mobile-3/);
+assert.match(hotfix, /factory-home-superadmin\.js\?v=layout-mobile-4/);
 
 console.log('Factory 3D status card click/detail and Superadmin isolation checks passed.');
 
@@ -24,3 +24,5 @@ assert.match(home, /ofh-original-mode \.ofh-title\{display:none!important\}/);
 assert.match(home, /function fitMobileViewport_\(\)/);
 assert.match(home, /root\.style\.height=available\+'px'/);
 assert.match(home, /fitMobileViewport_\(\)/);
+
+assert.match(home, /#dash-grid\{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important/);
