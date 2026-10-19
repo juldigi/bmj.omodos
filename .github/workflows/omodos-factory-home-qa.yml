@@ -45,7 +45,7 @@ jobs:
             assert.ok(latest.includes(key), 'status severity is mapped: ' + key);
           }
           assert.ok(latest.includes('date,'));
-          assert.ok(source.includes('if(!isSuperadmin())return'));
+          assert.ok(source.includes("if(!isSuperadmin()||mode!=='3d')return;"), 'status sender requires Superadmin and 3D mode');
           assert.ok(source.includes('if(!isSuperadmin()){cleanup();return;}'));
           assert.ok(source.includes("type:'OMODOS_FACTORY_STATUS'"));
           assert.ok(source.includes('event.origin!==TWIN_ORIGIN'));
