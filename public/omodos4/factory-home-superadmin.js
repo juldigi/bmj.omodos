@@ -106,6 +106,7 @@ function setHomeMode_(mode,persist){
       frame.removeAttribute('src');
     }
   }
+  fitMobileViewport_();
   if(show3d&&persist)sendStatuses(true);
 }
 
@@ -124,7 +125,8 @@ function makeStyles(){
     '#'+ROOT_ID+' .ofh-subtitle{margin:4px 0 0;color:#627888;font-size:11px;line-height:1.35}',
     '#'+ROOT_ID+' .ofh-tag{flex:0 0 auto;border:1px solid #c7d8e2;border-radius:999px;padding:6px 9px;background:#f7fafc;color:#466274;font-size:9px;font-weight:800;letter-spacing:.07em}',
     '#'+ROOT_ID+'.ofh-original-mode{height:auto!important;min-height:0!important;max-height:none!important;gap:0!important;overflow:visible!important;margin:0 auto 10px!important;padding:0!important;background:transparent!important;box-shadow:none!important}',
-    '#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:39px;gap:8px;padding:3px 1px}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:39px;gap:8px;padding:3px 1px;justify-content:flex-end!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-title{display:none!important}',
     '#'+ROOT_ID+'.ofh-original-mode .ofh-stage,#'+ROOT_ID+'.ofh-original-mode .ofh-footnote,#'+ROOT_ID+'.ofh-original-mode .ofh-subtitle{display:none!important}',
     '#'+ROOT_ID+' .ofh-mode-switch{display:flex;align-items:center;gap:3px;flex:0 0 auto;padding:3px;border:1px solid #cbd8e1;border-radius:11px;background:#edf3f6}',
     '#'+ROOT_ID+' .ofh-mode-switch button{min-height:32px;padding:6px 10px;border:0;border-radius:8px;background:transparent;color:#536e80;font:inherit;font-size:10px;font-weight:800;white-space:nowrap;cursor:pointer;touch-action:manipulation}',
@@ -150,6 +152,34 @@ function createRoot(view){
   root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><div class="ofh-mode-switch" role="group" aria-label="Pilih versi beranda"><button type="button" data-ofh-mode="original" aria-pressed="false">Original</button><button type="button" data-ofh-mode="3d" aria-pressed="true">Factory 3D</button></div></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
   view.prepend(root);return root;
 }
+function fitMobileViewport_(){
+  const root=document.getElementById(ROOT_ID);
+  if(!root)return;
+  const stage=root.querySelector('.ofh-stage');
+  if(currentMode!=='3d'||!isSuperadmin()||!window.matchMedia('(max-width:700px)').matches){
+    root.style.removeProperty('height');
+    root.style.removeProperty('min-height');
+    root.style.removeProperty('max-height');
+    if(stage){stage.style.removeProperty('min-height');stage.style.removeProperty('height');}
+    return;
+  }
+  const viewportHeight=Math.max(0,window.innerHeight||document.documentElement.clientHeight||0);
+  if(viewportHeight<320)return;
+  const rootTop=Math.max(0,root.getBoundingClientRect().top);
+  let bottomLimit=viewportHeight-140;
+  const candidates=Array.from(document.querySelectorAll('nav,[role="navigation"],[role="tablist"],footer'));
+  candidates.forEach(el=>{
+    if(root.contains(el)||el.contains(root))return;
+    const style=window.getComputedStyle(el),rect=el.getBoundingClientRect();
+    if((style.position!=='fixed'&&style.position!=='sticky')||rect.height<42||rect.top<rootTop+80||rect.top>viewportHeight)return;
+    bottomLimit=Math.min(bottomLimit,rect.top-8);
+  });
+  const available=Math.max(240,Math.min(viewportHeight-rootTop-6,bottomLimit-rootTop-4));
+  root.style.height=available+'px';
+  root.style.minHeight='0px';
+  root.style.maxHeight=available+'px';
+  if(stage){stage.style.height='0px';stage.style.minHeight='0px';}
+}
 function sendStatuses(force){
   if(!isSuperadmin()||currentMode!=='3d')return;const root=document.getElementById(ROOT_ID);if(!root)return;const frame=root.querySelector('iframe');if(!frame||!frame.contentWindow)return;
   const now=Date.now();if(!force&&now-lastSendAt<5000)return;const records=latestRecords();
@@ -172,7 +202,7 @@ function sync(){
     homeView=view;
     if(view.classList.contains(VIEW_CLASS)!==(currentMode==='3d'))setHomeMode_(currentMode,false);
   }
-  const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');sendStatuses(false);
+  const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');fitMobileViewport_();sendStatuses(false);
 }
 window.OMODOS_FACTORY_HOME_SYNC=sync;
 function openStatusDetailFromFactoryCard_(payload){
@@ -228,5 +258,8 @@ window.addEventListener('message',event=>{
   }
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)sendStatuses(true);});
+window.addEventListener('resize',fitMobileViewport_);
+document.addEventListener('scroll',fitMobileViewport_,{capture:true,passive:true});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',fitMobileViewport_);
 document.addEventListener('DOMContentLoaded',sync);setInterval(sync,1200);sync();
 })();
