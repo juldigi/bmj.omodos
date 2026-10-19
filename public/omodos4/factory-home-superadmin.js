@@ -175,7 +175,58 @@ function sync(){
   const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');sendStatuses(false);
 }
 window.OMODOS_FACTORY_HOME_SYNC=sync;
-window.addEventListener('message',event=>{if(currentMode!=='3d'||event.origin!==TWIN_ORIGIN||!iframe||event.source!==iframe.contentWindow)return;if(event.data?.type==='OMODOS_FACTORY_STATUS_READY'&&event.data?.version===1){const stage=document.getElementById(ROOT_ID)?.querySelector('.ofh-stage');if(stage)stage.classList.add('ready');sendStatuses(true);}});
+function openStatusDetailFromFactoryCard_(payload){
+  if(!isSuperadmin()||currentMode!=='3d')return;
+  const code=String(payload?.code||'').trim().slice(0,120);
+  const name=String(payload?.name||'').trim().slice(0,240);
+  if(!code&&!name)return;
+  let master=[];
+  try{if(typeof MACHINES!=='undefined'&&Array.isArray(MACHINES))master=MACHINES;}catch(e){}
+  if(!master.length&&Array.isArray(window.MACHINES))master=window.MACHINES;
+  const machineCode=row=>String(pick(row,['Kode Mesin','KodeMesin','Machine Code','MachineCode','Kode'])||'').trim();
+  const machineName=row=>String(pick(row,['Nama Mesin','NamaMesin','Machine Name','MachineName','Machine','Mesin','Nama Aset'])||'').trim();
+  const wantedName=normalizeKey(name),wantedCode=normalizeKey(code);
+  let selected=null;
+  if(wantedName){
+    const byName=master.filter(row=>normalizeKey(machineName(row))===wantedName);
+    if(byName.length===1)selected=byName[0];
+    else if(byName.length>1&&wantedCode){
+      const byNameAndCode=byName.filter(row=>normalizeKey(machineCode(row))===wantedCode);
+      if(byNameAndCode.length===1)selected=byNameAndCode[0];
+    }
+  }
+  // If the names do not exactly match, a unique code is safe. A duplicate
+  // code without an exact-name resolution is deliberately not opened.
+  if(!selected&&!wantedName&&wantedCode){
+    const byCode=master.filter(row=>normalizeKey(machineCode(row))===wantedCode);
+    if(byCode.length===1)selected=byCode[0];
+  }else if(!selected&&wantedCode){
+    const exactNameMatches=master.filter(row=>normalizeKey(machineName(row))===wantedName);
+    if(exactNameMatches.length===0){
+      const byCode=master.filter(row=>normalizeKey(machineCode(row))===wantedCode);
+      if(byCode.length===1)selected=byCode[0];
+    }
+  }
+  if(!selected)return;
+  const identity=machineName(selected)||machineCode(selected);
+  if(!identity)return;
+  if(typeof window.openMachineCurrentStatus==='function'){
+    // Reuse the same OMODOS detail modal and existing per-role detail checks
+    // as the original homepage machine-status cards.
+    window.openMachineCurrentStatus(identity);
+  }
+}
+window.addEventListener('message',event=>{
+  if(currentMode!=='3d'||event.origin!==TWIN_ORIGIN||!iframe||event.source!==iframe.contentWindow)return;
+  const payload=event.data;
+  if(payload?.type==='OMODOS_FACTORY_STATUS_READY'&&payload?.version===1){
+    const stage=document.getElementById(ROOT_ID)?.querySelector('.ofh-stage');
+    if(stage)stage.classList.add('ready');
+    sendStatuses(true);
+  }else if(payload?.type==='OMODOS_FACTORY_STATUS_CARD_CLICK'&&payload?.version===1){
+    openStatusDetailFromFactoryCard_(payload);
+  }
+});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)sendStatuses(true);});
 document.addEventListener('DOMContentLoaded',sync);setInterval(sync,1200);sync();
 })();
