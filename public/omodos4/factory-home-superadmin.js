@@ -2,8 +2,8 @@
 'use strict';
 if(window.__OMODOS_FACTORY_HOME_MODULE__)return;
 window.__OMODOS_FACTORY_HOME_MODULE__=true;
-const ROOT_ID='omodos-superadmin-factory-home',VIEW_CLASS='omodos-superadmin-factory-home',TWIN_ORIGIN='https://digitaltwin.juldigi.workers.dev',TWIN_URL=TWIN_ORIGIN+'/?embed=omodos-status';
-let homeView=null,iframe=null,styleNode=null,lastFingerprint='',lastSendAt=0;
+const ROOT_ID='omodos-superadmin-factory-home',VIEW_CLASS='omodos-superadmin-factory-home',MODE_STORAGE_KEY='omodos.superadmin.home.mode.v1',TWIN_ORIGIN='https://digitaltwin.juldigi.workers.dev',TWIN_URL=TWIN_ORIGIN+'/?embed=omodos-status';
+let homeView=null,iframe=null,styleNode=null,lastFingerprint='',lastSendAt=0,mode=readMode();
 function currentUser(){try{if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)return CURRENT_USER;}catch(e){}return window.CURRENT_USER||window.currentUser||null;}
 function isSuperadmin(){const u=currentUser(),role=String(u&&(u.role||u.Role||u.roleName||u.role_name||u.level)||'').toLowerCase().replace(/[\s_-]+/g,'');return role==='superadmin';}
 function normalizeKey(v){return String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'');}
@@ -72,51 +72,74 @@ function makeStyles(){
   styleNode.textContent=[
     '.view.'+VIEW_CLASS+'{position:relative!important;overflow:hidden!important;padding:0!important;min-height:0!important}',
     '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'){display:none!important}',
-    '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 160px);min-height:440px;max-height:none;padding:0;margin:0 auto;overflow:hidden;color:#173348}',
+    '#'+ROOT_ID+'{box-sizing:border-box;display:block;width:100%;height:auto;min-height:0;max-height:none;padding:0;margin:0 0 12px;overflow:visible;color:#173348}',
+    '#'+ROOT_ID+'.mode-3d{display:flex;flex-direction:column;gap:8px;height:calc(100dvh - 160px);min-height:440px;max-height:none;margin:0 auto;overflow:hidden}',
     '#'+ROOT_ID+',#'+ROOT_ID+' *{box-sizing:border-box}',
+    '#'+ROOT_ID+' .ofh-mode-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:8px 11px;border:1px solid #d5e0e7;border-radius:12px;background:#f8fbfd;color:#244154}',
+    '#'+ROOT_ID+' .ofh-mode-label{min-width:0}',
+    '#'+ROOT_ID+' .ofh-mode-label strong{display:block;font-size:12px;font-weight:850;line-height:1.25}',
+    '#'+ROOT_ID+' .ofh-mode-label small{display:block;margin-top:3px;color:#627888;font-size:10px;line-height:1.25}',
+    '#'+ROOT_ID+' .ofh-mode-options{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;padding:3px;border:1px solid #cfdae2;border-radius:999px;background:#eaf0f4}',
+    '#'+ROOT_ID+' .ofh-mode-button{min-width:66px;padding:7px 11px;border:0;border-radius:999px;background:transparent;color:#526b7c;font:800 10px/1.1 system-ui,sans-serif;cursor:pointer;touch-action:manipulation}',
+    '#'+ROOT_ID+' .ofh-mode-button[aria-pressed="true"]{background:#163e58;color:#fff;box-shadow:0 1px 4px rgba(17,46,64,.2)}',
+    '#'+ROOT_ID+' .ofh-mode-button:focus-visible{outline:2px solid #1383bf;outline-offset:2px}',
+    '#'+ROOT_ID+' .ofh-3d-content{display:none;flex:1 1 auto;flex-direction:column;gap:8px;min-height:0;overflow:hidden}',
+    '#'+ROOT_ID+'.mode-3d .ofh-3d-content{display:flex}',
     '#'+ROOT_ID+' .ofh-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;flex:0 0 auto;padding:6px 2px}',
     '#'+ROOT_ID+' .ofh-title{min-width:0}',
     '#'+ROOT_ID+' .ofh-eyebrow{display:block;margin-bottom:2px;color:#547083;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}',
     '#'+ROOT_ID+' h2{margin:0;color:#173348;font-size:clamp(17px,2vw,23px);font-weight:800;line-height:1.15}',
-    '#'+ROOT_ID+' .ofh-subtitle{margin:4px 0 0;color:#627888;font-size:11px;line-height:1.35}',
-    '#'+ROOT_ID+' .ofh-tag{flex:0 0 auto;border:1px solid #c7d8e2;border-radius:999px;padding:6px 9px;background:#f7fafc;color:#466274;font-size:9px;font-weight:800;letter-spacing:.07em}',
-    '#'+ROOT_ID+' .ofh-stage{position:relative;display:flex;flex:1 1 auto;width:100%;height:0;min-height:300px;overflow:hidden;border:1px solid #d5e0e7;border-radius:14px;background:#eaf0f3;box-shadow:0 6px 22px rgba(20,49,67,.09)}',
-    '#'+ROOT_ID+' .ofh-stage iframe{position:absolute;inset:0;display:block;width:100%;height:100%;min-height:0;border:0;border-radius:inherit;background:#eaf0f3;visibility:hidden}',
-    '#'+ROOT_ID+' .ofh-stage.ready iframe{visibility:visible}',
-    '#'+ROOT_ID+' .ofh-frame-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:22px;text-align:center;color:#365568;background:linear-gradient(145deg,#f7fafc,#e9f0f4)}',
-    '#'+ROOT_ID+' .ofh-frame-state strong{font-size:13px;font-weight:800}',
-    '#'+ROOT_ID+' .ofh-frame-state span{max-width:300px;font-size:11px;line-height:1.5;color:#708493}',
-    '#'+ROOT_ID+' .ofh-stage.ready .ofh-frame-state{display:none}',
-    '#'+ROOT_ID+' .ofh-footnote{flex:0 0 auto;margin:0;padding:0 3px;color:#6c8190;font-size:10px;line-height:1.35}',
-    '@media(max-width:700px){#'+ROOT_ID+'{height:calc(100dvh - 136px);min-height:370px;gap:6px}#'+ROOT_ID+' .ofh-heading{min-height:42px;padding:3px 1px}#'+ROOT_ID+' .ofh-eyebrow{font-size:8px}#'+ROOT_ID+' h2{font-size:17px}#'+ROOT_ID+' .ofh-subtitle{font-size:10px;max-width:255px}#'+ROOT_ID+' .ofh-tag{font-size:8px;padding:5px 7px}#'+ROOT_ID+' .ofh-stage{min-height:270px;border-radius:10px}#'+ROOT_ID+' .ofh-frame-state strong{font-size:12px}#'+ROOT_ID+' .ofh-frame-state span{font-size:10px}#'+ROOT_ID+' .ofh-footnote{font-size:9px}}'
   ].join('\n');
   document.head.appendChild(styleNode);
 }
-function cleanup(){document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';}
+function cleanup(){document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';lastSendAt=0;}
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
-  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
-  view.prepend(root);return root;
+  root.innerHTML='<div class="ofh-mode-switch"><div class="ofh-mode-label"><strong>Tampilan Beranda</strong><small>Pilihan khusus Superadmin</small></div><div class="ofh-mode-options" role="group" aria-label="Pilih versi beranda"><button type="button" class="ofh-mode-button" data-home-mode="original" aria-pressed="false">Original</button><button type="button" class="ofh-mode-button" data-home-mode="3d" aria-pressed="false">3D</button></div></div><div class="ofh-3d-content"><header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p></div>';
+  const topbar=view.querySelector(':scope > .topbar');
+  if(topbar&&topbar.parentNode)topbar.parentNode.insertBefore(root,topbar.nextSibling);else view.prepend(root);
+  return root;
 }
 function sendStatuses(force){
-  if(!isSuperadmin())return;const root=document.getElementById(ROOT_ID);if(!root)return;const frame=root.querySelector('iframe');if(!frame||!frame.contentWindow)return;
+  if(!isSuperadmin()||mode!=='3d')return;const root=document.getElementById(ROOT_ID);if(!root)return;const frame=root.querySelector('iframe');if(!frame||!frame.contentWindow||frame.getAttribute('src')!==TWIN_URL)return;
   const now=Date.now();if(!force&&now-lastSendAt<5000)return;const records=latestRecords();
   const fingerprint=records.map(r=>[r.code,r.name,r.status,r.date,r.index].join('|')).join('~');
   if(!force&&fingerprint===lastFingerprint&&now-lastSendAt<18000)return;
   lastFingerprint=fingerprint;lastSendAt=now;
   try{frame.contentWindow.postMessage({type:'OMODOS_FACTORY_STATUS',version:1,sentAt:new Date().toISOString(),records},TWIN_ORIGIN);}catch(e){}
 }
+function readMode(){try{const saved=localStorage.getItem(MODE_STORAGE_KEY);if(saved==='original'||saved==='3d')return saved;}catch(e){}return '3d';}
+function applyMode(next,persist=true){
+  if(next!=='original'&&next!=='3d')return;
+  mode=next;if(persist){try{localStorage.setItem(MODE_STORAGE_KEY,mode);}catch(e){}}
+  const root=document.getElementById(ROOT_ID);if(!root)return;
+  root.classList.toggle('mode-original',mode==='original');root.classList.toggle('mode-3d',mode==='3d');
+  if(homeView)homeView.classList.toggle(VIEW_CLASS,mode==='3d');
+  document.documentElement.classList.toggle(VIEW_CLASS,mode==='3d');
+  root.querySelectorAll('[data-home-mode]').forEach(button=>{const active=button.dataset.homeMode===mode;button.setAttribute('aria-pressed',active?'true':'false');});
+  const frame=root.querySelector('iframe'),stage=root.querySelector('.ofh-stage');
+  if(mode==='3d'){
+    if(frame&&frame.getAttribute('src')!==TWIN_URL){if(stage)stage.classList.remove('ready');frame.setAttribute('src',TWIN_URL);}
+    sendStatuses(true);
+  }else{
+    if(frame&&frame.hasAttribute('src'))frame.removeAttribute('src');
+    if(stage)stage.classList.remove('ready');
+    lastFingerprint='';lastSendAt=0;
+  }
+}
 function sync(){
   if(!isSuperadmin()){cleanup();return;}
   const view=findHomeView();if(!view)return;
   if(homeView!==view||!document.getElementById(ROOT_ID)){
-    cleanup();homeView=view;view.classList.add(VIEW_CLASS);document.documentElement.classList.add(VIEW_CLASS);makeStyles();
+    cleanup();homeView=view;makeStyles();
     const root=createRoot(view);iframe=root.querySelector('iframe');
+    root.querySelectorAll('[data-home-mode]').forEach(button=>button.addEventListener('click',()=>applyMode(button.dataset.homeMode,true)));
     iframe.addEventListener('load',()=>sendStatuses(true));
     iframe.addEventListener('error',()=>{const state=root.querySelector('.ofh-frame-state');if(state)state.innerHTML='<strong>Viewer 3D belum dapat dimuat</strong><span>Fungsi OMODOS lainnya tetap tersedia. Coba muat ulang beranda beberapa saat lagi.</span>';const foot=root.querySelector('.ofh-footnote');if(foot)foot.textContent='Viewer 3D belum siap; fitur OMODOS lain tetap dapat digunakan.';});
-  }else{homeView=view;if(!view.classList.contains(VIEW_CLASS))view.classList.add(VIEW_CLASS);}
-  const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');sendStatuses(false);
+  }else{homeView=view;}
+  const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');
+  applyMode(mode,false);sendStatuses(false);
 }
 window.OMODOS_FACTORY_HOME_SYNC=sync;
 window.addEventListener('message',event=>{if(event.origin!==TWIN_ORIGIN||!iframe||event.source!==iframe.contentWindow)return;if(event.data?.type==='OMODOS_FACTORY_STATUS_READY'&&event.data?.version===1){const stage=document.getElementById(ROOT_ID)?.querySelector('.ofh-stage');if(stage)stage.classList.add('ready');sendStatuses(true);}});
