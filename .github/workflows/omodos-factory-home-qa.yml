@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - "public/omodos4/factory-home-superadmin.js"
+      - "public/omodos4/hotfix.js"
+      - "public/index.html"
       - ".github/workflows/omodos-factory-home-qa.yml"
   push:
     branches: [main]
     paths:
       - "public/omodos4/factory-home-superadmin.js"
+      - "public/omodos4/hotfix.js"
+      - "public/index.html"
       - ".github/workflows/omodos-factory-home-qa.yml"
   workflow_dispatch:
 
@@ -60,6 +64,14 @@ jobs:
           assert.ok(!latest.includes('readEntries('), 'viewer must reuse dashboard status calculations instead of inferring raw Logbook status');
           console.log('OMODOS Superadmin factory viewer contract OK');
           NODE
+
+      - name: Validate versioned Factory Overview loaders
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq '<script src="/omodos4/hotfix.js?v=mobile-cards-v2" defer></script>' public/index.html
+          grep -Fq "script.src='/omodos4/factory-home-superadmin.js?v=mobile-cards-v2'" public/omodos4/hotfix.js
+          grep -Fq "TWIN_URL=TWIN_ORIGIN+'/?embed=omodos-status&ui=mobile-cards-v2'" public/omodos4/factory-home-superadmin.js
 
       - name: Install Playwright Chromium for homepage mode regression
         run: |
@@ -112,7 +124,7 @@ jobs:
                 let script = document.querySelector('script[data-omodos-factory-home-script]');
                 if (!script) {
                   script = document.createElement('script');
-                  script.src = '/omodos4/factory-home-superadmin.js';
+                  script.src = '/omodos4/factory-home-superadmin.js?v=mobile-cards-v2';
                   script.dataset.omodosFactoryHomeScript = '1';
                   script.onload = resolve;
                   script.onerror = () => reject(new Error('factory-home-superadmin.js failed to load'));
