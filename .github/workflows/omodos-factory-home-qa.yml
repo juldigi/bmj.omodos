@@ -45,8 +45,15 @@ jobs:
             assert.ok(latest.includes(key), 'status severity is mapped: ' + key);
           }
           assert.ok(latest.includes('date,'));
-          assert.ok(source.includes('if(!isSuperadmin())return'));
+          assert.ok(source.includes("if(!isSuperadmin()||currentMode!=='3d')return"), 'status sync only runs for an authenticated Superadmin in 3D mode');
           assert.ok(source.includes('if(!isSuperadmin()){cleanup();return;}'));
+          assert.ok(source.includes('data-ofh-mode="original"'), 'Original homepage toggle is rendered');
+          assert.ok(source.includes('data-ofh-mode="3d"'), 'Factory 3D toggle is rendered');
+          assert.ok(source.includes('function setHomeMode_(mode,persist)'), 'toggle state controller is present');
+          assert.ok(source.includes('function readSavedMode_()'), 'mode preference is restored after login');
+          assert.ok(source.includes('localStorage.setItem(modeStorageKey_(),currentMode)'), 'selection is persisted per account');
+          assert.ok(source.includes('view.classList.toggle(VIEW_CLASS,show3d)'), 'only 3D mode hides the original home');
+          assert.ok(source.includes("frame.removeAttribute('src')"), 'original mode unloads the embedded 3D scene');
           assert.ok(source.includes("type:'OMODOS_FACTORY_STATUS'"));
           assert.ok(source.includes('event.origin!==TWIN_ORIGIN'));
           assert.ok(source.includes('event.source!==iframe.contentWindow'));
