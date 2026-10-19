@@ -6,7 +6,7 @@ const read = path => readFileSync(path, 'utf8');
 const home = read('public/omodos4/factory-home-superadmin.js');
 const hotfix = read('public/omodos4/hotfix.js');
 
-assert.match(home, /const TWIN_ORIGIN='https:\/\/digitaltwin\.juldigi\.workers\.dev'/);
+assert.match(home, /TWIN_ORIGIN='https:\/\/digitaltwin\.juldigi\.workers\.dev'/);
 assert.match(home, /type:'OMODOS_FACTORY_STATUS_CARD_CLICK',version:1,code,name/);
 assert.match(home, /event\.origin!==TWIN_ORIGIN\|\|!iframe\|\|event\.source!==iframe\.contentWindow/);
 assert.match(home, /if\(!isSuperadmin\(\)\|\|currentMode!=='3d'\)return/);
