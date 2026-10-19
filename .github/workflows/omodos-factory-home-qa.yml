@@ -50,6 +50,15 @@ jobs:
           assert.ok(source.includes("type:'OMODOS_FACTORY_STATUS'"));
           assert.ok(source.includes('event.origin!==TWIN_ORIGIN'));
           assert.ok(source.includes('event.source!==iframe.contentWindow'));
+          assert.ok(source.includes('data-home-mode="original"'), 'Superadmin can switch to the original homepage');
+          assert.ok(source.includes('data-home-mode="3d"'), 'Superadmin can switch to the 3D homepage');
+          assert.ok(source.includes("function readMode()"));
+          assert.ok(source.includes("return '3d';"), '3D is the default until a local preference is saved');
+          assert.ok(source.includes("localStorage.setItem(MODE_STORAGE_KEY,mode)"), 'the selected homepage mode is remembered');
+          assert.ok(source.includes("if(!isSuperadmin()||mode!=='3d')return;"), 'status data is sent only for a Superadmin in 3D mode');
+          assert.ok(source.includes("frame.removeAttribute('src')"), 'the iframe stops loading in Original mode');
+          assert.ok(source.includes("root.classList.toggle('mode-original',mode==='original')"));
+          assert.ok(source.includes("root.classList.toggle('mode-3d',mode==='3d')"));
           assert.ok(!latest.includes('readEntries('), 'viewer must reuse dashboard status calculations instead of inferring raw Logbook status');
           console.log('OMODOS Superadmin factory viewer contract OK');
           NODE
