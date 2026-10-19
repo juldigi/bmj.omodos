@@ -3,7 +3,8 @@
 if(window.__OMODOS_FACTORY_HOME_MODULE__)return;
 window.__OMODOS_FACTORY_HOME_MODULE__=true;
 const ROOT_ID='omodos-superadmin-factory-home',VIEW_CLASS='omodos-superadmin-factory-home',TWIN_ORIGIN='https://digitaltwin.juldigi.workers.dev',TWIN_URL=TWIN_ORIGIN+'/?embed=omodos-status';
-let homeView=null,iframe=null,styleNode=null,lastFingerprint='',lastSendAt=0;
+let homeView=null,iframe=null,styleNode=null,lastFingerprint='',lastSendAt=0,currentMode='3d';
+const MODE_STORAGE_PREFIX='omodos.factoryHomeMode.v1.';
 function currentUser(){try{if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)return CURRENT_USER;}catch(e){}return window.CURRENT_USER||window.currentUser||null;}
 function isSuperadmin(){const u=currentUser(),role=String(u&&(u.role||u.Role||u.roleName||u.role_name||u.level)||'').toLowerCase().replace(/[\s_-]+/g,'');return role==='superadmin';}
 function normalizeKey(v){return String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'');}
@@ -66,6 +67,48 @@ function latestRecords(){
   });
   return records;
 }
+
+function modeStorageKey_(){
+  const user=currentUser()||{};
+  return MODE_STORAGE_PREFIX+normalizeKey(user.username||user.userName||user.email||'superadmin');
+}
+function readSavedMode_(){
+  try{return localStorage.getItem(modeStorageKey_())==='original'?'original':'3d';}
+  catch(e){return '3d';}
+}
+function setHomeMode_(mode,persist){
+  currentMode=mode==='original'?'original':'3d';
+  const show3d=currentMode==='3d',root=document.getElementById(ROOT_ID),view=homeView;
+  if(view)view.classList.toggle(VIEW_CLASS,show3d);
+  document.documentElement.classList.toggle(VIEW_CLASS,show3d);
+  if(root){
+    root.classList.toggle('ofh-original-mode',!show3d);
+    const title=root.querySelector('h2'),subtitle=root.querySelector('.ofh-subtitle');
+    if(title)title.textContent=show3d?'Factory Overview':'Beranda Original';
+    if(subtitle)subtitle.textContent=show3d?'Status seluruh mesin BMJ dalam visualisasi 3D.':'Beranda reguler OMODOS. Pilih Factory 3D untuk kembali ke visualisasi pabrik.';
+    root.querySelectorAll('[data-ofh-mode]').forEach(button=>{
+      const active=button.dataset.ofhMode===currentMode;
+      button.setAttribute('aria-pressed',active?'true':'false');
+    });
+    const stage=root.querySelector('.ofh-stage');
+    if(!show3d&&stage)stage.classList.remove('ready');
+  }
+  if(persist&&isSuperadmin()){
+    try{localStorage.setItem(modeStorageKey_(),currentMode);}catch(e){}
+  }
+  const frame=root?.querySelector('iframe');
+  if(frame){
+    const src=frame.getAttribute('src');
+    if(show3d&&src!==TWIN_URL){
+      root.querySelector('.ofh-stage')?.classList.remove('ready');
+      frame.setAttribute('src',TWIN_URL);
+    }else if(!show3d&&src){
+      frame.removeAttribute('src');
+    }
+  }
+  if(show3d&&persist)sendStatuses(true);
+}
+
 function makeStyles(){
   if(styleNode)return;
   styleNode=document.createElement('style');styleNode.id='omodos-superadmin-factory-home-style';
@@ -80,6 +123,14 @@ function makeStyles(){
     '#'+ROOT_ID+' h2{margin:0;color:#173348;font-size:clamp(17px,2vw,23px);font-weight:800;line-height:1.15}',
     '#'+ROOT_ID+' .ofh-subtitle{margin:4px 0 0;color:#627888;font-size:11px;line-height:1.35}',
     '#'+ROOT_ID+' .ofh-tag{flex:0 0 auto;border:1px solid #c7d8e2;border-radius:999px;padding:6px 9px;background:#f7fafc;color:#466274;font-size:9px;font-weight:800;letter-spacing:.07em}',
+    '#'+ROOT_ID+'.ofh-original-mode{height:auto!important;min-height:0!important;max-height:none!important;gap:0!important;overflow:visible!important;margin:0 auto 10px!important;padding:0!important;background:transparent!important;box-shadow:none!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:39px;gap:8px;padding:3px 1px}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-stage,#'+ROOT_ID+'.ofh-original-mode .ofh-footnote,#'+ROOT_ID+'.ofh-original-mode .ofh-subtitle{display:none!important}',
+    '#'+ROOT_ID+' .ofh-mode-switch{display:flex;align-items:center;gap:3px;flex:0 0 auto;padding:3px;border:1px solid #cbd8e1;border-radius:11px;background:#edf3f6}',
+    '#'+ROOT_ID+' .ofh-mode-switch button{min-height:32px;padding:6px 10px;border:0;border-radius:8px;background:transparent;color:#536e80;font:inherit;font-size:10px;font-weight:800;white-space:nowrap;cursor:pointer;touch-action:manipulation}',
+    '#'+ROOT_ID+' .ofh-mode-switch button[aria-pressed="true"]{background:#193a51;color:#fff;box-shadow:0 1px 4px rgba(18,45,62,.2)}',
+    '#'+ROOT_ID+' .ofh-mode-switch button:focus-visible{outline:2px solid #1685c5;outline-offset:2px}',
+    '@media(max-width:700px){#'+ROOT_ID+'.ofh-original-mode{height:auto!important;min-height:0!important;max-height:none!important;margin:0 auto 8px!important;padding:0!important}#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:37px;padding:2px 0}#'+ROOT_ID+'.ofh-original-mode h2{font-size:13px}#'+ROOT_ID+' .ofh-mode-switch{gap:2px;padding:2px;border-radius:9px}#'+ROOT_ID+' .ofh-mode-switch button{min-height:29px;padding:5px 7px;font-size:9px}}'
     '#'+ROOT_ID+' .ofh-stage{position:relative;display:flex;flex:1 1 auto;width:100%;height:0;min-height:300px;overflow:hidden;border:1px solid #d5e0e7;border-radius:14px;background:#eaf0f3;box-shadow:0 6px 22px rgba(20,49,67,.09)}',
     '#'+ROOT_ID+' .ofh-stage iframe{position:absolute;inset:0;display:block;width:100%;height:100%;min-height:0;border:0;border-radius:inherit;background:#eaf0f3;visibility:hidden}',
     '#'+ROOT_ID+' .ofh-stage.ready iframe{visibility:visible}',
@@ -92,15 +143,15 @@ function makeStyles(){
   ].join('\n');
   document.head.appendChild(styleNode);
 }
-function cleanup(){document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';}
+function cleanup(){document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';currentMode='3d';}
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
-  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><span class="ofh-tag">VIEW ONLY</span></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" src="'+TWIN_URL+'" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
+  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><div class="ofh-mode-switch" role="group" aria-label="Pilih versi beranda"><button type="button" data-ofh-mode="original" aria-pressed="false">Original</button><button type="button" data-ofh-mode="3d" aria-pressed="true">Factory 3D</button></div></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>'
   view.prepend(root);return root;
 }
 function sendStatuses(force){
-  if(!isSuperadmin())return;const root=document.getElementById(ROOT_ID);if(!root)return;const frame=root.querySelector('iframe');if(!frame||!frame.contentWindow)return;
+  if(!isSuperadmin()||currentMode!=='3d')return;const root=document.getElementById(ROOT_ID);if(!root)return;const frame=root.querySelector('iframe');if(!frame||!frame.contentWindow)return;
   const now=Date.now();if(!force&&now-lastSendAt<5000)return;const records=latestRecords();
   const fingerprint=records.map(r=>[r.code,r.name,r.status,r.date,r.index].join('|')).join('~');
   if(!force&&fingerprint===lastFingerprint&&now-lastSendAt<18000)return;
@@ -111,15 +162,20 @@ function sync(){
   if(!isSuperadmin()){cleanup();return;}
   const view=findHomeView();if(!view)return;
   if(homeView!==view||!document.getElementById(ROOT_ID)){
-    cleanup();homeView=view;view.classList.add(VIEW_CLASS);document.documentElement.classList.add(VIEW_CLASS);makeStyles();
+    cleanup();homeView=view;makeStyles();
     const root=createRoot(view);iframe=root.querySelector('iframe');
+    root.querySelectorAll('[data-ofh-mode]').forEach(button=>button.addEventListener('click',()=>setHomeMode_(button.dataset.ofhMode,true)));
     iframe.addEventListener('load',()=>sendStatuses(true));
     iframe.addEventListener('error',()=>{const state=root.querySelector('.ofh-frame-state');if(state)state.innerHTML='<strong>Viewer 3D belum dapat dimuat</strong><span>Fungsi OMODOS lainnya tetap tersedia. Coba muat ulang beranda beberapa saat lagi.</span>';const foot=root.querySelector('.ofh-footnote');if(foot)foot.textContent='Viewer 3D belum siap; fitur OMODOS lain tetap dapat digunakan.';});
-  }else{homeView=view;if(!view.classList.contains(VIEW_CLASS))view.classList.add(VIEW_CLASS);}
+    setHomeMode_(readSavedMode_(),false);
+  }else{
+    homeView=view;
+    if(view.classList.contains(VIEW_CLASS)!==(currentMode==='3d'))setHomeMode_(currentMode,false);
+  }
   const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');sendStatuses(false);
 }
 window.OMODOS_FACTORY_HOME_SYNC=sync;
-window.addEventListener('message',event=>{if(event.origin!==TWIN_ORIGIN||!iframe||event.source!==iframe.contentWindow)return;if(event.data?.type==='OMODOS_FACTORY_STATUS_READY'&&event.data?.version===1){const stage=document.getElementById(ROOT_ID)?.querySelector('.ofh-stage');if(stage)stage.classList.add('ready');sendStatuses(true);}});
+window.addEventListener('message',event=>{if(currentMode!=='3d'||event.origin!==TWIN_ORIGIN||!iframe||event.source!==iframe.contentWindow)return;if(event.data?.type==='OMODOS_FACTORY_STATUS_READY'&&event.data?.version===1){const stage=document.getElementById(ROOT_ID)?.querySelector('.ofh-stage');if(stage)stage.classList.add('ready');sendStatuses(true);}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)sendStatuses(true);});
 document.addEventListener('DOMContentLoaded',sync);setInterval(sync,1200);sync();
 })();
