@@ -79,6 +79,7 @@ function readSavedMode_(){
 function setHomeMode_(mode,persist){
   currentMode=mode==='original'?'original':'3d';
   const show3d=currentMode==='3d',root=document.getElementById(ROOT_ID),view=homeView;
+  if(!show3d)root?.classList.remove('ofh-fullscreen');
   if(view)view.classList.toggle(VIEW_CLASS,show3d);
   document.documentElement.classList.toggle(VIEW_CLASS,show3d);
   syncResumePath_(view,show3d);
@@ -178,7 +179,7 @@ function syncResumePath_(view,keep){
   // Preserve the full Smart Resume card rather than only its marker element.
   let resumeRoot=marker,node=marker;
   while(node&&node!==view){
-    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card')){
+    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card')){
       resumeRoot=node;break;
     }
     node=node.parentElement;
@@ -196,7 +197,7 @@ function syncCompactResume_(view,show3d){
   if(!marker||!view.contains(marker))return;
   let resumeRoot=marker,node=marker;
   while(node&&node!==view){
-    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card')){resumeRoot=node;break;}
+    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card')){resumeRoot=node;break;}
     node=node.parentElement;
   }
   if(resumeRoot===view)resumeRoot=marker;
