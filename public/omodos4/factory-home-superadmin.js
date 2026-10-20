@@ -118,9 +118,7 @@ function makeStyles(){
   styleNode=document.createElement('style');styleNode.id='omodos-superadmin-factory-home-style';
   styleNode.textContent=[
     '.view.'+VIEW_CLASS+'{position:relative!important;overflow-x:hidden!important;overflow-y:auto!important;padding:0!important;min-height:0!important;max-height:calc(100dvh - 220px)!important}',
-    '.view:not(.'+VIEW_CLASS+') .ofh-resume-root{position:relative!important;z-index:20!important;isolation:isolate!important}',
-    '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact):not(.ofh-resume-ancestor):not(.ofh-resume-root){display:none!important}',
-    '.view.'+VIEW_CLASS+' .ofh-resume-ancestor>:not(.ofh-resume-ancestor):not(.ofh-resume-root):not(#omodos-smart-resume-compact){display:none!important}',
+    '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact){display:none!important}',
     '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 160px);min-height:440px;max-height:none;padding:0;margin:0 auto;overflow:hidden;color:#173348}',
     '#'+ROOT_ID+',#'+ROOT_ID+' *{box-sizing:border-box}',
     '#'+ROOT_ID+' .ofh-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;flex:0 0 auto;padding:6px 2px}',
@@ -132,7 +130,7 @@ function makeStyles(){
     '#'+ROOT_ID+'.ofh-original-mode{height:auto!important;min-height:0!important;max-height:none!important;gap:0!important;overflow:visible!important;margin:0 auto 10px!important;padding:0!important;background:transparent!important;box-shadow:none!important}',
     '#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:39px;gap:8px;padding:3px 1px;justify-content:flex-end!important}',
     '#'+ROOT_ID+'.ofh-original-mode .ofh-title{display:none!important}',
-    '@media(max-width:700px){#dash-grid{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;align-content:start!important;grid-auto-rows:auto!important}}',
+
     '#'+ROOT_ID+'.ofh-original-mode .ofh-stage,#'+ROOT_ID+'.ofh-original-mode .ofh-footnote,#'+ROOT_ID+'.ofh-original-mode .ofh-subtitle{display:none!important}',
     '#'+ROOT_ID+' .ofh-mode-switch{display:flex;align-items:center;gap:3px;flex:0 0 auto;padding:3px;border:1px solid #cbd8e1;border-radius:11px;background:#edf3f6}',
     '#'+ROOT_ID+' .ofh-mode-switch button{min-height:32px;padding:6px 10px;border:0;border-radius:8px;background:transparent;color:#536e80;font:inherit;font-size:10px;font-weight:800;white-space:nowrap;cursor:pointer;touch-action:manipulation}',
@@ -155,8 +153,6 @@ function makeStyles(){
     '#'+ROOT_ID+' .ofh-stage{flex:1 1 auto;min-height:0}',
     '#'+ROOT_ID+' .ofh-stage.ready .ofh-frame-state{display:none}',
     '#'+ROOT_ID+' .ofh-footnote{flex:0 0 auto;margin:0;padding:0 3px;color:#6c8190;font-size:10px;line-height:1.35}',
-    '.view.'+VIEW_CLASS+' .ofh-full-resume{display:none!important}',
-    '.view.'+VIEW_CLASS+' .ofh-resume-root.ofh-full-resume{visibility:hidden!important;pointer-events:none!important}',
     '#omodos-smart-resume-compact{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1px solid #d9e2e8;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(20,49,67,.06);color:#193548}',
     '#omodos-smart-resume-compact .ofh-sr-copy{min-width:0;flex:1 1 140px}',
     '#omodos-smart-resume-compact strong{display:block;font-size:12px;font-weight:850;line-height:1.25}',
@@ -172,29 +168,11 @@ function clearResumePath_(view){
   view.querySelectorAll('.ofh-resume-ancestor,.ofh-resume-root,.ofh-full-resume').forEach(node=>node.classList.remove('ofh-resume-ancestor','ofh-resume-root','ofh-full-resume'));
   view.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());
 }
-function findSmartResumeCard_(view){
-  const marker=document.getElementById('home-smart-resume');
-  if(!marker||!view?.contains(marker))return null;
-  let fallback=marker;
-  for(let node=marker.parentElement;node&&node!==view;node=node.parentElement){
-    const text=String(node.innerText||node.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
-    const hasTitle=text.includes('smart resume pabrik')||text.includes('smart resume');
-    const hasResumeMetrics=text.includes('total lost time')||text.includes('pekerjaan berstatus')||text.includes('24 jam terakhir');
-    if(hasTitle&&hasResumeMetrics&&node.children.length>0)return node;
-    if(hasTitle&&node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card'))fallback=node;
-  }
-  return fallback;
-}
 function syncResumePath_(view,keep){
+  // Keep the original dashboard DOM in natural flow; no marker gets positioned,
+  // raised, or hidden by adding classes. Only the 3D view's sibling rule hides it.
   if(!view)return;
   clearResumePath_(view);
-  const resumeRoot=findSmartResumeCard_(view);
-  if(!resumeRoot)return;
-  resumeRoot.classList.add('ofh-resume-root');
-  if(!keep)return;
-  resumeRoot.classList.add('ofh-full-resume');
-  let node=resumeRoot.parentElement;
-  while(node&&node!==view){node.classList.add('ofh-resume-ancestor');node=node.parentElement;}
 }
 function syncCompactResume_(view,show3d){
   if(!view)return;
@@ -202,18 +180,16 @@ function syncCompactResume_(view,show3d){
   if(!show3d||!isSuperadmin())return;
   const marker=document.getElementById('home-smart-resume');
   if(!marker||!view.contains(marker))return;
-  const resumeRoot=findSmartResumeCard_(view)||marker;
   const compact=document.createElement('section');
   compact.id='omodos-smart-resume-compact';
   compact.setAttribute('aria-label','Smart Resume Pabrik ringkas');
   compact.innerHTML='<div class="ofh-sr-copy"><strong>Smart Resume Pabrik</strong><span>Ringkasan singkat tersedia. Buka detail untuk melihat tindak lanjut, lost time, KPI, dan sparepart.</span></div><button type="button">Buka Detail Smart Resume</button>';
   compact.querySelector('button').addEventListener('click',()=>{
     setHomeMode_('original',true);
-    window.setTimeout(()=>{try{resumeRoot.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},80);
+    window.setTimeout(()=>{try{marker.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},80);
   });
   const root=document.getElementById(ROOT_ID);
   if(root&&root.parentElement===view)root.insertAdjacentElement('afterend',compact);
-  else view.prepend(compact);
 }
 function restoreViewSizing_(view){
   if(!view)return;
