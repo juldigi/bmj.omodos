@@ -35,7 +35,7 @@ assert.match(home, /root\.classList\.add\('ofh-fullscreen'\)/);
 assert.match(home, /if\(!show3d\)root\?\.classList\.remove\('ofh-fullscreen'\)/);
 assert.match(home, /grid-template-columns:minmax\(0,1fr\) auto/);
 assert.match(home, /@media\(max-width:420px\)/);
-assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-15/);
+assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-16/);
 
 assert.match(home, /ofh-original-mode \.ofh-heading\{display:flex!important/);
 assert.match(home, /<strong>Smart Resume<\/strong><\/div><button type="button">Buka detail<\/button>/);
