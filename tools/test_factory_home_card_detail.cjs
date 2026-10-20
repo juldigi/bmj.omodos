@@ -26,13 +26,15 @@ assert.match(home, /root\.style\.height=available\+'px'/);
 assert.match(home, /fitMobileViewport_\(\)/);
 
 
+
 assert.doesNotMatch(home, /#dash-grid\{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important/);
 assert.doesNotMatch(home, /view:not\(\.'\+VIEW_CLASS\+'\) \.ofh-resume-root\{position:relative!important;z-index:20!important/);
-assert.match(home, /function syncResumePath_\(view,keep\)[\s\S]*?clearResumePath_\(view\)/);
+assert.match(home, /function syncResumePath_\(view,keep\)\{[\s\S]*?clearResumePath_\(view\);/);
 assert.match(home, /function syncCompactResume_\(view,show3d\)/);
 assert.match(home, /Buka Detail Smart Resume/);
-assert.match(home, /'\.view\.'\+VIEW_CLASS\+'\>:not\(#'\+ROOT_ID\+'\):not\(#omodos-smart-resume-compact\)\{display:none!important\}'/);
+assert.ok(home.includes("'.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact){display:none!important}',"));
 assert.match(home, /ofh-fullscreen-toggle/);
 assert.match(home, /stage\.requestFullscreen/);
+assert.match(home, /root\.classList\.add\('ofh-fullscreen'\)/);
 assert.match(home, /if\(!show3d\)root\?\.classList\.remove\('ofh-fullscreen'\)/);
-assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-10/);
+assert.ok(hotfix.includes('factory-home-superadmin.js?v=smart-resume-10'));
