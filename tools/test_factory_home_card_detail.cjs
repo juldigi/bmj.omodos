@@ -33,6 +33,8 @@ assert.match(home, /ofh-fullscreen-toggle/);
 assert.match(home, /stage\.requestFullscreen/);
 assert.match(home, /root\.classList\.add\('ofh-fullscreen'\)/);
 assert.match(home, /if\(!show3d\)root\?\.classList\.remove\('ofh-fullscreen'\)/);
-assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-13/);
+assert.match(home, /grid-template-columns:minmax\(0,1fr\) auto/);
+assert.match(home, /@media\(max-width:420px\)/);
+assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-14/);
 
 console.log('Factory home natural scrolling, Smart Resume flow, fullscreen and card-detail checks passed.');
