@@ -116,8 +116,8 @@ function makeStyles(){
   styleNode=document.createElement('style');styleNode.id='omodos-superadmin-factory-home-style';
   styleNode.textContent=[
     '.view.'+VIEW_CLASS+'{position:relative!important;overflow-x:hidden!important;overflow-y:auto!important;padding:0!important;min-height:0!important;max-height:calc(100dvh - 220px)!important}',
-    '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(.ofh-resume-ancestor):not(#home-smart-resume){display:none!important}',
-    '.view.'+VIEW_CLASS+' .ofh-resume-ancestor>:not(.ofh-resume-ancestor):not(#home-smart-resume){display:none!important}',
+    '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(.ofh-resume-ancestor):not(.ofh-resume-root){display:none!important}',
+    '.view.'+VIEW_CLASS+' .ofh-resume-ancestor>:not(.ofh-resume-ancestor):not(.ofh-resume-root){display:none!important}',
     '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 160px);min-height:440px;max-height:none;padding:0;margin:0 auto;overflow:hidden;color:#173348}',
     '#'+ROOT_ID+',#'+ROOT_ID+' *{box-sizing:border-box}',
     '#'+ROOT_ID+' .ofh-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;flex:0 0 auto;padding:6px 2px}',
@@ -151,7 +151,7 @@ function makeStyles(){
 }
 function clearResumePath_(view){
   if(!view)return;
-  view.querySelectorAll('.ofh-resume-ancestor').forEach(node=>node.classList.remove('ofh-resume-ancestor'));
+  view.querySelectorAll('.ofh-resume-ancestor,.ofh-resume-root').forEach(node=>node.classList.remove('ofh-resume-ancestor','ofh-resume-root'));
 }
 function syncResumePath_(view,keep){
   if(!view)return;
@@ -159,7 +159,17 @@ function syncResumePath_(view,keep){
   if(!keep)return;
   const marker=document.getElementById('home-smart-resume');
   if(!marker||!view.contains(marker))return;
-  let node=marker.parentElement;
+  // Preserve the full Smart Resume card rather than only its marker element.
+  let resumeRoot=marker,node=marker;
+  while(node&&node!==view){
+    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card,article,section')){
+      resumeRoot=node;break;
+    }
+    node=node.parentElement;
+  }
+  if(resumeRoot===view)resumeRoot=marker;
+  resumeRoot.classList.add('ofh-resume-root');
+  node=resumeRoot.parentElement;
   while(node&&node!==view){node.classList.add('ofh-resume-ancestor');node=node.parentElement;}
 }
 function restoreViewSizing_(view){
