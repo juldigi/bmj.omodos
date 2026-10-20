@@ -169,6 +169,17 @@ function makeStyles(){
     '@media(max-width:420px){#'+ROOT_ID+' .ofh-heading{grid-template-columns:minmax(0,1fr);gap:6px;padding-top:5px}#'+ROOT_ID+' .ofh-subtitle{-webkit-line-clamp:1;max-width:none}#'+ROOT_ID+' .ofh-mode-switch{width:100%;max-width:none;justify-content:stretch}#'+ROOT_ID+' .ofh-mode-switch button{flex:1 1 0;white-space:nowrap}}',
     '@media(max-width:700px){#omodos-smart-resume-compact{margin-top:8px;gap:8px;padding:10px;border-radius:12px}#omodos-smart-resume-compact .ofh-sr-copy{flex:1 1 155px}#omodos-smart-resume-compact strong{font-size:11px}#omodos-smart-resume-compact span{font-size:9px;line-height:1.3}#omodos-smart-resume-compact button{min-height:34px;font-size:9px}}',
     '@media(max-width:420px){#omodos-smart-resume-compact{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}#omodos-smart-resume-compact .ofh-sr-copy{min-width:0}#omodos-smart-resume-compact button{width:100%;white-space:normal}}',
+    '#'+ROOT_ID+'.ofh-original-mode{position:relative!important;z-index:1!important;display:flex!important;flex-direction:column!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;margin:0 0 16px!important;padding:0!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-heading{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-end!important;box-sizing:border-box!important;width:100%!important;min-height:54px!important;gap:10px!important;padding:8px 10px 12px!important;margin:0 0 14px!important;border:1px solid #dbe4ea!important;border-radius:12px!important;background:#fff!important;position:relative!important;overflow:visible!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{display:flex!important;align-items:center!important;justify-content:stretch!important;flex:0 0 auto!important;width:min(100%,245px)!important;max-width:100%!important;margin:0 0 0 auto!important;gap:3px!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch button{flex:1 1 0!important;min-width:0!important;min-height:36px!important;padding:7px 12px!important;font-size:11px!important;white-space:nowrap!important}',
+    '@media(max-width:700px){#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:56px!important;padding:8px 9px 12px!important;margin-bottom:15px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{width:min(100%,280px)!important}}',
+    '@media(max-width:420px){#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:60px!important;padding:8px!important;margin-bottom:17px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{width:100%!important;max-width:100%!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch button{min-height:38px!important;font-size:11px!important;padding:8px 10px!important}}',
+    '#omodos-smart-resume-compact{display:flex!important;align-items:center!important;justify-content:space-between!important;flex-wrap:nowrap!important;gap:8px!important;margin:8px 0 12px!important;padding:7px 10px!important;border:1px solid #d9e2e8!important;border-radius:10px!important;background:#f9fbfc!important;box-shadow:none!important;color:#193548!important}',
+    '#omodos-smart-resume-compact .ofh-sr-copy{display:flex!important;align-items:center!important;min-width:0!important;flex:1 1 auto!important}',
+    '#omodos-smart-resume-compact strong{display:block!important;margin:0!important;font-size:11px!important;font-weight:800!important;line-height:1.2!important}',
+    '#omodos-smart-resume-compact button{flex:0 0 auto!important;min-height:30px!important;border:1px solid #c6d6df!important;border-radius:8px!important;padding:6px 9px!important;background:#193a51!important;color:#fff!important;font:800 9px/1.1 system-ui,-apple-system,sans-serif!important;white-space:nowrap!important;box-shadow:none!important}',
+    '@media(max-width:420px){#omodos-smart-resume-compact{gap:8px!important;padding:7px 9px!important}#omodos-smart-resume-compact strong{font-size:10px!important}#omodos-smart-resume-compact button{min-height:30px!important;font-size:9px!important;padding:6px 8px!important}}',
   ].join('\n');
   document.head.appendChild(styleNode);
 }
@@ -193,7 +204,7 @@ function syncCompactResume_(view,show3d){
   const compact=document.createElement('section');
   compact.id='omodos-smart-resume-compact';
   compact.setAttribute('aria-label','Smart Resume Pabrik ringkas');
-  compact.innerHTML='<div class="ofh-sr-copy"><strong>Smart Resume Pabrik</strong><span>Ringkasan singkat tersedia. Buka detail untuk melihat tindak lanjut, lost time, KPI, dan sparepart.</span></div><button type="button">Buka Detail Smart Resume</button>';
+  compact.innerHTML='<div class="ofh-sr-copy"><strong>Smart Resume</strong></div><button type="button">Buka detail</button>';
   compact.querySelector('button').addEventListener('click',()=>{
     setHomeMode_('original',true);
     window.setTimeout(()=>{try{marker.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},80);

@@ -5145,7 +5145,7 @@ if(typeof originalAuthFailure==='function'){
     if(!allowed()){removeView();return;}
     if(typeof window.OMODOS_FACTORY_HOME_SYNC==='function'){window.OMODOS_FACTORY_HOME_SYNC();return;}
     if(document.querySelector('script[data-omodos-factory-home-script]'))return;
-    const script=document.createElement('script');script.src='/omodos4/factory-home-superadmin.js?v=smart-resume-14';script.async=true;script.dataset.omodosFactoryHomeScript='1';
+    const script=document.createElement('script');script.src='/omodos4/factory-home-superadmin.js?v=smart-resume-15';script.async=true;script.dataset.omodosFactoryHomeScript='1';
     script.onload=()=>{try{window.OMODOS_FACTORY_HOME_SYNC?.();}catch(e){}};script.onerror=()=>{script.remove();};(document.head||document.documentElement).appendChild(script);
   }
   document.addEventListener('DOMContentLoaded',sync);window.addEventListener('pageshow',sync);window.addEventListener('focus',sync);setInterval(sync,1200);sync();
