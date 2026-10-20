@@ -180,6 +180,14 @@ function makeStyles(){
     '#omodos-smart-resume-compact strong{display:block!important;margin:0!important;font-size:11px!important;font-weight:800!important;line-height:1.2!important}',
     '#omodos-smart-resume-compact button{flex:0 0 auto!important;min-height:30px!important;border:1px solid #c6d6df!important;border-radius:8px!important;padding:6px 9px!important;background:#193a51!important;color:#fff!important;font:800 9px/1.1 system-ui,-apple-system,sans-serif!important;white-space:nowrap!important;box-shadow:none!important}',
     '@media(max-width:420px){#omodos-smart-resume-compact{gap:8px!important;padding:7px 9px!important}#omodos-smart-resume-compact strong{font-size:10px!important}#omodos-smart-resume-compact button{min-height:30px!important;font-size:9px!important;padding:6px 8px!important}}',
+    '#'+ROOT_ID+'.ofh-original-mode{display:block!important;position:relative!important;inset:auto!important;transform:none!important;float:none!important;clear:both!important;isolation:isolate!important;box-sizing:border-box!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;margin:0 0 32px!important;padding:0!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-heading{display:block!important;position:relative!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;float:none!important;clear:both!important;z-index:2!important;box-sizing:border-box!important;width:100%!important;min-height:0!important;height:auto!important;overflow:visible!important;margin:0 0 26px!important;padding:10px!important;border:1px solid #dbe4ea!important;border-radius:12px!important;background:#fff!important;box-shadow:0 1px 4px rgba(25,54,72,.04)!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;align-items:stretch!important;justify-content:stretch!important;float:none!important;position:relative!important;inset:auto!important;transform:none!important;width:min(100%,320px)!important;max-width:100%!important;margin:0 auto!important;gap:4px!important;padding:3px!important;overflow:visible!important}',
+    '#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch button{display:block!important;box-sizing:border-box!important;min-width:0!important;width:100%!important;min-height:40px!important;padding:8px 10px!important;font-size:11px!important;line-height:1.15!important;white-space:nowrap!important;float:none!important;position:relative!important;inset:auto!important;transform:none!important}',
+    '@media(max-width:700px){#'+ROOT_ID+'.ofh-original-mode{margin-bottom:36px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-heading{margin-bottom:30px!important;padding:10px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{width:min(100%,320px)!important;max-width:100%!important}}',
+    '@media(max-width:420px){#'+ROOT_ID+'.ofh-original-mode{margin-bottom:38px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-heading{margin-bottom:30px!important;padding:9px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{width:100%!important;max-width:100%!important;gap:5px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch button{min-height:42px!important;padding:8px 6px!important;font-size:10px!important}}',
+    '#omodos-smart-resume-compact{display:none!important}',
+    '.view.'+VIEW_CLASS+' a[href*="digitaltwin"],.view.'+VIEW_CLASS+' [data-open-digital-twin]{display:none!important}',
   ].join('\n');
   document.head.appendChild(styleNode);
 }
@@ -196,21 +204,9 @@ function syncResumePath_(view,keep){
   clearResumePath_(view);
 }
 function syncCompactResume_(view,show3d){
-  if(!view)return;
-  view.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());
-  if(!show3d||!isSuperadmin())return;
-  const marker=document.getElementById('home-smart-resume');
-  if(!marker||!view.contains(marker))return;
-  const compact=document.createElement('section');
-  compact.id='omodos-smart-resume-compact';
-  compact.setAttribute('aria-label','Smart Resume Pabrik ringkas');
-  compact.innerHTML='<div class="ofh-sr-copy"><strong>Smart Resume</strong></div><button type="button">Buka detail</button>';
-  compact.querySelector('button').addEventListener('click',()=>{
-    setHomeMode_('original',true);
-    window.setTimeout(()=>{try{marker.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},80);
-  });
-  const root=document.getElementById(ROOT_ID);
-  if(root&&root.parentElement===view)root.insertAdjacentElement('afterend',compact);
+  // Smart Resume remains available in Original mode; keep the 3D canvas focused on the plant.
+  if(view)view.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());
+  document.getElementById('omodos-smart-resume-compact')?.remove();
 }
 function restoreViewSizing_(view){
   if(!view)return;

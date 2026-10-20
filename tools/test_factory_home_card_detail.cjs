@@ -27,7 +27,11 @@ assert.match(home, /if\(previous\)previous\.remove\(\)/);
 assert.doesNotMatch(home, /z-index:20!important;isolation:isolate!important/);
 assert.match(home, /function syncResumePath_\(view,keep\)\{[\s\S]*?clearResumePath_\(view\);/);
 assert.match(home, /function syncCompactResume_\(view,show3d\)/);
-assert.match(home, /Buka detail/);
+assert.ok(home.includes("Smart Resume remains available in Original mode"));
+assert.doesNotMatch(home, /Buka detail/);
+assert.ok(home.includes("ofh-original-mode .ofh-heading{display:block!important;position:relative!important"));
+assert.ok(home.includes("#omodos-smart-resume-compact{display:none!important}"));
+assert.ok(hotfix.includes("factory-home-superadmin.js?v=smart-resume-17"));
 assert.ok(home.includes("'.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact){display:none!important}',"));
 assert.match(home, /ofh-fullscreen-toggle/);
 assert.match(home, /stage\.requestFullscreen/);
@@ -35,10 +39,7 @@ assert.match(home, /root\.classList\.add\('ofh-fullscreen'\)/);
 assert.match(home, /if\(!show3d\)root\?\.classList\.remove\('ofh-fullscreen'\)/);
 assert.match(home, /grid-template-columns:minmax\(0,1fr\) auto/);
 assert.match(home, /@media\(max-width:420px\)/);
-assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-16/);
 
-assert.match(home, /ofh-original-mode \.ofh-heading\{display:flex!important/);
-assert.match(home, /<strong>Smart Resume<\/strong><\/div><button type="button">Buka detail<\/button>/);
 assert.doesNotMatch(home, /Buka Detail Smart Resume/);
 
 console.log('Factory home responsive toolbar, compact Smart Resume, fullscreen and card-detail checks passed.');
