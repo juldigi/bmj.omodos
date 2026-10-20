@@ -118,6 +118,7 @@ function makeStyles(){
   styleNode=document.createElement('style');styleNode.id='omodos-superadmin-factory-home-style';
   styleNode.textContent=[
     '.view.'+VIEW_CLASS+'{position:relative!important;overflow-x:hidden!important;overflow-y:auto!important;padding:0!important;min-height:0!important;max-height:calc(100dvh - 220px)!important}',
+    '.view:not(.'+VIEW_CLASS+') .ofh-resume-root{position:relative!important;z-index:20!important;isolation:isolate!important}',
     '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact):not(.ofh-resume-ancestor):not(.ofh-resume-root){display:none!important}',
     '.view.'+VIEW_CLASS+' .ofh-resume-ancestor>:not(.ofh-resume-ancestor):not(.ofh-resume-root):not(#omodos-smart-resume-compact){display:none!important}',
     '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 160px);min-height:440px;max-height:none;padding:0;margin:0 auto;overflow:hidden;color:#173348}',
@@ -187,10 +188,11 @@ function findSmartResumeCard_(view){
 function syncResumePath_(view,keep){
   if(!view)return;
   clearResumePath_(view);
-  if(!keep)return;
   const resumeRoot=findSmartResumeCard_(view);
   if(!resumeRoot)return;
-  resumeRoot.classList.add('ofh-resume-root','ofh-full-resume');
+  resumeRoot.classList.add('ofh-resume-root');
+  if(!keep)return;
+  resumeRoot.classList.add('ofh-full-resume');
   let node=resumeRoot.parentElement;
   while(node&&node!==view){node.classList.add('ofh-resume-ancestor');node=node.parentElement;}
 }
