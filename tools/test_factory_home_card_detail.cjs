@@ -15,7 +15,7 @@ assert.match(home, /const byName=master\.filter\(row=>normalizeKey\(machineName\
 assert.match(home, /if\(byCode\.length===1\)selected=byCode\[0\]/);
 assert.match(home, /window\.openMachineCurrentStatus\(identity\)/);
 assert.match(home, /OMODOS_FACTORY_STATUS_READY/);
-assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-9/);
+assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-10/);
 
 console.log('Factory 3D status card click/detail and Superadmin isolation checks passed.');
 
