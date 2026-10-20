@@ -117,8 +117,8 @@ function makeStyles(){
   styleNode=document.createElement('style');styleNode.id='omodos-superadmin-factory-home-style';
   styleNode.textContent=[
     '.view.'+VIEW_CLASS+'{position:relative!important;overflow-x:hidden!important;overflow-y:auto!important;padding:0!important;min-height:0!important;max-height:calc(100dvh - 220px)!important}',
-    '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(.ofh-resume-ancestor):not(.ofh-resume-root){display:none!important}',
-    '.view.'+VIEW_CLASS+' .ofh-resume-ancestor>:not(.ofh-resume-ancestor):not(.ofh-resume-root){display:none!important}',
+    '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact):not(.ofh-resume-ancestor):not(.ofh-resume-root){display:none!important}',
+    '.view.'+VIEW_CLASS+' .ofh-resume-ancestor>:not(.ofh-resume-ancestor):not(.ofh-resume-root):not(#omodos-smart-resume-compact){display:none!important}',
     '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 160px);min-height:440px;max-height:none;padding:0;margin:0 auto;overflow:hidden;color:#173348}',
     '#'+ROOT_ID+',#'+ROOT_ID+' *{box-sizing:border-box}',
     '#'+ROOT_ID+' .ofh-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;flex:0 0 auto;padding:6px 2px}',
@@ -138,6 +138,13 @@ function makeStyles(){
     '#'+ROOT_ID+' .ofh-mode-switch button:focus-visible{outline:2px solid #1685c5;outline-offset:2px}',
     '@media(max-width:700px){#'+ROOT_ID+'.ofh-original-mode{height:auto!important;min-height:0!important;max-height:none!important;margin:0 auto 8px!important;padding:0!important}#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:37px;padding:2px 0}#'+ROOT_ID+'.ofh-original-mode h2{font-size:13px}#'+ROOT_ID+' .ofh-mode-switch{gap:2px;padding:2px;border-radius:9px}#'+ROOT_ID+' .ofh-mode-switch button{min-height:29px;padding:5px 7px;font-size:9px}}',
     '#'+ROOT_ID+' .ofh-stage{position:relative;display:flex;flex:1 1 auto;width:100%;height:0;min-height:300px;overflow:hidden;border:1px solid #d5e0e7;border-radius:14px;background:#eaf0f3;box-shadow:0 6px 22px rgba(20,49,67,.09)}',
+    '#'+ROOT_ID+' .ofh-fullscreen-toggle{position:absolute;z-index:12;top:10px;right:10px;min-height:36px;padding:8px 11px;border:1px solid #c5d5df;border-radius:10px;background:rgba(255,255,255,.96);color:#193a51;font:800 12px/1.1 system-ui,-apple-system,sans-serif;box-shadow:0 2px 8px rgba(15,40,55,.15);cursor:pointer;touch-action:manipulation}',
+    '#'+ROOT_ID+' .ofh-fullscreen-toggle:focus-visible{outline:3px solid #1785c1;outline-offset:2px}',
+    '#'+ROOT_ID+'.ofh-fullscreen .ofh-stage{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;min-height:0!important;max-height:none!important;margin:0!important;border:0!important;border-radius:0!important;z-index:2147483000!important;background:#e8eef3}',
+    '#'+ROOT_ID+'.ofh-fullscreen .ofh-stage iframe{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}',
+    '#'+ROOT_ID+'.ofh-fullscreen .ofh-fullscreen-toggle{position:fixed!important;top:max(10px,env(safe-area-inset-top))!important;right:max(10px,env(safe-area-inset-right))!important}',
+    '#'+ROOT_ID+'.ofh-fullscreen .ofh-frame-state{display:none!important}',
+    '#'+ROOT_ID+'.ofh-fullscreen .ofh-heading,#'+ROOT_ID+'.ofh-fullscreen .ofh-footnote{visibility:hidden!important}',
     '#'+ROOT_ID+' .ofh-stage iframe{position:absolute;inset:0;display:block;width:100%;height:100%;min-height:0;border:0;border-radius:inherit;background:#eaf0f3;visibility:hidden}',
     '#'+ROOT_ID+' .ofh-stage.ready iframe{visibility:visible}',
     '#'+ROOT_ID+' .ofh-frame-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:22px;text-align:center;color:#365568;background:linear-gradient(145deg,#f7fafc,#e9f0f4)}',
@@ -171,7 +178,7 @@ function syncResumePath_(view,keep){
   // Preserve the full Smart Resume card rather than only its marker element.
   let resumeRoot=marker,node=marker;
   while(node&&node!==view){
-    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card,article,section')){
+    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card')){
       resumeRoot=node;break;
     }
     node=node.parentElement;
@@ -189,7 +196,7 @@ function syncCompactResume_(view,show3d){
   if(!marker||!view.contains(marker))return;
   let resumeRoot=marker,node=marker;
   while(node&&node!==view){
-    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card,article,section')){resumeRoot=node;break;}
+    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card')){resumeRoot=node;break;}
     node=node.parentElement;
   }
   if(resumeRoot===view)resumeRoot=marker;
@@ -213,7 +220,7 @@ function cleanup(){const view=homeView||document.querySelector('.view.'+VIEW_CLA
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
-  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><div class="ofh-mode-switch" role="group" aria-label="Pilih versi beranda"><button type="button" data-ofh-mode="original" aria-pressed="false">Original</button><button type="button" data-ofh-mode="3d" aria-pressed="true">Factory 3D</button></div></header><div class="ofh-stage"><iframe title="Visualisasi 3D status mesin BMJ" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
+  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><div class="ofh-mode-switch" role="group" aria-label="Pilih versi beranda"><button type="button" data-ofh-mode="original" aria-pressed="false">Original</button><button type="button" data-ofh-mode="3d" aria-pressed="true">Factory 3D</button></div></header><div class="ofh-stage"><button type="button" class="ofh-fullscreen-toggle" aria-pressed="false" aria-label="Tampilkan 3D layar penuh">⛶ Layar Penuh</button><iframe title="Visualisasi 3D status mesin BMJ" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
   view.prepend(root);return root;
 }
 function fitMobileViewport_(){
@@ -259,6 +266,11 @@ function sync(){
     cleanup();homeView=view;makeStyles();
     const root=createRoot(view);iframe=root.querySelector('iframe');
     root.querySelectorAll('[data-ofh-mode]').forEach(button=>button.addEventListener('click',()=>setHomeMode_(button.dataset.ofhMode,true)));
+    const stage=root.querySelector('.ofh-stage'),fullscreenButton=root.querySelector('.ofh-fullscreen-toggle');
+    const syncFullscreenLabel=()=>{const active=document.fullscreenElement===stage||root.classList.contains('ofh-fullscreen');fullscreenButton.setAttribute('aria-pressed',active?'true':'false');fullscreenButton.textContent=active?'⤢ Keluar Layar Penuh':'⛶ Layar Penuh';fullscreenButton.setAttribute('aria-label',active?'Keluar dari layar penuh':'Tampilkan 3D layar penuh');};
+    fullscreenButton.addEventListener('click',async()=>{const active=document.fullscreenElement===stage||root.classList.contains('ofh-fullscreen');if(active){if(document.fullscreenElement===stage&&document.exitFullscreen){try{await document.exitFullscreen();}catch(e){}}root.classList.remove('ofh-fullscreen');syncFullscreenLabel();return;}if(stage.requestFullscreen){try{await stage.requestFullscreen();syncFullscreenLabel();return;}catch(e){}}root.classList.add('ofh-fullscreen');syncFullscreenLabel();});
+    document.addEventListener('fullscreenchange',syncFullscreenLabel);
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&root.classList.contains('ofh-fullscreen')&&!document.fullscreenElement){root.classList.remove('ofh-fullscreen');syncFullscreenLabel();}});
     iframe.addEventListener('load',()=>sendStatuses(true));
     iframe.addEventListener('error',()=>{const state=root.querySelector('.ofh-frame-state');if(state)state.innerHTML='<strong>Viewer 3D belum dapat dimuat</strong><span>Fungsi OMODOS lainnya tetap tersedia. Coba muat ulang beranda beberapa saat lagi.</span>';const foot=root.querySelector('.ofh-footnote');if(foot)foot.textContent='Viewer 3D belum siap; fitur OMODOS lain tetap dapat digunakan.';});
     setHomeMode_(readSavedMode_(),false);
