@@ -155,6 +155,7 @@ function makeStyles(){
     '#'+ROOT_ID+' .ofh-stage.ready .ofh-frame-state{display:none}',
     '#'+ROOT_ID+' .ofh-footnote{flex:0 0 auto;margin:0;padding:0 3px;color:#6c8190;font-size:10px;line-height:1.35}',
     '.view.'+VIEW_CLASS+' .ofh-full-resume{display:none!important}',
+    '.view.'+VIEW_CLASS+' .ofh-resume-root.ofh-full-resume{visibility:hidden!important;pointer-events:none!important}',
     '#omodos-smart-resume-compact{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1px solid #d9e2e8;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(20,49,67,.06);color:#193548}',
     '#omodos-smart-resume-compact .ofh-sr-copy{min-width:0;flex:1 1 140px}',
     '#omodos-smart-resume-compact strong{display:block;font-size:12px;font-weight:850;line-height:1.25}',
@@ -170,23 +171,27 @@ function clearResumePath_(view){
   view.querySelectorAll('.ofh-resume-ancestor,.ofh-resume-root,.ofh-full-resume').forEach(node=>node.classList.remove('ofh-resume-ancestor','ofh-resume-root','ofh-full-resume'));
   view.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());
 }
+function findSmartResumeCard_(view){
+  const marker=document.getElementById('home-smart-resume');
+  if(!marker||!view?.contains(marker))return null;
+  let fallback=marker;
+  for(let node=marker.parentElement;node&&node!==view;node=node.parentElement){
+    const text=String(node.innerText||node.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+    const hasTitle=text.includes('smart resume pabrik')||text.includes('smart resume');
+    const hasResumeMetrics=text.includes('total lost time')||text.includes('pekerjaan berstatus')||text.includes('24 jam terakhir');
+    if(hasTitle&&hasResumeMetrics&&node.children.length>0)return node;
+    if(hasTitle&&node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card'))fallback=node;
+  }
+  return fallback;
+}
 function syncResumePath_(view,keep){
   if(!view)return;
   clearResumePath_(view);
   if(!keep)return;
-  const marker=document.getElementById('home-smart-resume');
-  if(!marker||!view.contains(marker))return;
-  // Preserve the full Smart Resume card rather than only its marker element.
-  let resumeRoot=marker,node=marker;
-  while(node&&node!==view){
-    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card')){
-      resumeRoot=node;break;
-    }
-    node=node.parentElement;
-  }
-  if(resumeRoot===view)resumeRoot=marker;
+  const resumeRoot=findSmartResumeCard_(view);
+  if(!resumeRoot)return;
   resumeRoot.classList.add('ofh-resume-root','ofh-full-resume');
-  node=resumeRoot.parentElement;
+  let node=resumeRoot.parentElement;
   while(node&&node!==view){node.classList.add('ofh-resume-ancestor');node=node.parentElement;}
 }
 function syncCompactResume_(view,show3d){
@@ -195,12 +200,7 @@ function syncCompactResume_(view,show3d){
   if(!show3d||!isSuperadmin())return;
   const marker=document.getElementById('home-smart-resume');
   if(!marker||!view.contains(marker))return;
-  let resumeRoot=marker,node=marker;
-  while(node&&node!==view){
-    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card')){resumeRoot=node;break;}
-    node=node.parentElement;
-  }
-  if(resumeRoot===view)resumeRoot=marker;
+  const resumeRoot=findSmartResumeCard_(view)||marker;
   const compact=document.createElement('section');
   compact.id='omodos-smart-resume-compact';
   compact.setAttribute('aria-label','Smart Resume Pabrik ringkas');
