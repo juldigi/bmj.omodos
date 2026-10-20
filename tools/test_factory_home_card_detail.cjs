@@ -32,4 +32,4 @@ assert.match(home, /ofh-resume-ancestor/);
 assert.match(home, /syncResumePath_\(view,show3d\)/);
 assert.match(home, /view\.style\.overflowY='auto'/);
 assert.match(home, /const rootHeight=Math\.max\(320,Math\.min\(mobile\?560:760,available-165\)\)/);
-assert.match(hotfix, /factory-home-superadmin\.js\\?v=smart-resume-5/);
+assert.match(hotfix, /factory-home-superadmin\.js\?v=smart-resume-5/);
