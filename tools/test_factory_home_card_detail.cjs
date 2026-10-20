@@ -27,7 +27,7 @@ assert.match(home, /if\(previous\)previous\.remove\(\)/);
 assert.doesNotMatch(home, /z-index:20!important;isolation:isolate!important/);
 assert.match(home, /function syncResumePath_\(view,keep\)\{[\s\S]*?clearResumePath_\(view\);/);
 assert.match(home, /function syncCompactResume_\(view,show3d\)/);
-assert.match(home, /Buka Detail Smart Resume/);
+assert.match(home, /Buka detail/);
 assert.ok(home.includes("'.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact){display:none!important}',"));
 assert.match(home, /ofh-fullscreen-toggle/);
 assert.match(home, /stage\.requestFullscreen/);
