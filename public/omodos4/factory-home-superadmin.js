@@ -82,6 +82,7 @@ function setHomeMode_(mode,persist){
   if(view)view.classList.toggle(VIEW_CLASS,show3d);
   document.documentElement.classList.toggle(VIEW_CLASS,show3d);
   syncResumePath_(view,show3d);
+  syncCompactResume_(view,show3d);
   if(root){
     root.classList.toggle('ofh-original-mode',!show3d);
     const title=root.querySelector('h2'),subtitle=root.querySelector('.ofh-subtitle');
@@ -145,13 +146,21 @@ function makeStyles(){
     '#'+ROOT_ID+' .ofh-stage{flex:1 1 auto;min-height:0}',
     '#'+ROOT_ID+' .ofh-stage.ready .ofh-frame-state{display:none}',
     '#'+ROOT_ID+' .ofh-footnote{flex:0 0 auto;margin:0;padding:0 3px;color:#6c8190;font-size:10px;line-height:1.35}',
+    '.view.'+VIEW_CLASS+' .ofh-full-resume{display:none!important}',
+    '#omodos-smart-resume-compact{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1px solid #d9e2e8;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(20,49,67,.06);color:#193548}',
+    '#omodos-smart-resume-compact .ofh-sr-copy{min-width:0;flex:1 1 140px}',
+    '#omodos-smart-resume-compact strong{display:block;font-size:12px;font-weight:850;line-height:1.25}',
+    '#omodos-smart-resume-compact span{display:block;margin-top:3px;font-size:10px;line-height:1.35;color:#687f8e}',
+    '#omodos-smart-resume-compact button{flex:0 0 auto;min-height:34px;border:1px solid #c6d6df;border-radius:9px;padding:7px 10px;background:#193a51;color:#fff;font:800 10px/1.2 system-ui,-apple-system,sans-serif;cursor:pointer;touch-action:manipulation}',
+    '#omodos-smart-resume-compact button:focus-visible{outline:2px solid #1685c5;outline-offset:2px}',
     '@media(max-width:700px){#'+ROOT_ID+'{height:calc(100dvh - 136px);min-height:370px;gap:6px}#'+ROOT_ID+' .ofh-heading{min-height:42px;padding:3px 1px}#'+ROOT_ID+' .ofh-eyebrow{font-size:8px}#'+ROOT_ID+' h2{font-size:17px}#'+ROOT_ID+' .ofh-subtitle{font-size:10px;max-width:255px}#'+ROOT_ID+' .ofh-tag{font-size:8px;padding:5px 7px}#'+ROOT_ID+' .ofh-stage{min-height:270px;border-radius:10px}#'+ROOT_ID+' .ofh-frame-state strong{font-size:12px}#'+ROOT_ID+' .ofh-frame-state span{font-size:10px}#'+ROOT_ID+' .ofh-footnote{font-size:9px}}'
   ].join('\n');
   document.head.appendChild(styleNode);
 }
 function clearResumePath_(view){
   if(!view)return;
-  view.querySelectorAll('.ofh-resume-ancestor,.ofh-resume-root').forEach(node=>node.classList.remove('ofh-resume-ancestor','ofh-resume-root'));
+  view.querySelectorAll('.ofh-resume-ancestor,.ofh-resume-root,.ofh-full-resume').forEach(node=>node.classList.remove('ofh-resume-ancestor','ofh-resume-root','ofh-full-resume'));
+  view.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());
 }
 function syncResumePath_(view,keep){
   if(!view)return;
@@ -168,9 +177,33 @@ function syncResumePath_(view,keep){
     node=node.parentElement;
   }
   if(resumeRoot===view)resumeRoot=marker;
-  resumeRoot.classList.add('ofh-resume-root');
+  resumeRoot.classList.add('ofh-resume-root','ofh-full-resume');
   node=resumeRoot.parentElement;
   while(node&&node!==view){node.classList.add('ofh-resume-ancestor');node=node.parentElement;}
+}
+function syncCompactResume_(view,show3d){
+  if(!view)return;
+  view.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());
+  if(!show3d||!isSuperadmin())return;
+  const marker=document.getElementById('home-smart-resume');
+  if(!marker||!view.contains(marker))return;
+  let resumeRoot=marker,node=marker;
+  while(node&&node!==view){
+    if(node.matches?.('[data-smart-resume],.smart-resume-card,.home-smart-resume,.home-resume-card,.dashboard-card,.card,article,section')){resumeRoot=node;break;}
+    node=node.parentElement;
+  }
+  if(resumeRoot===view)resumeRoot=marker;
+  const compact=document.createElement('section');
+  compact.id='omodos-smart-resume-compact';
+  compact.setAttribute('aria-label','Smart Resume Pabrik ringkas');
+  compact.innerHTML='<div class="ofh-sr-copy"><strong>Smart Resume Pabrik</strong><span>Ringkasan singkat tersedia. Buka detail untuk melihat tindak lanjut, lost time, KPI, dan sparepart.</span></div><button type="button">Buka Detail Smart Resume</button>';
+  compact.querySelector('button').addEventListener('click',()=>{
+    setHomeMode_('original',true);
+    window.setTimeout(()=>{try{resumeRoot.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},80);
+  });
+  const root=document.getElementById(ROOT_ID);
+  if(root&&root.parentElement===view)root.insertAdjacentElement('afterend',compact);
+  else view.prepend(compact);
 }
 function restoreViewSizing_(view){
   if(!view)return;
