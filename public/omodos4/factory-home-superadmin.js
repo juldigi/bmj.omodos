@@ -114,10 +114,13 @@ function setHomeMode_(mode,persist){
 }
 
 function makeStyles(){
-  if(styleNode)return;
+  // Hotfix scripts can be reloaded without a full page navigation. Replace the
+  // previous stylesheet instead of leaving stale floating/scroll-lock rules behind.
+  const previous=document.getElementById('omodos-superadmin-factory-home-style');
+  if(previous)previous.remove();
   styleNode=document.createElement('style');styleNode.id='omodos-superadmin-factory-home-style';
   styleNode.textContent=[
-    '.view.'+VIEW_CLASS+'{position:relative!important;overflow-x:hidden!important;overflow-y:auto!important;padding:0!important;min-height:0!important;max-height:calc(100dvh - 220px)!important}',
+    '.view.'+VIEW_CLASS+'{padding:0!important;min-height:0!important}',
     '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact){display:none!important}',
     '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 160px);min-height:440px;max-height:none;padding:0;margin:0 auto;overflow:hidden;color:#173348}',
     '#'+ROOT_ID+',#'+ROOT_ID+' *{box-sizing:border-box}',
@@ -167,6 +170,7 @@ function clearResumePath_(view){
   if(!view)return;
   view.querySelectorAll('.ofh-resume-ancestor,.ofh-resume-root,.ofh-full-resume').forEach(node=>node.classList.remove('ofh-resume-ancestor','ofh-resume-root','ofh-full-resume'));
   view.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());
+  document.getElementById('omodos-smart-resume-compact')?.remove();
 }
 function syncResumePath_(view,keep){
   // Keep the original dashboard DOM in natural flow; no marker gets positioned,
@@ -209,28 +213,25 @@ function fitMobileViewport_(){
   if(currentMode!=='3d'||!isSuperadmin()){
     root.style.removeProperty('height');root.style.removeProperty('min-height');root.style.removeProperty('max-height');
     if(stage){stage.style.removeProperty('min-height');stage.style.removeProperty('height');}
-    restoreViewSizing_(view);return;
+    restoreViewSizing_(view);
+    return;
   }
   const viewportHeight=Math.max(0,window.innerHeight||document.documentElement.clientHeight||0);
   if(viewportHeight<320)return;
   const mobile=window.matchMedia('(max-width:700px)').matches;
-  const viewTop=Math.max(0,view.getBoundingClientRect().top);
-  let bottomLimit=viewportHeight-140;
-  const candidates=Array.from(document.querySelectorAll('nav,[role="navigation"],[role="tablist"],footer'));
-  candidates.forEach(el=>{
-    if(root.contains(el)||el.contains(root)||view.contains(el))return;
-    const style=window.getComputedStyle(el),rect=el.getBoundingClientRect();
-    if((style.position!=='fixed'&&style.position!=='sticky')||rect.height<42||rect.top<viewTop+100||rect.top>viewportHeight)return;
-    bottomLimit=Math.min(bottomLimit,rect.top-8);
-  });
-  const available=Math.max(340,Math.min(viewportHeight-viewTop-4,bottomLimit-viewTop-4));
-  view.style.height=available+'px';view.style.maxHeight=available+'px';view.style.minHeight='0px';
-  view.style.overflowY='auto';view.style.overflowX='hidden';
-  // Leave visible scroll space for Smart Resume beneath the 3D viewer.
-  const rootHeight=Math.max(320,Math.min(mobile?560:760,available-165));
-  root.style.height=rootHeight+'px';root.style.minHeight='0px';root.style.maxHeight=rootHeight+'px';
+  const rootTop=Math.max(0,root.getBoundingClientRect().top);
+  // Size only the 3D module. Never turn the whole dashboard into a nested
+  // fixed-height scroller: the original cards and Smart Resume must stay in
+  // the page's normal scroll flow below the viewer.
+  const available=Math.max(mobile?300:360,viewportHeight-rootTop-(mobile?190:110));
+  const rootHeight=Math.max(mobile?300:360,Math.min(mobile?560:760,available));
+  root.style.height=rootHeight+'px';
+  root.style.minHeight='0px';
+  root.style.maxHeight=rootHeight+'px';
   if(stage){stage.style.height='0px';stage.style.minHeight=mobile?'220px':'300px';}
-}function sendStatuses(force){
+  restoreViewSizing_(view);
+}
+function sendStatuses(force){
   if(!isSuperadmin()||currentMode!=='3d')return;const root=document.getElementById(ROOT_ID);if(!root)return;const frame=root.querySelector('iframe');if(!frame||!frame.contentWindow)return;
   const now=Date.now();if(!force&&now-lastSendAt<5000)return;const records=latestRecords();
   const fingerprint=records.map(r=>[r.code,r.name,r.status,r.date,r.index].join('|')).join('~');
