@@ -219,11 +219,10 @@ function fitMobileViewport_(){
   const viewportHeight=Math.max(0,window.innerHeight||document.documentElement.clientHeight||0);
   if(viewportHeight<320)return;
   const mobile=window.matchMedia('(max-width:700px)').matches;
-  const rootTop=Math.max(0,root.getBoundingClientRect().top);
-  // Size only the 3D module. Never turn the whole dashboard into a nested
-  // fixed-height scroller: the original cards and Smart Resume must stay in
-  // the page's normal scroll flow below the viewer.
-  const available=Math.max(mobile?300:360,viewportHeight-rootTop-(mobile?190:110));
+  // Size only the 3D module using viewport dimensions, not its changing
+  // scroll position. This avoids height jumps while the page is being scrolled.
+  // The original cards and Smart Resume remain in the page's normal flow.
+  const available=Math.max(mobile?300:360,viewportHeight-(mobile?350:250));
   const rootHeight=Math.max(mobile?300:360,Math.min(mobile?560:760,available));
   root.style.height=rootHeight+'px';
   root.style.minHeight='0px';
