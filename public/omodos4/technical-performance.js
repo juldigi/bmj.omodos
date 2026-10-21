@@ -30,7 +30,7 @@ function ratioValue(key,row){var n=number(val(row,key));if(!Number.isFinite(n))r
 function pctText(n){return Number.isFinite(n)?fmt(n*100,1)+'%':'—';}
 /* Exact MTC category only; breakdown maintenance|maintenance breakdown are not treated as MTC. */
 function calc(){
-var mtcRows=state.rows.filter(function(r){return /^MTC$/i.test(String(val(r,'category')).trim());});
+var mtcRows=state.rows.filter(function(r){return /^mtc$/i.test(String(val(r,'category')).trim());});
 var allHours=state.rows.map(function(r){return hours(r,false);}).filter(Number.isFinite),mtcHours=mtcRows.map(function(r){return hours(r,true);}).filter(Number.isFinite);
 var incidentValues=mtcRows.map(function(r){return number(val(r,'bd'));}).filter(Number.isFinite);var incidents=incidentValues.length?incidentValues.reduce(function(a,b){return a+b;},0):mtcRows.filter(function(r){return val(r,'incident')!==''||val(r,'downtime')!==''||val(r,'lt')!=='';}).length;
 var paired=state.rows.map(function(r){return {energy:number(val(r,'energy')),sheets:number(val(r,'sheets'))};}).filter(function(x){return Number.isFinite(x.energy)&&x.energy>=0&&Number.isFinite(x.sheets)&&x.sheets>0;});
