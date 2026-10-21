@@ -9375,10 +9375,10 @@ function renderLogbookChunk_(reset){
 
 function computeStats(){
   const entriesRef = ENTRIES;
-  const cached = LOGBOOK_STATS_CACHE_;
-  if(cached && cached.entriesRef===entriesRef && cached.value) return cached.value;
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const cached = LOGBOOK_STATS_CACHE_;
+  if(cached && cached.entriesRef===entriesRef && cached.today===today && cached.value) return cached.value;
   const stats={total:ENTRIES.length,selesai:0,proses:0,emergency:0,todayCount:0};
   for(const entry of ENTRIES){
     const cls=statusClass(entry['Status']);
@@ -9387,7 +9387,7 @@ function computeStats(){
     else if(cls==='emergency')stats.emergency++;
     if(entry['Tanggal']===today)stats.todayCount++;
   }
-  LOGBOOK_STATS_CACHE_ = { entriesRef, value:stats };
+  LOGBOOK_STATS_CACHE_ = { entriesRef, today, value:stats };
   return stats;
 }
 
