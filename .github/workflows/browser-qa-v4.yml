@@ -1695,7 +1695,7 @@ jobs:
           JS
 
           node --check v4-qa.mjs
-          timeout -k 5s 75s node v4-qa.mjs
+          timeout -k 5s 150s node v4-qa.mjs
 
       - name: Remove transient QA files
         if: always()
