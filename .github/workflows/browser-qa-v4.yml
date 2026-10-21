@@ -40,6 +40,7 @@ jobs:
           grep -Fq "var mtcRows=state.rows.filter(function(r){return /^mtc$/i.test(String(val(r,'category')).trim());});" public/omodos4/technical-performance.js
           grep -Fq 'function calcOeeRows()' public/omodos4/technical-performance.js
           grep -Fq 'function hours(row,useMtcLostTime)' public/omodos4/technical-performance.js
+          grep -Fq "state.mapping.lt?val(row,'lt'):val(row,'downtime')" public/omodos4/technical-performance.js
           grep -Fq 'hours(r,false)' public/omodos4/technical-performance.js
           grep -Fq 'hours(r,true)' public/omodos4/technical-performance.js
           grep -Fq 'Availability × Performance × Quality' public/omodos4/technical-performance.js
