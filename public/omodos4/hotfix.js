@@ -1123,3 +1123,20 @@ const css=document.createElement('style');css.textContent=[
  '@media(max-width:700px){#btn-logbook-export-pdf{margin:8px 0 0}.omodos-logbook-pdf-dialog{padding:14px}.omodos-logbook-pdf-actions button{min-height:38px}}'
 ].join('\n');document.head.appendChild(css);
 })();
+
+
+/* TECHNICAL_PERFORMANCE_IMPORT_MVP_V1 — isolated additive module */
+(function(){
+'use strict';
+function loadTechnicalPerformance(){
+  if(!document.getElementById('omodos-technical-performance-script')){
+    var script=document.createElement('script');
+    script.id='omodos-technical-performance-script';
+    script.src='/omodos4/technical-performance.js';
+    script.async=true;
+    document.head.appendChild(script);
+  }
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadTechnicalPerformance,{once:true});
+else loadTechnicalPerformance();
+})();
