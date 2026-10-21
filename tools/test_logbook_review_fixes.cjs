@@ -68,6 +68,24 @@ assert.match(base,/const LOGBOOK_MOBILE_PAGE_SIZE_ = 20/);
 assert.ok(base.includes("const pageSize = typeof window.matchMedia==='function'") && base.includes('LOGBOOK_MOBILE_PAGE_SIZE_'),'responsive mobile Logbook rendering');
 assert.match(base,/let LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap\(\)/);
 assert.match(base,/function logbookAttachmentCount_\(entry\)/);
+const rawCountStart=base.indexOf('function rawAttachmentCount_(raw){');
+const rawCountEnd=base.indexOf('\\nfunction logbookAttachmentCount_(entry)',rawCountStart);
+assert.ok(rawCountStart>=0&&rawCountEnd>rawCountStart,'lightweight raw attachment counter exists');
+const rawCountSource=base.slice(rawCountStart,rawCountEnd);
+assert.doesNotMatch(rawCountSource,/parseAttachments\(/,'badge count must not normalize every attachment');
+const rawAttachmentCount=new Function(rawCountSource+'; return rawAttachmentCount_;')();
+for(const [raw,expected] of [
+  ['',0],['   ',0],[[],0],[[{},{}],2],['[]',0],
+  ['[{"name":"one"},{"name":"two"}]',2],['{"name":"one"}',1],
+  ['https://example.test/one.jpg\\nhttps://example.test/two.jpg',2],
+  ['bad-url',1],[null,0],[{name:'one'},0]
+]){
+  assert.equal(rawAttachmentCount(raw),expected,'raw attachment count for '+String(raw));
+}
+const countStart=base.indexOf('function logbookAttachmentCount_(entry){');
+const countEnd=base.indexOf('\\nfunction logbookSearchText_(entry)',countStart);
+assert.ok(countStart>=0&&countEnd>countStart,'cached attachment counter exists');
+assert.doesNotMatch(base.slice(countStart,countEnd),/parseAttachments\(raw\)/,'cached badge counter stays lightweight');
 assert.match(base,/const attCount = logbookAttachmentCount_\(e\)/);
 assert.match(base,/btn-entry-show-all-attachments/);
 assert.match(base,/let LOGBOOK_MACHINE_INDEX_CACHE_ = \{ entriesRef:null, machinesRef:null, value:null \}/);
