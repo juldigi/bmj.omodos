@@ -6080,6 +6080,8 @@ const DEFAULT_WEB_APP_URL = location.origin + '/api';
 let WEB_APP_URL = DEFAULT_WEB_APP_URL;
 let ENTRIES = [];
 let MACHINES = [];
+// Keep the explicit window alias in sync for OMODOS compatibility modules.
+window.ENTRIES = ENTRIES;
 let PERSONIL = [];
 let PATROL_TEMPLATE = []; // item checklist patrol spesifik per mesin, dari sheet Patrol_Checklist_Template
 let KB_ENTRIES = [];
@@ -6942,6 +6944,7 @@ async function applyLogbookDataFix(){
     toast(`Perbaikan diterapkan: ${res.dateFixCount} tanggal + ${res.jenisFixCount} Jenis Pekerjaan.`);
     $('#data-fix-result').innerHTML = `<div class="sub" style="color:var(--green,#3fc978);">✅ Selesai diterapkan. Memuat ulang data...</div>`;
     ENTRIES = await apiGet('list');
+    window.ENTRIES = ENTRIES;
     goToView('setting');
   }catch(err){
     applyBtn.disabled = false; applyBtn.innerHTML = oldLabel;
@@ -8721,6 +8724,7 @@ async function prepareAllData_(){
   // Keep prefetched responses fresh throughout hydration, even on slow connections.
   READY_READS.forEach(value=>{value.time=Date.now();});
   ENTRIES = entriesSource.slice().sort((a,b)=>new Date(b['Timestamp Input'])-new Date(a['Timestamp Input']));
+  window.ENTRIES = ENTRIES;
   MACHINES = machineSource.map(m=>({...m,'Kode Mesin':norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : '', 'Nama Mesin':norm_(m['Nama Mesin']) ? String(m['Nama Mesin']).trim() : (norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : 'Mesin tanpa nama')}));
   PERSONIL = personSource;
   PATROL_TEMPLATE = patrolTemplateSource;
