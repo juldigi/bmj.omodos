@@ -9303,8 +9303,12 @@ let LOGBOOK_FILTERED_ENTRIES_ = [];
 let LOGBOOK_RENDERED_COUNT_ = 0;
 let LOGBOOK_SORTED_SOURCE_REF_ = null;
 let LOGBOOK_SORTED_SOURCE_CACHE_ = [];
+let LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
+let LOGBOOK_SEARCH_DEBOUNCE_TIMER_ = null;
+const LOGBOOK_SEARCH_DEBOUNCE_MS_ = 130;
 function invalidateLogbookSortCache_(){
   LOGBOOK_SORTED_SOURCE_REF_ = null;
+  LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
 }
 function logbookOrderedEntries_(){
   if(LOGBOOK_SORTED_SOURCE_REF_ !== ENTRIES){
@@ -9317,8 +9321,17 @@ function logbookOrderedEntries_(){
       const tb=Date.parse(b['Timestamp Input']||b.Timestamp||'')||0;
       return tb-ta;
     });
+    LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
   }
   return LOGBOOK_SORTED_SOURCE_CACHE_;
+}
+function logbookSearchText_(entry){
+  if(!entry || typeof entry!=='object') return '';
+  const cached=LOGBOOK_SEARCH_TEXT_CACHE_.get(entry);
+  if(cached!==undefined) return cached;
+  const hay=[entry['Nama Mesin'],entry['Kode Mesin'],entry['Nama Unit'],entry['Nama Pelapor'],entry['Deskripsi Masalah'],entry['Lokasi/Area'],entry['Nomor Notifikasi Pekerjaan']].join(' ').toLocaleLowerCase('id');
+  LOGBOOK_SEARCH_TEXT_CACHE_.set(entry,hay);
+  return hay;
 }
 function renderLogbookChunk_(reset){
   const holder=$('#list-utama');
@@ -9348,12 +9361,15 @@ function renderLogbookChunk_(reset){
 function computeStats(){
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const total = ENTRIES.length;
-  const selesai = ENTRIES.filter(e=>statusClass(e['Status'])==='selesai').length;
-  const proses = ENTRIES.filter(e=>statusClass(e['Status'])==='proses').length;
-  const emergency = ENTRIES.filter(e=>statusClass(e['Status'])==='emergency').length;
-  const todayCount = ENTRIES.filter(e=> e['Tanggal']===today).length;
-  return {total, selesai, proses, emergency, todayCount};
+  const stats={total:ENTRIES.length,selesai:0,proses:0,emergency:0,todayCount:0};
+  for(const entry of ENTRIES){
+    const cls=statusClass(entry['Status']);
+    if(cls==='selesai')stats.selesai++;
+    else if(cls==='proses')stats.proses++;
+    else if(cls==='emergency')stats.emergency++;
+    if(entry['Tanggal']===today)stats.todayCount++;
+  }
+  return stats;
 }
 
 function renderUtama(){
@@ -9395,7 +9411,8 @@ function renderUtama(){
 }
 
 function applyUtamaFilters(){
-  const q = ($('#search-utama').value || '').toLowerCase();
+  if(LOGBOOK_SEARCH_DEBOUNCE_TIMER_){clearTimeout(LOGBOOK_SEARCH_DEBOUNCE_TIMER_);LOGBOOK_SEARCH_DEBOUNCE_TIMER_=null;}
+  const q = ($('#search-utama').value || '').trim().toLocaleLowerCase('id');
   const mk = $('#filter-machine')?.value || '';
   const machineIdx = mk ? buildMachineIndex_() : null;
   const st = $('#filter-status').value;
@@ -9410,10 +9427,7 @@ function applyUtamaFilters(){
     if(st && (e['Status']||'') !== st) return false;
     if(jn && (e['Jenis Pekerjaan']||'') !== jn) return false;
     if(gr && (e['Grouping Pekerjaan']||'') !== gr) return false;
-    if(q){
-      const hay = [e['Nama Mesin'],e['Kode Mesin'],e['Nama Unit'],e['Nama Pelapor'],e['Deskripsi Masalah'],e['Lokasi/Area'],e['Nomor Notifikasi Pekerjaan']].join(' ').toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
+    if(q && !logbookSearchText_(e).includes(q)) return false;
     return true;
   });
   const holder = $('#list-utama');
@@ -9432,7 +9446,11 @@ function resetLogbookCardFilterForManual_(){
     $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat==='total'; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
   }
 }
-$('#search-utama').addEventListener('input', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
+$('#search-utama').addEventListener('input', ()=>{
+  resetLogbookCardFilterForManual_();
+  if(LOGBOOK_SEARCH_DEBOUNCE_TIMER_) clearTimeout(LOGBOOK_SEARCH_DEBOUNCE_TIMER_);
+  LOGBOOK_SEARCH_DEBOUNCE_TIMER_=setTimeout(()=>{LOGBOOK_SEARCH_DEBOUNCE_TIMER_=null;applyUtamaFilters();},LOGBOOK_SEARCH_DEBOUNCE_MS_);
+});
 $('#filter-machine').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
 $('#filter-status').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
 $('#filter-jenis').addEventListener('change', ()=>{ resetLogbookCardFilterForManual_(); applyUtamaFilters(); });
