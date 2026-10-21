@@ -14,6 +14,39 @@ assert.ok(us>=0&&ue>us,'updateEntry block exists');
 const update=worker.slice(us,ue);
 assert.match(worker,/var explicitCustom=!!customArea&&customArea===area/);
 assert.match(worker,/data\.namaAreaLainnya\|\|data\["Nama Area Lainnya"\]/);
+assert.match(worker,/"logbookAttachments": \{ permission: "logbook\.read", audit: false, idempotent: false, handler: "getLogbookAttachments_", method: "GET" \}/);
+assert.match(worker,/function logbookAttachmentCountRaw_\(raw\)/);
+assert.match(worker,/function summarizeLogbookRows_\(rows\)/);
+assert.match(worker,/copy\["Lampiran Count"\] = logbookAttachmentCountRaw_\(copy\["Lampiran \(JSON\)"\]\)/);
+assert.match(worker,/delete copy\["Lampiran \(JSON\)"\]/);
+assert.match(worker,/function getLogbookAttachments_\(params\)/);
+assert.match(worker,/action === "logbookAttachments" && typeof getLogbookAttachments_/);
+assert.match(worker,/var summary = String\(params\.summary \|\| ""\) === "1"/);
+assert.match(worker,/var lightweightRecentEntries = summarizeLogbookRows_\(recentEntries\)/);
+const compactStart=worker.indexOf('  function logbookAttachmentCountRaw_(raw) {');
+const compactEnd=worker.indexOf('  function getLogbookAttachments_(params) {',compactStart);
+assert.ok(compactStart>=0&&compactEnd>compactStart,'compact Logbook helper block exists');
+const compactSource=worker.slice(compactStart,compactEnd);
+const compactHelpers=new Function('__name',compactSource+'; return {logbookAttachmentCountRaw_,summarizeLogbookRows_};')((fn)=>fn);
+const compactRows=compactHelpers.summarizeLogbookRows_([
+  {ID:'one',Status:'Selesai','Lampiran (JSON)':[{},{}]},
+  {ID:'two',Status:'Proses','Lampiran (JSON)':'[{"name":"a"},{"name":"b"},{"name":"c"}]'},
+  {ID:'three',Status:'Pending','Lampiran (JSON)':'https://example.test/a.jpg\\nhttps://example.test/b.jpg'}
+]);
+assert.deepEqual(compactRows.map(r=>r['Lampiran Count']),[2,3,2],'summary count matches source attachment shapes');
+assert.ok(compactRows.every(r=>!Object.prototype.hasOwnProperty.call(r,'Lampiran (JSON)')),'summary rows omit full attachment payloads');
+assert.equal(compactRows[0].Status,'Selesai','summary preserves non-attachment fields');
+const attachmentStart=worker.indexOf('  function getLogbookAttachments_(params) {');
+const attachmentEnd=worker.indexOf('  __name(getLogbookAttachments_',attachmentStart);
+assert.ok(attachmentStart>=0&&attachmentEnd>attachmentStart,'per-entry attachment endpoint exists');
+const attachmentSource=worker.slice(attachmentStart,attachmentEnd);
+const getAttachmentsForTest=new Function('getLogbookListFull_','safeJsonParse_',attachmentSource+'; return getLogbookAttachments_;')(
+  ()=>[{ID:'one','Lampiran (JSON)':[ {name:'a'}, {name:'b'} ]}],
+  (value,fallback)=>{try{return JSON.parse(value);}catch(e){return fallback;}}
+);
+assert.equal(getAttachmentsForTest({id:'one'}).length,2,'attachment endpoint returns only the requested row payload');
+assert.throws(()=>getAttachmentsForTest({}),err=>err&&err.message==='ID Logbook wajib diisi','attachment endpoint requires a Logbook ID');
+assert.throws(()=>getAttachmentsForTest({id:'missing'}),err=>err&&err.message==='Catatan Logbook tidak ditemukan','attachment endpoint rejects missing rows');
 assert.match(worker,/rowMap\["Nomor MO"\] = trainingValue_\(data\.nomorMO\) \|\| ""/);
 assert.match(update,/attachmentList\.push\(uploaded\)/);
 assert.match(update,/rowMap\["Lampiran \(JSON\)"\] = JSON\.stringify\(attachmentList\)/);
@@ -68,6 +101,12 @@ assert.match(base,/const LOGBOOK_MOBILE_PAGE_SIZE_ = 20/);
 assert.ok(base.includes("const pageSize = typeof window.matchMedia==='function'") && base.includes('LOGBOOK_MOBILE_PAGE_SIZE_'),'responsive mobile Logbook rendering');
 assert.match(base,/let LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap\(\)/);
 assert.match(base,/function logbookAttachmentCount_\(entry\)/);
+assert.match(base,/const readParams = action === 'list' \? \{ summary:'1' \} : \{\}/);
+assert.match(base,/let LOGBOOK_ATTACHMENT_LOAD_PROMISES_ = new WeakMap\(\)/);
+assert.match(base,/async function ensureLogbookAttachments_\(entry\)/);
+assert.match(base,/apiGet\('logbookAttachments',\{id\},1\)/);
+assert.match(base,/async function loadLogbookAttachmentPreview_\(entry,id,slot\)/);
+assert.match(base,/await ensureLogbookAttachments_\(e\);renderEntryEditForm\(e\)/);
 const rawCountStart=base.indexOf('function rawAttachmentCount_(raw){');
 const rawCountEnd=base.indexOf('\nfunction logbookAttachmentCount_(entry)',rawCountStart);
 assert.ok(rawCountStart>=0&&rawCountEnd>rawCountStart,'lightweight raw attachment counter exists');
@@ -101,9 +140,12 @@ assert.ok(detailStart>=0&&detailEnd>detailStart,'Logbook detail renderer exists'
 const detail=base.slice(detailStart,detailEnd);
 assert.match(detail,/const rawAttachments = e\['Lampiran \(JSON\)'\]/);
 assert.match(detail,/const attachmentCount = logbookAttachmentCount_\(e\)/);
+assert.match(detail,/const attachmentsLoaded = Array\.isArray\(rawAttachments\)/);
+assert.match(detail,/if\(attachmentCount>0&&!attachmentsLoaded\)/);
+assert.match(detail,/ensureLogbookAttachments_\(e\)/);
 assert.match(detail,/attachmentCount > 12 \? parseAttachments\(rawAttachments, 12\)/);
 assert.match(detail,/Tampilkan semua '\+attachmentCount\+' lampiran/);
-assert.match(detail,/slot\.innerHTML=renderAttachGrid\(parseAttachments\(rawAttachments\),'Lampiran'\)/);
+assert.match(detail,/slot\.innerHTML=renderAttachGrid\(parseAttachments\(loaded\),'Lampiran'\)/);
 const countStart=base.indexOf('function logbookAttachmentCount_(entry){');
 const countEnd=base.indexOf('\nfunction logbookSearchText_(entry)',countStart);
 assert.ok(countStart>=0&&countEnd>countStart,'cached attachment counter exists');
