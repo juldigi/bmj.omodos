@@ -4578,7 +4578,7 @@ function createBackend(services, env = {}) {
   __name(getLogbookListFull_, "getLogbookListFull_");
   function getLogbookListSot_() {
     var cache = getCache_();
-    var cacheKey = "rows_Logbook_sot";
+    var cacheKey = "rows_Logbook_sot_raw_attachments_v2";
     if (cache) {
       var cached = cache.get(cacheKey);
       if (cached) {
@@ -4609,11 +4609,8 @@ function createBackend(services, env = {}) {
         if (isNaN(d.getTime()) || d < cutoff) continue;
       }
       var obj = rowToObj_(headers, r);
-      try {
-        obj["Lampiran (JSON)"] = safeJsonParse_(obj["Lampiran (JSON)"] || "[]", []);
-      } catch (e) {
-        obj["Lampiran (JSON)"] = [];
-      }
+      // Bootstrap/home only serializes a compact row later; preserve the raw cell here
+      // so large attachment JSON is not expanded into arrays/objects for every row.
       if (obj["Tanggal"] instanceof Date) {
         obj["Tanggal"] = Utilities.formatDate(obj["Tanggal"], Session.getScriptTimeZone(), "yyyy-MM-dd");
       }
