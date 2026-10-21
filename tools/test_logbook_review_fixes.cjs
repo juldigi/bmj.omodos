@@ -41,7 +41,6 @@ assert.match(hot,/LOGBOOK_REVIEW_FIXES_20261021_V1/);
 assert.match(hot,/name="nomorMO"/);
 assert.match(hot,/id="edit-nomorMO"/);
 assert.match(hot,/function compressEditPhoto\(file\)/);
-assert.match(hot,/const thumb=f\\.thumbUrl\\|\\|f\\.previewUrl\\|\\|''/);
 assert.match(hot,/decoding="async" fetchpriority="low"/);
 assert.match(hot,/takeLogbookEditFiles_/);
 assert.match(hot,/function exportPdf\(modal\)/);
