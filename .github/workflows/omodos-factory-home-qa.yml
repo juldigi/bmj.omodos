@@ -124,49 +124,61 @@ jobs:
               });
               window.OMODOS_FACTORY_HOME_SYNC?.();
             });
-            await page.waitForSelector('#omodos-superadmin-factory-home .ofh-mode-switch', { timeout: 10000 });
+            await page.waitForSelector('#omodos-factory-mode-switch', { timeout: 10000 });
 
             const originalBefore = await page.evaluate(() => ({
               mode: document.getElementById('omodos-superadmin-factory-home')?.classList.contains('ofh-original-mode'),
               active3d: document.getElementById('view-dashboard')?.classList.contains('omodos-superadmin-factory-home'),
               src: document.querySelector('#omodos-superadmin-factory-home iframe')?.getAttribute('src') ?? null,
+              rootDisplay: getComputedStyle(document.getElementById('omodos-superadmin-factory-home')).display,
+              statusTitleDisplay: getComputedStyle(document.querySelector('.home-status-title')).display,
+              toggleHost: document.getElementById('omodos-factory-mode-switch')?.parentElement?.classList.contains('topbar-title-row'),
+              settingsNextToToggle: document.getElementById('btn-open-pengaturan')?.nextElementSibling?.id === 'omodos-factory-mode-switch',
               gridDisplay: getComputedStyle(document.getElementById('dash-grid')).display,
-              pressed: document.querySelector('#omodos-superadmin-factory-home [data-ofh-mode="original"]')?.getAttribute('aria-pressed')
+              pressed: document.querySelector('#omodos-factory-mode-switch [data-ofh-mode="original"]')?.getAttribute('aria-pressed')
             }));
             assert.equal(originalBefore.mode, true, 'saved Original mode should be restored for this Superadmin');
             assert.equal(originalBefore.active3d, false, 'Original mode must not hide the regular homepage');
             assert.equal(originalBefore.src, null, 'Original mode must not load the DigitalTwin iframe');
+            assert.equal(originalBefore.rootDisplay, 'none', 'the 3D module must be fully hidden in Original mode');
+            assert.notEqual(originalBefore.statusTitleDisplay, 'none', 'the native Status Mesin Sekarang title must remain visible');
+            assert.equal(originalBefore.toggleHost, true, 'the compact mode switch must live in the mobile top toolbar');
+            assert.equal(originalBefore.settingsNextToToggle, true, 'the mode switch must sit beside the Settings toggle');
             assert.notEqual(originalBefore.gridDisplay, 'none', 'regular machine cards should remain visible');
             assert.equal(originalBefore.pressed, 'true');
 
-            await page.locator('#omodos-superadmin-factory-home [data-ofh-mode="3d"]').click();
+            await page.locator('#omodos-factory-mode-switch [data-ofh-mode="3d"]').click();
             const mode3d = await page.evaluate(() => ({
               originalClass: document.getElementById('omodos-superadmin-factory-home')?.classList.contains('ofh-original-mode'),
               active3d: document.getElementById('view-dashboard')?.classList.contains('omodos-superadmin-factory-home'),
               title: document.querySelector('#omodos-superadmin-factory-home h2')?.textContent,
               src: document.querySelector('#omodos-superadmin-factory-home iframe')?.getAttribute('src') ?? null,
+              rootDisplay: getComputedStyle(document.getElementById('omodos-superadmin-factory-home')).display,
               gridDisplay: getComputedStyle(document.getElementById('dash-grid')).display,
-              pressed: document.querySelector('#omodos-superadmin-factory-home [data-ofh-mode="3d"]')?.getAttribute('aria-pressed')
+              pressed: document.querySelector('#omodos-factory-mode-switch [data-ofh-mode="3d"]')?.getAttribute('aria-pressed')
             }));
             assert.equal(mode3d.originalClass, false, '3D mode should remove Original-only layout');
+            assert.notEqual(mode3d.rootDisplay, 'none', '3D viewer must be visible in Factory 3D mode');
             assert.equal(mode3d.active3d, true, '3D mode must isolate the factory view');
             assert.equal(mode3d.title, 'Factory Overview');
             assert.equal(mode3d.src, 'https://digitaltwin.juldigi.workers.dev/?embed=omodos-status');
             assert.equal(mode3d.gridDisplay, 'none', 'regular machine cards should not leak into 3D mode');
             assert.equal(mode3d.pressed, 'true');
 
-            await page.locator('#omodos-superadmin-factory-home [data-ofh-mode="original"]').click();
+            await page.locator('#omodos-factory-mode-switch [data-ofh-mode="original"]').click();
             const originalAfter = await page.evaluate(() => ({
               mode: document.getElementById('omodos-superadmin-factory-home')?.classList.contains('ofh-original-mode'),
               active3d: document.getElementById('view-dashboard')?.classList.contains('omodos-superadmin-factory-home'),
               src: document.querySelector('#omodos-superadmin-factory-home iframe')?.getAttribute('src') ?? null,
+              rootDisplay: getComputedStyle(document.getElementById('omodos-superadmin-factory-home')).display,
               gridDisplay: getComputedStyle(document.getElementById('dash-grid')).display,
-              pressed: document.querySelector('#omodos-superadmin-factory-home [data-ofh-mode="original"]')?.getAttribute('aria-pressed')
+              pressed: document.querySelector('#omodos-factory-mode-switch [data-ofh-mode="original"]')?.getAttribute('aria-pressed')
             }));
             assert.equal(originalAfter.mode, true, 'Original mode should be active');
             assert.equal(originalAfter.active3d, false, 'Original mode must restore the ordinary dashboard');
             assert.equal(originalAfter.src, null, 'DigitalTwin iframe should be unloaded in Original mode');
-            assert.notEqual(originalAfter.gridDisplay, 'none');
+            assert.equal(originalAfter.rootDisplay, 'none', 'the 3D module should be hidden after returning to Original');
+            assert.notEqual(originalAfter.gridDisplay, 'none', 'Original status machine cards remain visible');
             assert.equal(originalAfter.pressed, 'true');
 
             await page.evaluate(() => {
@@ -176,7 +188,7 @@ jobs:
             await page.waitForFunction(() => !document.getElementById('omodos-superadmin-factory-home'), null, { timeout: 5000 });
             const nonAdmin = await page.evaluate(() => ({
               root: !!document.getElementById('omodos-superadmin-factory-home'),
-              toggle: !!document.querySelector('[data-ofh-mode]'),
+              toggle: !!document.getElementById('omodos-factory-mode-switch'),
               active3d: document.getElementById('view-dashboard')?.classList.contains('omodos-superadmin-factory-home'),
               gridDisplay: getComputedStyle(document.getElementById('dash-grid')).display
             }));

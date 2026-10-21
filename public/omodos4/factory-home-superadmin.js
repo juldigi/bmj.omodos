@@ -3,6 +3,7 @@
 if(window.__OMODOS_FACTORY_HOME_MODULE__)return;
 window.__OMODOS_FACTORY_HOME_MODULE__=true;
 const ROOT_ID='omodos-superadmin-factory-home',VIEW_CLASS='omodos-superadmin-factory-home',TWIN_ORIGIN='https://digitaltwin.juldigi.workers.dev',TWIN_URL=TWIN_ORIGIN+'/?embed=omodos-status';
+const MODE_SWITCH_ID='omodos-factory-mode-switch';
 let homeView=null,iframe=null,styleNode=null,lastFingerprint='',lastSendAt=0,currentMode='3d';
 const MODE_STORAGE_PREFIX='omodos.factoryHomeMode.v1.';
 function currentUser(){try{if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)return CURRENT_USER;}catch(e){}return window.CURRENT_USER||window.currentUser||null;}
@@ -76,6 +77,44 @@ function readSavedMode_(){
   try{return localStorage.getItem(modeStorageKey_())==='original'?'original':'3d';}
   catch(e){return '3d';}
 }
+function syncModeSwitch_(){
+  if(!isSuperadmin()){
+    document.getElementById(MODE_SWITCH_ID)?.remove();
+    return;
+  }
+  let control=document.getElementById(MODE_SWITCH_ID);
+  if(!control){
+    control=document.createElement('div');
+    control.id=MODE_SWITCH_ID;
+    control.className='ofh-global-mode-switch';
+    control.setAttribute('role','group');
+    control.setAttribute('aria-label','Mode beranda Superadmin');
+    control.innerHTML='<button type="button" data-ofh-mode="original" aria-label="Beranda Original" title="Beranda Original">Ori</button><button type="button" data-ofh-mode="3d" aria-label="Factory 3D" title="Factory 3D">3D</button>';
+    control.querySelectorAll('[data-ofh-mode]').forEach(button=>{
+      button.addEventListener('click',()=>setHomeMode_(button.dataset.ofhMode,true));
+    });
+  }
+  const root=document.getElementById(ROOT_ID);
+  const mobileLayout=window.matchMedia('(max-width:900px), (pointer:coarse)').matches;
+  let host=null;
+  if(mobileLayout)host=document.querySelector('.topbar-title-row');
+  else if(currentMode==='3d')host=root?.querySelector('.ofh-mode-holder');
+  else host=document.querySelector('#view-dashboard .topbar > div:last-child');
+  if(!host)host=document.querySelector('.topbar-title-row')||root?.querySelector('.ofh-mode-holder')||document.querySelector('#view-dashboard .topbar > div:last-child');
+  if(host){
+    const settingsButton=host.querySelector('#btn-open-pengaturan');
+    if(settingsButton&&settingsButton.parentElement===host){
+      if(settingsButton.nextElementSibling!==control)settingsButton.insertAdjacentElement('afterend',control);
+    }else if(control.parentElement!==host){
+      host.appendChild(control);
+    }
+  }
+  control.querySelectorAll('[data-ofh-mode]').forEach(button=>{
+    const active=button.dataset.ofhMode===currentMode;
+    button.setAttribute('aria-pressed',active?'true':'false');
+  });
+}
+
 function setHomeMode_(mode,persist){
   currentMode=mode==='original'?'original':'3d';
   const show3d=currentMode==='3d',root=document.getElementById(ROOT_ID),view=homeView;
@@ -85,17 +124,16 @@ function setHomeMode_(mode,persist){
   syncResumePath_(view,show3d);
   syncCompactResume_(view,show3d);
   if(root){
+    // Original mode hides only our 3D container. The native OMODOS dashboard
+    // and all status-machine cards remain untouched and in their original flow.
     root.classList.toggle('ofh-original-mode',!show3d);
     const title=root.querySelector('h2'),subtitle=root.querySelector('.ofh-subtitle');
-    if(title)title.textContent=show3d?'Factory Overview':'Beranda Original';
-    if(subtitle)subtitle.textContent=show3d?'Status seluruh mesin BMJ dalam visualisasi 3D.':'Beranda reguler OMODOS. Pilih Factory 3D untuk kembali ke visualisasi pabrik.';
-    root.querySelectorAll('[data-ofh-mode]').forEach(button=>{
-      const active=button.dataset.ofhMode===currentMode;
-      button.setAttribute('aria-pressed',active?'true':'false');
-    });
+    if(title)title.textContent='Factory Overview';
+    if(subtitle)subtitle.textContent='Status seluruh mesin BMJ dalam visualisasi 3D.';
     const stage=root.querySelector('.ofh-stage');
     if(!show3d&&stage)stage.classList.remove('ready');
   }
+  syncModeSwitch_();
   if(persist&&isSuperadmin()){
     try{localStorage.setItem(modeStorageKey_(),currentMode);}catch(e){}
   }
@@ -121,25 +159,22 @@ function makeStyles(){
   styleNode.textContent=[
     '.view.'+VIEW_CLASS+'{padding:0!important;min-height:0!important}',
     '.view.'+VIEW_CLASS+'>:not(#'+ROOT_ID+'):not(#omodos-smart-resume-compact){display:none!important}',
-    '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;position:relative;width:100%;grid-column:1/-1!important;grid-row:auto!important;align-self:stretch!important;justify-self:stretch!important;order:-999!important;float:none!important;clear:both!important;inset:auto!important;transform:none!important;height:calc(100dvh - 160px);min-height:360px;max-height:none;padding:0 clamp(8px,1.2vw,16px);margin:0 auto 16px;overflow:hidden;color:#173348}',
+    '#'+ROOT_ID+'{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;height:calc(100dvh - 160px);min-height:360px;max-height:none;padding:0 clamp(8px,1.2vw,16px);margin:0 auto 16px;overflow:hidden;color:#173348}',
+    '#'+ROOT_ID+'.ofh-original-mode{display:none!important}',
     '#'+ROOT_ID+',#'+ROOT_ID+' *{box-sizing:border-box}',
-    '#'+ROOT_ID+' .ofh-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;flex:0 0 auto;padding:6px 2px;margin:0}',
+    '#'+ROOT_ID+' .ofh-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;flex:0 0 auto;padding:5px 2px;margin:0}',
     '#'+ROOT_ID+' .ofh-title{min-width:0}',
     '#'+ROOT_ID+' .ofh-eyebrow{display:block;margin-bottom:2px;color:#547083;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}',
     '#'+ROOT_ID+' h2{margin:0;color:#173348;font-size:clamp(17px,2vw,23px);font-weight:800;line-height:1.15}',
     '#'+ROOT_ID+' .ofh-subtitle{margin:4px 0 0;color:#627888;font-size:11px;line-height:1.35}',
-    '#'+ROOT_ID+' .ofh-tag{flex:0 0 auto;border:1px solid #c7d8e2;border-radius:999px;padding:6px 9px;background:#f7fafc;color:#466274;font-size:9px;font-weight:800;letter-spacing:.07em}',
-    '#'+ROOT_ID+' .ofh-mode-switch{display:flex;align-items:center;gap:3px;flex:0 0 auto;max-width:100%;padding:3px;border:1px solid #cbd8e1;border-radius:11px;background:#edf3f6}',
-    '#'+ROOT_ID+' .ofh-mode-switch button{display:block;min-width:0;min-height:34px;padding:7px 11px;border:0;border-radius:8px;background:transparent;color:#536e80;font:800 10px/1.15 system-ui,-apple-system,sans-serif;white-space:nowrap;cursor:pointer;touch-action:manipulation}',
-    '#'+ROOT_ID+' .ofh-mode-switch button[aria-pressed="true"]{background:#193a51;color:#fff;box-shadow:0 1px 4px rgba(18,45,62,.2)}',
-    '#'+ROOT_ID+' .ofh-mode-switch button:focus-visible,#'+ROOT_ID+' .ofh-fullscreen-toggle:focus-visible,#omodos-smart-resume-compact button:focus-visible{outline:2px solid #1685c5;outline-offset:2px}',
-    '#'+ROOT_ID+'.ofh-original-mode{display:flow-root!important;position:static!important;grid-column:1/-1!important;grid-row:auto!important;align-self:stretch!important;justify-self:stretch!important;order:-999!important;flex:none!important;inset:auto!important;transform:none!important;float:none!important;clear:both!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;margin:0 0 18px!important;padding:0!important;background:transparent!important;box-shadow:none!important;z-index:auto!important}',
-    '#'+ROOT_ID+'.ofh-original-mode .ofh-title,#'+ROOT_ID+'.ofh-original-mode .ofh-stage,#'+ROOT_ID+'.ofh-original-mode .ofh-footnote,#'+ROOT_ID+'.ofh-original-mode .ofh-subtitle{display:none!important}',
-    '#'+ROOT_ID+'.ofh-original-mode .ofh-heading{display:flex!important;position:static!important;top:auto!important;left:auto!important;right:auto!important;inset:auto!important;transform:none!important;float:none!important;clear:both!important;z-index:auto!important;box-sizing:border-box!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;width:100%!important;min-height:56px!important;height:auto!important;overflow:visible!important;margin:0 0 16px!important;padding:8px!important;border:1px solid #dbe4ea!important;border-radius:12px!important;background:#fff!important;box-shadow:0 1px 4px rgba(25,54,72,.04)!important}',
-    '#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{display:grid!important;position:relative!important;inset:auto!important;transform:none!important;float:none!important;clear:both!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;align-items:stretch!important;justify-content:stretch!important;width:min(100%,290px)!important;max-width:100%!important;margin:0 0 0 auto!important;gap:4px!important;padding:3px!important;overflow:visible!important}',
-    '#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch button{display:block!important;position:relative!important;inset:auto!important;transform:none!important;float:none!important;box-sizing:border-box!important;min-width:0!important;width:100%!important;min-height:40px!important;padding:8px 9px!important;font-size:11px!important;line-height:1.15!important;white-space:nowrap!important}',
+    '#'+ROOT_ID+' .ofh-mode-holder{display:flex;align-items:center;justify-content:flex-end;flex:0 0 auto;margin-left:auto}',
+    '.ofh-global-mode-switch{display:inline-flex!important;align-items:center;justify-content:center;gap:2px;flex:0 0 auto;box-sizing:border-box;height:34px;margin:0 0 0 3px;padding:2px;border:1px solid var(--line,#cbd8e1);border-radius:9px;background:var(--panel-2,#edf3f6);vertical-align:middle}',
+    '.ofh-global-mode-switch button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:31px;height:28px;min-height:28px;margin:0;padding:0 3px;border:0;border-radius:6px;background:transparent;color:var(--text-dim,#536e80);font:800 10px/1 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;white-space:nowrap;cursor:pointer;touch-action:manipulation}',
+    '.ofh-global-mode-switch button[aria-pressed=\"true\"]{background:#193a51;color:#fff}',
+    '.ofh-global-mode-switch button:focus-visible{outline:2px solid #1685c5;outline-offset:2px}',
     '#'+ROOT_ID+' .ofh-stage{position:relative;display:flex;flex:1 1 auto;width:100%;height:0;min-height:300px;overflow:hidden;border:1px solid #d5e0e7;border-radius:14px;background:#eaf0f3;box-shadow:0 6px 22px rgba(20,49,67,.09)}',
     '#'+ROOT_ID+' .ofh-fullscreen-toggle{position:absolute;z-index:12;top:10px;right:10px;min-height:36px;padding:8px 11px;border:1px solid #c5d5df;border-radius:10px;background:rgba(255,255,255,.96);color:#193a51;font:800 12px/1.1 system-ui,-apple-system,sans-serif;box-shadow:0 2px 8px rgba(15,40,55,.15);cursor:pointer;touch-action:manipulation}',
+    '#'+ROOT_ID+' .ofh-fullscreen-toggle:focus-visible{outline:3px solid #1785c1;outline-offset:2px}',
     '#'+ROOT_ID+'.ofh-fullscreen .ofh-stage{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;min-height:0!important;max-height:none!important;margin:0!important;border:0!important;border-radius:0!important;z-index:2147483000!important;background:#e8eef3}',
     '#'+ROOT_ID+'.ofh-fullscreen .ofh-stage iframe{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}',
     '#'+ROOT_ID+'.ofh-fullscreen .ofh-fullscreen-toggle{position:fixed!important;top:max(10px,env(safe-area-inset-top))!important;right:max(10px,env(safe-area-inset-right))!important}',
@@ -158,10 +193,8 @@ function makeStyles(){
     '#omodos-smart-resume-compact span{display:block!important;margin-top:3px!important;font-size:9px!important;line-height:1.3!important;color:#687f8e!important}',
     '#omodos-smart-resume-compact button{display:block!important;flex:0 0 auto!important;min-height:30px!important;max-width:100%!important;border:1px solid #c6d6df!important;border-radius:8px!important;padding:6px 9px!important;background:#193a51!important;color:#fff!important;font:800 9px/1.1 system-ui,-apple-system,sans-serif!important;white-space:nowrap!important;box-shadow:none!important;cursor:pointer!important;touch-action:manipulation!important}',
     '.view.'+VIEW_CLASS+' a[href*="digitaltwin"],.view.'+VIEW_CLASS+' [data-open-digital-twin]{display:none!important}',
-    '@media(max-width:700px){#'+ROOT_ID+'{gap:6px;padding-left:8px;padding-right:8px}#'+ROOT_ID+' .ofh-heading{min-height:42px;padding:3px 1px;gap:7px}#'+ROOT_ID+' .ofh-eyebrow{font-size:8px;letter-spacing:.1em}#'+ROOT_ID+' h2{font-size:clamp(14px,4.1vw,17px);line-height:1.12;overflow-wrap:anywhere}#'+ROOT_ID+' .ofh-subtitle{max-width:220px;font-size:9px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}#'+ROOT_ID+' .ofh-mode-switch{gap:2px;padding:2px;border-radius:9px}#'+ROOT_ID+' .ofh-mode-switch button{min-height:30px;padding:5px 7px;font-size:9px}#'+ROOT_ID+' .ofh-stage{min-height:220px;border-radius:10px}#'+ROOT_ID+' .ofh-fullscreen-toggle{top:7px;right:7px;min-height:32px;padding:6px 9px;font-size:10px}#'+ROOT_ID+' .ofh-frame-state strong{font-size:12px}#'+ROOT_ID+' .ofh-frame-state span{font-size:10px}#'+ROOT_ID+' .ofh-footnote{font-size:9px;line-height:1.3}}',
-    '@media(max-width:700px){#'+ROOT_ID+'.ofh-original-mode{margin:0 0 18px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-heading{min-height:54px!important;margin:0 0 16px!important;padding:8px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{width:min(100%,290px)!important;margin-left:auto!important}}',
-    '@media(max-width:420px){#'+ROOT_ID+' .ofh-heading{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:6px;padding-top:5px}#'+ROOT_ID+' .ofh-subtitle{-webkit-line-clamp:1;max-width:none}#'+ROOT_ID+' .ofh-mode-switch{width:100%;max-width:none;justify-content:stretch}#'+ROOT_ID+' .ofh-mode-switch button{flex:1 1 0;white-space:nowrap}#'+ROOT_ID+'.ofh-original-mode .ofh-heading{display:flex!important;align-items:center!important;justify-content:flex-end!important;min-height:56px!important;margin-bottom:16px!important;padding:8px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:min(100%,290px)!important;max-width:100%!important;margin:0 0 0 auto!important;gap:4px!important}#'+ROOT_ID+'.ofh-original-mode .ofh-mode-switch button{min-height:40px!important;padding:8px 6px!important;font-size:10px!important}}',
-    '@media(max-width:420px){#omodos-smart-resume-compact{gap:7px!important;padding:7px 8px!important}#omodos-smart-resume-compact .ofh-sr-copy{flex:1 1 120px!important}#omodos-smart-resume-compact strong{font-size:10px!important}#omodos-smart-resume-compact button{min-height:30px!important;font-size:9px!important;padding:6px 8px!important}}'
+    '@media(max-width:900px),(pointer:coarse){#'+ROOT_ID+'{gap:6px;padding-left:8px;padding-right:8px}#'+ROOT_ID+' .ofh-heading{min-height:40px;padding:3px 1px;gap:7px}#'+ROOT_ID+' .ofh-eyebrow{font-size:8px;letter-spacing:.1em}#'+ROOT_ID+' h2{font-size:clamp(14px,4.1vw,17px);line-height:1.12;overflow-wrap:anywhere}#'+ROOT_ID+' .ofh-subtitle{max-width:220px;font-size:9px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}#'+ROOT_ID+' .ofh-stage{min-height:220px;border-radius:10px}#'+ROOT_ID+' .ofh-fullscreen-toggle{top:7px;right:7px;min-height:32px;padding:6px 9px;font-size:10px}#'+ROOT_ID+' .ofh-footnote{font-size:9px;line-height:1.3}.ofh-global-mode-switch{height:32px;margin-left:3px;padding:2px;border-radius:8px}.ofh-global-mode-switch button{width:29px;height:26px;min-height:26px;font-size:9px}}',
+    '@media(max-width:420px){#'+ROOT_ID+' .ofh-heading{gap:5px}#'+ROOT_ID+' .ofh-title{min-width:0}#'+ROOT_ID+' .ofh-subtitle{-webkit-line-clamp:1;max-width:none}#omodos-smart-resume-compact{gap:7px!important;padding:7px 8px!important}#omodos-smart-resume-compact .ofh-sr-copy{flex:1 1 120px!important}#omodos-smart-resume-compact strong{font-size:10px!important}#omodos-smart-resume-compact button{min-height:30px!important;font-size:9px!important;padding:6px 8px!important}}'
   ].join('\n');
   document.head.appendChild(styleNode);
 }
@@ -210,11 +243,11 @@ function restoreViewSizing_(view){
   if(!view)return;
   for(const key of ['height','min-height','max-height','overflow-y','overflow-x'])view.style.removeProperty(key);
 }
-function cleanup(){const view=homeView||document.querySelector('.view.'+VIEW_CLASS);clearResumePath_(view);document.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());restoreViewSizing_(view);document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';currentMode='3d';}
+function cleanup(){const view=homeView||document.querySelector('.view.'+VIEW_CLASS);clearResumePath_(view);document.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());document.getElementById(MODE_SWITCH_ID)?.remove();restoreViewSizing_(view);document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';currentMode='3d';}
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
-  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><div class="ofh-mode-switch" role="group" aria-label="Pilih versi beranda"><button type="button" data-ofh-mode="original" aria-pressed="false">Original</button><button type="button" data-ofh-mode="3d" aria-pressed="true">Factory 3D</button></div></header><div class="ofh-stage"><button type="button" class="ofh-fullscreen-toggle" aria-pressed="false" aria-label="Tampilkan 3D layar penuh">⛶ Layar Penuh</button><iframe title="Visualisasi 3D status mesin BMJ" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
+  root.innerHTML='<header class="ofh-heading"><div class="ofh-title"><span class="ofh-eyebrow">OMODOS · SUPERADMIN</span><h2>Factory Overview</h2><p class="ofh-subtitle">Status seluruh mesin BMJ dalam visualisasi 3D.</p></div><div class="ofh-mode-holder" aria-hidden="true"></div></header><div class="ofh-stage"><button type="button" class="ofh-fullscreen-toggle" aria-pressed="false" aria-label="Tampilkan 3D layar penuh">⛶ Layar Penuh</button><iframe title="Visualisasi 3D status mesin BMJ" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen"></iframe><div class="ofh-frame-state"><strong>Menyiapkan viewer 3D…</strong><span>Model dan status mesin akan ditampilkan saat mode pemantauan siap.</span></div></div><p class="ofh-footnote">Status mengikuti sumber Logbook atau Patrol terbaru yang dipakai pada beranda OMODOS. Bukan telemetry sensor langsung.</p>';
   view.prepend(root);return root;
 }
 function fitMobileViewport_(){
@@ -255,8 +288,7 @@ function sync(){
   if(homeView!==view||!document.getElementById(ROOT_ID)){
     cleanup();homeView=view;makeStyles();
     const root=createRoot(view);iframe=root.querySelector('iframe');
-    root.querySelectorAll('[data-ofh-mode]').forEach(button=>button.addEventListener('click',()=>setHomeMode_(button.dataset.ofhMode,true)));
-    const stage=root.querySelector('.ofh-stage'),fullscreenButton=root.querySelector('.ofh-fullscreen-toggle');
+        const stage=root.querySelector('.ofh-stage'),fullscreenButton=root.querySelector('.ofh-fullscreen-toggle');
     const syncFullscreenLabel=()=>{const active=document.fullscreenElement===stage||root.classList.contains('ofh-fullscreen');fullscreenButton.setAttribute('aria-pressed',active?'true':'false');fullscreenButton.textContent=active?'⤢ Keluar Layar Penuh':'⛶ Layar Penuh';fullscreenButton.setAttribute('aria-label',active?'Keluar dari layar penuh':'Tampilkan 3D layar penuh');};
     fullscreenButton.addEventListener('click',async()=>{const active=document.fullscreenElement===stage||root.classList.contains('ofh-fullscreen');if(active){if(document.fullscreenElement===stage&&document.exitFullscreen){try{await document.exitFullscreen();}catch(e){}}root.classList.remove('ofh-fullscreen');syncFullscreenLabel();return;}if(stage.requestFullscreen){try{await stage.requestFullscreen();syncFullscreenLabel();return;}catch(e){}}root.classList.add('ofh-fullscreen');syncFullscreenLabel();});
     document.addEventListener('fullscreenchange',syncFullscreenLabel);
@@ -268,7 +300,7 @@ function sync(){
     homeView=view;
     if(view.classList.contains(VIEW_CLASS)!==(currentMode==='3d'))setHomeMode_(currentMode,false);
   }
-  const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');syncCompactResume_(view,currentMode==='3d');fitMobileViewport_();sendStatuses(false);
+  const root=document.getElementById(ROOT_ID);if(root&&root.querySelector('iframe')!==iframe)iframe=root.querySelector('iframe');syncModeSwitch_();syncCompactResume_(view,currentMode==='3d');fitMobileViewport_();sendStatuses(false);
 }
 window.OMODOS_FACTORY_HOME_SYNC=sync;
 function openStatusDetailFromFactoryCard_(payload){
