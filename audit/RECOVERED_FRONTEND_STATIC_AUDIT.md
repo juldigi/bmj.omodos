@@ -1,9 +1,9 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-21T05:30:55.614626+00:00
-- File bytes: 1674687
+- Audited UTC: 2026-10-21T05:34:33.881412+00:00
+- File bytes: 1674791
 - Lines: 29061
-- SHA-256: a93e2a7f63d435c9842983653f839c6db4cff9cfa7cba6dce978b5650379d427
+- SHA-256: d0b0c8dc5b8acd7bb4f07e52d18ebb6cb0b6347533960c483766d1cdc0feb0b4
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
@@ -197,7 +197,7 @@
 - L7981: // deklarasi const) sudah selesai dieksekusi dulu sebelum switchToView jalan.
 - L7982: if(typeof switchToView === 'function'){ setTimeout(()=> switchToView('dashboard'), 0); }
 - L8257: function switchToView(enteringView){
-- L8279: switchToView('omodos4');
+- L8280: if(shell && shell.classList.contains('active')) switchToView('omodos4');
 - L8512: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L8523: showSettingLoginModal(()=> switchToView('setting'));
 - L8526: switchToView(view);
@@ -219,11 +219,11 @@
 ### OMODOS 4.0 — 7 match(es)
 - L3429: <button class="nav-parent-btn" data-group="omodos4"><span class="ico"><i class="ph-bold ph-cpu"></i></span> OMODOS 4.0 <span class="v4-badge">SUPERADMIN</span> <span class="chev"><i class="ph-bold ph-caret-down"></i></span></button>
 - L4230: <h1 style="margin-top:4px;">OMODOS 4.0</h1>
-- L8283: toast('Modul OMODOS 4.0 gagal dimuat. Periksa koneksi lalu coba kembali.',true);
+- L8284: toast('Modul OMODOS 4.0 gagal dimuat. Periksa koneksi lalu coba kembali.',true);
 - L8512: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L23387: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
 - L29056: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
-### Superadmin — 48 match(es)
+### Superadmin — 47 match(es)
 - L4231: <div class="sub">Command Center Superadmin yang membaca data existing tanpa membuat duplikasi sumber data.</div>
 - L5452: <div class="setting-tab-empty" id="rbac-empty-hint" style="display:none;">Memuat data user... Jika tetap kosong, pastikan kamu login sebagai Superadmin.</div>
 - L6400: if(CURRENT_USER.role === 'Superadmin') return true; // selalu full access, tidak dapat dibatasi
@@ -251,8 +251,7 @@
 - L7303: hint = ' Request harus memakai sesi Superadmin.';
 - L8016: // perubahan yang Superadmin simpan di Role Access Management tidak akan
 - L8241: script.src='/omodos4/superadmin-intelligence.js';
-- L8272: // allows entry to the Superadmin-only view. Technician sessions never fetch it.
-- L8282: console.error('[OMODOS] Gagal memuat Superadmin Intelligence:',err);
+- L8283: console.error('[OMODOS] Gagal memuat Superadmin Intelligence:',err);
 - L8486: if(view === 'omodos4' || view.startsWith('omodos4-')) return isSuperadmin();
 - L21282: errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App). Hubungi Superadmin untuk konfigurasi awal.';
 - L21324: // code.gs) supaya perubahan yang diatur Superadmin di satu device ikut
