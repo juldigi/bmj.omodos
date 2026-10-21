@@ -70,17 +70,116 @@ assert.ok(fullStart>=0&&fullEnd>fullStart,'full Logbook source function exists')
 const fullSource=worker.slice(fullStart,fullEnd);
 assert.ok(fullSource.includes('safeJsonParse_(obj["Lampiran (JSON)"]'),'full Logbook reads must preserve normalized attachments for detail');
 
+const listStart=worker.indexOf('function getLogbookList_(params) {');
+const listEnd=worker.indexOf('function logbookAttachmentCountRaw_(raw)',listStart);
+assert.ok(listStart>=0&&listEnd>listStart,'Logbook list source function exists');
+const listSource=worker.slice(listStart,listEnd);
+assert.match(listSource,/if \(summary\) return getLogbookListSummary_\(\)/,'summary list should use the compact cached loader');
+assert.match(listSource,/if \(!summary\) \{/,'incremental sync should skip attachment normalization in summary mode');
+
+const summaryStart=worker.indexOf('function getLogbookListSummary_() {');
+const summaryEnd=worker.indexOf('__name(getLogbookListSummary_',summaryStart);
+assert.ok(summaryStart>=0&&summaryEnd>summaryStart,'compact cached summary loader exists');
+const summarySource=worker.slice(summaryStart,summaryEnd);
+assert.match(summarySource,/rows_Logbook_summary_v1/);
+assert.match(summarySource,/logbookAttachmentCountRaw_\(obj\["Lampiran \(JSON\)"\]\)/);
+assert.match(summarySource,/delete obj\["Lampiran \(JSON\)"\]/);
+assert.doesNotMatch(summarySource,/safeJsonParse_\(/,'summary loader must not normalize attachment objects');
+const summaryInvalidationStart=worker.indexOf('function invalidateCacheForSheet_\(sheetName\) {');
+const summaryInvalidationEnd=worker.indexOf('__name(invalidateCacheForSheet_',summaryInvalidationStart);
+assert.ok(summaryInvalidationStart>=0&&summaryInvalidationEnd>summaryInvalidationStart,'cache invalidation helper exists');
+const summaryInvalidation=worker.slice(summaryInvalidationStart,summaryInvalidationEnd);
+assert.match(summaryInvalidation,/cache\.remove\("rows_Logbook_summary_v1"\)/);
+assert.match(summaryInvalidation,/cache\.remove\("rows_Logbook_sot_raw_attachments_v2"\)/);
+
+const summaryHeaders=['ID','Status','Lampiran (JSON)','DeletedAt','Tanggal','Timestamp Input'];
+const summaryDataRows=[
+  ['old','Selesai','[{"name":"a"},{"name":"b"}]','','2026-10-20','2026-10-20T08:00:00.000Z'],
+  ['hidden','Selesai','[{"name":"h"}]','2026-10-21','2026-10-21','2026-10-21T08:00:00.000Z'],
+  ['new','Proses','{"name":"one"}','','2026-10-21','2026-10-21T09:00:00.000Z']
+];
+const summaryCacheStore=new Map();
+const summaryCache={
+  get:key=>summaryCacheStore.get(key)||null,
+  put:(key,value)=>summaryCacheStore.set(key,value),
+  remove:key=>summaryCacheStore.delete(key)
+};
+let summarySheetReadCount=0;
+const summarySheet={
+  getLastRow(){summarySheetReadCount++;return summaryDataRows.length+1;},
+  getLastColumn(){return summaryHeaders.length;},
+  getRange(row,col,numRows=1,numCols=1){
+    return {
+      getValues(){
+        summarySheetReadCount++;
+        if(row===1)return [summaryHeaders.slice(col-1,col-1+numCols)];
+        return summaryDataRows.slice(row-2,row-2+numRows).map(r=>r.slice(col-1,col-1+numCols));
+      },
+      getValue(){return this.getValues()[0][0];}
+    };
+  }
+};
+const rowToObjectForSummary=(headers,row)=>{
+  const out={};headers.forEach((header,index)=>out[header]=row[index]);return out;
+};
+const getSummaryForTest=new Function(
+  'getCache_','getOrCreateSheet_','SHEET_LOGBOOK','LOGBOOK_HEADERS','rowToObj_',
+  'logbookAttachmentCountRaw_','Utilities','Session','CACHE_TTL_SECONDS',
+  summarySource+'; return getLogbookListSummary_;'
+)(
+  ()=>summaryCache,()=>summarySheet,'Logbook',[],rowToObjectForSummary,
+  compactHelpers.logbookAttachmentCountRaw_,{formatDate:(date)=>date},{getScriptTimeZone:()=>'UTC'},600
+);
+const summaryOutput=getSummaryForTest();
+assert.deepEqual(summaryOutput.map(r=>r.ID),['new','old'],'summary list retains reverse chronological row order and skips soft-deleted rows');
+assert.deepEqual(summaryOutput.map(r=>r['Lampiran Count']),[1,2],'summary loader counts raw attachments without materializing them');
+assert.ok(summaryOutput.every(r=>!Object.prototype.hasOwnProperty.call(r,'Lampiran (JSON)')),'summary output omits raw attachment payload');
+const readsAfterSummary=summarySheetReadCount;
+assert.deepEqual(getSummaryForTest(),summaryOutput,'cached summary remains stable');
+assert.equal(summarySheetReadCount,readsAfterSummary,'cached summary avoids rereading Logbook rows');
+
 const attachmentStart=worker.indexOf('  function getLogbookAttachments_(params) {');
 const attachmentEnd=worker.indexOf('  __name(getLogbookAttachments_',attachmentStart);
 assert.ok(attachmentStart>=0&&attachmentEnd>attachmentStart,'per-entry attachment endpoint exists');
 const attachmentSource=worker.slice(attachmentStart,attachmentEnd);
-const getAttachmentsForTest=new Function('getLogbookListFull_','safeJsonParse_',attachmentSource+'; return getLogbookAttachments_;')(
-  ()=>[{ID:'one','Lampiran (JSON)':[ {name:'a'}, {name:'b'} ]}],
+const attachmentHeaders=['ID','Lampiran (JSON)','DeletedAt'];
+const attachmentDataRows=[
+  ['one','[{"name":"a"},{"name":"b"}]',''],
+  ['deleted','[{"name":"gone"}]','2026-10-20T00:00:00.000Z']
+];
+const attachmentRangeCalls=[];
+const attachmentSheet={
+  getLastRow:()=>attachmentDataRows.length+1,
+  getLastColumn:()=>attachmentHeaders.length,
+  getRange(row,col,numRows=1,numCols=1){
+    attachmentRangeCalls.push([row,col,numRows,numCols]);
+    return {
+      getValues(){
+        if(row===1)return [attachmentHeaders.slice(col-1,col-1+numCols)];
+        return attachmentDataRows.slice(row-2,row-2+numRows).map(r=>r.slice(col-1,col-1+numCols));
+      },
+      getValue(){return this.getValues()[0][0];}
+    };
+  }
+};
+let fullLoaderCalls=0;
+const getAttachmentsForTest=new Function(
+  'getLogbookListFull_','getOrCreateSheet_','SHEET_LOGBOOK','LOGBOOK_HEADERS','safeJsonParse_',
+  attachmentSource+'; return getLogbookAttachments_;'
+)(
+  ()=>{fullLoaderCalls++;throw new Error('full Logbook loader should not run for one attachment request');},
+  ()=>attachmentSheet,'Logbook',[],
   (value,fallback)=>{try{return JSON.parse(value);}catch(e){return fallback;}}
 );
-assert.equal(getAttachmentsForTest({id:'one'}).length,2,'attachment endpoint returns only the requested row payload');
+assert.equal(getAttachmentsForTest({id:'one'}).length,2,'attachment endpoint returns the selected row payload');
+assert.equal(fullLoaderCalls,0,'attachment endpoint does not load/normalize all Logbook entries');
+assert.ok(attachmentRangeCalls.some(([row,col,count,width])=>row===2&&col===1&&count===2&&width===1),'attachment endpoint reads only the ID column for lookup');
+assert.ok(attachmentRangeCalls.some(([row,col,count,width])=>row===2&&col===3&&count===2&&width===1),'attachment endpoint checks soft-delete state through a single column');
+assert.ok(attachmentRangeCalls.some(([row,col,count,width])=>row===2&&col===2&&count===1&&width===1),'attachment endpoint reads attachment JSON only for the selected row');
+assert.ok(!attachmentRangeCalls.some(([row,_col,_count,width])=>row===2&&width===attachmentHeaders.length),'attachment endpoint does not read every field of every Logbook row');
 assert.throws(()=>getAttachmentsForTest({}),err=>err&&err.message==='ID Logbook wajib diisi','attachment endpoint requires a Logbook ID');
 assert.throws(()=>getAttachmentsForTest({id:'missing'}),err=>err&&err.message==='Catatan Logbook tidak ditemukan','attachment endpoint rejects missing rows');
+assert.throws(()=>getAttachmentsForTest({id:'deleted'}),err=>err&&err.message==='Catatan Logbook tidak ditemukan','attachment endpoint excludes soft-deleted rows');
 assert.match(worker,/rowMap\["Nomor MO"\] = trainingValue_\(data\.nomorMO\) \|\| ""/);
 assert.match(update,/attachmentList\.push\(uploaded\)/);
 assert.match(update,/rowMap\["Lampiran \(JSON\)"\] = JSON\.stringify\(attachmentList\)/);
