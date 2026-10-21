@@ -8268,22 +8268,22 @@ function switchToView(enteringView){
     return false;
   }
 
-  // Load the optional 100-feature OMODOS 4 layer only after the RBAC gate
-  // allows entry to the Superadmin-only view. Technician sessions never fetch it.
+  // The lightweight shell renders immediately. Load the 100-feature OMODOS 4 layer
+  // only after RBAC has allowed entry; technicians never fetch this optional script.
   if(enteringView === 'omodos4' && !(window.OMODOS4 && window.OMODOS4.version === '4.0-master-recovery-100')){
     if(!window.__OMODOS4_INTELLIGENCE_NAV_PENDING__){
       window.__OMODOS4_INTELLIGENCE_NAV_PENDING__=true;
       loadOmodos4Intelligence_().then(()=>{
         window.__OMODOS4_INTELLIGENCE_NAV_PENDING__=false;
         if(typeof canAccessView_==='function' && !canAccessView_('omodos4')){showAccessDenied();return;}
-        switchToView('omodos4');
+        const shell=document.getElementById('view-omodos4');
+        if(shell && shell.classList.contains('active')) switchToView('omodos4');
       }).catch(err=>{
         window.__OMODOS4_INTELLIGENCE_NAV_PENDING__=false;
         console.error('[OMODOS] Gagal memuat Superadmin Intelligence:',err);
         toast('Modul OMODOS 4.0 gagal dimuat. Periksa koneksi lalu coba kembali.',true);
       });
     }
-    return true;
   }
 
   const leavingView = PREVIOUS_ACTIVE_VIEW;
