@@ -42,7 +42,7 @@ assert.match(hot,/name="nomorMO"/);
 assert.match(hot,/id="edit-nomorMO"/);
 assert.match(hot,/function compressEditPhoto\(file\)/);
 assert.match(hot,/const thumb=f\\.thumbUrl\\|\\|f\\.previewUrl\\|\\|''/);
-assert.match(hot,/decoding=\\"async\\" fetchpriority=\\"low\\"/);
+assert.match(hot,/decoding="async" fetchpriority="low"/);
 assert.match(hot,/takeLogbookEditFiles_/);
 assert.match(hot,/function exportPdf\(modal\)/);
 assert.match(hot,/OMODOS_LAZY_VENDOR_LOAD_V1/);
