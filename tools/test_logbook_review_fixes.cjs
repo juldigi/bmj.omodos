@@ -23,6 +23,30 @@ assert.match(worker,/function getLogbookAttachments_\(params\)/);
 assert.match(worker,/action === "logbookAttachments" && typeof getLogbookAttachments_/);
 assert.match(worker,/var summary = String\(params\.summary \|\| ""\) === "1"/);
 assert.match(worker,/var lightweightRecentEntries = summarizeLogbookRows_\(recentEntries\)/);
+const compactStart=worker.indexOf('  function logbookAttachmentCountRaw_(raw) {');
+const compactEnd=worker.indexOf('  function getLogbookAttachments_(params) {',compactStart);
+assert.ok(compactStart>=0&&compactEnd>compactStart,'compact Logbook helper block exists');
+const compactSource=worker.slice(compactStart,compactEnd);
+const compactHelpers=new Function('__name',compactSource+'; return {logbookAttachmentCountRaw_,summarizeLogbookRows_};')((fn)=>fn);
+const compactRows=compactHelpers.summarizeLogbookRows_([
+  {ID:'one',Status:'Selesai','Lampiran (JSON)':[{},{}]},
+  {ID:'two',Status:'Proses','Lampiran (JSON)':'[{"name":"a"},{"name":"b"},{"name":"c"}]'},
+  {ID:'three',Status:'Pending','Lampiran (JSON)':'https://example.test/a.jpg\\nhttps://example.test/b.jpg'}
+]);
+assert.deepEqual(compactRows.map(r=>r['Lampiran Count']),[2,3,2],'summary count matches source attachment shapes');
+assert.ok(compactRows.every(r=>!Object.prototype.hasOwnProperty.call(r,'Lampiran (JSON)')),'summary rows must omit full attachment payloads');
+assert.equal(compactRows[0].Status,'Selesai','summary keeps non-attachment fields');
+const attachmentStart=worker.indexOf('  function getLogbookAttachments_(params) {');
+const attachmentEnd=worker.indexOf('  __name(getLogbookAttachments_',attachmentStart);
+assert.ok(attachmentStart>=0&&attachmentEnd>attachmentStart,'per-entry attachment endpoint exists');
+const attachmentSource=worker.slice(attachmentStart,attachmentEnd);
+const getAttachmentsForTest=new Function('getLogbookListFull_','safeJsonParse_',attachmentSource+'; return getLogbookAttachments_;')(
+  ()=>[{ID:'one','Lampiran (JSON)':[ {name:'a'}, {name:'b'} ]}],
+  (value,fallback)=>{try{return JSON.parse(value);}catch(e){return fallback;}}
+);
+assert.equal(getAttachmentsForTest({id:'one'}).length,2,'attachment endpoint returns only the requested row payload');
+assert.throws(()=>getAttachmentsForTest({}),/ID Logbook wajib diisi/,'attachment endpoint requires a Logbook ID');
+assert.throws(()=>getAttachmentsForTest({id:'missing'}),/Catatan Logbook tidak ditemukan/,'attachment endpoint does not return arbitrary rows');
 assert.match(worker,/rowMap\["Nomor MO"\] = trainingValue_\(data\.nomorMO\) \|\| ""/);
 assert.match(update,/attachmentList\.push\(uploaded\)/);
 assert.match(update,/rowMap\["Lampiran \(JSON\)"\] = JSON\.stringify\(attachmentList\)/);
