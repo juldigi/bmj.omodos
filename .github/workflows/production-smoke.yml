@@ -59,6 +59,7 @@ jobs:
           ROOT_URL="$BASE_URL/"
           API_URL="$BASE_URL/api"
           JS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.js"
+          ADMIN_JS_URL="https://omodos.juldigi.workers.dev/omodos4/superadmin-intelligence.js"
           CSS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.css"
           OW_JS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.js"
           OW_CSS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.css"
@@ -90,6 +91,7 @@ jobs:
             echo "[SMOKE] attempt $i/6"
             HTML="$(curl --max-time 10 -fsS "$ROOT_URL" || true)"
             JS="$(curl --max-time 10 -fsS "$JS_URL" || true)"
+            ADMIN_JS="$(curl --max-time 10 -fsS "$ADMIN_JS_URL" || true)"
             CSS="$(curl --max-time 10 -fsS "$CSS_URL" || true)"
             OW_JS="$(curl --max-time 10 -fsS "$OW_JS_URL" || true)"
             OW_CSS="$(curl --max-time 10 -fsS "$OW_CSS_URL" || true)"
@@ -111,14 +113,14 @@ jobs:
             HTML_HOTFIX="no"; has_marker 'OMODOS4_FRONTEND_SAFE_V3' "$HTML" && HTML_HOTFIX="yes"
             HTML_CSS="no"; has_marker '/omodos4/hotfix.css' "$HTML" && HTML_CSS="yes"
             HTML_JS="no"; has_marker '/omodos4/hotfix.js' "$HTML" && HTML_JS="yes"
-            JS_RECOVERY="no"; has_marker 'frontend-only recovery' "$JS" && JS_RECOVERY="yes"
+            JS_RECOVERY="no"; has_marker 'frontend-only recovery' "$ADMIN_JS" && JS_RECOVERY="yes"
             OW_MODULE="no"; has_marker 'window.OMODOS_OFFSET_WAYS' "$OW_JS" && OW_MODULE="yes"
             OW_THEME="no"; has_marker 'omodos-2.0' "$OW_JS" && OW_THEME="yes"
             OW_STYLE="no"; has_marker '.ow-hero' "$OW_CSS" && OW_STYLE="yes"
 
-            echo "[SMOKE_DIAG] build='$BUILD' expected='$EXPECTED_BUILD' html_login=$HTML_LOGIN html_v4=$HTML_V4 html_hotfix=$HTML_HOTFIX html_css=$HTML_CSS html_js=$HTML_JS recovery=$JS_RECOVERY css_bytes=$(printf '%s' "$CSS" | wc -c | tr -d ' ') login_http=$STATUS login_json_ok=$LOGIN_JSON_OK login_ok=$LOGIN_OK_VALUE file_guard_http=$FILE_STATUS offset_js_bytes=$(printf '%s' "$OW_JS" | wc -c | tr -d ' ') offset_module=$OW_MODULE offset_theme=$OW_THEME offset_css_bytes=$(printf '%s' "$OW_CSS" | wc -c | tr -d ' ') offset_style=$OW_STYLE"
+            echo "[SMOKE_DIAG] build='$BUILD' expected='$EXPECTED_BUILD' html_login=$HTML_LOGIN html_v4=$HTML_V4 html_hotfix=$HTML_HOTFIX html_css=$HTML_CSS html_js=$HTML_JS admin_js_bytes=$(printf '%s' "$ADMIN_JS" | wc -c | tr -d ' ') recovery=$JS_RECOVERY css_bytes=$(printf '%s' "$CSS" | wc -c | tr -d ' ') login_http=$STATUS login_json_ok=$LOGIN_JSON_OK login_ok=$LOGIN_OK_VALUE file_guard_http=$FILE_STATUS offset_js_bytes=$(printf '%s' "$OW_JS" | wc -c | tr -d ' ') offset_module=$OW_MODULE offset_theme=$OW_THEME offset_css_bytes=$(printf '%s' "$OW_CSS" | wc -c | tr -d ' ') offset_style=$OW_STYLE"
 
-            if [ "$HTML_LOGIN" = "yes" ] && [ "$HTML_V4" = "yes" ] && [ "$HTML_HOTFIX" = "yes" ] && [ "$HTML_CSS" = "yes" ] && [ "$HTML_JS" = "yes" ] && [ "$JS_RECOVERY" = "yes" ] && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ] && [ "$FILE_STATUS" = "401" ] && [ "$LOGIN_JSON_OK" = "yes" ] && [ "$OW_MODULE" = "yes" ] && [ "$OW_THEME" = "yes" ] && [ "$OW_STYLE" = "yes" ]; then
+            if [ "$HTML_LOGIN" = "yes" ] && [ "$HTML_V4" = "yes" ] && [ "$HTML_HOTFIX" = "yes" ] && [ "$HTML_CSS" = "yes" ] && [ "$HTML_JS" = "yes" ] && [ "$JS_RECOVERY" = "yes" ] && [ -n "$ADMIN_JS" ] && [ -n "$CSS" ] && [ "$BUILD" = "$EXPECTED_BUILD" ] && [ "$STATUS" = "200" ] && [ "$FILE_STATUS" = "401" ] && [ "$LOGIN_JSON_OK" = "yes" ] && [ "$OW_MODULE" = "yes" ] && [ "$OW_THEME" = "yes" ] && [ "$OW_STYLE" = "yes" ]; then
               passed=1
               break
             fi
@@ -135,19 +137,22 @@ jobs:
           test "$(printf '%s' "$HTML" | grep -o '/omodos4/hotfix.css' | wc -l | tr -d ' ')" = "1"
 
           printf '%s' "$JS" > /tmp/omodos-hotfix.js
+          printf '%s' "$ADMIN_JS" > /tmp/omodos-superadmin-intelligence.js
           printf '%s' "$OW_JS" > /tmp/omodos-offset-ways.js
           node --check /tmp/omodos-hotfix.js
+          node --check /tmp/omodos-superadmin-intelligence.js
           node --check /tmp/omodos-offset-ways.js
-          check_marker "machine profile link" "Buka profil mesin" "$JS"
-          check_marker "sparepart purchase priority" "Tampilkan prioritas pembelian" "$JS"
-          check_marker "expert technician finder" "Cari teknisi berpengalaman" "$JS"
-          check_marker "correlation scale label" "Nilai hubungan (-1 sampai +1)" "$JS"
-          check_marker "difference level label" "Tingkat perbedaan " "$JS"
-          check_marker "confidence label helper" "function confidenceLabel" "$JS"
-          check_marker "percentage validation" "if(n<1||n>100)" "$JS"
-          check_absent "legacy Pearson label removed" "Kekuatan hubungan (Pearson r)" "$JS"
-          check_absent "legacy pattern distance removed" "Jarak pola " "$JS"
-          check_absent "legacy load-analysis control removed" "Muat Analisis" "$JS"
+          check_marker "Superadmin bundle version" "version:'4.0-master-recovery-100'" "$ADMIN_JS"
+          check_marker "machine profile link" "Buka profil mesin" "$ADMIN_JS"
+          check_marker "sparepart purchase priority" "Tampilkan prioritas pembelian" "$ADMIN_JS"
+          check_marker "expert technician finder" "Cari teknisi berpengalaman" "$ADMIN_JS"
+          check_marker "correlation scale label" "Nilai hubungan (-1 sampai +1)" "$ADMIN_JS"
+          check_marker "difference level label" "Tingkat perbedaan " "$ADMIN_JS"
+          check_marker "confidence label helper" "function confidenceLabel" "$ADMIN_JS"
+          check_marker "percentage validation" "if(n<1||n>100)" "$ADMIN_JS"
+          check_absent "legacy Pearson label removed" "Kekuatan hubungan (Pearson r)" "$ADMIN_JS"
+          check_absent "legacy pattern distance removed" "Jarak pola " "$ADMIN_JS"
+          check_absent "legacy load-analysis control removed" "Muat Analisis" "$ADMIN_JS"
           check_marker "Offset Ways database read action" "offsetWaysRead" "$OW_JS"
           check_marker "Offset Ways database write action" "offsetWaysSave" "$OW_JS"
           check_marker "native theme registry integration" "registerThemeInThemeManager" "$OW_JS"
