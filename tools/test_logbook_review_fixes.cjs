@@ -43,6 +43,14 @@ assert.match(hot,/id="edit-nomorMO"/);
 assert.match(hot,/function compressEditPhoto\(file\)/);
 assert.match(hot,/takeLogbookEditFiles_/);
 assert.match(hot,/function exportPdf\(modal\)/);
+assert.match(hot,/OMODOS_LAZY_VENDOR_LOAD_V1/);
+assert.match(hot,/window\.omodosLoadVendor_/);
+assert.match(hot,/buildMaterialPickerIndex_/);
+assert.doesNotMatch(hot,/function attachEditMaterialSuggestions/,'legacy edit material picker must not add duplicate per-keystroke listeners');
+assert.doesNotMatch(hot,/function attachPicker\(\)/,'second duplicate edit material picker must remain removed');
+for(const vendor of ['html2canvas.min.js','docx.min.js','exceljs.min.js','vis-network.min.js']){
+ assert.ok(!base.includes('<script src="/vendor/'+vendor+'"></script>'),vendor+' should load only on demand');
+}
 assert.match(base,/const LOGBOOK_PAGE_SIZE_ = 40/);
 assert.match(base,/function logbookOrderedEntries_\(\)/);
 assert.match(base,/function logbookSearchText_\(entry\)/);

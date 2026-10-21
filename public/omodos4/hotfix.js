@@ -431,61 +431,7 @@ if(typeof oldBuild==='function'){
   };
 }
 
-function attachEditMaterialSuggestions(){
-  const holder=document.getElementById('entry-view-mode');
-  if(!holder || !holder.querySelector('[data-edit-field="Nama Material"]')) return;
-  const nameInput=holder.querySelector('[data-edit-field="Nama Material"]');
-  const sapInput=holder.querySelector('[data-edit-field="Material Number SAP"]');
-  if(!nameInput || !sapInput || nameInput.dataset.materialSuggestReady==='1') return;
-  nameInput.dataset.materialSuggestReady='1';
-  sapInput.dataset.materialSuggestReady='1';
-  [nameInput,sapInput].forEach(input=>{
-    const field=input.closest('.field');
-    if(field) field.style.position='relative';
-    const box=document.createElement('div');
-    box.className='sp-suggest-box';
-    box.style.cssText='position:absolute;z-index:10020;left:0;right:0;top:100%;max-height:220px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line,#d1d5db);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);';
-    if(field) field.appendChild(box);
-    const byName=input===nameInput;
-    const run=()=>{
-      let master=[];
-      try{ master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[]; }catch(e){}
-      const q=input.value.trim().toLowerCase();
-      if(!q){box.classList.remove('open');box.innerHTML='';return;}
-      const seen=new Set();
-      const found=master.filter(x=>{
-        const v=String(byName?(x.nama||''):(x.sap||'')).trim();
-        const k=v.toLowerCase();
-        if(!k.includes(q)||seen.has(k))return false;
-        seen.add(k);return true;
-      }).slice(0,25);
-      if(!found.length){box.classList.remove('open');box.innerHTML='';return;}
-      box.innerHTML=found.map((x,i)=>'<div class="sp-suggest-item" data-edit-material-idx="'+i+'" style="display:flex;flex-direction:column;gap:2px;padding:9px 11px;cursor:pointer;border-bottom:1px solid var(--line,#e5e7eb)"><span class="sp-suggest-main">'+esc(byName?x.nama:x.sap)+'</span><span class="sp-suggest-sub">'+esc(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</span></div>').join('');
-      box.classList.add('open');
-      box.querySelectorAll('[data-edit-material-idx]').forEach(el=>el.addEventListener('mousedown',ev=>{
-        ev.preventDefault();
-        const item=found[Number(el.dataset.editMaterialIdx)];
-        if(!item)return;
-        nameInput.value=item.nama||'';
-        sapInput.value=item.sap||'';
-        box.classList.remove('open');box.innerHTML='';
-        nameInput.dispatchEvent(new Event('input',{bubbles:true}));
-        sapInput.dispatchEvent(new Event('input',{bubbles:true}));
-      }));
-    };
-    input.addEventListener('input',run);
-    input.addEventListener('focus',run);
-    input.addEventListener('blur',()=>setTimeout(()=>{box.classList.remove('open');box.innerHTML='';},180));
-  });
-}
-const oldEdit=window.renderEntryEditForm;
-if(typeof oldEdit==='function'){
-  window.renderEntryEditForm=function(){
-    const result=oldEdit.apply(this,arguments);
-    attachEditMaterialSuggestions();
-    return result;
-  };
-}
+/* Duplicate legacy material suggestion renderer removed; one cached picker is installed by V4 below. */
 const style=document.createElement('style');
 style.textContent=
   '.detail-row .v{white-space:pre-wrap;overflow-wrap:anywhere}'+
@@ -511,104 +457,13 @@ if(typeof window.aktifkanFullscreen==='function'){
 }
 function init(){
   addUnits();
-  attachEditMaterialSuggestions();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 /* addUnits is invoked by renderSparepartRows; edit suggestions are attached by the edit-form wrapper. */
 })();
 
 
-/* OMODOS_REVIEW_FIXES_20261017_V2
-   Make the edit-logbook material picker discoverable on mobile (including
-   when the field is empty), and preserve typed form content during lifecycle
-   transitions. */
-(function(){
-'use strict';
-if(window.__OMODOS_REVIEW_FIXES_20261017_V2__)return;
-window.__OMODOS_REVIEW_FIXES_20261017_V2__=true;
-function esc2(v){
-  try{return typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-  catch(e){return String(v==null?'':v);}
-}
-function attachPicker(){
-  const holder=document.getElementById('entry-view-mode');
-  if(!holder)return;
-  const name=holder.querySelector('[data-edit-field="Nama Material"]');
-  const sap=holder.querySelector('[data-edit-field="Material Number SAP"]');
-  if(!name||!sap)return;
-  [name,sap].forEach(input=>{
-    const box=input.closest('.field')?.querySelector('.omodos-edit-material-picker');
-    if(!box)return;
-    const byName=input===name;
-    const render=(showAll)=>{
-      let master=[];
-      try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
-      const q=String(input.value||'').trim().toLocaleLowerCase('id');
-      const seen=new Set();
-      const found=master.filter(x=>{
-        const v=String(byName?(x.nama||''):(x.sap||'')).trim();
-        const k=v.toLocaleLowerCase('id');
-        if(!k||seen.has(k)||(q&&!k.includes(q)))return false;
-        seen.add(k);return true;
-      }).slice(0,25);
-      if(!found.length){box.classList.remove('open');box.innerHTML='';return;}
-      box.innerHTML=found.map((x,i)=>'<button type="button" class="sp-suggest-item" data-pick-index="'+i+'" style="display:flex;width:100%;text-align:left;flex-direction:column;gap:2px;padding:10px 12px;border:0;border-bottom:1px solid var(--line,#e5e7eb);background:transparent;color:inherit;cursor:pointer"><span class="sp-suggest-main">'+esc2(byName?x.nama:x.sap)+'</span><span class="sp-suggest-sub">'+esc2(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</span></button>').join('');
-      box.__items=found;box.classList.add('open');
-    };
-    if(input.dataset.materialPickerV2==='1')return;
-    input.dataset.materialPickerV2='1';
-    input.addEventListener('focus',()=>render(true));
-    input.addEventListener('input',()=>render(false));
-    input.addEventListener('keydown',ev=>{
-      if(ev.key==='Escape'){box.classList.remove('open');box.innerHTML='';}
-    });
-    box.addEventListener('pointerdown',ev=>{
-      const option=ev.target.closest('[data-pick-index]');
-      if(!option)return;
-      ev.preventDefault();
-      const item=box.__items?.[Number(option.dataset.pickIndex)];
-      if(!item)return;
-      name.value=item.nama||'';sap.value=item.sap||'';
-      box.classList.remove('open');box.innerHTML='';
-      name.dispatchEvent(new Event('input',{bubbles:true}));
-      sap.dispatchEvent(new Event('input',{bubbles:true}));
-    });
-    input.addEventListener('blur',()=>setTimeout(()=>{if(!box.matches(':hover')){box.classList.remove('open');box.innerHTML='';}},250));
-  });
-}
-/* The legacy helper is scoped to the previous IIFE; do not reference it here. */
-function ensurePicker(){
-  const holder=document.getElementById('entry-view-mode');
-  if(!holder)return;
-  const name=holder.querySelector('[data-edit-field="Nama Material"]');
-  const sap=holder.querySelector('[data-edit-field="Material Number SAP"]');
-  [name,sap].forEach(input=>{
-    if(!input)return;
-    const field=input.closest('.field');
-    if(!field)return;
-    let box=field.querySelector('.omodos-edit-material-picker');
-    if(!box){
-      box=document.createElement('div');
-      box.className='sp-suggest-box omodos-edit-material-picker';
-      box.style.cssText='display:none;position:absolute;z-index:10030;left:0;right:0;top:100%;max-height:240px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line,#d1d5db);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);';
-      field.style.position='relative';field.appendChild(box);
-    }
-  });
-  attachPicker();
-}
-const style=document.createElement('style');
-style.textContent='.omodos-edit-material-picker.open{display:block!important}.omodos-edit-material-picker .sp-suggest-item:active{background:var(--surface-2,#f3f4f6)}';
-document.head.appendChild(style);
-const previousRender=window.renderEntryEditForm;
-if(typeof previousRender==='function'&&!previousRender.__materialPickerV2){
-  const wrapped=function(){const result=previousRender.apply(this,arguments);ensurePicker();return result;};
-  wrapped.__materialPickerV2=true;window.renderEntryEditForm=wrapped;
-}
-function boot(){ensurePicker();}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-/* Render wrappers and one-time boot replace the document-wide observer. */
-})();
-
+/* V2 duplicate picker removed; single indexed edit picker is installed below. */
 
 /* OMODOS_REVIEW_FIXES_20261017_V3
    Preserve multiline job descriptions and protect an in-progress logbook form
@@ -675,47 +530,61 @@ if(typeof window.aktifkanFullscreen==='function'){
 /* Edit-logbook material picker: refresh the master list if cache is empty,
    then populate results on focus (including an empty search) for touch users. */
 function escape(v){try{return typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}catch(e){return '';}}
+let materialPickerMasterRef_=null;
+let materialPickerMasterLength_=-1;
+let materialPickerNameIndex_=[];
+let materialPickerSapIndex_=[];
+function buildMaterialPickerIndex_(){
+ let master=[];try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
+ if(master!==materialPickerMasterRef_||master.length!==materialPickerMasterLength_){
+  const names=new Map(),saps=new Map();
+  for(const row of master){
+   if(!row||typeof row!=='object')continue;
+   const name=String(row.nama||'').trim(),sap=String(row.sap||'').trim();
+   const nk=name.toLocaleLowerCase('id'),sk=sap.toLocaleLowerCase('id');
+   if(nk&&!names.has(nk))names.set(nk,{row,key:nk});
+   if(sk&&!saps.has(sk))saps.set(sk,{row,key:sk});
+  }
+  materialPickerMasterRef_=master;materialPickerMasterLength_=master.length;
+  materialPickerNameIndex_=Array.from(names.values());materialPickerSapIndex_=Array.from(saps.values());
+ }
+ return {master,name:materialPickerNameIndex_,sap:materialPickerSapIndex_};
+}
 function bindEditPicker(){
  const holder=document.getElementById('entry-view-mode');if(!holder)return;
  const name=holder.querySelector('[data-edit-field="Nama Material"]');
  const sap=holder.querySelector('[data-edit-field="Material Number SAP"]');
  if(!name||!sap)return;
  [name,sap].forEach(input=>{
-   const field=input.closest('.field');if(!field)return;
-   /* Remove legacy suggestion layers in this edit field to prevent overlap. */
-   field.querySelectorAll('.sp-suggest-box').forEach(box=>{if(!box.classList.contains('omodos-edit-material-picker'))box.remove();});
-   let box=field.querySelector('.omodos-edit-material-picker');
-   if(!box){box=document.createElement('div');box.className='sp-suggest-box omodos-edit-material-picker';box.style.cssText='display:none;position:absolute;z-index:10040;left:0;right:0;top:100%;max-height:240px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line,#d1d5db);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);';field.style.position='relative';field.appendChild(box);}
-   if(input.dataset.materialPickerV4==='1')return;
-   input.dataset.materialPickerV4='1';
-   const byName=input===name;
-   let items=[];
-   const render=()=>{
-     let master=[];try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
-     const q=String(input.value||'').trim().toLocaleLowerCase('id');const seen=new Set();
-     items=master.filter(x=>{const val=String(byName?(x.nama||''):(x.sap||'')).trim();const k=val.toLocaleLowerCase('id');if(!k||seen.has(k)||(q&&!k.includes(q)))return false;seen.add(k);return true;}).slice(0,30);
-     if(!items.length){box.classList.remove('open');box.innerHTML='<div style="padding:10px 12px;color:var(--text-dim)">'+(master.length?'Tidak ada material yang cocok.':'Master material belum termuat. Coba buka kembali setelah koneksi tersedia.')+'</div>';if(master.length)box.classList.add('open');return;}
-     box.innerHTML=items.map((x,i)=>'<button type="button" data-v4-pick="'+i+'" style="display:flex;width:100%;text-align:left;flex-direction:column;gap:2px;padding:10px 12px;border:0;border-bottom:1px solid var(--line,#e5e7eb);background:transparent;color:inherit;cursor:pointer"><span>'+escape(byName?x.nama:x.sap)+'</span><small>'+escape(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</small></button>').join('');
-     box.classList.add('open');
-   };
-   const loadThenRender=async()=>{
-     let master=[];try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
-     if(!master.length&&typeof syncSparepartLokasiFromBackend==='function'){try{await syncSparepartLokasiFromBackend();}catch(e){}}
-     render();
-   };
-   input.addEventListener('focus',loadThenRender);
-   input.addEventListener('input',render);
-   input.addEventListener('keydown',ev=>{if(ev.key==='Escape'){box.classList.remove('open');box.innerHTML='';}});
-   box.addEventListener('pointerdown',ev=>{
-     const opt=ev.target.closest('[data-v4-pick]');if(!opt)return;ev.preventDefault();
-     const item=items[Number(opt.dataset.v4Pick)];if(!item)return;
-     name.value=item.nama||'';sap.value=item.sap||'';
-     box.classList.remove('open');box.innerHTML='';
-     name.dispatchEvent(new Event('input',{bubbles:true}));sap.dispatchEvent(new Event('input',{bubbles:true}));
-   });
-   input.addEventListener('blur',()=>setTimeout(()=>{if(!box.contains(document.activeElement)){box.classList.remove('open');box.innerHTML='';}},300));
+  const field=input.closest('.field');if(!field)return;
+  field.querySelectorAll('.sp-suggest-box').forEach(box=>{if(!box.classList.contains('omodos-edit-material-picker'))box.remove();});
+  let box=field.querySelector('.omodos-edit-material-picker');
+  if(!box){box=document.createElement('div');box.className='sp-suggest-box omodos-edit-material-picker';box.style.cssText='display:none;position:absolute;z-index:10040;left:0;right:0;top:100%;max-height:240px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line,#d1d5db);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);';field.style.position='relative';field.appendChild(box);}
+  if(input.dataset.materialPickerV4==='1')return;
+  input.dataset.materialPickerV4='1';
+  const byName=input===name;let items=[],timer=null;
+  const render=()=>{
+   const idx=buildMaterialPickerIndex_(),query=String(input.value||'').trim().toLocaleLowerCase('id');
+   const candidates=byName?idx.name:idx.sap;items=[];
+   for(const candidate of candidates){if(query&&!candidate.key.includes(query))continue;items.push(candidate.row);if(items.length>=30)break;}
+   if(!items.length){box.innerHTML='<div style="padding:10px 12px;color:var(--text-dim)">'+(idx.master.length?'Tidak ada material yang cocok.':'Master material belum termuat. Coba fokuskan kembali setelah koneksi tersedia.')+'</div>';box.classList.add('open');return;}
+   box.innerHTML=items.map((x,i)=>'<button type="button" data-v4-pick="'+i+'" style="display:flex;width:100%;text-align:left;flex-direction:column;gap:2px;padding:10px 12px;border:0;border-bottom:1px solid var(--line,#e5e7eb);background:transparent;color:inherit;cursor:pointer"><span>'+escape(byName?x.nama:x.sap)+'</span><small>'+escape(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</small></button>').join('');
+   box.classList.add('open');
+  };
+  const loadThenRender=async()=>{
+   let master=[];try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
+   if(!master.length&&typeof syncSparepartLokasiFromBackend==='function'){try{await syncSparepartLokasiFromBackend();}catch(e){}}
+   render();
+  };
+  input.addEventListener('focus',loadThenRender);
+  input.addEventListener('input',()=>{if(timer)clearTimeout(timer);timer=setTimeout(render,110);});
+  input.addEventListener('keydown',ev=>{if(ev.key==='Escape'){box.classList.remove('open');box.innerHTML='';}});
+  box.addEventListener('pointerdown',ev=>{const opt=ev.target.closest('[data-v4-pick]');if(!opt)return;ev.preventDefault();const item=items[Number(opt.dataset.v4Pick)];if(!item)return;name.value=item.nama||'';sap.value=item.sap||'';box.classList.remove('open');box.innerHTML='';name.dispatchEvent(new Event('input',{bubbles:true}));sap.dispatchEvent(new Event('input',{bubbles:true}));});
+  input.addEventListener('blur',()=>setTimeout(()=>{if(!box.contains(document.activeElement)){box.classList.remove('open');box.innerHTML='';}},300));
  });
 }
+const renderEditBeforePickerV4_=window.renderEntryEditForm;
+if(typeof renderEditBeforePickerV4_==='function'&&!renderEditBeforePickerV4_.__materialPickerV4){const wrapped=function(){const result=renderEditBeforePickerV4_.apply(this,arguments);bindEditPicker();return result;};wrapped.__materialPickerV4=true;window.renderEntryEditForm=wrapped;}
 function boot(){bindEditPicker();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 /* Render wrappers and one-time boot replace the document-wide observer. */
@@ -1169,6 +1038,33 @@ function exportPdf(modal){
 
 function boot(){installMoField();installPdfButton();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',boot,{passive:true});
+/* OMODOS_LAZY_VENDOR_LOAD_V1 — defer rarely-used export and graph bundles. */
+(function(){
+ 'use strict';
+ const files={
+  html2canvas:{src:'/vendor/html2canvas.min.js',ready:()=>typeof window.html2canvas==='function'},
+  docx:{src:'/vendor/docx.min.js',ready:()=>!!(window.docx&&window.docx.Document)},
+  exceljs:{src:'/vendor/exceljs.min.js',ready:()=>!!(window.ExcelJS&&window.ExcelJS.Workbook)},
+  vis:{src:'/vendor/vis-network.min.js',ready:()=>!!(window.vis&&window.vis.Network)}
+ };
+ const pending=window.__OMODOS_LAZY_VENDOR_PROMISES__||(window.__OMODOS_LAZY_VENDOR_PROMISES__={});
+ window.omodosLoadVendor_=function(name){
+  const item=files[name];if(!item)return Promise.reject(new Error('Library tidak terdaftar: '+name));
+  if(item.ready())return Promise.resolve(true);if(pending[name])return pending[name];
+  pending[name]=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');script.src=item.src;script.async=true;script.dataset.omodosLazyVendor=name;
+   script.onload=()=>{if(item.ready())resolve(true);else reject(new Error('File termuat tetapi '+name+' tidak tersedia'));};
+   script.onerror=()=>reject(new Error('Gagal memuat '+item.src));document.head.appendChild(script);
+  }).catch(err=>{delete pending[name];throw err;});return pending[name];
+ };
+ function wrap(name,deps){
+  const original=window[name];if(typeof original!=='function'||original.__omodosLazyVendorWrapped)return;
+  const wrapped=function(){const context=this,args=arguments;return Promise.all(deps.map(dep=>window.omodosLoadVendor_(dep))).then(()=>original.apply(context,args)).catch(err=>{console.error('[OMODOS] Lazy vendor gagal:',name,err);if(typeof window.toast==='function')window.toast('Fitur belum bisa dimuat ('+deps.join(', ')+'). Periksa koneksi lalu coba lagi.',true);});};
+  wrapped.__omodosLazyVendorWrapped=true;window[name]=wrapped;
+ }
+ wrap('exportRcaPdf',['html2canvas']);wrap('exportRcaDocx',['html2canvas','docx']);wrap('exportRcaXlsx',['html2canvas','exceljs']);
+ wrap('exportProjectPdf',['html2canvas']);wrap('exportProjectDocx',['docx']);wrap('exportProjectXlsx',['exceljs']);wrap('renderKnowledgeGraphView',['vis']);
+})();
 const css=document.createElement('style');css.textContent=[
  '.omodos-edit-photo-panel{grid-column:1/-1;margin-top:8px;padding:12px;border:1px solid var(--line,#dbe3e8);border-radius:10px;background:var(--panel-2,#f8fafc)}',
  '#entry-view-mode .omodos-edit-photo-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}',

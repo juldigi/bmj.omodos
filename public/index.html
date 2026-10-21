@@ -3130,15 +3130,11 @@ pre, code{ white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; 
   .bottom-nav-btn{ min-height:44px; }
 }
 </style>
-<!-- Library export laporan: PDF (jsPDF+html2canvas), Word (docx.js), Excel (ExcelJS), Excel-read (SheetJS - dipakai modul Analisa Downtime) -->
-<script src="/vendor/html2canvas.min.js"></script>
+<!-- Core libraries used broadly; heavy report and graph bundles load only on demand. -->
 <script src="/vendor/jspdf.min.js"></script>
-<script src="/vendor/docx.min.js"></script>
 <script src="/vendor/xlsx.min.js"></script>
-<script src="/vendor/exceljs.min.js"></script>
-<!-- Chart.js: dipakai menu baru "Analitik & Dashboard" (Pareto, trend, dsb) -->
+<!-- Chart.js remains eager because several authorised dashboards use it. -->
 <script src="/vendor/chart.min.js"></script>
-<script src="/vendor/vis-network.min.js"></script>
 
 <style id="scroll-top-global-style">
 #scroll-to-top-btn{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:849;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--text);box-shadow:0 10px 30px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transform:translateY(10px);pointer-events:none;transition:opacity .18s ease,transform .18s ease,visibility .18s;cursor:pointer}
