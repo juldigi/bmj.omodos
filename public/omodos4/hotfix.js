@@ -1054,7 +1054,8 @@ function installLightweightLogbookAttachmentGrid(){
  if(typeof window.renderAttachGrid==='function'&&!window.renderAttachGrid.__omodosLogbookAttachmentLiteV1){
   const originalGrid=window.renderAttachGrid;
   const wrappedGrid=function(atts,label){
-   const inLogbookDetail=!!window.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1||!!byId('btn-export-entry-pdf');
+   const modal=byId('modal-bg'),showAll=byId('btn-entry-show-all-attachments');
+   const inLogbookDetail=!!window.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1||!!(showAll&&modal&&modal.classList.contains('active'));
    if(!inLogbookDetail||String(label||'')!=='Lampiran'||!Array.isArray(atts))return originalGrid.apply(this,arguments);
    const light=atts.map(a=>{
     if(!a||!/\/files\//.test(String(a.viewUrl||'')))return a;
