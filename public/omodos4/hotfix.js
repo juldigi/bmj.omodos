@@ -915,7 +915,7 @@ function renderEditPhotos(holder,entry,id){
  const oldCards=visibleOld.map((f,i)=>{
   const url=f.viewUrl||f.previewUrl||f.thumbUrl||'';
   if(!url)return '';
-  const thumb=f.thumbUrl||f.previewUrl||'';
+  const thumb=[f.thumbUrl,f.previewUrl].find(candidate=>candidate&&candidate!==url)||'';
   const preview=thumb?'<img src="'+esc(thumb)+'" alt="Foto tersimpan" loading="lazy" decoding="async" fetchpriority="low">':'<span style="display:flex;align-items:center;justify-content:center;width:100px;height:76px;border-radius:5px;background:var(--panel-2,#f0f4f7);font-size:10px;text-align:center;padding:4px">Buka foto tersimpan</span>';
   return '<a class="omodos-edit-photo-current" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+preview+'<span>Foto lama '+(i+1)+'</span></a>';
  }).filter(Boolean);
@@ -1049,7 +1049,37 @@ function exportPdf(modal){
  pdf.save((singleId?'Detail_Logbook':'Report_Logbook')+'_'+now.toISOString().replace(/[-:]/g,'').slice(0,15)+'.pdf');modal.remove();notice('PDF berhasil dibuat ('+rows.length+' entri).');
 }
 
-function boot(){installMoField();installPdfButton();}
+/* LOGBOOK_LIGHTWEIGHT_FILE_PREVIEWS_V1 — avoid loading full uploaded media just to build Logbook preview cards. */
+function installLightweightLogbookAttachmentGrid(){
+ if(typeof window.renderAttachGrid==='function'&&!window.renderAttachGrid.__omodosLogbookAttachmentLiteV1){
+  const originalGrid=window.renderAttachGrid;
+  const wrappedGrid=function(atts,label){
+   const inLogbookDetail=!!window.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1||!!byId('btn-export-entry-pdf');
+   if(!inLogbookDetail||String(label||'')!=='Lampiran'||!Array.isArray(atts))return originalGrid.apply(this,arguments);
+   const light=atts.map(a=>{
+    if(!a||!/\\/files\\//.test(String(a.viewUrl||'')))return a;
+    const mime=String(a.mimeType||'').toLowerCase(),type=String(a.type||'').toLowerCase();
+    if(type==='image'||type==='video'||mime.startsWith('image/')||mime.startsWith('video/'))return {...a,type:'file'};
+    return a;
+   });
+   return String(originalGrid.apply(this,[light,label])).replace('— klik untuk memperbesar','— klik untuk membuka lampiran');
+  };
+  wrappedGrid.__omodosLogbookAttachmentLiteV1=true;
+  window.renderAttachGrid=wrappedGrid;
+ }
+ if(typeof window.openDetail==='function'&&!window.openDetail.__omodosLogbookDetailScopeV1){
+  const originalOpen=window.openDetail;
+  const wrappedOpen=function(){
+   const previous=window.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1;
+   window.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1=true;
+   try{return originalOpen.apply(this,arguments);}
+   finally{window.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1=previous;}
+  };
+  wrappedOpen.__omodosLogbookDetailScopeV1=true;
+  window.openDetail=wrappedOpen;
+ }
+}
+function boot(){installMoField();installPdfButton();installLightweightLogbookAttachmentGrid();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',boot,{passive:true});
 /* OMODOS_LAZY_VENDOR_LOAD_V1 — defer rarely-used export and graph bundles. */
 (function(){
