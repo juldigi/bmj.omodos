@@ -34,6 +34,7 @@ jobs:
           set -euo pipefail
           node --check src/worker.js
           node tools/test_factory_home_card_detail.cjs
+          node tools/test_logbook_review_fixes.cjs
 
           node <<'NODE'
           const fs=require('fs');
