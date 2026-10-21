@@ -1057,7 +1057,7 @@ function installLightweightLogbookAttachmentGrid(){
    const inLogbookDetail=!!window.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1||!!byId('btn-export-entry-pdf');
    if(!inLogbookDetail||String(label||'')!=='Lampiran'||!Array.isArray(atts))return originalGrid.apply(this,arguments);
    const light=atts.map(a=>{
-    if(!a||!/\\/files\\//.test(String(a.viewUrl||'')))return a;
+    if(!a||!/\/files\//.test(String(a.viewUrl||'')))return a;
     const mime=String(a.mimeType||'').toLowerCase(),type=String(a.type||'').toLowerCase();
     if(type==='image'||type==='video'||mime.startsWith('image/')||mime.startsWith('video/'))return {...a,type:'file'};
     return a;
