@@ -58,7 +58,7 @@ for(const vendor of ['html2canvas.min.js','docx.min.js','exceljs.min.js','vis-ne
 assert.match(base,/const LOGBOOK_PAGE_SIZE_ = 40/);
 assert.match(base,/const LOGBOOK_MOBILE_PAGE_SIZE_ = 20/);
 assert.ok(base.includes("const pageSize = typeof window.matchMedia==='function'") && base.includes('LOGBOOK_MOBILE_PAGE_SIZE_'),'responsive mobile Logbook rendering');
-assert.match(base,/const LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap\(\)/);
+assert.match(base,/let LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap\(\)/);
 assert.match(base,/function logbookAttachmentCount_\(entry\)/);
 assert.match(base,/const attCount = logbookAttachmentCount_\(e\)/);
 assert.match(base,/btn-entry-show-all-attachments/);
