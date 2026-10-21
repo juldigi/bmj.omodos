@@ -4493,7 +4493,7 @@ function createBackend(services, env = {}) {
       if (parsed && typeof parsed === "object") return 1;
     } catch (e) {
     }
-    return trimmed.split(/[\\n,]+/).map(function(s) { return s.trim(); }).filter(Boolean).length;
+    return trimmed.split(/[\n,]+/).map(function(s) { return s.trim(); }).filter(Boolean).length;
   }
   __name(logbookAttachmentCountRaw_, "logbookAttachmentCountRaw_");
   function summarizeLogbookRows_(rows) {
