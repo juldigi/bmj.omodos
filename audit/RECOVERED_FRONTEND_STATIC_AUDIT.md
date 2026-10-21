@@ -1,9 +1,9 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-21T13:21:05.724142+00:00
-- File bytes: 1679045
-- Lines: 29146
-- SHA-256: a1f72a861aece9d8c7da9a68efe4969b3a4305588356831a3bfd9a0f3962a897
+- Audited UTC: 2026-10-21T13:28:55.759754+00:00
+- File bytes: 1683277
+- Lines: 29222
+- SHA-256: 650630b04702c20e25dcdcd860a7c648f94c7e1faec1ba0250d2e8aea1e99ba8
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
@@ -53,82 +53,82 @@
 - L8528: $$('.nav-btn').forEach(btn=>{
 - L8539: $$('.bottom-nav-btn').forEach(btn=>{
 - L8554: $$('.nav-btn', submenu).forEach(navBtn=>{
-- L9220: $$('.att-item', container).forEach(el=>{
-- L9434: $$('[data-logbook-stat]', $('#stat-strip')).forEach(btn=>btn.addEventListener('click',()=>{
-- L9439: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat===LOGBOOK_CARD_FILTER; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
-- L9496: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat==='total'; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
-- L9653: Array.from(registeredNames).forEach(n=>{ if(!(n in counts)) counts[n] = 0; });
-- L9666: $$('#pelapor-chips .machine-chip').forEach(c=>{
-- L9698: $$('#group-chips .machine-chip').forEach(c=>{
-- L10002: sotEntries(ENTRIES).filter(anIsBreakdown).forEach(e=>{
+- L9221: $$('.att-item', container).forEach(el=>{
+- L9492: $$('[data-logbook-stat]', $('#stat-strip')).forEach(btn=>btn.addEventListener('click',()=>{
+- L9497: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat===LOGBOOK_CARD_FILTER; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
+- L9554: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat==='total'; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
+- L9711: Array.from(registeredNames).forEach(n=>{ if(!(n in counts)) counts[n] = 0; });
+- L9724: $$('#pelapor-chips .machine-chip').forEach(c=>{
+- L9756: $$('#group-chips .machine-chip').forEach(c=>{
+- L10060: sotEntries(ENTRIES).filter(anIsBreakdown).forEach(e=>{
 ### ).find( — 16 match(es)
 - L8372: const parentBtn = activeNavBtn ? Array.from(document.querySelectorAll('.nav-parent-btn[data-group]')).find(b => {
-- L11183: const rec = (selRecord._records||[]).find(r=> String(r.id)===selRecord.value);
-- L11670: const rep = loadRcaReportsLocal().find(r=>r.id===b.dataset.id);
-- L12546: const rep = loadIpalReportsLocal().find(r=>r.id===b.dataset.id);
-- L16167: const stats = expertFinderStats(ENTRIES).find(s=>s.nama===label);
-- L16442: const stats = expertFinderStats(entries).find(s=>s.nama===nama) || { total:entries.length, selesai:0, breakdown:0, successRate:0, mesinCount:0, tahunPengalaman:0 };
-- L17964: const invalidField = requiredFieldsIn(steps[idx]).find(f=> !f.validity.valid) || firstInvalid;
-- L20114: const original = (PM_REPORTS||[]).find(r=>r.id===PATROL_STATE.id);
-- L20374: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
-- L20440: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
-- L20689: const rep = loadIpalReportsLocal().find(r=>r.id===card.dataset.id);
-- L20716: const rep = loadRcaReportsLocal().find(r=>r.id===card.dataset.id);
-- L24296: return (list||[]).find(item=> piNamesMatch(getter(item), nama)) || null;
-- L24574: const ef = expertFinderStats(ENTRIES).find(r=>r.nama===nama) || { total:0, selesai:0, breakdown:0, mesinCount:0, successRate:0, tahunPengalaman:0, score:0 };
-- L27254: const item = id ? (PMC_STATE.data[type]||[]).find(x=>x.ID===id) : null;
-- L27439: return (PMC_STATE.data[PMC_DETAIL.type]||[]).find(x=>x.ID===PMC_DETAIL.id);
+- L11241: const rec = (selRecord._records||[]).find(r=> String(r.id)===selRecord.value);
+- L11728: const rep = loadRcaReportsLocal().find(r=>r.id===b.dataset.id);
+- L12604: const rep = loadIpalReportsLocal().find(r=>r.id===b.dataset.id);
+- L16225: const stats = expertFinderStats(ENTRIES).find(s=>s.nama===label);
+- L16500: const stats = expertFinderStats(entries).find(s=>s.nama===nama) || { total:entries.length, selesai:0, breakdown:0, successRate:0, mesinCount:0, tahunPengalaman:0 };
+- L18040: const invalidField = requiredFieldsIn(steps[idx]).find(f=> !f.validity.valid) || firstInvalid;
+- L20190: const original = (PM_REPORTS||[]).find(r=>r.id===PATROL_STATE.id);
+- L20450: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
+- L20516: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
+- L20765: const rep = loadIpalReportsLocal().find(r=>r.id===card.dataset.id);
+- L20792: const rep = loadRcaReportsLocal().find(r=>r.id===card.dataset.id);
+- L24372: return (list||[]).find(item=> piNamesMatch(getter(item), nama)) || null;
+- L24650: const ef = expertFinderStats(ENTRIES).find(r=>r.nama===nama) || { total:0, selesai:0, breakdown:0, mesinCount:0, successRate:0, tahunPengalaman:0, score:0 };
+- L27330: const item = id ? (PMC_STATE.data[type]||[]).find(x=>x.ID===id) : null;
+- L27515: return (PMC_STATE.data[PMC_DETAIL.type]||[]).find(x=>x.ID===PMC_DETAIL.id);
 ### ).map( — 164 match(es)
 - L6921: const dateRows = (res.dateFixSample||[]).map(x=> `<tr><td>${escapeHtml(String(x.id))}</td><td>${escapeHtml(x.oldValue)}</td><td>→ ${escapeHtml(x.newValue)}</td></tr>`).join('');
 - L6922: const jenisRows = (res.jenisFixSample||[]).map(x=> `<tr><td>${escapeHtml(String(x.id))}</td><td>${escapeHtml(x.oldDeskripsi)}</td><td>→ Jenis Pekerjaan: ${escapeHtml(x.newJenis)}</td></tr>`).join('');
 - L7857: const key = JSON.stringify([WEB_APP_URL, token, action, Object.keys(params).sort().map(k=>[k,params[k]])]);
-- L8766: return String(str).split(/[\/\-&]+/,).map(s=>s.trim()).filter(Boolean).map(n=>/^(Fatkhurrohman|Fatkhurrosidi)$/i.test(n)?'Fatkhurosidi':n);
-- L8792: const optionsKode = MACHINES.filter(m=>norm_(m['Kode Mesin'])).map(m=>`<option value="${escapeHtml(m['Kode Mesin']||'')}">${escapeHtml(m['Kode Mesin']||'(tanpa kode)')} — ${escapeHtml(m['Nama Mesin']||'')}</option>`).join('');
-- L8889: $('#select-kategoriArea').innerHTML='<option value="">Pilih kategori...</option>'+Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('');
-- L9014: else list = trimmed.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-- L9017: list = trimmed.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-- L9359: return trimmed.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).length;
-- L9395: holder.insertAdjacentHTML('beforeend',LOGBOOK_FILTERED_ENTRIES_.slice(start,end).map((e,i)=>entryCardHtml(e,total-(start+i))).join(''));
-- L9535: const areaList=[...new Set(ENTRIES.filter(isAreaEntry_).map(e=>e['Lokasi/Area']))].filter(Boolean).map(area=>({key:'area:'+area,label:'Area · '+area,kode:'',nama:'Area · '+area}));
-- L9672: const names = splitPelaporNames(e['Nama Pelapor']).map(n=> registeredNames.has(n) ? n : 'Lainnya');
-- L9898: const [y,m] = String(periode||'').split('-').map(Number);
-- L10295: const jenisDurList = Object.entries(jenisDur).map(([j,v])=>({ jenis:j, avg: v.total/v.count, count: v.count }))
-- L10468: return $$('#diag-symptom-chips .machine-chip.active').map(b=> b.dataset.symptom);
-- L10720: const starsHtml = Array.from({length:5}).map((_,i)=> `<span class="${i<hs.stars?'star-on':'star-off'}">★</span>`).join('');
-- L10729: const relLogbook=ENTRIES.filter(e=>machineRecordMatchesIdentity_(e,kodeOrNama)).map(e=>({
-- L10734: const relEm=getDowntimeEmEntriesForMachine(kodeOrNama).map(r=>({
-- L10749: return `<div class="wiki-group-list">${Object.keys(groups).sort((a,b)=>Number(b)-Number(a)).map((y,idx)=>`
-- L10797: ${k.tags ? `<div class="kb-tags">${String(k.tags).split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
-- L11034: holder.innerHTML = suggestions.slice(0,30).map((s,i)=>`
-- L11163: if(type==='logbook') records = kbSourceLogbook().map(c=>({ id:c.sourceId, label:`${c.namaMesin||'-'} · ${c.judul} (${c.count}x)`, data:c }));
-- L11164: else if(type==='kaizen') records = kbSourceKaizen().map(c=>({ id:c.sourceId, label:`${c.judul}${c.namaMesin?' · '+c.namaMesin:''}`, data:c }));
-- L11165: else if(type==='rca') records = kbSourceRca().map(c=>({ id:c.sourceId, label:`${c.judul}${c.namaMesin?' · '+c.namaMesin:''}`, data:c }));
-- L11166: else if(type==='meeting-action') records = kbSourceMeetingAction().map(c=>({ id:c.sourceId, label:`${c.judul}${c.namaMesin?' · '+c.namaMesin:''}`, data:c }));
-- L11167: else if(type==='general-report') records = kbSourceGeneralReport().map(c=>({ id:c.sourceId, label:c.judul, data:c }));
-- L11168: else if(type==='predictive') records = kbSourcePredictive().map(c=>({ id:c.sourceId, label:`${c.namaMesin||'-'} · ${c.titikInspeksi} (${c.severity})`, data:c }));
-- L11548: causesByCategory[k] = causesByCategory[k].slice(0,3).map(txt=> newCauseNode(txt));
-- L11828: const lines = String(summary||'').split('\n').map(l=>l.trim()).filter(Boolean);
-- L11945: const childrenHtml = (node.children||[]).map((child, ci)=> renderCauseNodeRow(child, path.concat(ci))).join('');
-- L12066: const path = b.dataset.causePath.split('-').map(Number);
-- L12078: const path = b.dataset.causePath.split('-').map(Number);
-- L12104: s.whys = $$('[data-field="why"]', el).map(x=> x.textContent.trim());
-- L12111: const path = inp.dataset.causePath.split('-').map(Number);
-- L12267: new TableCell({ borders:cellBorder, children: (flattenCauseTree(s.causesByCategory[k]||[]).length ? flattenCauseTree(s.causesByCategory[k]) : ['-']).map(line=> new Paragraph({ text: line })) }),
-- L12335: <td style="border:1px solid #999;padding:6px;">${flattenCauseTree(s.causesByCategory[k]||[]).map(line=>escapeHtml(line)).join('<br>') || '-'}</td></tr>`).join('');
-- L12496: const [y,m] = String(bulanYYYYMM || '').split('-').map(Number);
-- L12530: return list.length ? list.slice().reverse().map(r => `
-- L13324: const divs=Array.from(new Set(source.filter(r=>String(r['Tahun'])===tahunSel.value).map(r=>String(r['Divisi']||'')).filter(Boolean))).sort();
-- L13341: holder.innerHTML=meta.sourceSheets.filter(x=>x.nonEmptyCells>0).map(x=>`<div class="kd-source-sheet-card ${x.errorCells?'warn':''}"><div class="nm">${escapeHtml(x.sheet)}</div><div class="meta">Range ${escapeHtml(x.dimension||'-')} · ${kdFmt(x.nonEmptyCells,0)} cell · ${kdFmt(x.formulaCells,0)} formula${x.errorCells?` · <strong>${kdFmt(x.errorCells,0)} error</strong>`:' · 0 error'}</div></div>`).join('');
-- L13838: const previewRows = IMPORT_STATE.rawRows.slice(0, 5).map(impBuildRow);
-- L13852: const allMapped = IMPORT_STATE.rawRows.map(impBuildRow).filter(r=> !r.__missing).map(r=>{ const c = {...r}; delete c.__missing; return c; });
-- L14958: const namaList = String(entry['Nama Material']||'').split(';').map(s=>s.trim()).filter(Boolean);
-- L14959: const sapList = String(entry['Material Number SAP']||'').split(';').map(s=>s.trim()).filter(Boolean);
-- L15193: ? detail.filter(d=>d.nama).map(d=> wikiLinkHtml('sparepart', d.nama, d.nama)).join(', ')
-- L15197: const teknisiHtml = e['Nama Pelapor'] ? splitPelaporNames(e['Nama Pelapor']).map(n=>wikiLinkHtml('personil', n, n)).join(', ') : '-';
-- L15340: const rows = sparepartCollectFilteredSorted().map(({entry:e, sap})=>[
-- L15781: const todaySap = new Set(sparepartOpnameToday().map(x=>x.sap).filter(Boolean));
-- L15796: const todaySap = new Set(sparepartOpnameToday().map(x=>x.sap).filter(Boolean));
-- L15912: return Object.values(stats).map(s=>{
+- L8767: return String(str).split(/[\/\-&]+/,).map(s=>s.trim()).filter(Boolean).map(n=>/^(Fatkhurrohman|Fatkhurrosidi)$/i.test(n)?'Fatkhurosidi':n);
+- L8793: const optionsKode = MACHINES.filter(m=>norm_(m['Kode Mesin'])).map(m=>`<option value="${escapeHtml(m['Kode Mesin']||'')}">${escapeHtml(m['Kode Mesin']||'(tanpa kode)')} — ${escapeHtml(m['Nama Mesin']||'')}</option>`).join('');
+- L8890: $('#select-kategoriArea').innerHTML='<option value="">Pilih kategori...</option>'+Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('');
+- L9015: else list = trimmed.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+- L9018: list = trimmed.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+- L9361: return trimmed.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).length;
+- L9453: holder.insertAdjacentHTML('beforeend',LOGBOOK_FILTERED_ENTRIES_.slice(start,end).map((e,i)=>entryCardHtml(e,total-(start+i))).join(''));
+- L9593: const areaList=[...new Set(ENTRIES.filter(isAreaEntry_).map(e=>e['Lokasi/Area']))].filter(Boolean).map(area=>({key:'area:'+area,label:'Area · '+area,kode:'',nama:'Area · '+area}));
+- L9730: const names = splitPelaporNames(e['Nama Pelapor']).map(n=> registeredNames.has(n) ? n : 'Lainnya');
+- L9956: const [y,m] = String(periode||'').split('-').map(Number);
+- L10353: const jenisDurList = Object.entries(jenisDur).map(([j,v])=>({ jenis:j, avg: v.total/v.count, count: v.count }))
+- L10526: return $$('#diag-symptom-chips .machine-chip.active').map(b=> b.dataset.symptom);
+- L10778: const starsHtml = Array.from({length:5}).map((_,i)=> `<span class="${i<hs.stars?'star-on':'star-off'}">★</span>`).join('');
+- L10787: const relLogbook=ENTRIES.filter(e=>machineRecordMatchesIdentity_(e,kodeOrNama)).map(e=>({
+- L10792: const relEm=getDowntimeEmEntriesForMachine(kodeOrNama).map(r=>({
+- L10807: return `<div class="wiki-group-list">${Object.keys(groups).sort((a,b)=>Number(b)-Number(a)).map((y,idx)=>`
+- L10855: ${k.tags ? `<div class="kb-tags">${String(k.tags).split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+- L11092: holder.innerHTML = suggestions.slice(0,30).map((s,i)=>`
+- L11221: if(type==='logbook') records = kbSourceLogbook().map(c=>({ id:c.sourceId, label:`${c.namaMesin||'-'} · ${c.judul} (${c.count}x)`, data:c }));
+- L11222: else if(type==='kaizen') records = kbSourceKaizen().map(c=>({ id:c.sourceId, label:`${c.judul}${c.namaMesin?' · '+c.namaMesin:''}`, data:c }));
+- L11223: else if(type==='rca') records = kbSourceRca().map(c=>({ id:c.sourceId, label:`${c.judul}${c.namaMesin?' · '+c.namaMesin:''}`, data:c }));
+- L11224: else if(type==='meeting-action') records = kbSourceMeetingAction().map(c=>({ id:c.sourceId, label:`${c.judul}${c.namaMesin?' · '+c.namaMesin:''}`, data:c }));
+- L11225: else if(type==='general-report') records = kbSourceGeneralReport().map(c=>({ id:c.sourceId, label:c.judul, data:c }));
+- L11226: else if(type==='predictive') records = kbSourcePredictive().map(c=>({ id:c.sourceId, label:`${c.namaMesin||'-'} · ${c.titikInspeksi} (${c.severity})`, data:c }));
+- L11606: causesByCategory[k] = causesByCategory[k].slice(0,3).map(txt=> newCauseNode(txt));
+- L11886: const lines = String(summary||'').split('\n').map(l=>l.trim()).filter(Boolean);
+- L12003: const childrenHtml = (node.children||[]).map((child, ci)=> renderCauseNodeRow(child, path.concat(ci))).join('');
+- L12124: const path = b.dataset.causePath.split('-').map(Number);
+- L12136: const path = b.dataset.causePath.split('-').map(Number);
+- L12162: s.whys = $$('[data-field="why"]', el).map(x=> x.textContent.trim());
+- L12169: const path = inp.dataset.causePath.split('-').map(Number);
+- L12325: new TableCell({ borders:cellBorder, children: (flattenCauseTree(s.causesByCategory[k]||[]).length ? flattenCauseTree(s.causesByCategory[k]) : ['-']).map(line=> new Paragraph({ text: line })) }),
+- L12393: <td style="border:1px solid #999;padding:6px;">${flattenCauseTree(s.causesByCategory[k]||[]).map(line=>escapeHtml(line)).join('<br>') || '-'}</td></tr>`).join('');
+- L12554: const [y,m] = String(bulanYYYYMM || '').split('-').map(Number);
+- L12588: return list.length ? list.slice().reverse().map(r => `
+- L13382: const divs=Array.from(new Set(source.filter(r=>String(r['Tahun'])===tahunSel.value).map(r=>String(r['Divisi']||'')).filter(Boolean))).sort();
+- L13399: holder.innerHTML=meta.sourceSheets.filter(x=>x.nonEmptyCells>0).map(x=>`<div class="kd-source-sheet-card ${x.errorCells?'warn':''}"><div class="nm">${escapeHtml(x.sheet)}</div><div class="meta">Range ${escapeHtml(x.dimension||'-')} · ${kdFmt(x.nonEmptyCells,0)} cell · ${kdFmt(x.formulaCells,0)} formula${x.errorCells?` · <strong>${kdFmt(x.errorCells,0)} error</strong>`:' · 0 error'}</div></div>`).join('');
+- L13896: const previewRows = IMPORT_STATE.rawRows.slice(0, 5).map(impBuildRow);
+- L13910: const allMapped = IMPORT_STATE.rawRows.map(impBuildRow).filter(r=> !r.__missing).map(r=>{ const c = {...r}; delete c.__missing; return c; });
+- L15016: const namaList = String(entry['Nama Material']||'').split(';').map(s=>s.trim()).filter(Boolean);
+- L15017: const sapList = String(entry['Material Number SAP']||'').split(';').map(s=>s.trim()).filter(Boolean);
+- L15251: ? detail.filter(d=>d.nama).map(d=> wikiLinkHtml('sparepart', d.nama, d.nama)).join(', ')
+- L15255: const teknisiHtml = e['Nama Pelapor'] ? splitPelaporNames(e['Nama Pelapor']).map(n=>wikiLinkHtml('personil', n, n)).join(', ') : '-';
+- L15398: const rows = sparepartCollectFilteredSorted().map(({entry:e, sap})=>[
+- L15839: const todaySap = new Set(sparepartOpnameToday().map(x=>x.sap).filter(Boolean));
+- L15854: const todaySap = new Set(sparepartOpnameToday().map(x=>x.sap).filter(Boolean));
+- L15970: return Object.values(stats).map(s=>{
 ### ).filter( — 161 match(es)
 - L6153: return (list || ENTRIES).filter(isSotEntry);
 - L6158: return (list || ENTRIES).filter(isHistoricalEntry);
@@ -137,56 +137,56 @@
 - L7365: const direct=Array.from(container.children).filter(x=>!x.classList.contains('empty-state'));
 - L7371: const nested=Array.from(wrap.children).filter(x=>!x.classList.contains('group-header')&&!x.classList.contains('section-title')&&!x.classList.contains('empty-state'));
 - L7387: return Array.from(set).filter(n=>n>=1&&n<=totalPages).sort((a,b)=>a-b);
-- L8770: const names = PERSONIL.map(p=>p['Nama Personil']).filter(Boolean).sort();
-- L9329: const value = Array.from(new Set(ENTRIES.map(e=>e['Jenis Pekerjaan']).filter(Boolean)));
-- L9473: let filtered = logbookOrderedEntries_().filter(e=>{
-- L9529: }).filter(m=> m.key);
-- L9642: const registeredNames = new Set(PERSONIL.map(p=>String(p['Nama Personil']||'').trim()).filter(Boolean));
-- L9958: const scoped = sotEntries(ENTRIES).filter(filterFn);
-- L9966: const dates = scoped.map(e=> new Date(e['Tanggal'])).filter(d=>!isNaN(d));
-- L10251: const scoped = sotEntries(ENTRIES).filter(filterFn);
-- L10317: const words = masalah.replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=> w.length>=4 && !STOPWORDS.has(w));
-- L10325: const pairList = Object.values(pairMap).filter(p=> p.count >= 2).sort((a,b)=> b.count-a.count).slice(0, 15);
-- L10450: const relevant = kodeMesin ? sotEntries().filter(e=> machineRecordMatchesIdentity_(e,kodeMesin)) : sotEntries();
-- L10455: const top = Object.entries(freq).filter(([,c])=> c>=2).sort((a,b)=> b[1]-a[1]).slice(0, 16);
-- L10497: const logbookScope = kodeMesin ? sotEntries().filter(e=> machineRecordMatchesIdentity_(e,kodeMesin)) : sotEntries();
-- L10690: const emRel = getDowntimeEmEntriesForMachine(kodeOrNama).filter(r=>{
-- L10846: return Object.values(map).filter(x=> x.count>=2).sort((a,b)=> b.count-a.count);
-- L11060: return new Set(kbNormalize(str).split(/[^a-z0-9]+/).filter(w=> w.length>=4));
-- L11645: saveRcaReportsLocal(loadRcaReportsLocal().filter(r=>r.id!==id));
-- L11752: const nodes = arr.map(normalizeCauseNode_).filter(n=> n.text !== '' || n.children.length);
-- L12478: saveIpalReportsLocal(loadIpalReportsLocal().filter(r=>r.id!==id));
-- L13310: const years=Array.from(new Set(allRows.map(r=>String(r['Tahun']||'')).filter(Boolean))).sort().reverse();
-- L13395: let source=(period==='YTD'?KPI_DEPARTMENT_YTD:KPI_DEPARTMENT_MTD).filter(r=>String(r['Tahun'])===String(year));
-- L13410: const ranked=valid.map(r=>({r,p:kdAttainment(r,month)})).filter(x=>x.p!==null).sort((a,b)=>b.p-a.p);
-- L13497: const years = Array.from(new Set(MACHINE_BREAKDOWN.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
-- L13941: const years = Array.from(new Set(rows.map(r=> Number(r['Tahun'])).filter(Boolean))).sort();
-- L13942: const mesinList = Array.from(new Set(rows.map(r=> r['Mesin']).filter(Boolean))).sort();
-- L13969: const years = Array.from(new Set(RECORD_YTD.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
-- L14167: const years = Array.from(new Set(RUN_HOUR_COMPARISON.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
-- L14363: const years = Array.from(new Set(ENERGY_COST_TOE.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
-- L14540: const years = Array.from(new Set(CORRECTIVE_REPORT.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
-- L14776: const years = Array.from(new Set(ENERGY_UTILITY.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
-- L15016: const pending=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview);
+- L8771: const names = PERSONIL.map(p=>p['Nama Personil']).filter(Boolean).sort();
+- L9331: const value = Array.from(new Set(ENTRIES.map(e=>e['Jenis Pekerjaan']).filter(Boolean)));
+- L9531: let filtered = logbookOrderedEntries_().filter(e=>{
+- L9587: }).filter(m=> m.key);
+- L9700: const registeredNames = new Set(PERSONIL.map(p=>String(p['Nama Personil']||'').trim()).filter(Boolean));
+- L10016: const scoped = sotEntries(ENTRIES).filter(filterFn);
+- L10024: const dates = scoped.map(e=> new Date(e['Tanggal'])).filter(d=>!isNaN(d));
+- L10309: const scoped = sotEntries(ENTRIES).filter(filterFn);
+- L10375: const words = masalah.replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=> w.length>=4 && !STOPWORDS.has(w));
+- L10383: const pairList = Object.values(pairMap).filter(p=> p.count >= 2).sort((a,b)=> b.count-a.count).slice(0, 15);
+- L10508: const relevant = kodeMesin ? sotEntries().filter(e=> machineRecordMatchesIdentity_(e,kodeMesin)) : sotEntries();
+- L10513: const top = Object.entries(freq).filter(([,c])=> c>=2).sort((a,b)=> b[1]-a[1]).slice(0, 16);
+- L10555: const logbookScope = kodeMesin ? sotEntries().filter(e=> machineRecordMatchesIdentity_(e,kodeMesin)) : sotEntries();
+- L10748: const emRel = getDowntimeEmEntriesForMachine(kodeOrNama).filter(r=>{
+- L10904: return Object.values(map).filter(x=> x.count>=2).sort((a,b)=> b.count-a.count);
+- L11118: return new Set(kbNormalize(str).split(/[^a-z0-9]+/).filter(w=> w.length>=4));
+- L11703: saveRcaReportsLocal(loadRcaReportsLocal().filter(r=>r.id!==id));
+- L11810: const nodes = arr.map(normalizeCauseNode_).filter(n=> n.text !== '' || n.children.length);
+- L12536: saveIpalReportsLocal(loadIpalReportsLocal().filter(r=>r.id!==id));
+- L13368: const years=Array.from(new Set(allRows.map(r=>String(r['Tahun']||'')).filter(Boolean))).sort().reverse();
+- L13453: let source=(period==='YTD'?KPI_DEPARTMENT_YTD:KPI_DEPARTMENT_MTD).filter(r=>String(r['Tahun'])===String(year));
+- L13468: const ranked=valid.map(r=>({r,p:kdAttainment(r,month)})).filter(x=>x.p!==null).sort((a,b)=>b.p-a.p);
+- L13555: const years = Array.from(new Set(MACHINE_BREAKDOWN.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
+- L13999: const years = Array.from(new Set(rows.map(r=> Number(r['Tahun'])).filter(Boolean))).sort();
+- L14000: const mesinList = Array.from(new Set(rows.map(r=> r['Mesin']).filter(Boolean))).sort();
+- L14027: const years = Array.from(new Set(RECORD_YTD.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
+- L14225: const years = Array.from(new Set(RUN_HOUR_COMPARISON.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
+- L14421: const years = Array.from(new Set(ENERGY_COST_TOE.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
+- L14598: const years = Array.from(new Set(CORRECTIVE_REPORT.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
+- L14834: const years = Array.from(new Set(ENERGY_UTILITY.map(r=> String(r['Tahun'])).filter(Boolean))).sort().reverse();
+- L15074: const pending=(SPAREPART_LOKASI||[]).filter(r=>r.needsReview);
 
 ## Known regression functions
 ### attachSparepartPaginationHandlers — 2 match(es)
-- L15227: attachSparepartPaginationHandlers(pager);
-- L15250: function attachSparepartPaginationHandlers(pager){
+- L15285: attachSparepartPaginationHandlers(pager);
+- L15308: function attachSparepartPaginationHandlers(pager){
 ### renderSparepartCollectTable — 6 match(es)
-- L15138: renderSparepartCollectTable();
-- L15169: function renderSparepartCollectTable(){
-- L15255: renderSparepartCollectTable();
-- L15266: renderSparepartCollectTable();
-- L15272: renderSparepartCollectTable();
-- L15305: if($('#filter-sparepart-collection')?.value) renderSparepartCollectTable();
+- L15196: renderSparepartCollectTable();
+- L15227: function renderSparepartCollectTable(){
+- L15313: renderSparepartCollectTable();
+- L15324: renderSparepartCollectTable();
+- L15330: renderSparepartCollectTable();
+- L15363: if($('#filter-sparepart-collection')?.value) renderSparepartCollectTable();
 ### applySparepartFilters — 6 match(es)
-- L15029: applySparepartFilters();
-- L15031: syncSparepartStatusFromBackend().then((synced)=>{ if(synced){ renderSparepartCollectDash(); applySparepartFilters(); } });
-- L15136: function applySparepartFilters(){
-- L15316: $('#search-sparepart').addEventListener('input', applySparepartFilters);
-- L15318: if(filterSparepartCollectionEl) filterSparepartCollectionEl.addEventListener('change', applySparepartFilters);
-- L15320: if(sortSparepartEl) sortSparepartEl.addEventListener('change', applySparepartFilters);
+- L15087: applySparepartFilters();
+- L15089: syncSparepartStatusFromBackend().then((synced)=>{ if(synced){ renderSparepartCollectDash(); applySparepartFilters(); } });
+- L15194: function applySparepartFilters(){
+- L15374: $('#search-sparepart').addEventListener('input', applySparepartFilters);
+- L15376: if(filterSparepartCollectionEl) filterSparepartCollectionEl.addEventListener('change', applySparepartFilters);
+- L15378: if(sortSparepartEl) sortSparepartEl.addEventListener('change', applySparepartFilters);
 ### switchToView — 22 match(es)
 - L6047: // tersimpan otomatis dipulihkan lalu langsung switchToView('dashboard') dijalankan secara sinkron).
 - L6060: // [FIX-TDZ] Key cache Patrol General harus dideklarasikan sebelum restoreRbacSession_ -> switchToView -> getViewLocalStorageKeys.
@@ -201,28 +201,28 @@
 - L8511: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L8522: showSettingLoginModal(()=> switchToView('setting'));
 - L8525: switchToView(view);
-- L20501: /* ---- Entry point (dipanggil dari switchToView) ---- */
-- L21450: if(typeof switchToView === 'function'){ switchToView('dashboard'); }
-- L25802: const _origSwitchToView = window.switchToView;
-- L25803: if(typeof _origSwitchToView === 'function'){
-- L25804: window.switchToView = function(enteringView){
-- L25805: const result = _origSwitchToView.apply(this, arguments);
-- L28593: const origSwitchToView = window.switchToView;
-- L28594: window.switchToView = function(view){
-- L28595: const result = typeof origSwitchToView==='function' ? origSwitchToView(view) : false;
+- L20577: /* ---- Entry point (dipanggil dari switchToView) ---- */
+- L21526: if(typeof switchToView === 'function'){ switchToView('dashboard'); }
+- L25878: const _origSwitchToView = window.switchToView;
+- L25879: if(typeof _origSwitchToView === 'function'){
+- L25880: window.switchToView = function(enteringView){
+- L25881: const result = _origSwitchToView.apply(this, arguments);
+- L28669: const origSwitchToView = window.switchToView;
+- L28670: window.switchToView = function(view){
+- L28671: const result = typeof origSwitchToView==='function' ? origSwitchToView(view) : false;
 
 ## OMODOS 4 RBAC
 ### omodos4.view — 3 match(es)
 - L6497: if(!discovered.some(f=>f.PermissionKey==='omodos4.view')){
 - L6498: discovered.push({PermissionKey:'omodos4.view',Label:'OMODOS 4.0 (Superadmin Root)',Group:'OMODOS 4.0'});
-- L28986: const V4_PERMISSION_ROOT = 'omodos4.view';
+- L29062: const V4_PERMISSION_ROOT = 'omodos4.view';
 ### OMODOS 4.0 — 7 match(es)
 - L3425: <button class="nav-parent-btn" data-group="omodos4"><span class="ico"><i class="ph-bold ph-cpu"></i></span> OMODOS 4.0 <span class="v4-badge">SUPERADMIN</span> <span class="chev"><i class="ph-bold ph-caret-down"></i></span></button>
 - L4226: <h1 style="margin-top:4px;">OMODOS 4.0</h1>
 - L8283: toast('Modul OMODOS 4.0 gagal dimuat. Periksa koneksi lalu coba kembali.',true);
 - L8511: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
-- L23472: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
-- L29141: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
+- L23548: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
+- L29217: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
 ### Superadmin — 47 match(es)
 - L4227: <div class="sub">Command Center Superadmin yang membaca data existing tanpa membuat duplikasi sumber data.</div>
 - L5448: <div class="setting-tab-empty" id="rbac-empty-hint" style="display:none;">Memuat data user... Jika tetap kosong, pastikan kamu login sebagai Superadmin.</div>
@@ -253,22 +253,22 @@
 - L8240: script.src='/omodos4/superadmin-intelligence.js';
 - L8282: console.error('[OMODOS] Gagal memuat Superadmin Intelligence:',err);
 - L8485: if(view === 'omodos4' || view.startsWith('omodos4-')) return isSuperadmin();
-- L21367: errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App). Hubungi Superadmin untuk konfigurasi awal.';
-- L21409: // code.gs) supaya perubahan yang diatur Superadmin di satu device ikut
-- L23473: 'Halaman ini khusus Superadmin dan membaca data existing tanpa input ganda.',
-- L25941: dengan RBAC yang sudah ada, jadi Superadmin bisa mengatur DUA hal
-- L25964: if(CURRENT_USER.role === 'Superadmin') return false; // Superadmin selalu full, sama seperti RBAC akses biasa
-- L26091: // diatur Superadmin) gagal tersimpan. Kegagalan utama di atas sudah
-- L26755: sampai Superadmin menyimpannya secara eksplisit. Mapping role yang
-- L26790: // sekali), beri penanda visual kecil "Baru" supaya Superadmin sadar ini
-- L28487: // ternyata tidak diizinkan (mis. baru diubah Superadmin), otomatis
-- L28526: // restore sesi, dan setiap kali Superadmin menyimpan perubahan Role
-- L28988: function v4IsSuperadmin(){
-- L28990: return typeof isSuperadmin === 'function'
-- L28991: ? isSuperadmin()
-- L28992: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
-- L29090: if(!v4IsSuperadmin()){
-- L29135: isAllowed:v4IsSuperadmin,
+- L21443: errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App). Hubungi Superadmin untuk konfigurasi awal.';
+- L21485: // code.gs) supaya perubahan yang diatur Superadmin di satu device ikut
+- L23549: 'Halaman ini khusus Superadmin dan membaca data existing tanpa input ganda.',
+- L26017: dengan RBAC yang sudah ada, jadi Superadmin bisa mengatur DUA hal
+- L26040: if(CURRENT_USER.role === 'Superadmin') return false; // Superadmin selalu full, sama seperti RBAC akses biasa
+- L26167: // diatur Superadmin) gagal tersimpan. Kegagalan utama di atas sudah
+- L26831: sampai Superadmin menyimpannya secara eksplisit. Mapping role yang
+- L26866: // sekali), beri penanda visual kecil "Baru" supaya Superadmin sadar ini
+- L28563: // ternyata tidak diizinkan (mis. baru diubah Superadmin), otomatis
+- L28602: // restore sesi, dan setiap kali Superadmin menyimpan perubahan Role
+- L29064: function v4IsSuperadmin(){
+- L29066: return typeof isSuperadmin === 'function'
+- L29067: ? isSuperadmin()
+- L29068: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
+- L29166: if(!v4IsSuperadmin()){
+- L29211: isAllowed:v4IsSuperadmin,
 
 ## Copilot & Bantuan
 ### Copilot — 367 match(es)
@@ -324,22 +324,22 @@
 - L1263: .copilot-record-title{font-weight:700;font-size:11.5px;line-height:1.35;color:var(--text);min-width:0;overflow-wrap:anywhere;}
 ### Bantuan — 7 match(es)
 - L5910: <button class="btn btn-sm" type="button" id="copilot-help" title="Buka bantuan untuk halaman yang sedang digunakan"><i class="ph-bold ph-question"></i> Bantuan</button>
-- L12381: { key:'ai',             icon:'✦',  title:'Analisa AI', sub:'Minta bantuan AI membaca data dan memberi saran. Tetap periksa hasilnya.', enabled:true },
-- L23477: return helpMap[view] || {title:'Bantuan Halaman',steps:[
-- L23497: <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
-- L24702: <div class="sub" style="margin-top:10px;">Rekomendasi dihasilkan 100% lokal dari data Logbook, Hard Skill/Soft Skill Assessment, Kaizen/Project Improvement, dan Meeting Action Item yang sudah tersimpan di aplikasi ini (tanpa API/LLM eksternal) — gunakan sebagai bantuan pengambilan keputusan, tetap verifikasi di lapangan.</div>
-- L28750: /* BANTUAN_PAGE_CARD_REMOVAL_V1 */
-- L28791: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
+- L12439: { key:'ai',             icon:'✦',  title:'Analisa AI', sub:'Minta bantuan AI membaca data dan memberi saran. Tetap periksa hasilnya.', enabled:true },
+- L23553: return helpMap[view] || {title:'Bantuan Halaman',steps:[
+- L23573: <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
+- L24778: <div class="sub" style="margin-top:10px;">Rekomendasi dihasilkan 100% lokal dari data Logbook, Hard Skill/Soft Skill Assessment, Kaizen/Project Improvement, dan Meeting Action Item yang sudah tersimpan di aplikasi ini (tanpa API/LLM eksternal) — gunakan sebagai bantuan pengambilan keputusan, tetap verifikasi di lapangan.</div>
+- L28826: /* BANTUAN_PAGE_CARD_REMOVAL_V1 */
+- L28867: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
 
 ## Machine status
 ### machineStatus — 7 match(es)
-- L16734: const sourceText=snap.source==='none'?'Belum ada sumber terbaru':('Sumber terbaru: '+snap.sourceLabel+' • '+formatMachineStatusTime_(snap.ts));
-- L18566: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
-- L18573: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
-- L18580: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
-- L18586: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
-- L18603: <span style="font-size:12px;color:var(--text-dim);">${escapeHtml(snap.sourceLabel)} • ${escapeHtml(formatMachineStatusTime_(snap.ts))}</span>
-- L19583: function formatMachineStatusTime_(ts){
+- L16792: const sourceText=snap.source==='none'?'Belum ada sumber terbaru':('Sumber terbaru: '+snap.sourceLabel+' • '+formatMachineStatusTime_(snap.ts));
+- L18642: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
+- L18649: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
+- L18656: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
+- L18662: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
+- L18679: <span style="font-size:12px;color:var(--text-dim);">${escapeHtml(snap.sourceLabel)} • ${escapeHtml(formatMachineStatusTime_(snap.ts))}</span>
+- L19659: function formatMachineStatusTime_(ts){
 ### status mesin — 15 match(es)
 - L1807: /* [FIX] Card mesin di Home: HANYA menampilkan Kode Mesin + Status Mesin
 - L1980: /* Judul "Home" & sub-teks diperkecil supaya area cards status mesin yang mendominasi layar */
@@ -350,39 +350,39 @@
 - L2820: animasi dekoratif — ini sinyal status mesin (aman/butuh perhatian/breakdown)
 - L4195: <div><h1>Home</h1><div class="sub">Ringkasan status mesin &amp; jalan pintas menu.</div></div>
 - L4206: <div class="section-title home-status-title"><i class="ph-bold ph-gauge"></i> Status Mesin Sekarang</div>
-- L16591: // [FIX SOT] Status Mesin Sekarang di Home HARUS hanya mencerminkan data
-- L18597: <div class="sub">Status mesin terkini berdasarkan data Logbook atau Patrol yang waktunya paling baru.</div>
-- L23444: dashboard:{title:'Home & Status Mesin',steps:[
-- L23445: 'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
-- L25672: dashboard:'Semua staf shift, untuk memantau status mesin secara real-time',
-- L29013: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
+- L16649: // [FIX SOT] Status Mesin Sekarang di Home HARUS hanya mencerminkan data
+- L18673: <div class="sub">Status mesin terkini berdasarkan data Logbook atau Patrol yang waktunya paling baru.</div>
+- L23520: dashboard:{title:'Home & Status Mesin',steps:[
+- L23521: 'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
+- L25748: dashboard:'Semua staf shift, untuk memantau status mesin secara real-time',
+- L29089: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
 ### latestLogbook — 2 match(es)
-- L16640: function latestLogbookForMachine_(machine){
-- L19573: const log=latestLogbookForMachine_(machine), patrol=latestPatrolForMachine_(machine);
+- L16698: function latestLogbookForMachine_(machine){
+- L19649: const log=latestLogbookForMachine_(machine), patrol=latestPatrolForMachine_(machine);
 ### latestPatrol — 2 match(es)
-- L19564: function latestPatrolForMachine_(machine){
+- L19640: function latestPatrolForMachine_(machine){
 
 ## Pagination controls
 ### pageSize — 6 match(es)
-- L9392: const pageSize = typeof window.matchMedia==='function' && window.matchMedia('(max-width: 767px)').matches ? LOGBOOK_MOBILE_PAGE_SIZE_ : LOGBOOK_PAGE_SIZE_;
-- L9393: const end=Math.min(start+pageSize,total);
-- L9399: const next=Math.min(pageSize,total-end);
-- L12212: const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
-- L21201: const pageW = pdf.internal.pageSize.getWidth();
-- L21202: const pageH = pdf.internal.pageSize.getHeight();
+- L9450: const pageSize = typeof window.matchMedia==='function' && window.matchMedia('(max-width: 767px)').matches ? LOGBOOK_MOBILE_PAGE_SIZE_ : LOGBOOK_PAGE_SIZE_;
+- L9451: const end=Math.min(start+pageSize,total);
+- L9457: const next=Math.min(pageSize,total-end);
+- L12270: const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
+- L21277: const pageW = pdf.internal.pageSize.getWidth();
+- L21278: const pageH = pdf.internal.pageSize.getHeight();
 ### Halaman Sebelumnya — 3 match(es)
 - L7449: '<button type="button" data-page-action="prev" '+(st.page<=1?'disabled':'')+'>Halaman Sebelumnya</button>'+
-- L15235: '<button type="button" data-sp-pg-action="prev" '+(page<=1?'disabled':'')+'>Halaman Sebelumnya</button>';
-- L25649: Tidak ada carry-over data dari halaman sebelumnya.
+- L15293: '<button type="button" data-sp-pg-action="prev" '+(page<=1?'disabled':'')+'>Halaman Sebelumnya</button>';
+- L25725: Tidak ada carry-over data dari halaman sebelumnya.
 ### Halaman Selanjutnya — 2 match(es)
 - L7451: '<button type="button" data-page-action="next" '+(st.page>=totalPages?'disabled':'')+'>Halaman Selanjutnya</button>'+
-- L15243: nav += '<button type="button" data-sp-pg-action="next" '+(page>=totalPages?'disabled':'')+'>Halaman Selanjutnya</button>'+
+- L15301: nav += '<button type="button" data-sp-pg-action="next" '+(page>=totalPages?'disabled':'')+'>Halaman Selanjutnya</button>'+
 ### Halaman Awal — 2 match(es)
 - L7448: '<button type="button" data-page-action="first" '+(st.page<=1?'disabled':'')+'>Halaman Awal</button>'+
-- L15234: let nav='<button type="button" data-sp-pg-action="first" '+(page<=1?'disabled':'')+'>Halaman Awal</button>'+
+- L15292: let nav='<button type="button" data-sp-pg-action="first" '+(page<=1?'disabled':'')+'>Halaman Awal</button>'+
 ### Halaman Akhir — 2 match(es)
 - L7452: '<button type="button" data-page-action="last" '+(st.page>=totalPages?'disabled':'')+'>Halaman Akhir</button>'+
-- L15244: '<button type="button" data-sp-pg-action="last" '+(page>=totalPages?'disabled':'')+'>Halaman Akhir</button>';
+- L15302: '<button type="button" data-sp-pg-action="last" '+(page>=totalPages?'disabled':'')+'>Halaman Akhir</button>';
 
 ## Regression risk summary
 - HIGH: found 174 direct dollar-helper .forEach/.find call(s).
@@ -410,62 +410,62 @@
   - L8528: $$('.nav-btn').forEach(btn=>{
   - L8539: $$('.bottom-nav-btn').forEach(btn=>{
   - L8554: $$('.nav-btn', submenu).forEach(navBtn=>{
-  - L9220: $$('.att-item', container).forEach(el=>{
-  - L9434: $$('[data-logbook-stat]', $('#stat-strip')).forEach(btn=>btn.addEventListener('click',()=>{
-  - L9439: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat===LOGBOOK_CARD_FILTER; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
-  - L9496: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat==='total'; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
-  - L9666: $$('#pelapor-chips .machine-chip').forEach(c=>{
-  - L9698: $$('#group-chips .machine-chip').forEach(c=>{
-  - L10185: $$('.an-machine-card', grid).forEach(el=>{
-  - L10463: $$('.machine-chip', holder).forEach(btn=>{
-  - L10800: $$('.kb-card', holder).forEach(el=> el.addEventListener('click', ()=> openKbDetail(el.dataset.id)));
-  - L10803: $$('#kb-kategori-chips .machine-chip').forEach(btn=>{
-  - L10805: $$('#kb-kategori-chips .machine-chip').forEach(b=>b.classList.remove('active'));
-  - L11043: $$('.btn-kb-suggest-add', holder).forEach(btn=>{
-  - L11591: $$('.machine-chip', chipHolder).forEach(c=>{
-  - L11669: $$('.rca-open', holder).forEach(b=> b.addEventListener('click', ()=>{
-  - L11673: $$('.rca-delete', holder).forEach(b=> b.addEventListener('click', async (e)=>{
-  - L12018: $$('.btn-remove-section', holder).forEach(b=>{
-  - L12026: $$('.btn-why-add', holder).forEach(b=>{
-  - L12034: $$('.btn-why-remove', holder).forEach(b=>{
-  - L12046: $$('.btn-cause-add-factor', holder).forEach(b=>{
-  - L12059: $$('.btn-cause-add-child', holder).forEach(b=>{
-  - L12071: $$('.btn-cause-remove', holder).forEach(b=>{
-  - L12093: $$('.rca-section', holder).forEach((el,i)=>{
-  - L12108: $$('.cause-cat-editor', el).forEach(catEl=>{
-  - L12110: $$('[data-cause-text]', catEl).forEach(inp=>{
-  - L12399: $$('.report-cat-card[data-cat]').forEach(card=>{
-  - L12545: $$('.ipal-open').forEach(b=> b.addEventListener('click', ()=>{
-  - L12549: $$('.ipal-delete').forEach(b=> b.addEventListener('click', async (e)=>{
-  - L12602: $$('.ipal-daily-outlet', root).forEach(inp=>{
-  - L12607: $$('.ipal-daily-ph', root).forEach(inp=>{
-  - L12612: $$('.ipal-chem-input', root).forEach(inp=>{
-  - L12993: $$('.sl-edit', holder).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L13005: $$('.sl-delete', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L13550: $$('.mbd-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L13554: $$('.mbd-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L14010: $$('.ryt-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L14014: $$('.ryt-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L14196: $$('.rhc-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L14200: $$('.rhc-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L14403: $$('.ect-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L14407: $$('.ect-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L14587: $$('.cr-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L14591: $$('.cr-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L14821: $$('.eng-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L14825: $$('.eng-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L15251: $$('button[data-pg]', pager).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L15257: $$('button[data-sp-pg-action]', pager).forEach(btn=>btn.addEventListener('click',()=>{
-  - L15285: $$('.sp-detail', root).forEach(btn=>{
-  - L15288: $$('.sp-collect-toggle', root).forEach(cb=>{
-  - L15516: $$('.sp-eta-arrive', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L15523: $$('.sp-po-go-validate', holder).forEach(btn=> btn.addEventListener('click', ()=>{
-  - L15526: $$('.sp-eta-delete', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L15635: $$('.sp-wh-validate', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L15808: $$('.sp-checklist-item', holder).forEach(row=> row.addEventListener('click', ()=>{
-  - L15857: $$('.sp-opname-delete', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
-  - L15964: $$('.ef-card', holder).forEach(el=>{
-  - L16748: $$('.dash-card', holder).forEach(el=>{
+  - L9221: $$('.att-item', container).forEach(el=>{
+  - L9492: $$('[data-logbook-stat]', $('#stat-strip')).forEach(btn=>btn.addEventListener('click',()=>{
+  - L9497: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat===LOGBOOK_CARD_FILTER; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
+  - L9554: $$('[data-logbook-stat]', $('#stat-strip')).forEach(b=>{ const on=b.dataset.logbookStat==='total'; b.classList.toggle('active',on); b.setAttribute('aria-pressed',String(on)); });
+  - L9724: $$('#pelapor-chips .machine-chip').forEach(c=>{
+  - L9756: $$('#group-chips .machine-chip').forEach(c=>{
+  - L10243: $$('.an-machine-card', grid).forEach(el=>{
+  - L10521: $$('.machine-chip', holder).forEach(btn=>{
+  - L10858: $$('.kb-card', holder).forEach(el=> el.addEventListener('click', ()=> openKbDetail(el.dataset.id)));
+  - L10861: $$('#kb-kategori-chips .machine-chip').forEach(btn=>{
+  - L10863: $$('#kb-kategori-chips .machine-chip').forEach(b=>b.classList.remove('active'));
+  - L11101: $$('.btn-kb-suggest-add', holder).forEach(btn=>{
+  - L11649: $$('.machine-chip', chipHolder).forEach(c=>{
+  - L11727: $$('.rca-open', holder).forEach(b=> b.addEventListener('click', ()=>{
+  - L11731: $$('.rca-delete', holder).forEach(b=> b.addEventListener('click', async (e)=>{
+  - L12076: $$('.btn-remove-section', holder).forEach(b=>{
+  - L12084: $$('.btn-why-add', holder).forEach(b=>{
+  - L12092: $$('.btn-why-remove', holder).forEach(b=>{
+  - L12104: $$('.btn-cause-add-factor', holder).forEach(b=>{
+  - L12117: $$('.btn-cause-add-child', holder).forEach(b=>{
+  - L12129: $$('.btn-cause-remove', holder).forEach(b=>{
+  - L12151: $$('.rca-section', holder).forEach((el,i)=>{
+  - L12166: $$('.cause-cat-editor', el).forEach(catEl=>{
+  - L12168: $$('[data-cause-text]', catEl).forEach(inp=>{
+  - L12457: $$('.report-cat-card[data-cat]').forEach(card=>{
+  - L12603: $$('.ipal-open').forEach(b=> b.addEventListener('click', ()=>{
+  - L12607: $$('.ipal-delete').forEach(b=> b.addEventListener('click', async (e)=>{
+  - L12660: $$('.ipal-daily-outlet', root).forEach(inp=>{
+  - L12665: $$('.ipal-daily-ph', root).forEach(inp=>{
+  - L12670: $$('.ipal-chem-input', root).forEach(inp=>{
+  - L13051: $$('.sl-edit', holder).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L13063: $$('.sl-delete', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L13608: $$('.mbd-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L13612: $$('.mbd-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L14068: $$('.ryt-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L14072: $$('.ryt-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L14254: $$('.rhc-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L14258: $$('.rhc-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L14461: $$('.ect-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L14465: $$('.ect-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L14645: $$('.cr-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L14649: $$('.cr-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L14879: $$('.eng-edit', tbody).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L14883: $$('.eng-del', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L15309: $$('button[data-pg]', pager).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L15315: $$('button[data-sp-pg-action]', pager).forEach(btn=>btn.addEventListener('click',()=>{
+  - L15343: $$('.sp-detail', root).forEach(btn=>{
+  - L15346: $$('.sp-collect-toggle', root).forEach(cb=>{
+  - L15574: $$('.sp-eta-arrive', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L15581: $$('.sp-po-go-validate', holder).forEach(btn=> btn.addEventListener('click', ()=>{
+  - L15584: $$('.sp-eta-delete', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L15693: $$('.sp-wh-validate', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L15866: $$('.sp-checklist-item', holder).forEach(row=> row.addEventListener('click', ()=>{
+  - L15915: $$('.sp-opname-delete', holder).forEach(btn=> btn.addEventListener('click', async ()=>{
+  - L16022: $$('.ef-card', holder).forEach(el=>{
+  - L16806: $$('.dash-card', holder).forEach(el=>{
 - Dollar helper candidates:
   - L7318: const $ = (sel, root=document) => root.querySelector(sel);
 
