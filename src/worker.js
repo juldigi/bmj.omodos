@@ -3842,6 +3842,18 @@ function createBackend(services, env = {}) {
         validateRequired_(body, ["id", "transactionId"]);
         validateStringMax_(body, "id", 200);
         break;
+      case "technicalPerformanceImport":
+        validateRequired_(body, ["dataset", "period", "sourceFile", "rows"]);
+        validateStringMax_(body, "dataset", 40);
+        validateStringMax_(body, "period", 40);
+        validateStringMax_(body, "sourceFile", 180);
+        if (!Array.isArray(body.rows) || body.rows.length < 1 || body.rows.length > 1200) throw { code:"VALIDATION_ERROR", message:"Data impor harus berisi 1–1.200 baris." };
+        break;
+      case "technicalPerformanceArchive":
+        validateRequired_(body, ["id"]);
+        validateStringMax_(body, "id", 100);
+        break;
+      case "technicalPerformanceRead":
       case "offsetWaysRead":
         break;
       default:
@@ -3997,6 +4009,10 @@ function createBackend(services, env = {}) {
     "v4.getWarRoom": { permission: "omodos4.warroom", audit: false, idempotent: false, handler: "handleOmodos4_", method: "POST" },
     "v4.createWarRoom": { permission: "omodos4.warroom", audit: true, idempotent: true, handler: "handleOmodos4_", method: "POST" },
     "v4.updateWarRoom": { permission: "omodos4.warroom", audit: true, idempotent: true, handler: "handleOmodos4_", method: "POST" },
+    // TECHNICAL PERFORMANCE — official report snapshots, restricted again inside every handler.
+    "technicalPerformanceRead": { permission: null, audit: false, idempotent: false, handler: "handleTechnicalPerformanceRead_" },
+    "technicalPerformanceImport": { permission: null, audit: true, idempotent: true, handler: "handleTechnicalPerformanceImport_" },
+    "technicalPerformanceArchive": { permission: null, audit: true, idempotent: true, handler: "handleTechnicalPerformanceArchive_" },
     // OFFSET WAYS — dedicated superadmin-only records in the existing SQLite-backed store
     "offsetWaysRead": { permission: null, audit: false, idempotent: false, handler: "handleOffsetWaysRead_" },
     "offsetWaysSave": { permission: null, audit: true, idempotent: true, handler: "handleOffsetWaysSave_" },
@@ -9031,6 +9047,65 @@ function createBackend(services, env = {}) {
     }
   }
   __name(handleSaveRoleAccessConfig_, "handleSaveRoleAccessConfig_");
+  const TECHNICAL_PERFORMANCE_HEADERS = ["ID","Dataset","Period","SourceFile","RowCount","RowsJSON","ImportedAt","ImportedBy","DeletedAt"];
+  const TECHNICAL_PERFORMANCE_DATASETS = ["oee-teep","maintenance","downtime","issues","energy"];
+  function handleTechnicalPerformanceRead_(body) {
+    requireSuperadmin_(body.actor);
+    var rows = getGenericRows_("OMODOS_TechnicalPerformance", TECHNICAL_PERFORMANCE_HEADERS)
+      .filter(function(r){ return !String(r.DeletedAt || "").trim(); })
+      .sort(function(a,b){ return String(b.ImportedAt || "").localeCompare(String(a.ImportedAt || "")); })
+      .slice(0, 100)
+      .map(function(r){
+        var parsed = [];
+        try { parsed = JSON.parse(String(r.RowsJSON || "[]")); } catch(e) { parsed = []; }
+        return { id:String(r.ID || ""), dataset:String(r.Dataset || ""), period:String(r.Period || ""),
+          sourceFile:String(r.SourceFile || ""), rowCount:Number(r.RowCount) || parsed.length,
+          importedAt:String(r.ImportedAt || ""), importedBy:String(r.ImportedBy || ""), rows:Array.isArray(parsed) ? parsed : [] };
+      });
+    return jsonOut_({ ok:true, data:{ imports:rows } });
+  }
+  __name(handleTechnicalPerformanceRead_, "handleTechnicalPerformanceRead_");
+  function handleTechnicalPerformanceImport_(body) {
+    requireSuperadmin_(body.actor);
+    var dataset = String(body.dataset || "").trim();
+    var period = String(body.period || "").trim();
+    var sourceFile = String(body.sourceFile || "").trim();
+    var rows = body.rows;
+    if (TECHNICAL_PERFORMANCE_DATASETS.indexOf(dataset) < 0) throw { code:"VALIDATION_ERROR", message:"Jenis dataset tidak dikenal." };
+    if (!period || period.length > 40) throw { code:"VALIDATION_ERROR", message:"Periode wajib diisi (maksimal 40 karakter)." };
+    if (!sourceFile || sourceFile.length > 180) throw { code:"VALIDATION_ERROR", message:"Nama file sumber wajib diisi (maksimal 180 karakter)." };
+    if (!Array.isArray(rows) || rows.length < 1 || rows.length > 1200) throw { code:"VALIDATION_ERROR", message:"Data impor harus berisi 1–1.200 baris." };
+    if (rows.some(function(r){ return !r || typeof r !== "object" || Array.isArray(r); })) throw { code:"VALIDATION_ERROR", message:"Setiap baris harus berupa objek dengan header kolom." };
+    var rowsJSON = JSON.stringify(rows);
+    if (rowsJSON.length > 150000) throw { code:"VALIDATION_ERROR", message:"Ukuran data terlalu besar. Pecah impor per periode atau worksheet (maksimal 150 KB per snapshot)." };
+    var sh = getOrCreateSheet_("OMODOS_TechnicalPerformance", TECHNICAL_PERFORMANCE_HEADERS);
+    var id = "TP-" + Utilities.getUuid();
+    var now = new Date().toISOString();
+    sh.appendRow(TECHNICAL_PERFORMANCE_HEADERS.map(function(h){
+      return ({ID:id,Dataset:dataset,Period:period,SourceFile:sourceFile,RowCount:rows.length,RowsJSON:rowsJSON,ImportedAt:now,ImportedBy:String(body.actor || ""),DeletedAt:""})[h] || "";
+    }));
+    invalidateCacheForSheet_("OMODOS_TechnicalPerformance");
+    return jsonOut_({ ok:true, data:{ id:id, dataset:dataset, period:period, rowCount:rows.length, importedAt:now } });
+  }
+  __name(handleTechnicalPerformanceImport_, "handleTechnicalPerformanceImport_");
+  function handleTechnicalPerformanceArchive_(body) {
+    requireSuperadmin_(body.actor);
+    var id = String(body.id || "").trim();
+    if (!id) throw { code:"VALIDATION_ERROR", message:"ID snapshot wajib diisi." };
+    var sh = getOrCreateSheet_("OMODOS_TechnicalPerformance", TECHNICAL_PERFORMANCE_HEADERS);
+    var data = sh.getDataRange().getValues(), headers = data[0] || TECHNICAL_PERFORMANCE_HEADERS;
+    var idCol = headers.indexOf("ID"), deletedCol = headers.indexOf("DeletedAt");
+    for (var i=1;i<data.length;i++) {
+      if (String(data[i][idCol] || "") === id && !String(data[i][deletedCol] || "").trim()) {
+        sh.getRange(i+1,deletedCol+1).setValue(new Date().toISOString());
+        invalidateCacheForSheet_("OMODOS_TechnicalPerformance");
+        return jsonOut_({ok:true,data:{id:id,archived:true}});
+      }
+    }
+    return jsonOut_({ok:false,error:"Snapshot impor tidak ditemukan."});
+  }
+  __name(handleTechnicalPerformanceArchive_, "handleTechnicalPerformanceArchive_");
+
   const OFFSET_WAYS_HEADERS = ["ID","Type","Title","Machine","Owner","DueDate","Status","PayloadJSON","CreatedAt","UpdatedAt","CreatedBy","UpdatedBy","DeletedAt"];
   const OFFSET_WAYS_TYPES = ["oee-calculation","teep-calculation","behavior-action"];
   function handleOffsetWaysRead_(body) {
