@@ -8225,6 +8225,35 @@ function invokeViewRenderer_(view, renderer, label){
     return null;
   }
 }
+let OMODOS4_INTELLIGENCE_LOAD_PROMISE_ = null;
+function loadOmodos4Intelligence_(){
+  if(window.OMODOS4 && window.OMODOS4.version === '4.0-master-recovery-100') return Promise.resolve(true);
+  if(OMODOS4_INTELLIGENCE_LOAD_PROMISE_) return OMODOS4_INTELLIGENCE_LOAD_PROMISE_;
+  OMODOS4_INTELLIGENCE_LOAD_PROMISE_ = new Promise((resolve,reject)=>{
+    const existing=document.getElementById('omodos4-intelligence-lazy-script');
+    if(existing){
+      existing.addEventListener('load',()=>resolve(true),{once:true});
+      existing.addEventListener('error',()=>reject(new Error('OMODOS4 intelligence script failed to load')),{once:true});
+      return;
+    }
+    const script=document.createElement('script');
+    script.id='omodos4-intelligence-lazy-script';
+    script.src='/omodos4/superadmin-intelligence.js';
+    script.async=true;
+    script.onload=()=>resolve(true);
+    script.onerror=()=>{script.remove();reject(new Error('OMODOS4 intelligence script failed to load'));};
+    document.head.appendChild(script);
+  }).then(()=>{
+    if(!window.OMODOS4 || window.OMODOS4.version !== '4.0-master-recovery-100') throw new Error('OMODOS4 intelligence did not initialize');
+    return true;
+  }).catch(err=>{
+    OMODOS4_INTELLIGENCE_LOAD_PROMISE_=null;
+    const stale=document.getElementById('omodos4-intelligence-lazy-script');
+    if(stale)stale.remove();
+    throw err;
+  });
+  return OMODOS4_INTELLIGENCE_LOAD_PROMISE_;
+}
 function switchToView(enteringView){
   enteringView = String(enteringView||'').trim();
   if(!enteringView){ toast('Tujuan halaman tidak valid.', true); return false; }
@@ -8237,6 +8266,24 @@ function switchToView(enteringView){
     console.error('[OMODOS] View target tidak ditemukan:', enteringView);
     toast('Halaman "' + enteringView + '" belum tersedia. Muat ulang aplikasi lalu coba lagi.', true);
     return false;
+  }
+
+  // Load the optional 100-feature OMODOS 4 layer only after the RBAC gate
+  // allows entry to the Superadmin-only view. Technician sessions never fetch it.
+  if(enteringView === 'omodos4' && !(window.OMODOS4 && window.OMODOS4.version === '4.0-master-recovery-100')){
+    if(!window.__OMODOS4_INTELLIGENCE_NAV_PENDING__){
+      window.__OMODOS4_INTELLIGENCE_NAV_PENDING__=true;
+      loadOmodos4Intelligence_().then(()=>{
+        window.__OMODOS4_INTELLIGENCE_NAV_PENDING__=false;
+        if(typeof canAccessView_==='function' && !canAccessView_('omodos4')){showAccessDenied();return;}
+        switchToView('omodos4');
+      }).catch(err=>{
+        window.__OMODOS4_INTELLIGENCE_NAV_PENDING__=false;
+        console.error('[OMODOS] Gagal memuat Superadmin Intelligence:',err);
+        toast('Modul OMODOS 4.0 gagal dimuat. Periksa koneksi lalu coba kembali.',true);
+      });
+    }
+    return true;
   }
 
   const leavingView = PREVIOUS_ACTIVE_VIEW;
