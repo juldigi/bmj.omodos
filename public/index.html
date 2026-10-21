@@ -9311,14 +9311,24 @@ let LOGBOOK_SORTED_SOURCE_CACHE_ = [];
 let LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
 let LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap();
 let LOGBOOK_MACHINE_INDEX_CACHE_ = { entriesRef:null, machinesRef:null, value:null };
-let LOGBOOK_STATS_CACHE_ = { entriesRef:null, value:null };
+let LOGBOOK_STATS_CACHE_ = { entriesRef:null, today:null, value:null };
+let LOGBOOK_JOB_TYPES_CACHE_ = { entriesRef:null, value:null };
 let LOGBOOK_SEARCH_DEBOUNCE_TIMER_ = null;
 const LOGBOOK_SEARCH_DEBOUNCE_MS_ = 130;
 function invalidateLogbookSortCache_(){
   LOGBOOK_SORTED_SOURCE_REF_ = null;
   LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
   LOGBOOK_MACHINE_INDEX_CACHE_ = { entriesRef:null, machinesRef:null, value:null };
-  LOGBOOK_STATS_CACHE_ = { entriesRef:null, value:null };
+  LOGBOOK_STATS_CACHE_ = { entriesRef:null, today:null, value:null };
+  LOGBOOK_JOB_TYPES_CACHE_ = { entriesRef:null, value:null };
+}
+function logbookJobTypes_(){
+  const entriesRef = ENTRIES;
+  const cached = LOGBOOK_JOB_TYPES_CACHE_;
+  if(cached && cached.entriesRef===entriesRef && cached.value) return cached.value;
+  const value = Array.from(new Set(ENTRIES.map(e=>e['Jenis Pekerjaan']).filter(Boolean)));
+  LOGBOOK_JOB_TYPES_CACHE_ = { entriesRef, value };
+  return value;
 }
 function logbookOrderedEntries_(){
   if(LOGBOOK_SORTED_SOURCE_REF_ !== ENTRIES){
@@ -9444,7 +9454,7 @@ function renderUtama(){
     if(Array.from(machineFilter.options).some(o=>o.value===previousMachine)) machineFilter.value=previousMachine;
   }
 
-  const jenisSet = Array.from(new Set(ENTRIES.map(e=>e['Jenis Pekerjaan']).filter(Boolean)));
+  const jenisSet = logbookJobTypes_();
   $('#filter-jenis').innerHTML = '<option value="">Semua Jenis</option>' + jenisSet.map(j=>`<option>${escapeHtml(j)}</option>`).join('');
 
   applyUtamaFilters();
