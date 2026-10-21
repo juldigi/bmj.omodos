@@ -147,7 +147,7 @@ assert.match(detail,/attachmentCount > 12 \? parseAttachments\(rawAttachments, 1
 assert.match(detail,/Tampilkan semua '\+attachmentCount\+' lampiran/);
 assert.match(detail,/slot\.innerHTML=renderAttachGrid\(parseAttachments\(loaded\),'Lampiran'\)/);
 const countStart=base.indexOf('function logbookAttachmentCount_(entry){');
-const countEnd=base.indexOf('\nfunction logbookSearchText_(entry)',countStart);
+const countEnd=base.indexOf('\nasync function ensureLogbookAttachments_(entry)',countStart);
 assert.ok(countStart>=0&&countEnd>countStart,'cached attachment counter exists');
 assert.doesNotMatch(base.slice(countStart,countEnd),/parseAttachments\(raw\)/,'cached badge counter stays lightweight');
 assert.match(base,/const attCount = logbookAttachmentCount_\(e\)/);
