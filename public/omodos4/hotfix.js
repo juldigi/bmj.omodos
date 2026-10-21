@@ -4770,7 +4770,7 @@ if(typeof previousRender==='function'&&!previousRender.__materialPickerV2){
 }
 function boot(){ensurePicker();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
+/* Render wrappers and one-time boot replace the document-wide observer. */
 })();
 
 
@@ -4815,7 +4815,7 @@ function bindDirtyGuard(){
 }
 function boot(){bindMultiline();bindDirtyGuard();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
+/* Render wrappers and one-time boot replace the document-wide observer. */
 })();
 
 
@@ -4882,7 +4882,7 @@ function bindEditPicker(){
 }
 function boot(){bindEditPicker();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-new MutationObserver(boot).observe(document.documentElement,{subtree:true,childList:true});
+/* Render wrappers and one-time boot replace the document-wide observer. */
 /* Ensure quantity is decimal-capable and keep units reflected in every
    material detail before the legacy-compatible logbook payload is assembled. */
 const prevBuild=window.buildMaterialFieldsFromRows;
@@ -4936,7 +4936,7 @@ function bind(){
   }
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
-new MutationObserver(bind).observe(document.documentElement,{subtree:true,childList:true});
+
 window.addEventListener('pagehide',flushLogbookDraft,{capture:true});
 window.addEventListener('beforeunload',flushLogbookDraft,{capture:true});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushLogbookDraft();},{capture:true});
@@ -4972,7 +4972,7 @@ function guardForm(){
   }
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',guardForm,{once:true});else guardForm();
-new MutationObserver(guardForm).observe(document.documentElement,{subtree:true,childList:true});
+
 })();
 
 
@@ -5044,7 +5044,7 @@ function bind(){
   },true);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
-new MutationObserver(bind).observe(document.documentElement,{subtree:true,childList:true});
+
 })();
 
 
