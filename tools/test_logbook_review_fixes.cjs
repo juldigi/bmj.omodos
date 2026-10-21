@@ -50,7 +50,7 @@ const countCases=[
   ['[{},{}]',2],['[{"name":"one","items":[1,2]},{"name":"two,three"}]',2],
   ['["comma,inside","escaped\\\\,comma"]',2],['[null,true,false,123,"x"]',5],
   ['[1,,2]',2],['[,1]',2],['[1,]',2],
-  ['{"name":"one"}',1],['https://example.test/a.jpg\\nhttps://example.test/b.jpg',2],
+  ['{"name":"one"}',1],['https://example.test/a.jpg\nhttps://example.test/b.jpg',2],
   ['bad-url',1],[null,0],[{name:'one'},0]
 ];
 for(const [raw,expected] of countCases){
