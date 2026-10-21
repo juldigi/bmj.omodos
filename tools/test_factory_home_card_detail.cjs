@@ -16,7 +16,7 @@ assert.match(home, /if\(byCode\.length===1\)selected=byCode\[0\]/);
 assert.match(home, /window\.openMachineCurrentStatus\(identity\)/);
 assert.match(home, /OMODOS_FACTORY_STATUS_READY/);
 
-assert.match(home, /ofh-original-mode \.ofh-title\{display:none!important\}/);
+assert.ok(home.includes(".ofh-original-mode .ofh-title,#'+ROOT_ID+'.ofh-original-mode .ofh-stage"));
 assert.match(home, /function fitMobileViewport_\(\)/);
 assert.match(home, /const rootHeight=Math\.max\(mobile\?300:360,Math\.min\(mobile\?560:760,available\)\)/);
 assert.doesNotMatch(home, /view\.style\.height=available\+'px'/);
@@ -38,7 +38,7 @@ assert.match(home, /ofh-fullscreen-toggle/);
 assert.match(home, /stage\.requestFullscreen/);
 assert.match(home, /root\.classList\.add\('ofh-fullscreen'\)/);
 assert.match(home, /if\(!show3d\)root\?\.classList\.remove\('ofh-fullscreen'\)/);
-assert.match(home, /grid-template-columns:minmax\(0,1fr\) auto/);
+assert.match(home, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 assert.match(home, /@media\(max-width:420px\)/);
 
 assert.doesNotMatch(home, /Buka Detail Smart Resume/);
