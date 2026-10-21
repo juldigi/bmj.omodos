@@ -3887,6 +3887,7 @@ function createBackend(services, env = {}) {
     "saveRoleAccessConfig": { permission: "rbac.manage", audit: true, idempotent: true, handler: "handleSaveRoleAccessConfig_" },
     // LOGBOOK
     "list": { permission: "logbook.read", audit: false, idempotent: false, handler: "getLogbookList_", method: "GET" },
+    "logbookAttachments": { permission: "logbook.read", audit: false, idempotent: false, handler: "getLogbookAttachments_", method: "GET" },
     "addEntry": { permission: "logbook.create", audit: true, idempotent: true, handler: "addEntry_" },
     "updateEntry": { permission: "logbook.update", audit: true, idempotent: true, handler: "updateEntry_" },
     "updateStatus": { permission: "logbook.update", audit: true, idempotent: true, handler: "updateStatus_" },
@@ -4235,6 +4236,7 @@ function createBackend(services, env = {}) {
     try {
       if (action === "bootstrap" && typeof getBootstrap_ === "function") return jsonOut_({ ok: true, data: getBootstrap_(params.role || "") });
       if (action === "list" && typeof getLogbookList_ === "function") return jsonDataOut_(getLogbookList_(params));
+      if (action === "logbookAttachments" && typeof getLogbookAttachments_ === "function") return jsonDataOut_(getLogbookAttachments_(params));
       if (action === "machines" && typeof getMachinesList_ === "function") return jsonDataOut_(getMachinesList_());
       if (action === "patrolChecklistTemplate" && typeof getPatrolTemplateList_ === "function") return jsonDataOut_(getPatrolTemplateList_());
       if (action === "personil" && typeof getPersonilList_ === "function") return jsonDataOut_(getPersonilList_());
@@ -4438,6 +4440,7 @@ function createBackend(services, env = {}) {
   __name(deleteEntryLegacyV1_, "deleteEntryLegacyV1_");
   function getLogbookList_(params) {
     params = params || {};
+    var summary = String(params.summary || "") === "1";
     var since = params.since ? new Date(params.since) : null;
     if (since && !isNaN(since.getTime())) {
       var sh0 = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
@@ -4473,10 +4476,55 @@ function createBackend(services, env = {}) {
         changed.push(obj);
       }
       changed.reverse();
-      return { changed, deletedIds, serverTime: nowIso_() };
+      return { changed: summary ? summarizeLogbookRows_(changed) : changed, deletedIds, serverTime: nowIso_() };
     }
-    return getLogbookListFull_();
+    var fullRows = getLogbookListFull_();
+    return summary ? summarizeLogbookRows_(fullRows) : fullRows;
   }
+  function logbookAttachmentCountRaw_(raw) {
+    if (!raw) return 0;
+    if (Array.isArray(raw)) return raw.length;
+    if (typeof raw !== "string") return 0;
+    var trimmed = raw.trim();
+    if (!trimmed) return 0;
+    try {
+      var parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.length;
+      if (parsed && typeof parsed === "object") return 1;
+    } catch (e) {
+    }
+    return trimmed.split(/[\n,]+/).map(function(s) { return s.trim(); }).filter(Boolean).length;
+  }
+  __name(logbookAttachmentCountRaw_, "logbookAttachmentCountRaw_");
+  function summarizeLogbookRows_(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows.map(function(row) {
+      var copy = Object.assign({}, row);
+      copy["Lampiran Count"] = logbookAttachmentCountRaw_(copy["Lampiran (JSON)"]);
+      delete copy["Lampiran (JSON)"];
+      return copy;
+    });
+  }
+  __name(summarizeLogbookRows_, "summarizeLogbookRows_");
+  function getLogbookAttachments_(params) {
+    params = params || {};
+    var id = String(params.id || params.entryId || "").trim();
+    if (!id) throw { code: "VALIDATION_ERROR", message: "ID Logbook wajib diisi" };
+    var rows = getLogbookListFull_();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i]["ID"] || rows[i].id || "") !== id) continue;
+      var raw = rows[i]["Lampiran (JSON)"];
+      if (Array.isArray(raw)) return raw;
+      try {
+        var parsed = safeJsonParse_(raw || "[]", []);
+        return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" ? [parsed] : []);
+      } catch (e) {
+        return [];
+      }
+    }
+    throw { code: "NOT_FOUND", message: "Catatan Logbook tidak ditemukan" };
+  }
+  __name(getLogbookAttachments_, "getLogbookAttachments_");
   __name(getLogbookList_, "getLogbookList_");
   function getLogbookListFull_() {
     var cache = getCache_();
@@ -6281,11 +6329,12 @@ function createBackend(services, env = {}) {
       } catch (e) {
       }
     }
+    var lightweightRecentEntries = summarizeLogbookRows_(recentEntries);
     return {
       machines,
       personil,
-      recentEntries,
-      entries: recentEntries,
+      recentEntries: lightweightRecentEntries,
+      entries: lightweightRecentEntries,
       homePatrolLatest,
       patrolTemplate,
       analitikConfig,
