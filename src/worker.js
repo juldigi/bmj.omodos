@@ -4487,6 +4487,41 @@ function createBackend(services, env = {}) {
     if (typeof raw !== "string") return 0;
     var trimmed = raw.trim();
     if (!trimmed) return 0;
+    // Count top-level JSON-array items without materializing attachment objects.
+    if (trimmed.charAt(0) === "[" && trimmed.charAt(trimmed.length - 1) === "]") {
+      var count = 0;
+      var depth = 0;
+      var inString = false;
+      var escaped = false;
+      var hasTopLevelItem = false;
+      var validEnvelope = true;
+      for (var i = 1; i < trimmed.length - 1; i++) {
+        var ch = trimmed.charAt(i);
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (ch === "\\") escaped = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+        if (ch === "," && depth === 0) {
+          if (!hasTopLevelItem) validEnvelope = false;
+          count++;
+          hasTopLevelItem = false;
+          continue;
+        }
+        if (!/\s/.test(ch) && depth === 0) hasTopLevelItem = true;
+        if (ch === '"') {
+          inString = true;
+        } else if (ch === "{" || ch === "[") {
+          depth++;
+        } else if (ch === "}" || ch === "]") {
+          depth--;
+          if (depth < 0) validEnvelope = false;
+        }
+      }
+      if (count > 0 && !hasTopLevelItem) validEnvelope = false;
+      if (validEnvelope && !inString && depth === 0) return hasTopLevelItem ? count + 1 : 0;
+    }
     try {
       var parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) return parsed.length;
@@ -4578,7 +4613,7 @@ function createBackend(services, env = {}) {
   __name(getLogbookListFull_, "getLogbookListFull_");
   function getLogbookListSot_() {
     var cache = getCache_();
-    var cacheKey = "rows_Logbook_sot";
+    var cacheKey = "rows_Logbook_sot_raw_attachments_v2";
     if (cache) {
       var cached = cache.get(cacheKey);
       if (cached) {
@@ -4609,11 +4644,8 @@ function createBackend(services, env = {}) {
         if (isNaN(d.getTime()) || d < cutoff) continue;
       }
       var obj = rowToObj_(headers, r);
-      try {
-        obj["Lampiran (JSON)"] = safeJsonParse_(obj["Lampiran (JSON)"] || "[]", []);
-      } catch (e) {
-        obj["Lampiran (JSON)"] = [];
-      }
+      // Bootstrap/home only serializes a compact row later; preserve the raw cell here
+      // so large attachment JSON is not expanded into arrays/objects for every row.
       if (obj["Tanggal"] instanceof Date) {
         obj["Tanggal"] = Utilities.formatDate(obj["Tanggal"], Session.getScriptTimeZone(), "yyyy-MM-dd");
       }

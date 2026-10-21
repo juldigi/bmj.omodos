@@ -36,6 +36,40 @@ const compactRows=compactHelpers.summarizeLogbookRows_([
 assert.deepEqual(compactRows.map(r=>r['Lampiran Count']),[2,3,2],'summary count matches source attachment shapes');
 assert.ok(compactRows.every(r=>!Object.prototype.hasOwnProperty.call(r,'Lampiran (JSON)')),'summary rows omit full attachment payloads');
 assert.equal(compactRows[0].Status,'Selesai','summary preserves non-attachment fields');
+const countRaw=compactHelpers.logbookAttachmentCountRaw_;
+const oldCountRaw=(raw)=>{
+  if(!raw)return 0;
+  if(Array.isArray(raw))return raw.length;
+  if(typeof raw!=='string')return 0;
+  const trimmed=raw.trim();if(!trimmed)return 0;
+  try{const parsed=JSON.parse(trimmed);if(Array.isArray(parsed))return parsed.length;if(parsed&&typeof parsed==='object')return 1;}catch(e){}
+  return trimmed.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).length;
+};
+const countCases=[
+  ['',0],['   ',0],['[]',0],[' [ ] ',0],[[{},{}],2],
+  ['[{},{}]',2],['[{"name":"one","items":[1,2]},{"name":"two,three"}]',2],
+  ['["comma,inside","escaped\\\\,comma"]',2],['[null,true,false,123,"x"]',5],
+  ['[1,,2]',2],['[,1]',2],['[1,]',2],
+  ['{"name":"one"}',1],['https://example.test/a.jpg\nhttps://example.test/b.jpg',2],
+  ['bad-url',1],[null,0],[{name:'one'},0]
+];
+for(const [raw,expected] of countCases){
+  assert.equal(oldCountRaw(raw),expected,'legacy attachment count fixture');
+  assert.equal(countRaw(raw),expected,'lightweight attachment count parity for '+String(raw));
+}
+
+const sotStart=worker.indexOf('function getLogbookListSot_()');
+const sotEnd=worker.indexOf('__name(getLogbookListSot_',sotStart);
+assert.ok(sotStart>=0&&sotEnd>sotStart,'bootstrap Logbook source function exists');
+const sotSource=worker.slice(sotStart,sotEnd);
+assert.match(sotSource,/rows_Logbook_sot_raw_attachments_v2/);
+assert.ok(!sotSource.includes('safeJsonParse_(obj["Lampiran (JSON)"]'),'bootstrap must not expand all attachment JSON before summarization');
+const fullStart=worker.indexOf('function getLogbookListFull_()');
+const fullEnd=worker.indexOf('__name(getLogbookListFull_',fullStart);
+assert.ok(fullStart>=0&&fullEnd>fullStart,'full Logbook source function exists');
+const fullSource=worker.slice(fullStart,fullEnd);
+assert.ok(fullSource.includes('safeJsonParse_(obj["Lampiran (JSON)"]'),'full Logbook reads must preserve normalized attachments for detail');
+
 const attachmentStart=worker.indexOf('  function getLogbookAttachments_(params) {');
 const attachmentEnd=worker.indexOf('  __name(getLogbookAttachments_',attachmentStart);
 assert.ok(attachmentStart>=0&&attachmentEnd>attachmentStart,'per-entry attachment endpoint exists');
