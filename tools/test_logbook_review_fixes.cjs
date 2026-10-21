@@ -41,6 +41,8 @@ assert.match(hot,/LOGBOOK_REVIEW_FIXES_20261021_V1/);
 assert.match(hot,/name="nomorMO"/);
 assert.match(hot,/id="edit-nomorMO"/);
 assert.match(hot,/function compressEditPhoto\(file\)/);
+assert.match(hot,/const thumb=f\\.thumbUrl\\|\\|f\\.previewUrl\\|\\|''/);
+assert.match(hot,/decoding=\\"async\\" fetchpriority=\\"low\\"/);
 assert.match(hot,/takeLogbookEditFiles_/);
 assert.match(hot,/function exportPdf\(modal\)/);
 assert.match(hot,/OMODOS_LAZY_VENDOR_LOAD_V1/);
@@ -52,6 +54,8 @@ for(const vendor of ['html2canvas.min.js','docx.min.js','exceljs.min.js','vis-ne
  assert.ok(!base.includes('<script src="/vendor/'+vendor+'"></script>'),vendor+' should load only on demand');
 }
 assert.match(base,/const LOGBOOK_PAGE_SIZE_ = 40/);
+assert.match(base,/const LOGBOOK_MOBILE_PAGE_SIZE_ = 20/);
+assert.match(base,/const pageSize = typeof window\\.matchMedia==='function'.*LOGBOOK_MOBILE_PAGE_SIZE_/);
 assert.match(base,/function logbookOrderedEntries_\(\)/);
 assert.match(base,/function logbookSearchText_\(entry\)/);
 assert.match(base,/LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap\(\)/);

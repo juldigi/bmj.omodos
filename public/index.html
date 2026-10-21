@@ -9295,6 +9295,7 @@ function attachEntryClickHandlers(root){
 /* ---------------- VIEW: LOGBOOK UTAMA ---------------- */
 let LOGBOOK_CARD_FILTER = 'total';
 const LOGBOOK_PAGE_SIZE_ = 40;
+const LOGBOOK_MOBILE_PAGE_SIZE_ = 20;
 let LOGBOOK_FILTERED_ENTRIES_ = [];
 let LOGBOOK_RENDERED_COUNT_ = 0;
 let LOGBOOK_SORTED_SOURCE_REF_ = null;
@@ -9340,13 +9341,14 @@ function renderLogbookChunk_(reset){
   if(oldMore) oldMore.remove();
   const total=LOGBOOK_FILTERED_ENTRIES_.length;
   const start=LOGBOOK_RENDERED_COUNT_;
-  const end=Math.min(start+LOGBOOK_PAGE_SIZE_,total);
+  const pageSize = typeof window.matchMedia==='function' && window.matchMedia('(max-width: 767px)').matches ? LOGBOOK_MOBILE_PAGE_SIZE_ : LOGBOOK_PAGE_SIZE_;
+  const end=Math.min(start+pageSize,total);
   if(end>start){
     holder.insertAdjacentHTML('beforeend',LOGBOOK_FILTERED_ENTRIES_.slice(start,end).map((e,i)=>entryCardHtml(e,total-(start+i))).join(''));
   }
   LOGBOOK_RENDERED_COUNT_=end;
   if(end<total){
-    const next=Math.min(LOGBOOK_PAGE_SIZE_,total-end);
+    const next=Math.min(pageSize,total-end);
     holder.insertAdjacentHTML('beforeend','<div id="logbook-load-more-wrap" style="display:flex;justify-content:center;padding:14px 0 22px"><button type="button" class="btn btn-ghost btn-sm" id="btn-load-more-logbook">Tampilkan '+next+' catatan berikutnya ('+end.toLocaleString('id-ID')+' dari '+total.toLocaleString('id-ID')+')</button></div>');
     const more=$('#btn-load-more-logbook',holder);
     if(more) more.addEventListener('click',()=>renderLogbookChunk_(false),{once:true});

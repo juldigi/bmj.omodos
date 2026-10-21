@@ -909,7 +909,14 @@ function isImageFile(f){return/image/i.test(String(f&&(f.mimeType||f.type)||''))
 function renderEditPhotos(holder,entry,id){
  const host=q('[data-edit-photo-preview]',holder);if(!host)return;
  const old=getAttachments(entry).filter(isImageFile),pending=pendingEditPhotos.get(String(id))||[];
- host.innerHTML=[...old.map((f,i)=>{const url=f.thumbUrl||f.previewUrl||f.viewUrl||'';return url?'<a class="omodos-edit-photo-current" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer"><img src="'+esc(url)+'" alt="Foto tersimpan" loading="lazy"><span>Foto lama '+(i+1)+'</span></a>':'';}),...pending.map((f,i)=>'<div class="omodos-edit-photo-current"><img src="'+esc(f.localUrl)+'" alt="Foto baru" loading="lazy"><span>Foto baru '+(i+1)+'</span><button type="button" data-edit-photo-remove="'+i+'">Hapus</button></div>')].filter(Boolean).join('')||'<span class="omodos-edit-photo-empty">Belum ada foto.</span>';
+ const oldCards=old.map((f,i)=>{
+  const url=f.viewUrl||f.previewUrl||f.thumbUrl||'';
+  if(!url)return '';
+  const thumb=f.thumbUrl||f.previewUrl||'';
+  const preview=thumb?'<img src="'+esc(thumb)+'" alt="Foto tersimpan" loading="lazy" decoding="async" fetchpriority="low">':'<span style="display:flex;align-items:center;justify-content:center;width:100px;height:76px;border-radius:5px;background:var(--panel-2,#f0f4f7);font-size:10px;text-align:center;padding:4px">Buka foto tersimpan</span>';
+  return '<a class="omodos-edit-photo-current" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+preview+'<span>Foto lama '+(i+1)+'</span></a>';
+ });
+ host.innerHTML=[...oldCards,...pending.map((f,i)=>'<div class="omodos-edit-photo-current"><img src="'+esc(f.localUrl)+'" alt="Foto baru" loading="lazy" decoding="async"><span>Foto baru '+(i+1)+'</span><button type="button" data-edit-photo-remove="'+i+'">Hapus</button></div>')].filter(Boolean).join('')||'<span class="omodos-edit-photo-empty">Belum ada foto.</span>';
  qa('[data-edit-photo-remove]',host).forEach(btn=>btn.addEventListener('click',()=>{const files=pendingEditPhotos.get(String(id))||[],removed=files.splice(+btn.dataset.editPhotoRemove,1)[0];if(removed&&removed.localUrl)URL.revokeObjectURL(removed.localUrl);pendingEditPhotos.set(String(id),files);renderEditPhotos(holder,entry,id);}));
 }
 function attachEditUi(entry){
