@@ -9302,11 +9302,15 @@ let LOGBOOK_SORTED_SOURCE_REF_ = null;
 let LOGBOOK_SORTED_SOURCE_CACHE_ = [];
 let LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
 let LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap();
+let LOGBOOK_MACHINE_INDEX_CACHE_ = { entriesRef:null, machinesRef:null, value:null };
+let LOGBOOK_STATS_CACHE_ = { entriesRef:null, value:null };
 let LOGBOOK_SEARCH_DEBOUNCE_TIMER_ = null;
 const LOGBOOK_SEARCH_DEBOUNCE_MS_ = 130;
 function invalidateLogbookSortCache_(){
   LOGBOOK_SORTED_SOURCE_REF_ = null;
   LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
+  LOGBOOK_MACHINE_INDEX_CACHE_ = { entriesRef:null, machinesRef:null, value:null };
+  LOGBOOK_STATS_CACHE_ = { entriesRef:null, value:null };
 }
 function logbookOrderedEntries_(){
   if(LOGBOOK_SORTED_SOURCE_REF_ !== ENTRIES){
@@ -9370,6 +9374,9 @@ function renderLogbookChunk_(reset){
 }
 
 function computeStats(){
+  const entriesRef = ENTRIES;
+  const cached = LOGBOOK_STATS_CACHE_;
+  if(cached && cached.entriesRef===entriesRef && cached.value) return cached.value;
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const stats={total:ENTRIES.length,selesai:0,proses:0,emergency:0,todayCount:0};
@@ -9380,6 +9387,7 @@ function computeStats(){
     else if(cls==='emergency')stats.emergency++;
     if(entry['Tanggal']===today)stats.todayCount++;
   }
+  LOGBOOK_STATS_CACHE_ = { entriesRef, value:stats };
   return stats;
 }
 
@@ -9478,6 +9486,9 @@ $('#btn-refresh-utama').addEventListener('click', async ()=>{ await loadAll(); r
 function norm_(s){ const v=String(s??'').trim().toLowerCase(); return /^[—–-]+$/.test(v)?'':v; }
 
 function buildMachineIndex_(){
+  const entriesRef = ENTRIES, machinesRef = MACHINES;
+  const cached = LOGBOOK_MACHINE_INDEX_CACHE_;
+  if(cached && cached.entriesRef===entriesRef && cached.machinesRef===machinesRef && cached.value) return cached.value;
   const list = MACHINES.map(m=>{
     const kode = norm_(m['Kode Mesin']) ? String(m['Kode Mesin']).trim() : '';
     const nama = String(m['Nama Mesin']||'').trim();
@@ -9491,7 +9502,9 @@ function buildMachineIndex_(){
     if(m.nama) byNama[norm_(m.nama)] = m.key;
   });
   const areaList=[...new Set(ENTRIES.filter(isAreaEntry_).map(e=>e['Lokasi/Area']))].filter(Boolean).map(area=>({key:'area:'+area,label:'Area · '+area,kode:'',nama:'Area · '+area}));
-  return { list:[...list,...areaList], byKode, byNama };
+  const value = { list:[...list,...areaList], byKode, byNama };
+  LOGBOOK_MACHINE_INDEX_CACHE_ = { entriesRef, machinesRef, value };
+  return value;
 }
 function matchEntryMachineKey_(e, idx){
   const kode = norm_(e['Kode Mesin']);
