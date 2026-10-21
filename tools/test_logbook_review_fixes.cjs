@@ -74,11 +74,18 @@ assert.ok(rawCountStart>=0&&rawCountEnd>rawCountStart,'lightweight raw attachmen
 const rawCountSource=base.slice(rawCountStart,rawCountEnd);
 assert.doesNotMatch(rawCountSource,/parseAttachments\(/,'badge count must not normalize every attachment');
 const rawAttachmentCount=new Function(rawCountSource+'; return rawAttachmentCount_;')();
-const parseStart=base.indexOf('function parseAttachments(raw)');
+const parseStart=base.indexOf('function parseAttachments(raw, limit)');
 const parseEnd=base.indexOf('\nfunction renderAttachThumb(a)',parseStart);
 assert.ok(parseStart>=0&&parseEnd>parseStart,'existing attachment normalizer exists for parity comparison');
 const parseSource=base.slice(parseStart,parseEnd);
+assert.match(base,/function parseAttachments\(raw, limit\)/);
+assert.match(parseSource,/const items = Number\.isFinite\(Number\(limit\)\)/);
+assert.match(parseSource,/return items\.map\(item => \{/);
+
 const parseAttachmentsForParity=new Function('inferUploadMime_','openLightbox',parseSource+'; return parseAttachments;')(()=> 'application/octet-stream',()=>{});
+const manyAttachments=JSON.stringify(Array.from({length:20},(_,i)=>({name:'photo-'+i+'.jpg',type:'image',mimeType:'image/jpeg',viewUrl:'https://example.test/'+i+'.jpg'})));
+assert.equal(parseAttachmentsForParity(manyAttachments,12).length,12,'detail preview normalizes only the first 12 attachments');
+assert.equal(parseAttachmentsForParity(manyAttachments).length,20,'default attachment parsing still returns every item');
 for(const [raw,expected] of [
   ['',0],['   ',0],[[],0],[[{},{}],2],['[]',0],
   ['[{"name":"one"},{"name":"two"}]',2],['{"name":"one"}',1],
@@ -88,6 +95,15 @@ for(const [raw,expected] of [
   assert.equal(rawAttachmentCount(raw),expected,'raw attachment count for '+String(raw));
   assert.equal(rawAttachmentCount(raw),parseAttachmentsForParity(raw).length,'lightweight count matches the existing normalizer');
 }
+const detailStart=base.indexOf('function openDetail(id){');
+const detailEnd=base.indexOf('\n// [FITUR EDIT LOGBOOK]',detailStart);
+assert.ok(detailStart>=0&&detailEnd>detailStart,'Logbook detail renderer exists');
+const detail=base.slice(detailStart,detailEnd);
+assert.match(detail,/const rawAttachments = e\['Lampiran \(JSON\)'\]/);
+assert.match(detail,/const attachmentCount = logbookAttachmentCount_\(e\)/);
+assert.match(detail,/attachmentCount > 12 \? parseAttachments\(rawAttachments, 12\)/);
+assert.match(detail,/Tampilkan semua '\+attachmentCount\+' lampiran/);
+assert.match(detail,/slot\.innerHTML=renderAttachGrid\(parseAttachments\(rawAttachments\),'Lampiran'\)/);
 const countStart=base.indexOf('function logbookAttachmentCount_(entry){');
 const countEnd=base.indexOf('\nfunction logbookSearchText_(entry)',countStart);
 assert.ok(countStart>=0&&countEnd>countStart,'cached attachment counter exists');

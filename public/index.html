@@ -8999,7 +8999,7 @@ function fmtTime(t){
    Fix: SEMUA jalur sekarang mengisi variabel "list" lalu diteruskan ke
    .map() normalisasi yang sama di bawah -- tidak ada lagi early-return
    yang melewati proses itu. */
-function parseAttachments(raw) {
+function parseAttachments(raw, limit) {
   if (!raw) return [];
   let list;
   if (Array.isArray(raw)) {
@@ -9020,8 +9020,12 @@ function parseAttachments(raw) {
     list = raw;
   }
   if (!Array.isArray(list)) return [];
+  // Detail Logbook dapat meminta hanya preview pertama; parsing item lain ditunda sampai pengguna memilih Tampilkan semua.
+  const items = Number.isFinite(Number(limit)) && limit !== null && limit !== undefined
+    ? list.slice(0, Math.max(0, Math.floor(Number(limit))))
+    : list;
   
-  return list.map(item => {
+  return items.map(item => {
     if (item && typeof item === 'object' && item.viewUrl) {
       if(/\/files\//.test(String(item.viewUrl||''))){ const filePath=String(item.viewUrl).match(/\/files\/[^?#]+/)[0]; item={...item,viewUrl:filePath,previewUrl:filePath,thumbUrl:filePath}; }
       if(String(item.viewUrl||'').startsWith('blob:')) item = { ...item, _persistedBlob:true };
@@ -16871,9 +16875,11 @@ $$('#home-mesin-filter .machine-chip').forEach(btn=>{
 function openDetail(id){
   const e = ENTRIES.find(x=>x['ID']===id);
   if(!e) return;
-  const atts = parseAttachments(e['Lampiran (JSON)']);
-  const attachHtml = atts.length > 12
-    ? '<div id="entry-attachments-slot">'+renderAttachGrid(atts.slice(0,12), 'Lampiran')+'</div><button type="button" class="btn btn-ghost btn-sm" id="btn-entry-show-all-attachments" style="margin-top:8px">Tampilkan semua '+atts.length+' lampiran</button>'
+  const rawAttachments = e['Lampiran (JSON)'];
+  const attachmentCount = logbookAttachmentCount_(e);
+  const atts = attachmentCount > 12 ? parseAttachments(rawAttachments, 12) : parseAttachments(rawAttachments);
+  const attachHtml = attachmentCount > 12
+    ? '<div id="entry-attachments-slot">'+renderAttachGrid(atts, 'Lampiran')+'</div><button type="button" class="btn btn-ghost btn-sm" id="btn-entry-show-all-attachments" style="margin-top:8px">Tampilkan semua '+attachmentCount+' lampiran</button>'
     : renderAttachGrid(atts, 'Lampiran');
   const mesinKey = isAreaEntry_(e) ? '' : (e['Kode Mesin'] || e['Nama Mesin']);
   const mesinLabel = [e['Kode Mesin'], e['Nama Mesin']].filter(Boolean).join(' — ');
@@ -16950,7 +16956,7 @@ function openDetail(id){
   const showAllAttachments=$('#btn-entry-show-all-attachments');
   if(showAllAttachments) showAllAttachments.addEventListener('click',()=>{
     const slot=$('#entry-attachments-slot');if(!slot)return;
-    slot.innerHTML=renderAttachGrid(atts,'Lampiran');
+    slot.innerHTML=renderAttachGrid(parseAttachments(rawAttachments),'Lampiran');
     showAllAttachments.remove();
     bindAttachGridClicks(slot);
   });
