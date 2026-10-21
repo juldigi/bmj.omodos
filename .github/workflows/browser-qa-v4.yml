@@ -38,6 +38,7 @@ jobs:
           grep -Fq 'var sourceRows=state.rows.filter' public/omodos4/technical-performance.js
           grep -Fq 'for(var i=1;i<a.length;i++)if(Math.abs(a[i]-a[0])>1e-9)return NaN;' public/omodos4/technical-performance.js
           grep -Fq "var mtcRows=state.rows.filter(function(r){return /^mtc$/i.test(String(val(r,'category')).trim());});" public/omodos4/technical-performance.js
+          grep -Fq "if(n===1&&!explicitPercent)return NaN" public/omodos4/technical-performance.js
           grep -Fq 'function calcOeeRows()' public/omodos4/technical-performance.js
           grep -Fq 'function hours(row,useMtcLostTime)' public/omodos4/technical-performance.js
           grep -Fq "state.mapping.lt?val(row,'lt'):val(row,'downtime')" public/omodos4/technical-performance.js
