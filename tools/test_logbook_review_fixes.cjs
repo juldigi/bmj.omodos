@@ -77,7 +77,7 @@ assert.match(base,/LOGBOOK_MACHINE_INDEX_CACHE_ = \{ entriesRef:null, machinesRe
 assert.match(base,/cached\.entriesRef===entriesRef && cached\.today===today && cached\.value/);
 assert.match(base,/LOGBOOK_STATS_CACHE_ = \{ entriesRef:null, value:null \}/);
 const invalidateStart=base.indexOf('function invalidateLogbookSortCache_(){');
-const invalidateEnd=base.indexOf('\\nfunction logbookOrderedEntries_()',invalidateStart);
+const invalidateEnd=base.indexOf('\nfunction logbookOrderedEntries_()',invalidateStart);
 assert.ok(invalidateStart>=0&&invalidateEnd>invalidateStart,'Logbook cache invalidation block exists');
 const invalidate=base.slice(invalidateStart,invalidateEnd);
 assert.match(invalidate,/LOGBOOK_MACHINE_INDEX_CACHE_ = \{ entriesRef:null, machinesRef:null, value:null \}/);
