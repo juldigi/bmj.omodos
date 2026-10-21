@@ -41,11 +41,12 @@ jobs:
           grep -Fq 'hours(r,true)' public/omodos4/technical-performance.js
           grep -Fq 'Availability × Performance × Quality' public/omodos4/technical-performance.js
           grep -Fq 'OEE × Utilization' public/omodos4/technical-performance.js
+          grep -Fq 'OEE sumber' public/omodos4/technical-performance.js
+          grep -Fq 'OEE hitung' public/omodos4/technical-performance.js
           grep -Fq "fieldSelect('utilization','Utilization untuk TEEP')" public/omodos4/technical-performance.js
           grep -Fq 'MTBF/MTTR hanya diringkas dari nilai eksplisit yang dipetakan' public/omodos4/technical-performance.js
           grep -Fq 'TECHNICAL_PERFORMANCE_MVP_V1' public/omodos4/technical-performance.js
           grep -Fq "String(u.role||u.Role||'').toLowerCase()==='superadmin'" public/omodos4/technical-performance.js
-          grep -Fq 'Belum dihitung dari sumber ini' public/omodos4/technical-performance.js
           node tools/test_factory_home_card_detail.cjs
           node tools/test_logbook_review_fixes.cjs
 
