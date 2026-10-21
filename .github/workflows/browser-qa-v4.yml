@@ -34,8 +34,11 @@ jobs:
           set -euo pipefail
           node --check src/worker.js
           node --check public/omodos4/technical-performance.js
-          grep -Fq "return /^mtc$/i.test(String(val(r,'category')).trim())" public/omodos4/technical-performance.js
+          grep -Fq "return /^MTC$/i.test(String(val(r,'category')).trim());" public/omodos4/technical-performance.js
           grep -Fq 'function calcOeeRows()' public/omodos4/technical-performance.js
+          grep -Fq 'function hours(row,useMtcLostTime)' public/omodos4/technical-performance.js
+          grep -Fq 'hours(r,false)' public/omodos4/technical-performance.js
+          grep -Fq 'hours(r,true)' public/omodos4/technical-performance.js
           grep -Fq 'Availability × Performance × Quality' public/omodos4/technical-performance.js
           grep -Fq 'OEE × Utilization' public/omodos4/technical-performance.js
           grep -Fq "fieldSelect('utilization','Utilization untuk TEEP')" public/omodos4/technical-performance.js
