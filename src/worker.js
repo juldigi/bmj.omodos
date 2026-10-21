@@ -3144,11 +3144,15 @@ function createBackend(services, env = {}) {
           return "rows_" + n;
         }));
         cache.remove("rows_Logbook_v3_full");
+        cache.remove("rows_Logbook_summary_v1");
+        cache.remove("rows_Logbook_sot_raw_attachments_v2");
         cache.remove("rows_Logbook_sot");
       } else {
         cache.remove("rows_" + sheetName);
         if (sheetName === SHEET_LOGBOOK) {
           cache.remove("rows_Logbook_v3_full");
+          cache.remove("rows_Logbook_summary_v1");
+          cache.remove("rows_Logbook_sot_raw_attachments_v2");
           cache.remove("rows_Logbook_sot");
         }
       }
@@ -4466,10 +4470,13 @@ function createBackend(services, env = {}) {
           continue;
         }
         var obj = rowToObj_(headers0, r);
-        try {
-          obj["Lampiran (JSON)"] = safeJsonParse_(obj["Lampiran (JSON)"] || "[]", []);
-        } catch (e) {
-          obj["Lampiran (JSON)"] = [];
+        // Summary syncs only need the raw attachment value for a count; avoid expanding media objects.
+        if (!summary) {
+          try {
+            obj["Lampiran (JSON)"] = safeJsonParse_(obj["Lampiran (JSON)"] || "[]", []);
+          } catch (e) {
+            obj["Lampiran (JSON)"] = [];
+          }
         }
         if (obj["Tanggal"] instanceof Date) obj["Tanggal"] = Utilities.formatDate(obj["Tanggal"], Session.getScriptTimeZone(), "yyyy-MM-dd");
         if (obj["Timestamp Input"] instanceof Date) obj["Timestamp Input"] = obj["Timestamp Input"].toISOString();
@@ -4478,8 +4485,8 @@ function createBackend(services, env = {}) {
       changed.reverse();
       return { changed: summary ? summarizeLogbookRows_(changed) : changed, deletedIds, serverTime: nowIso_() };
     }
-    var fullRows = getLogbookListFull_();
-    return summary ? summarizeLogbookRows_(fullRows) : fullRows;
+    if (summary) return getLogbookListSummary_();
+    return getLogbookListFull_();
   }
   function logbookAttachmentCountRaw_(raw) {
     if (!raw) return 0;
@@ -4545,19 +4552,38 @@ function createBackend(services, env = {}) {
     params = params || {};
     var id = String(params.id || params.entryId || "").trim();
     if (!id) throw { code: "VALIDATION_ERROR", message: "ID Logbook wajib diisi" };
-    var rows = getLogbookListFull_();
-    for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i]["ID"] || rows[i].id || "") !== id) continue;
-      var raw = rows[i]["Lampiran (JSON)"];
-      if (Array.isArray(raw)) return raw;
-      try {
-        var parsed = safeJsonParse_(raw || "[]", []);
-        return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" ? [parsed] : []);
-      } catch (e) {
-        return [];
-      }
+    // Read only the ID/deletion columns and the selected row's attachment cell.
+    // Loading getLogbookListFull_ here would normalize attachments for every Logbook entry.
+    var sh = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) throw { code: "NOT_FOUND", message: "Catatan Logbook tidak ditemukan" };
+    var lastColumn = sh.getLastColumn();
+    var headers = sh.getRange(1, 1, 1, lastColumn).getValues()[0];
+    var idCol = headers.indexOf("ID");
+    var attachmentCol = headers.indexOf("Lampiran (JSON)");
+    var deletedAtCol = headers.indexOf("DeletedAt");
+    if (idCol < 0) throw { code: "NOT_FOUND", message: "Catatan Logbook tidak ditemukan" };
+    var rowCount = lastRow - 1;
+    var idValues = sh.getRange(2, idCol + 1, rowCount, 1).getValues();
+    var deletedValues = deletedAtCol >= 0 ? sh.getRange(2, deletedAtCol + 1, rowCount, 1).getValues() : null;
+    var targetRow = -1;
+    for (var i = 0; i < idValues.length; i++) {
+      if (String(idValues[i][0] || "") !== id) continue;
+      var deletedAt = deletedValues && deletedValues[i] ? deletedValues[i][0] : "";
+      if (deletedAt && String(deletedAt).trim() !== "") continue;
+      targetRow = i + 2;
+      break;
     }
-    throw { code: "NOT_FOUND", message: "Catatan Logbook tidak ditemukan" };
+    if (targetRow < 0) throw { code: "NOT_FOUND", message: "Catatan Logbook tidak ditemukan" };
+    if (attachmentCol < 0) return [];
+    var raw = sh.getRange(targetRow, attachmentCol + 1).getValue();
+    if (Array.isArray(raw)) return raw;
+    try {
+      var parsed = safeJsonParse_(raw || "[]", []);
+      return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" ? [parsed] : []);
+    } catch (e) {
+      return [];
+    }
   }
   __name(getLogbookAttachments_, "getLogbookAttachments_");
   __name(getLogbookList_, "getLogbookList_");
@@ -4611,6 +4637,51 @@ function createBackend(services, env = {}) {
     return rows;
   }
   __name(getLogbookListFull_, "getLogbookListFull_");
+  function getLogbookListSummary_() {
+    var cache = getCache_();
+    var cacheKey = "rows_Logbook_summary_v1";
+    if (cache) {
+      var cached = cache.get(cacheKey);
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch (e) {
+        }
+      }
+    }
+    var sh = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return [];
+    var lastColumn = sh.getLastColumn();
+    var data = sh.getRange(2, 1, lastRow - 1, lastColumn).getValues();
+    var headers = sh.getRange(1, 1, 1, lastColumn).getValues()[0];
+    var deletedAtCol = headers.indexOf("DeletedAt");
+    var rows = [];
+    for (var i = 0; i < data.length; i++) {
+      var r = data[i];
+      if (r[0] === "") continue;
+      if (deletedAtCol !== -1 && r[deletedAtCol] && String(r[deletedAtCol]).trim() !== "") continue;
+      var obj = rowToObj_(headers, r);
+      obj["Lampiran Count"] = logbookAttachmentCountRaw_(obj["Lampiran (JSON)"]);
+      delete obj["Lampiran (JSON)"];
+      if (obj["Tanggal"] instanceof Date) {
+        obj["Tanggal"] = Utilities.formatDate(obj["Tanggal"], Session.getScriptTimeZone(), "yyyy-MM-dd");
+      }
+      if (obj["Timestamp Input"] instanceof Date) {
+        obj["Timestamp Input"] = obj["Timestamp Input"].toISOString();
+      }
+      rows.push(obj);
+    }
+    rows.reverse();
+    if (cache) {
+      try {
+        cache.put(cacheKey, JSON.stringify(rows), CACHE_TTL_SECONDS);
+      } catch (e) {
+      }
+    }
+    return rows;
+  }
+  __name(getLogbookListSummary_, "getLogbookListSummary_");
   function getLogbookListSot_() {
     var cache = getCache_();
     var cacheKey = "rows_Logbook_sot_raw_attachments_v2";
