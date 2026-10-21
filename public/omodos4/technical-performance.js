@@ -25,12 +25,12 @@ function number(v){if(typeof v==='number')return Number.isFinite(v)?v:NaN;var s=
 function rate(v){var n=number(v);if(!Number.isFinite(n)||n<0||n>100)return NaN;return n>1?n/100:n;}
 function calcOeeRows(){return state.rows.map(function(r){var a=rate(val(r,'availability')),p=rate(val(r,'performance')),q=rate(val(r,'quality')),u=rate(val(r,'utilization'));var valid=Number.isFinite(a)&&Number.isFinite(p)&&Number.isFinite(q);var oee=valid?a*p*q:NaN;return {machine:val(r,'machine')||'—',date:val(r,'date')||'—',availability:a,performance:p,quality:q,oee:oee,utilization:u,teep:Number.isFinite(oee)&&Number.isFinite(u)?oee*u:NaN};}).filter(function(r){return Number.isFinite(r.oee)||Number.isFinite(r.teep);});}
 function fmt(n,d){return Number.isFinite(n)?n.toLocaleString('id-ID',{minimumFractionDigits:d==null?1:d,maximumFractionDigits:d==null?1:d}):'—';}
-function hours(row,useMtcLostTime){var raw=useMtcLostTime&&/^MTC$/i.test(String(val(row,'category')).trim())&&val(row,'lt')!==''?val(row,'lt'):val(row,'downtime');var n=number(raw);if(!Number.isFinite(n)||n<0)return NaN;var unit=state.mapping.downtimeUnit||'hours';return unit==='minutes'?n/60:unit==='seconds'?n/3600:n;}
+function hours(row,useMtcLostTime){var raw=useMtcLostTime&&/^mtc$/i.test(String(val(row,'category')).trim())&&val(row,'lt')!==''?val(row,'lt'):val(row,'downtime');var n=number(raw);if(!Number.isFinite(n)||n<0)return NaN;var unit=state.mapping.downtimeUnit||'hours';return unit==='minutes'?n/60:unit==='seconds'?n/3600:n;}
 function ratioValue(key,row){var n=number(val(row,key));if(!Number.isFinite(n))return NaN;return n>1?n/100:n;}
 function pctText(n){return Number.isFinite(n)?fmt(n*100,1)+'%':'—';}
 /* Exact MTC category only; breakdown maintenance|maintenance breakdown are not treated as MTC. */
 function calc(){
-var mtcRows=state.rows.filter(function(r){return /^MTC$/i.test(String(val(r,'category')).trim());});
+var mtcRows=state.rows.filter(function(r){return /^mtc$/i.test(String(val(r,'category')).trim());});
 var allHours=state.rows.map(function(r){return hours(r,false);}).filter(Number.isFinite),mtcHours=mtcRows.map(function(r){return hours(r,true);}).filter(Number.isFinite);
 var incidentValues=mtcRows.map(function(r){return number(val(r,'bd'));}).filter(Number.isFinite);var incidents=incidentValues.length?incidentValues.reduce(function(a,b){return a+b;},0):mtcRows.filter(function(r){return val(r,'incident')!==''||val(r,'downtime')!==''||val(r,'lt')!=='';}).length;
 var paired=state.rows.map(function(r){return {energy:number(val(r,'energy')),sheets:number(val(r,'sheets'))};}).filter(function(x){return Number.isFinite(x.energy)&&x.energy>=0&&Number.isFinite(x.sheets)&&x.sheets>0;});
