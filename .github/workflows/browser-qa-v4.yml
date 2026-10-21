@@ -64,7 +64,7 @@ jobs:
           grep -Fq "return /^mtc$/i.test(String(val(r,'category')).trim())" public/omodos4/technical-performance.js
           grep -Fq "var calculatedOee=[a,p,q].every(Number.isFinite)?a*p*q:NaN;" public/omodos4/technical-performance.js
           grep -Fq "var calculatedTeep=Number.isFinite(oee)&&Number.isFinite(u)?oee*u:NaN;" public/omodos4/technical-performance.js
-          grep -Fq "Total energi ÷ total sheet" public/omodos4/technical-performance.js
+          grep -Fq "Sumber ENPI atau energi ÷ sheet" public/omodos4/technical-performance.js
           grep -Fq "Top 3" public/omodos4/technical-performance.js
           grep -Fq "File tidak diunggah ke server" public/omodos4/technical-performance.js
           grep -Fq "String(u.role||u.Role||'').toLowerCase()==='superadmin'" public/omodos4/technical-performance.js
