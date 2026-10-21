@@ -9355,7 +9355,8 @@ function logbookAttachmentCount_(entry){
   const raw=entry['Lampiran (JSON)'];
   const arrayLoaded=Array.isArray(raw);
   const provided=entry['Lampiran Count'];
-  const hasProvided=!arrayLoaded&&provided!==undefined&&provided!==null&&String(provided).trim()!==''&&Number.isFinite(Number(provided));
+  const hasRawString=typeof raw==='string'&&raw.trim()!=='';
+  const hasProvided=!arrayLoaded&&!hasRawString&&provided!==undefined&&provided!==null&&String(provided).trim()!==''&&Number.isFinite(Number(provided));
   const signature=(arrayLoaded?'array:'+raw.length:(typeof raw==='string'?'string:'+raw:'raw:'+String(raw??'')))+'|count:'+(hasProvided?String(provided):'');
   const cached=LOGBOOK_ATTACHMENT_COUNT_CACHE_.get(entry);
   if(cached && cached.signature===signature) return cached.count;
