@@ -8155,24 +8155,28 @@ function createBackend(services, env = {}) {
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
       ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)", "Lampiran (JSON)", "Nomor MO", "Lokasi Pekerjaan", "Kategori Area", "Nama Area"]);
-      var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-      var values = sh.getDataRange().getValues();
+      var lastColumn = sh.getLastColumn();
+      var lastRow = sh.getLastRow();
+      var headers = sh.getRange(1, 1, 1, lastColumn).getValues()[0];
       var idCol = headers.indexOf("ID");
+      if (idCol < 0) throw { code: "DATA_INTEGRITY", message: "Kolom ID tidak ditemukan pada Logbook." };
       var targetRow = -1;
-      for (var i = 1; i < values.length; i++) {
-        if (String(values[i][idCol]) === String(id)) {
-          targetRow = i + 1;
-          break;
+      if (lastRow >= 2) {
+        // Lookup in the ID column only instead of copying the full table into memory.
+        var idValues = sh.getRange(2, idCol + 1, lastRow - 1, 1).getValues();
+        for (var i = 0; i < idValues.length; i++) {
+          if (String(idValues[i][0]) === String(id)) { targetRow = i + 2; break; }
         }
       }
       if (targetRow === -1) throw { code: "NOT_FOUND", message: "Entri Logbook dengan ID " + id + " tidak ditemukan" };
-      var locationExisting = Object.fromEntries(headers.map(function(h,c){return [h,values[targetRow-1][c]];}));
+      // Read the matching row only; other rows stay out of memory.
+      var existingRow = sh.getRange(targetRow, 1, 1, lastColumn).getValues()[0];
+      var locationExisting = Object.fromEntries(headers.map(function(h,c){return [h,existingRow[c]];}));
       normalizeLogbookWorkLocation_(data,locationExisting);
       var missing = REQUIRED_ENTRY_FIELDS.filter(function(f) {
         return !data[f] || String(data[f]).trim() === "";
       });
       if (missing.length) throw { code: "VALIDATION_ERROR", message: "Field wajib belum diisi: " + missing.join(", ") };
-      var existingRow = values[targetRow - 1];
       var getExisting = /* @__PURE__ */ __name(function(h) {
         var c = headers.indexOf(h);
         return c === -1 ? "" : existingRow[c];

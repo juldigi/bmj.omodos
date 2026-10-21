@@ -19,6 +19,8 @@ assert.match(update,/attachmentList\.push\(uploaded\)/);
 assert.match(update,/rowMap\["Lampiran \(JSON\)"\] = JSON\.stringify\(attachmentList\)/);
 assert.match(update,/rowMap\["Nomor MO"\] = data\.nomorMO/);
 assert.match(update,/attachments: attachmentList/);
+assert.match(update,/idValues = sh\.getRange\(2, idCol \+ 1, lastRow - 1, 1\)\.getValues\(\)/);
+assert.doesNotMatch(update,/getDataRange\(\)\.getValues\(\)/,'Edit should not copy the whole Logbook table into memory');
 assert.match(base,/refreshLogbookLocal_\(entry,saved,'add'\)/);
 assert.match(edit,/files:editFiles/);
 assert.match(edit,/refreshLogbookLocal_\(entry,saved,'update'\)/);
