@@ -96,6 +96,7 @@ jobs:
             ADMIN_JS="$(curl --max-time 10 -fsS "$ADMIN_JS_URL" || true)"
             CSS="$(curl --max-time 10 -fsS "$CSS_URL" || true)"
             OW_JS="$(curl --max-time 10 -fsS "$OW_JS_URL" || true)"
+            TP_JS="$(curl --max-time 10 -fsS "$TP_JS_URL" || true)"
             OW_CSS="$(curl --max-time 10 -fsS "$OW_CSS_URL" || true)"
             HEADERS="$(curl --max-time 10 -fsSI "$ROOT_URL" 2>/dev/null | tr -d '\r' || true)"
             BUILD="$(awk -F': *' 'tolower($1)=="x-omodos-build"{print $2}' <<< "$HEADERS" | tail -1)"
