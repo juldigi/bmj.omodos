@@ -4487,14 +4487,14 @@ function createBackend(services, env = {}) {
     if (typeof raw !== "string") return 0;
     var trimmed = raw.trim();
     if (!trimmed) return 0;
-    // Scan valid-looking JSON arrays without building an array of attachment objects.
-    // The summary needs only the top-level item count, not the decoded media payloads.
+    // Scan a JSON-array envelope to count top-level items without decoding each attachment object.
     if (trimmed.charAt(0) === "[" && trimmed.charAt(trimmed.length - 1) === "]") {
       var count = 0;
       var depth = 0;
       var inString = false;
       var escaped = false;
       var hasValue = false;
+      var validEnvelope = true;
       for (var i = 1; i < trimmed.length - 1; i++) {
         var ch = trimmed.charAt(i);
         if (inString) {
@@ -4511,13 +4511,14 @@ function createBackend(services, env = {}) {
           hasValue = true;
         } else if (ch === "}" || ch === "]") {
           depth--;
+          if (depth < 0) validEnvelope = false;
         } else if (ch === "," && depth === 0) {
           count++;
-        } else if (!/\\s/.test(ch)) {
+        } else if (!/\s/.test(ch)) {
           hasValue = true;
         }
       }
-      return hasValue ? count + 1 : 0;
+      if (validEnvelope && !inString && depth === 0) return hasValue ? count + 1 : 0;
     }
     try {
       var parsed = JSON.parse(trimmed);
@@ -4525,7 +4526,7 @@ function createBackend(services, env = {}) {
       if (parsed && typeof parsed === "object") return 1;
     } catch (e) {
     }
-    return trimmed.split(/[\\n,]+/).map(function(s) { return s.trim(); }).filter(Boolean).length;
+    return trimmed.split(/[\n,]+/).map(function(s) { return s.trim(); }).filter(Boolean).length;
   }
   __name(logbookAttachmentCountRaw_, "logbookAttachmentCountRaw_");
   function summarizeLogbookRows_(rows) {
