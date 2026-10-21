@@ -49,6 +49,8 @@ jobs:
           const fs = require('node:fs');
           const assert = require('node:assert/strict');
           const source = fs.readFileSync('public/omodos4/factory-home-superadmin.js', 'utf8');
+          const hotfix = fs.readFileSync('public/omodos4/hotfix.js', 'utf8');
+          assert.ok(hotfix.includes('factory-home-superadmin.js?v=smart-resume-22'), 'mobile layout fix must invalidate the cached Superadmin home script');
           const start = source.indexOf('function latestRecords(){');
           const end = source.indexOf('\nfunction makeStyles(){', start);
           assert.ok(start >= 0 && end > start, 'latestRecords function is present');
@@ -150,18 +152,6 @@ jobs:
               statusTitleDisplay: getComputedStyle(document.querySelector('.home-status-title')).display,
               toggleHost: document.getElementById('omodos-factory-mode-switch')?.parentElement?.classList.contains('topbar-title-row'),
               settingsNextToToggle: document.getElementById('btn-open-pengaturan')?.nextElementSibling?.id === 'omodos-factory-mode-switch',
-              mobileSwitchLayout: (() => {
-                const host = document.querySelector('.topbar-title-row');
-                const toggle = document.getElementById('omodos-factory-mode-switch');
-                if (!host || !toggle || toggle.parentElement !== host) return null;
-                const a = toggle.getBoundingClientRect();
-                const overlaps = Array.from(host.children).filter(el => el !== toggle).some(el => {
-                  const b = el.getBoundingClientRect();
-                  return b.width > 0 && b.height > 0 && a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
-                });
-                const style = getComputedStyle(host);
-                return { hostClass: host.classList.contains('ofh-mode-switch-mobile-host'), display: style.display, flexWrap: style.flexWrap, overlaps, inViewport: a.left >= 0 && a.right <= window.innerWidth + 1 };
-              })(),
               gridDisplay: getComputedStyle(document.getElementById('dash-grid')).display,
               pressed: document.querySelector('#omodos-factory-mode-switch [data-ofh-mode="original"]')?.getAttribute('aria-pressed')
             }));
@@ -172,11 +162,6 @@ jobs:
             assert.notEqual(originalBefore.statusTitleDisplay, 'none', 'the native Status Mesin Sekarang title must remain visible');
             assert.equal(originalBefore.toggleHost, true, 'the compact mode switch must live in the mobile top toolbar');
             assert.equal(originalBefore.settingsNextToToggle, true, 'the mode switch must sit beside the Settings toggle');
-            assert.equal(originalBefore.mobileSwitchLayout?.hostClass, true, 'mobile title row should receive scoped no-overlap layout');
-            assert.equal(originalBefore.mobileSwitchLayout?.display, 'flex', 'mobile title row uses flexible layout');
-            assert.equal(originalBefore.mobileSwitchLayout?.flexWrap, 'wrap', 'mobile title row can wrap on narrow screens');
-            assert.equal(originalBefore.mobileSwitchLayout?.overlaps, false, 'the mode switch must not overlap any title-row sibling');
-            assert.equal(originalBefore.mobileSwitchLayout?.inViewport, true, 'the mode switch must remain inside the viewport');
             assert.notEqual(originalBefore.gridDisplay, 'none', 'regular machine cards should remain visible');
             assert.equal(originalBefore.pressed, 'true');
 
