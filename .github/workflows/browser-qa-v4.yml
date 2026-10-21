@@ -195,20 +195,30 @@ jobs:
             result.phases.push('non-superadmin');
 
             console.log('[QA] superadmin');
-            const sup = await page.evaluate(() => {
+            const supGate = await page.evaluate(() => {
               CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
               SESSION_TOKEN = 'qa';
               FEATURE_REGISTRY = mergeFeatureRegistry([]);
               PERMISSIONS = {};
               applyRbacToUi();
-
               const allowed = canAccessView_('omodos4');
               const display = document.getElementById('v4-nav-group').style.display;
               const go = goToView('omodos4');
-              const active = document.getElementById('view-omodos4').classList.contains('active');
-              const cards = document.querySelectorAll('#v4-summary .v4-card').length;
-              return { allowed, display, go, active, cards };
+              return { allowed, display, go };
             });
+            // OMODOS 4 is intentionally fetched after RBAC approves navigation.
+            await page.waitForFunction(() => {
+              const view = document.getElementById('view-omodos4');
+              const cards = document.querySelectorAll('#v4-summary .v4-card').length;
+              return window.OMODOS4?.version === '4.0-master-recovery-100'
+                && !!view?.classList.contains('active') && cards === 6;
+            }, null, { timeout: 15000 });
+            const supState = await page.evaluate(() => ({
+              active: document.getElementById('view-omodos4').classList.contains('active'),
+              cards: document.querySelectorAll('#v4-summary .v4-card').length,
+              version: window.OMODOS4?.version || ''
+            }));
+            const sup = { ...supGate, ...supState };
             result.superadmin = sup;
             if (sup.allowed !== true || sup.display === 'none' || sup.go !== true || sup.active !== true || sup.cards !== 6) {
               throw new Error('Superadmin V4 access failed: ' + JSON.stringify(sup));
