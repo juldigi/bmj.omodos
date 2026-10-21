@@ -1,6 +1,6 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-21T08:49:22.117033+00:00
+- Audited UTC: 2026-10-21T08:52:18.608418+00:00
 - File bytes: 1677703
 - Lines: 29117
 - SHA-256: 9f2675a8c0efb09753a4532d6ec8de6dca9993ecaf6278d995ab2a1a68ccedcc
