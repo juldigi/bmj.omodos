@@ -12,8 +12,8 @@ const sandbox={window:{},document:{readyState:'loading',addEventListener(){}},Mu
 vm.runInNewContext(s,sandbox);
 const api=sandbox.window.OMODOS_TECH_PERFORMANCE_TEST;
 assert(api,'test API should be exposed');
-assert.strictEqual(api.calcOeeRow({Availability:'50%',Performance:'80%',Quality:'90%'}).oee,0.36,'percent strings should normalize correctly');
-assert.strictEqual(api.calcOeeRow({Availability:'0.5',Performance:'0.8',Quality:'0.9'}).oee,0.36);
-assert.strictEqual(api.calcTeepRow({Availability:'50',Performance:'80',Quality:'90',Utilization:'25'}).teep,0.09);
+assert(Math.abs(api.calcOeeRow({Availability:'50%',Performance:'80%',Quality:'90%'}).oee-0.36)<1e-10,'percent strings should normalize correctly');
+assert(Math.abs(api.calcOeeRow({Availability:'0.5',Performance:'0.8',Quality:'0.9'}).oee-0.36)<1e-10);
+assert(Math.abs(api.calcTeepRow({Availability:'50',Performance:'80',Quality:'90',Utilization:'25'}).teep-0.09)<1e-10);
 assert.strictEqual(api.csvParse('Machine,Hours\n"Offset #5",12.5')[0].Machine,'Offset #5');
 console.log('Technical Performance source/formula smoke checks passed');
