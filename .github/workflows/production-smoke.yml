@@ -42,6 +42,7 @@ jobs:
           grep -q '"no_bundle": true' wrangler.jsonc
           node --check public/omodos4/hotfix.js
           node --check public/omodos4/offset-ways.js
+          node --check public/omodos4/technical-performance.js
           test -s public/omodos4/hotfix.css
           test -s public/omodos4/offset-ways.css
           grep -Fq "X-OMODOS-Build: omodos-20261001-r1" public/_headers
@@ -62,6 +63,7 @@ jobs:
           ADMIN_JS_URL="https://omodos.juldigi.workers.dev/omodos4/superadmin-intelligence.js"
           CSS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.css"
           OW_JS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.js"
+          TP_JS_URL="https://omodos.juldigi.workers.dev/omodos4/technical-performance.js"
           OW_CSS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.css"
           EXPECTED_BUILD="omodos-20261001-r1"
           passed=0
@@ -139,9 +141,11 @@ jobs:
           printf '%s' "$JS" > /tmp/omodos-hotfix.js
           printf '%s' "$ADMIN_JS" > /tmp/omodos-superadmin-intelligence.js
           printf '%s' "$OW_JS" > /tmp/omodos-offset-ways.js
+          printf '%s' "$TP_JS" > /tmp/omodos-technical-performance.js
           node --check /tmp/omodos-hotfix.js
           node --check /tmp/omodos-superadmin-intelligence.js
           node --check /tmp/omodos-offset-ways.js
+          node --check /tmp/omodos-technical-performance.js
           check_marker "Superadmin bundle version" "version:'4.0-master-recovery-100'" "$ADMIN_JS"
           check_marker "machine profile link" "Buka profil mesin" "$ADMIN_JS"
           check_marker "sparepart purchase priority" "Tampilkan prioritas pembelian" "$ADMIN_JS"
@@ -153,7 +157,9 @@ jobs:
           check_absent "legacy Pearson label removed" "Kekuatan hubungan (Pearson r)" "$ADMIN_JS"
           check_absent "legacy pattern distance removed" "Jarak pola " "$ADMIN_JS"
           check_absent "legacy load-analysis control removed" "Muat Analisis" "$ADMIN_JS"
+          check_marker "Technical Performance Superadmin module" "TECHNICAL_PERFORMANCE_MVP_V1" "$TP_JS"
+          check_marker "Technical Performance file import" "Impor laporan resmi" "$TP_JS"
           check_marker "Offset Ways database read action" "offsetWaysRead" "$OW_JS"
           check_marker "Offset Ways database write action" "offsetWaysSave" "$OW_JS"
           check_marker "native theme registry integration" "registerThemeInThemeManager" "$OW_JS"
-          echo "[SMOKE_PASS] Production login contract, OMODOS 4 assets, and Offset Ways/OMODOS 2.0 assets."
+          echo "[SMOKE_PASS] Production login contract, OMODOS 4 assets, Technical Performance, and Offset Ways/OMODOS 2.0 assets."
