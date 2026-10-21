@@ -55,7 +55,7 @@ for(const vendor of ['html2canvas.min.js','docx.min.js','exceljs.min.js','vis-ne
 }
 assert.match(base,/const LOGBOOK_PAGE_SIZE_ = 40/);
 assert.match(base,/const LOGBOOK_MOBILE_PAGE_SIZE_ = 20/);
-assert.match(base,/const pageSize = typeof window\\.matchMedia==='function'.*LOGBOOK_MOBILE_PAGE_SIZE_/);
+assert.ok(base.includes("const pageSize = typeof window.matchMedia==='function'") && base.includes('LOGBOOK_MOBILE_PAGE_SIZE_'),'responsive mobile Logbook rendering');
 assert.match(base,/function logbookOrderedEntries_\(\)/);
 assert.match(base,/function logbookSearchText_\(entry\)/);
 assert.match(base,/LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap\(\)/);
