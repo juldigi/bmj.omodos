@@ -1123,3 +1123,26 @@ const css=document.createElement('style');css.textContent=[
  '@media(max-width:700px){#btn-logbook-export-pdf{margin:8px 0 0}.omodos-logbook-pdf-dialog{padding:14px}.omodos-logbook-pdf-actions button{min-height:38px}}'
 ].join('\n');document.head.appendChild(css);
 })();
+
+
+/* TECHNICAL_PERFORMANCE_MODULE_LOADER_V1 — isolated, additive Superadmin module */
+(function(){
+'use strict';
+function loadTechnicalPerformanceModule(){
+  if(!document.getElementById('omodos-technical-performance-style')){
+    var style=document.createElement('link');
+    style.id='omodos-technical-performance-style';
+    style.rel='stylesheet';
+    style.href='/omodos4/technical-performance.css';
+    document.head.appendChild(style);
+  }
+  if(document.getElementById('omodos-technical-performance-script')) return;
+  var script=document.createElement('script');
+  script.id='omodos-technical-performance-script';
+  script.src='/omodos4/technical-performance.js';
+  script.async=true;
+  document.head.appendChild(script);
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',loadTechnicalPerformanceModule,{once:true});
+else loadTechnicalPerformanceModule();
+})();
