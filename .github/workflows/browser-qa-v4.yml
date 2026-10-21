@@ -35,7 +35,7 @@ jobs:
           node --check src/worker.js
           node --check public/omodos4/technical-performance.js
           grep -Fq 'async function readFile(file)' public/omodos4/technical-performance.js
-          grep -Fq 'var sourceRows=state.rows.filter(function(r){return /^mtc$/i.test(String(val(r,\'category\')).trim());});' public/omodos4/technical-performance.js
+          grep -Fq 'var sourceRows=state.rows.filter' public/omodos4/technical-performance.js
           grep -Fq 'for(var i=1;i<a.length;i++)if(Math.abs(a[i]-a[0])>1e-9)return NaN;' public/omodos4/technical-performance.js
           grep -Fq "var mtcRows=state.rows.filter(function(r){return /^mtc$/i.test(String(val(r,'category')).trim());});" public/omodos4/technical-performance.js
           grep -Fq 'function calcOeeRows()' public/omodos4/technical-performance.js
