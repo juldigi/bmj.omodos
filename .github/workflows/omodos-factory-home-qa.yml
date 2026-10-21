@@ -5,11 +5,19 @@ on:
     branches: [main]
     paths:
       - "public/omodos4/factory-home-superadmin.js"
+      - "public/index.html"
+      - "public/omodos4/hotfix.js"
+      - "src/worker.js"
+      - "tools/test_logbook_review_fixes.cjs"
       - ".github/workflows/omodos-factory-home-qa.yml"
   push:
     branches: [main]
     paths:
       - "public/omodos4/factory-home-superadmin.js"
+      - "public/index.html"
+      - "public/omodos4/hotfix.js"
+      - "src/worker.js"
+      - "tools/test_logbook_review_fixes.cjs"
       - ".github/workflows/omodos-factory-home-qa.yml"
   workflow_dispatch:
 
@@ -24,6 +32,12 @@ jobs:
 
       - name: Check JavaScript syntax
         run: node --check public/omodos4/factory-home-superadmin.js
+
+      - name: Check Logbook review regressions
+        run: node tools/test_logbook_review_fixes.cjs
+
+      - name: Check worker JavaScript syntax
+        run: node --check src/worker.js
 
       - name: Validate Superadmin and source-of-truth contract
         shell: bash

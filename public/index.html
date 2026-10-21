@@ -16880,7 +16880,7 @@ async function saveEntryEdit(id){
   const keyToPayload = {
     'Lokasi Pekerjaan':'lokasiPekerjaan','Kategori Area':'kategoriArea','Nama Area':'namaArea',
     'Tanggal':'tanggal', 'Waktu':'waktu', 'Shift':'shift', 'Grouping Pekerjaan':'groupingPekerjaan',
-    'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi',
+    'Grouping Team':'groupingTeam', 'Nama Pelapor':'namaPelapor', 'Nomor Notifikasi Pekerjaan':'nomorNotifikasi', 'Nomor MO':'nomorMO',
     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
@@ -16906,10 +16906,12 @@ async function saveEntryEdit(id){
   const btn = $('#btn-save-entry-edit');
   btn.disabled = true; btn.textContent = 'Menyimpan...';
   try{
-    await apiPost({ action:'updateEntry', entry });
+    const editFiles = typeof window.takeLogbookEditFiles_==='function' ? window.takeLogbookEditFiles_(id) : [];
+    const saved = await apiPost({ action:'updateEntry', entry, files:editFiles });
+    if(typeof window.refreshLogbookLocal_==='function') window.refreshLogbookLocal_(entry,saved,'update');
     toast('Perubahan Logbook tersimpan ✓');
+    if(typeof window.clearLogbookEditFiles_==='function') window.clearLogbookEditFiles_(id);
     closeModal();
-    await loadAll();
     refreshCurrentView();
   }catch(err){
     toast('Gagal menyimpan perubahan: ' + err.message, true);
@@ -17850,7 +17852,8 @@ $('#form-entry').addEventListener('submit', async (ev)=>{
     if(typeof resetAdditionalPersonil === 'function') resetAdditionalPersonil();
     // Penyimpanan sudah sukses; refresh seluruh modul berjalan di background
     // agar satu endpoint lambat tidak mengunci tombol/form tanpa batas.
-    loadAll().catch(()=>{});
+    if(typeof window.refreshLogbookLocal_==='function') window.refreshLogbookLocal_(entry,saved,'add');
+    else loadAll().catch(()=>{});
     syncLogbookLocationForm_();
   }catch(err){
     toast('Gagal menyimpan: ' + err.message, true);

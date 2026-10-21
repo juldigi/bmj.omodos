@@ -2841,7 +2841,7 @@ function createBackend(services, env = {}) {
   const SHEET_SPAREPART_WAREHOUSE = "Sparepart_Warehouse";
   const PREDICTIVE_SHEET_NAME = "Predictive_Maintenance";
   const IPAL_SHEET_NAME = "IPAL_Reports";
-  const LOGBOOK_HEADERS = ["ID", "Timestamp Input", "Tanggal", "Waktu", "Shift", "Nama Pelapor", "Kode Mesin", "Nama Mesin", "Lokasi/Area", "Jenis Pekerjaan", "Prioritas", "Deskripsi Masalah", "Tindakan Perbaikan", "Spare Part Digunakan", "Status", "Jam Mulai", "Jam Selesai", "Downtime (menit)", "Lampiran (JSON)", "Catatan Tambahan", "Grouping Pekerjaan", "Grouping Team", "Nomor Notifikasi Pekerjaan", "Nama Unit", "Nama Material", "Material Number SAP", "Status Sparepart", "TransactionID", "CreatedBy", "DeletedAt", "DeletedBy", "DeleteReason", "UpdatedAt"];
+  const LOGBOOK_HEADERS = ["ID", "Timestamp Input", "Tanggal", "Waktu", "Shift", "Nama Pelapor", "Kode Mesin", "Nama Mesin", "Lokasi/Area", "Jenis Pekerjaan", "Prioritas", "Deskripsi Masalah", "Tindakan Perbaikan", "Spare Part Digunakan", "Status", "Jam Mulai", "Jam Selesai", "Downtime (menit)", "Lampiran (JSON)", "Catatan Tambahan", "Grouping Pekerjaan", "Grouping Team", "Nomor Notifikasi Pekerjaan", "Nomor MO", "Nama Unit", "Nama Material", "Material Number SAP", "Status Sparepart", "TransactionID", "CreatedBy", "DeletedAt", "DeletedBy", "DeleteReason", "UpdatedAt"];
   const REQUIRED_ENTRY_FIELDS = ["tanggal", "shift", "namaPelapor", "kodeMesin", "namaMesin", "jenisPekerjaan", "prioritas", "deskripsiMasalah", "tindakanPerbaikan", "status"];
   const MESIN_HEADERS = ["Kode Mesin", "Nama Mesin", "Lokasi/Area", "Kategori", "Spesifikasi Mesin", "Manual PDF URL", "Model", "Deskripsi Mesin", "Fungsi Mesin", "Link Manual/Referensi", "Keterangan Sumber"];
   const PERSONIL_HEADERS = ["Nama Personil", "Grouping Team", "Jabatan", "Foto URL"];
@@ -8028,9 +8028,13 @@ function createBackend(services, env = {}) {
     if(kind!=="Mesin" && kind!=="Area") throw {code:"VALIDATION_ERROR",message:"Lokasi pekerjaan harus Mesin atau Area."};
     data.lokasiPekerjaan=kind;
     if(kind==="Area"){
-      var category=data.kategoriArea||data["Kategori Area"]||existing["Kategori Area"];
-      var area=data.namaArea||data["Nama Area"]||existing["Nama Area"];
-      if(!(globalThis.OMODOS_WORK_AREAS[category]||[]).includes(area)) throw {code:"VALIDATION_ERROR",message:"Pilih kategori dan area pekerjaan yang sesuai."};
+      var category=String(data.kategoriArea||data["Kategori Area"]||existing["Kategori Area"]||"").trim();
+      var area=String(data.namaArea||data["Nama Area"]||existing["Nama Area"]||"").trim();
+      var customArea=String(data.namaAreaLainnya||data["Nama Area Lainnya"]||"").trim();
+      var knownAreas=globalThis.OMODOS_WORK_AREAS&&Array.isArray(globalThis.OMODOS_WORK_AREAS[category])?globalThis.OMODOS_WORK_AREAS[category]:[];
+      var explicitCustom=!!customArea&&customArea===area;
+      if(!category||!area||(!knownAreas.includes(area)&&!explicitCustom)) throw {code:"VALIDATION_ERROR",message:"Pilih kategori dan area pekerjaan yang sesuai. Untuk area lain, isi Nama Area Lainnya."};
+      if(category==="Lainnya"&&!explicitCustom) throw {code:"VALIDATION_ERROR",message:"Isi nama area lainnya terlebih dahulu."};
       data.kategoriArea=category;data.namaArea=area;
       data.kodeMesin="-";data.namaMesin="-";data.namaUnit="-";
       data.lokasi=category===area?category:category+" · "+area;
@@ -8066,7 +8070,7 @@ function createBackend(services, env = {}) {
       var usesSparepart = materialDetails.length > 0;
       var sh = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
       try {
-        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive", "Sparepart Detail (JSON)", "Lokasi Pekerjaan", "Kategori Area", "Nama Area"]);
+        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive", "Sparepart Detail (JSON)", "Lokasi Pekerjaan", "Kategori Area", "Nama Area", "Nomor MO"]);
       } catch (e) {
       }
       try {
@@ -8124,6 +8128,7 @@ function createBackend(services, env = {}) {
       rowMap["Grouping Pekerjaan"] = data.groupingPekerjaan || "";
       rowMap["Grouping Team"] = data.groupingTeam || "";
       rowMap["Nomor Notifikasi Pekerjaan"] = trainingValue_(data.nomorNotifikasi) || "-";
+      rowMap["Nomor MO"] = trainingValue_(data.nomorMO) || "";
       rowMap["Nama Unit"] = trainingValue_(data.namaUnit) || "-";
       rowMap["Status Sparepart"] = usesSparepart ? "PENDING" : "";
       rowMap["TransactionID"] = txId;
@@ -8149,7 +8154,7 @@ function createBackend(services, env = {}) {
       if (!id) throw { code: "VALIDATION_ERROR", message: "ID wajib diisi untuk update" };
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
-      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)", "Lokasi Pekerjaan", "Kategori Area", "Nama Area"]);
+      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)", "Lampiran (JSON)", "Nomor MO", "Lokasi Pekerjaan", "Kategori Area", "Nama Area"]);
       var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
       var values = sh.getDataRange().getValues();
       var idCol = headers.indexOf("ID");
@@ -8172,6 +8177,15 @@ function createBackend(services, env = {}) {
         var c = headers.indexOf(h);
         return c === -1 ? "" : existingRow[c];
       }, "getExisting");
+      var attachmentList = safeJsonParse_(getExisting("Lampiran (JSON)"), []);
+      if (!Array.isArray(attachmentList)) attachmentList = [];
+      if (Array.isArray(body.files) && body.files.length) {
+        var editFolder = getOrCreateDriveFolder_();
+        body.files.forEach(function(fileObj) {
+          var uploaded = uploadBase64File_(editFolder, fileObj, fileObj.name || "foto-logbook", fileObj.mimeType || "image/jpeg");
+          attachmentList.push(uploaded);
+        });
+      }
       var materialInput = data;
       if (data.sparepartDetail === void 0 && data.namaMaterial === void 0 && data.materialNumberSAP === void 0 && data["Nama Material"] === void 0 && data["Material Number SAP"] === void 0) {
         var persistedDetails = safeJsonParse_(getExisting("Sparepart Detail (JSON)"),null);
@@ -8211,10 +8225,12 @@ function createBackend(services, env = {}) {
       rowMap["Jam Mulai"] = data.jamMulai !== void 0 ? data.jamMulai : getExisting("Jam Mulai");
       rowMap["Jam Selesai"] = data.jamSelesai !== void 0 ? data.jamSelesai : getExisting("Jam Selesai");
       rowMap["Downtime (menit)"] = data.downtime !== void 0 ? data.downtime : getExisting("Downtime (menit)");
+      rowMap["Lampiran (JSON)"] = JSON.stringify(attachmentList);
       rowMap["Catatan Tambahan"] = data.catatan !== void 0 ? data.catatan : getExisting("Catatan Tambahan");
       rowMap["Grouping Pekerjaan"] = data.groupingPekerjaan || getExisting("Grouping Pekerjaan");
       rowMap["Grouping Team"] = data.groupingTeam || getExisting("Grouping Team");
       rowMap["Nomor Notifikasi Pekerjaan"] = data.nomorNotifikasi !== void 0 ? data.nomorNotifikasi : getExisting("Nomor Notifikasi Pekerjaan");
+      rowMap["Nomor MO"] = data.nomorMO !== void 0 ? data.nomorMO : getExisting("Nomor MO");
       rowMap["Nama Unit"] = data.namaUnit !== void 0 ? data.namaUnit : getExisting("Nama Unit");
       rowMap["Status Sparepart"] = usesSparepart ? getExisting("Status Sparepart") || "PENDING" : getExisting("Status Sparepart");
       rowMap["UpdatedAt"] = nowIso_();
@@ -8225,7 +8241,7 @@ function createBackend(services, env = {}) {
       sh.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
       invalidateCacheForSheet_(SHEET_LOGBOOK);
       var newSpareparts=registerTrainingMaterials_(materialDetails,id);
-      return jsonOut_({ ok: true, id, newSpareparts });
+      return jsonOut_({ ok: true, id, newSpareparts, attachments: attachmentList });
     } catch (e) {
       return handleError_(e);
     }

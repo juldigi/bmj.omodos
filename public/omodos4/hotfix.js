@@ -4252,9 +4252,10 @@ ready(function(){
       window.__omodosOtherAreaApplyWrapped=true;
       window.applyLogbookLocationPayload_=function(entry){
         if(entry&&entry.lokasiPekerjaan==='Area'&&(entry.kategoriArea==='Lainnya'||entry.namaArea==='Lainnya')){
-          var typed=(customArea&&customArea.value||'').trim();
+          var typedField=entry.ID?byId('input-edit-namaArea-lainnya'):customArea;
+          var typed=String((typedField&&typedField.value)||entry.namaAreaLainnya||'').trim();
           if(!typed)throw new Error('Masukkan nama area lainnya.');
-          entry.namaArea=typed;
+          entry.namaArea=typed;entry.namaAreaLainnya=typed;
           entry.kodeMesin='-';entry.namaMesin='-';entry.namaUnit='-';
           entry.lokasi=entry.kategoriArea===entry.namaArea?entry.kategoriArea:entry.kategoriArea+' · '+entry.namaArea;
           return entry;
@@ -4929,11 +4930,8 @@ function bind(){
     form.dataset.lifecycleDraftFlush='1';
     ['input','change'].forEach(type=>form.addEventListener(type,()=>{
       try{
-        if(typeof formEntryDraftSaveTimer!=='undefined' && formEntryDraftSaveTimer){
-          clearTimeout(formEntryDraftSaveTimer);
-          formEntryDraftSaveTimer=null;
-        }
-        if(typeof saveFormEntryDraft==='function') saveFormEntryDraft();
+        if(typeof saveFormEntryDraftDebounced==='function') saveFormEntryDraftDebounced();
+        else if(typeof saveFormEntryDraft==='function') saveFormEntryDraft();
       }catch(e){}
     },{capture:true}));
   }
@@ -5149,4 +5147,130 @@ if(typeof originalAuthFailure==='function'){
     script.onload=()=>{try{window.OMODOS_FACTORY_HOME_SYNC?.();}catch(e){}};script.onerror=()=>{script.remove();};(document.head||document.documentElement).appendChild(script);
   }
   document.addEventListener('DOMContentLoaded',sync);window.addEventListener('pageshow',sync);window.addEventListener('focus',sync);setInterval(sync,1200);sync();
+})();
+
+/* LOGBOOK_REVIEW_FIXES_20261021_V1 — custom area, MO, edit photos, incremental refresh and memory-safe PDF export. */
+(function(){
+'use strict';
+if(window.__OMODOS_LOGBOOK_REVIEW_20261021_V1__)return;
+window.__OMODOS_LOGBOOK_REVIEW_20261021_V1__=true;
+const byId=id=>document.getElementById(id),q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=v=>{try{return typeof escapeHtml==='function'?escapeHtml(String(v==null?'':v)):String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}catch(e){return String(v==null?'':v);}};
+const pendingEditPhotos=new Map();
+function notice(m,b){if(typeof window.toast==='function')window.toast(m,!!b);else if(b)console.error('[OMODOS Logbook]',m);}
+function installMoField(){
+ const form=byId('form-entry'),n=form&&q('[name="nomorNotifikasi"]',form);if(!form||!n||q('#input-nomorMO',form))return;
+ const d=document.createElement('div');d.className='field';d.id='field-nomorMO';d.innerHTML='<label for="input-nomorMO">Nomor MO (Maintenance Order, opsional)</label><input type="text" id="input-nomorMO" name="nomorMO" autocomplete="off" placeholder="Contoh: 4000123456">';
+ n.closest('.field')?.insertAdjacentElement('afterend',d);
+}
+function dateValue(v){const s=String(v==null?'':v).trim();if(!s)return null;let d=new Date(s);if(!Number.isNaN(d.getTime()))return d;const m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);if(m){d=new Date(+m[3],+m[2]-1,+m[1]);if(!Number.isNaN(d.getTime()))return d;}return null;}
+window.refreshLogbookLocal_=function(entry,saved,mode){
+ try{
+  const add=mode==='add',id=String(add?(saved&&(saved.id||saved.ID)||entry.ID||entry.id||''):(entry.ID||entry.id||''));
+  const rows=Array.isArray(window.ENTRIES)?window.ENTRIES:[];let row=rows.find(x=>String(x.ID||x.id||'')===id)||{ID:id};
+  const map={tanggal:'Tanggal',waktu:'Waktu',shift:'Shift',namaPelapor:'Nama Pelapor',personilTambahanStr:'Personil Tambahan',semuaPersonil:'Semua Personil',kodeMesin:'Kode Mesin',namaMesin:'Nama Mesin',namaUnit:'Nama Unit',lokasiPekerjaan:'Lokasi Pekerjaan',kategoriArea:'Kategori Area',namaArea:'Nama Area',lokasi:'Lokasi/Area',jenisPekerjaan:'Jenis Pekerjaan',prioritas:'Prioritas',deskripsiMasalah:'Deskripsi Masalah',tindakanPerbaikan:'Tindakan Perbaikan',sparePart:'Spare Part Digunakan',namaMaterial:'Nama Material',materialNumberSAP:'Material Number SAP',status:'Status',jamMulai:'Jam Mulai',jamSelesai:'Jam Selesai',downtime:'Downtime (menit)',catatan:'Catatan Tambahan',groupingPekerjaan:'Grouping Pekerjaan',groupingTeam:'Grouping Team',nomorNotifikasi:'Nomor Notifikasi Pekerjaan',nomorMO:'Nomor MO'};
+  Object.entries(map).forEach(([a,b])=>{if(Object.prototype.hasOwnProperty.call(entry,a))row[b]=entry[a];});
+  if(add){row.ID=id;row['Timestamp Input']=new Date().toISOString();row.Timestamp=row.Timestamp||row['Timestamp Input'];}
+  if(saved&&Array.isArray(saved.attachments))row['Lampiran (JSON)']=JSON.stringify(saved.attachments);else if(add)row['Lampiran (JSON)']='[]';
+  if(id&&!rows.some(x=>String(x.ID||x.id||'')===id))rows.unshift(row);
+  rows.sort((a,b)=>{const da=dateValue(a['Timestamp Input']||a.Timestamp||a.Tanggal),db=dateValue(b['Timestamp Input']||b.Timestamp||b.Tanggal);return(db?db.getTime():0)-(da?da.getTime():0);});
+  window.ENTRIES=rows;
+  try{if(typeof renderDashboardCriticalSummary==='function')renderDashboardCriticalSummary();}catch(e){}
+  try{if(typeof renderHomeSmartResume==='function')renderHomeSmartResume();}catch(e){}
+  return row;
+ }catch(e){console.warn('[OMODOS] Logbook local refresh failed',e);return null;}
+};
+function loadImage(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('Foto gagal dibaca.'));r.onload=()=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('Foto tidak dapat dibuka. Pilih JPG/PNG.'));img.src=String(r.result);};r.readAsDataURL(file);});}
+async function compressEditPhoto(file){
+ if(!file||!String(file.type||'').toLowerCase().startsWith('image/'))throw Error('Pilih foto yang didukung browser.');
+ if(file.size>40*1024*1024)throw Error('Ukuran foto awal maksimal 40 MB.');
+ let bitmap=null,img=null;
+ try{
+  if(typeof createImageBitmap==='function'){try{bitmap=await createImageBitmap(file);}catch(e){}}
+  if(!bitmap)img=await loadImage(file);
+  const w=bitmap?bitmap.width:img.naturalWidth,h=bitmap?bitmap.height:img.naturalHeight,scale=Math.min(1,1600/Math.max(w,h));
+  const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));
+  const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw Error('Browser tidak dapat menyiapkan kompresi foto.');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap||img,0,0,canvas.width,canvas.height);
+  const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Kompresi foto gagal.')),'image/jpeg',0.78));
+  canvas.width=0;canvas.height=0;if(bitmap){bitmap.close?.();bitmap=null;}img=null;
+  if(blob.size>8.5*1024*1024)throw Error('Foto masih lebih dari 8,5 MB setelah dikompres. Pilih foto lebih kecil.');
+  const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]||'');r.onerror=()=>reject(Error('Hasil foto gagal dibaca.'));r.readAsDataURL(blob);});
+  return{name:String(file.name||'foto-logbook').replace(/\.[^.]+$/,'')+'.jpg',mimeType:'image/jpeg',base64,localUrl:URL.createObjectURL(blob)};
+ }catch(e){if(bitmap)bitmap.close?.();throw e;}
+}
+function getAttachments(entry){try{const raw=entry&&entry['Lampiran (JSON)'];const x=Array.isArray(raw)?raw:JSON.parse(String(raw||'[]'));return Array.isArray(x)?x:[];}catch(e){return[];}}
+function isImageFile(f){return/image/i.test(String(f&&(f.mimeType||f.type)||''))||/\.(jpe?g|png|webp)(\?|$)/i.test(String(f&&(f.viewUrl||f.previewUrl||f.thumbUrl)||''));}
+function renderEditPhotos(holder,entry,id){
+ const host=q('[data-edit-photo-preview]',holder);if(!host)return;
+ const old=getAttachments(entry).filter(isImageFile),pending=pendingEditPhotos.get(String(id))||[];
+ host.innerHTML=[...old.map((f,i)=>{const url=f.thumbUrl||f.previewUrl||f.viewUrl||'';return url?'<a class="omodos-edit-photo-current" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer"><img src="'+esc(url)+'" alt="Foto tersimpan" loading="lazy"><span>Foto lama '+(i+1)+'</span></a>':'';}),...pending.map((f,i)=>'<div class="omodos-edit-photo-current"><img src="'+esc(f.localUrl)+'" alt="Foto baru" loading="lazy"><span>Foto baru '+(i+1)+'</span><button type="button" data-edit-photo-remove="'+i+'">Hapus</button></div>')].filter(Boolean).join('')||'<span class="omodos-edit-photo-empty">Belum ada foto.</span>';
+ qa('[data-edit-photo-remove]',host).forEach(btn=>btn.addEventListener('click',()=>{const files=pendingEditPhotos.get(String(id))||[],removed=files.splice(+btn.dataset.editPhotoRemove,1)[0];if(removed&&removed.localUrl)URL.revokeObjectURL(removed.localUrl);pendingEditPhotos.set(String(id),files);renderEditPhotos(holder,entry,id);}));
+}
+function attachEditUi(entry){
+ const holder=byId('entry-view-mode');if(!holder||!q('#btn-save-entry-edit',holder))return;const id=String(entry&&(entry.ID||entry.id)||'');if(!id)return;
+ if(!q('[data-edit-field="Nomor MO"]',holder)){const n=q('[data-edit-field="Nomor Notifikasi Pekerjaan"]',holder),field=document.createElement('div');field.className='field';field.dataset.editWrap='Nomor MO';field.innerHTML='<label for="edit-nomorMO">Nomor MO (Maintenance Order, opsional)</label><input type="text" id="edit-nomorMO" data-edit-field="Nomor MO" value="'+esc(entry['Nomor MO']||'')+'" placeholder="Contoh: 4000123456" autocomplete="off">';if(n&&n.closest('.field'))n.closest('.field').insertAdjacentElement('afterend',field);else(q('.grid2',holder)||holder).appendChild(field);}
+ const kind=q('#edit-location-kind',holder),category=q('#edit-area-category',holder),area=q('#edit-area-name',holder);
+ if(category&&!Array.from(category.options).some(o=>o.value==='Lainnya'))category.add(new Option('Lainnya','Lainnya'));
+ if(!q('#field-edit-area-lainnya',holder)){const f=document.createElement('div');f.className='field';f.id='field-edit-area-lainnya';f.innerHTML='<label for="input-edit-namaArea-lainnya">Nama Area Lainnya</label><input type="text" id="input-edit-namaArea-lainnya" autocomplete="off" placeholder="Masukkan nama area...">';const ar=byId('edit-area-name-wrap');if(ar)ar.insertAdjacentElement('afterend',f);else(q('.grid3',holder)||holder).appendChild(f);}
+ const other=q('#input-edit-namaArea-lainnya',holder),otherWrap=q('#field-edit-area-lainnya',holder),catValue=String(entry['Kategori Area']||'').trim(),areaValue=String(entry['Nama Area']||'').trim();
+ if(category&&catValue){if(!Array.from(category.options).some(o=>o.value===catValue))category.add(new Option(catValue,catValue));category.value=catValue;}
+ if(category&&area&&areaValue){try{if(typeof populateWorkAreaOptions_==='function')populateWorkAreaOptions_(category.value,area,areaValue);}catch(e){}if(!Array.from(area.options).some(o=>o.value===areaValue)){area.value='Lainnya';if(other)other.value=areaValue;}else if(other)other.value='';}
+ const sync=()=>{const visible=!!(kind&&kind.value==='Area'&&area&&area.value==='Lainnya');if(otherWrap)otherWrap.hidden=!visible;if(other){other.disabled=!visible;other.required=visible;}};
+ kind?.addEventListener('change',sync);category?.addEventListener('change',()=>setTimeout(sync,0));area?.addEventListener('change',sync);sync();
+ if(!q('#edit-entry-photo-input',holder)){const panel=document.createElement('div');panel.className='field omodos-edit-photo-panel';panel.innerHTML='<label for="edit-entry-photo-input">Foto Bukti Pekerjaan</label><div class="sub" style="margin:0 0 8px">Foto lama tetap tersimpan; foto baru dikompres sebelum diunggah.</div><input type="file" id="edit-entry-photo-input" accept="image/*" multiple><div class="omodos-edit-photo-grid" data-edit-photo-preview></div>';const actions=q('#btn-save-entry-edit',holder)?.closest('div');actions?.insertAdjacentElement('beforebegin',panel);q('#edit-entry-photo-input',holder)?.addEventListener('change',async ev=>{const selected=Array.from(ev.target.files||[]).filter(f=>String(f.type||'').startsWith('image/'));ev.target.value='';if(!selected.length)return;const pending=pendingEditPhotos.get(id)||[];for(const file of selected){try{notice('Mengompres foto '+file.name+'...');pending.push(await compressEditPhoto(file));notice('Foto siap diunggah bersama perubahan Logbook.');}catch(error){notice(error.message||'Foto gagal diproses.',true);}}pendingEditPhotos.set(id,pending);renderEditPhotos(holder,entry,id);});}
+ renderEditPhotos(holder,entry,id);
+}
+const renderEdit=window.renderEntryEditForm;
+if(typeof renderEdit==='function'&&!renderEdit.__logbookReviewV1){const wrapped=function(){const result=renderEdit.apply(this,arguments);try{attachEditUi(arguments[0]||{});}catch(e){console.warn('[OMODOS] Edit Logbook UI not ready',e);}return result;};wrapped.__logbookReviewV1=true;window.renderEntryEditForm=wrapped;}
+window.takeLogbookEditFiles_=id=>(pendingEditPhotos.get(String(id))||[]).map(({name,mimeType,base64})=>({name,mimeType,base64}));
+window.clearLogbookEditFiles_=id=>{(pendingEditPhotos.get(String(id))||[]).forEach(f=>{if(f.localUrl)URL.revokeObjectURL(f.localUrl);});pendingEditPhotos.delete(String(id));};
+
+function installPdfButton(){
+ const host=q('#view-utama .topbar');if(!host||byId('btn-logbook-export-pdf'))return;
+ const btn=document.createElement('button');btn.type='button';btn.id='btn-logbook-export-pdf';btn.className='btn btn-sm';btn.innerHTML='<i class="ph-bold ph-file-pdf"></i> Export PDF Logbook';btn.addEventListener('click',showPdfDialog);
+ const stat=q('#stat-strip',host);if(stat)stat.insertAdjacentElement('afterend',btn);else host.appendChild(btn);
+}
+function showPdfDialog(){
+ if(byId('omodos-logbook-pdf-modal'))return;
+ const m=document.createElement('div');m.id='omodos-logbook-pdf-modal';m.className='omodos-logbook-pdf-overlay';
+ m.innerHTML='<section class="omodos-logbook-pdf-dialog" role="dialog" aria-modal="true" aria-labelledby="omodos-logbook-pdf-title"><div class="omodos-logbook-pdf-heading"><div><strong id="omodos-logbook-pdf-title">Export Report Logbook</strong><p>PDF menggunakan teks, bukan screenshot layar.</p></div><button type="button" data-pdf-close aria-label="Tutup">×</button></div><label for="omodos-logbook-pdf-period">Periode laporan</label><select id="omodos-logbook-pdf-period"><option value="90">90 hari terakhir</option><option value="30">30 hari terakhir</option><option value="year">Tahun berjalan</option><option value="all">Semua data yang tersedia</option></select><div class="omodos-logbook-pdf-actions"><button type="button" class="btn btn-ghost btn-sm" data-pdf-close>Batal</button><button type="button" class="btn btn-primary btn-sm" id="btn-logbook-pdf-download">Unduh PDF</button></div><p class="omodos-logbook-pdf-note">Termasuk tanggal, mesin/area, status, uraian, tindakan, nomor notifikasi dan MO.</p></section>';
+ document.body.appendChild(m);qa('[data-pdf-close]',m).forEach(b=>b.addEventListener('click',()=>m.remove()));m.addEventListener('click',e=>{if(e.target===m)m.remove();});byId('btn-logbook-pdf-download').addEventListener('click',()=>exportPdf(m));
+}
+function safePdfText(v){return String(v==null||v===''?'-':v).replace(/\r/g,'').replace(/\t/g,' ').replace(/[^\x20-\x7E]/g,' ').replace(/\s+/g,' ').trim()||'-';}
+function exportPdf(modal){
+ if(!window.jspdf||typeof window.jspdf.jsPDF!=='function'){notice('Library PDF belum termuat. Coba kembali saat koneksi stabil.',true);return;}
+ const source=Array.isArray(window.ENTRIES)?window.ENTRIES:[],period=q('#omodos-logbook-pdf-period',modal)?.value||'90',now=new Date(),cutoff=new Date(now);
+ if(period==='30')cutoff.setDate(cutoff.getDate()-30);else if(period==='90')cutoff.setDate(cutoff.getDate()-90);else if(period==='year'){cutoff.setMonth(0,1);cutoff.setHours(0,0,0,0);}
+ const rows=source.filter(e=>{if(period==='all')return true;const d=dateValue(e['Tanggal'])||dateValue(e['Timestamp Input'])||dateValue(e.Timestamp);return d&&d>=cutoff&&d<=now;}).slice().sort((a,b)=>{const da=dateValue(a['Tanggal'])||dateValue(a['Timestamp Input'])||new Date(0),db=dateValue(b['Tanggal'])||dateValue(b['Timestamp Input'])||new Date(0);return db-da;});
+ if(!rows.length){notice('Tidak ada entri Logbook pada periode itu.',true);return;}if(rows.length>3000){notice('Lebih dari 3.000 entri. Pilih periode yang lebih singkat untuk mencegah Out Of Memory.',true);return;}if(period==='all'&&rows.length>1200&&!window.confirm('Ada '+rows.length+' entri. Export semua dapat membebani browser. Lanjutkan?'))return;
+ const {jsPDF}=window.jspdf,pdf=new jsPDF('p','pt','a4',{compress:true}),pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight(),left=36,right=36,bottom=42;
+ let y=42;const label=period==='all'?'Semua data':period==='year'?'Tahun berjalan':period+' hari terakhir';
+ const header=()=>{pdf.setFont('helvetica','bold');pdf.setFontSize(14);pdf.text('LAPORAN LOGBOOK MAINTENANCE',left,y);y+=18;pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.text('Periode: '+label+' | Dibuat: '+now.toLocaleString('id-ID'),left,y);y+=12;pdf.text('Jumlah entri: '+rows.length,left,y);y+=15;pdf.setDrawColor(180);pdf.line(left,y,pw-right,y);y+=12;};
+ header();
+ const line=(name,value)=>{const lines=pdf.splitTextToSize(name+': '+safePdfText(value),pw-left-right);if(y+lines.length*11>ph-bottom){pdf.addPage();y=34;header();}pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text(lines,left,y);y+=lines.length*11;};
+ rows.forEach((e,i)=>{
+  if(y+52>ph-bottom){pdf.addPage();y=34;header();}
+  const location=String(e['Lokasi Pekerjaan']||'').toLowerCase()==='area'?(e['Lokasi/Area']||e['Nama Area']||'-'):[e['Kode Mesin'],e['Nama Mesin']].filter(Boolean).join(' - ');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);const d=dateValue(e['Tanggal']);pdf.text((i+1)+'. '+(d?d.toLocaleDateString('id-ID'):(e['Tanggal']||'-'))+' | '+safePdfText(location).slice(0,110),left,y);y+=14;
+  line('Status / Prioritas',safePdfText(e['Status'])+' / '+safePdfText(e['Prioritas']));line('Nomor MO',e['Nomor MO']);line('Nomor Notifikasi',e['Nomor Notifikasi Pekerjaan']);line('Jenis Pekerjaan',e['Jenis Pekerjaan']);line('Pelapor / Shift',[e['Nama Pelapor'],e['Shift']].filter(Boolean).join(' / '));line('Deskripsi Masalah',e['Deskripsi Masalah']);line('Tindakan Perbaikan',e['Tindakan Perbaikan']);line('Catatan',e['Catatan Tambahan']);pdf.setDrawColor(220);pdf.line(left,y+2,pw-right,y+2);y+=12;
+ });
+ const total=pdf.internal.getNumberOfPages();for(let page=1;page<=total;page++){pdf.setPage(page);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(110);pdf.text('OMODOS | Report Logbook | Halaman '+page+' / '+total,pw-right,ph-18,{align:'right'});}
+ pdf.save('Report_Logbook_'+now.toISOString().replace(/[-:]/g,'').slice(0,15)+'.pdf');modal.remove();notice('PDF berhasil dibuat ('+rows.length+' entri).');
+}
+function boot(){installMoField();installPdfButton();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',boot,{passive:true});
+const css=document.createElement('style');css.textContent=[
+ '.omodos-edit-photo-panel{grid-column:1/-1;margin-top:8px;padding:12px;border:1px solid var(--line,#dbe3e8);border-radius:10px;background:var(--panel-2,#f8fafc)}',
+ '#entry-view-mode .omodos-edit-photo-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}',
+ '#entry-view-mode .omodos-edit-photo-current{display:flex;flex-direction:column;gap:4px;max-width:112px;padding:5px;border:1px solid var(--line,#dbe3e8);border-radius:8px;color:var(--text,#203040);font-size:10px;text-decoration:none;overflow-wrap:anywhere}',
+ '#entry-view-mode .omodos-edit-photo-current img{width:100px;height:76px;object-fit:cover;border-radius:5px;background:#e9eef1}',
+ '#entry-view-mode .omodos-edit-photo-empty{font-size:11px;color:var(--text-dim,#708090)}','#field-edit-area-lainnya[hidden]{display:none!important}',
+ '.omodos-logbook-pdf-overlay{position:fixed;inset:0;z-index:100500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(10,24,35,.54);backdrop-filter:blur(3px)}',
+ '.omodos-logbook-pdf-dialog{width:min(100%,440px);padding:18px;border:1px solid var(--line,#dbe3e8);border-radius:14px;background:var(--panel,#fff);color:var(--text,#1e3443);box-shadow:0 12px 44px rgba(0,0,0,.22)}',
+ '.omodos-logbook-pdf-heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:16px}.omodos-logbook-pdf-heading strong{font-size:16px}.omodos-logbook-pdf-heading p,.omodos-logbook-pdf-note{margin:4px 0;color:var(--text-dim,#708090);font-size:11px;line-height:1.45}',
+ '.omodos-logbook-pdf-dialog>label{display:block;margin-bottom:6px;font-size:12px;font-weight:700}.omodos-logbook-pdf-dialog select{width:100%;min-height:40px;padding:8px;border:1px solid var(--line,#cfd9df);border-radius:8px;background:var(--panel-2,#f6f8fa);color:inherit}',
+ '.omodos-logbook-pdf-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.omodos-logbook-pdf-note{margin-top:12px}#btn-logbook-export-pdf{margin-left:8px;flex:0 0 auto}',
+ '@media(max-width:700px){#btn-logbook-export-pdf{margin:8px 0 0}.omodos-logbook-pdf-dialog{padding:14px}.omodos-logbook-pdf-actions button{min-height:38px}}'
+].join('\n');document.head.appendChild(css);
 })();
