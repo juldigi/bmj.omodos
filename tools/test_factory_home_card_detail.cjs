@@ -39,7 +39,7 @@ assert.match(home, /stage\.requestFullscreen/);
 assert.match(home, /root\.classList\.add\('ofh-fullscreen'\)/);
 assert.match(home, /if\(!show3d\)root\?\.classList\.remove\('ofh-fullscreen'\)/);
 assert.doesNotMatch(home, /<div class="ofh-mode-switch"/);
-assert.ok(hotfix.includes("factory-home-superadmin.js?v=smart-resume-21"));
+assert.ok(hotfix.includes("factory-home-superadmin.js?v=smart-resume-22"));
 assert.doesNotMatch(home, /Buka Detail Smart Resume/);
 assert.match(home, /document\.querySelectorAll\('#omodos-smart-resume-compact'\)\.forEach\(node=>node\.remove\(\)\)/);
 assert.match(home, /syncModeSwitch_\(\);syncCompactResume_\(view,currentMode==='3d'\)/);
