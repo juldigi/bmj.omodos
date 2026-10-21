@@ -73,20 +73,20 @@ const rawCountEnd=base.indexOf('\nfunction logbookAttachmentCount_(entry)',rawCo
 assert.ok(rawCountStart>=0&&rawCountEnd>rawCountStart,'lightweight raw attachment counter exists');
 const rawCountSource=base.slice(rawCountStart,rawCountEnd);
 assert.doesNotMatch(rawCountSource,/parseAttachments\(/,'badge count must not normalize every attachment');
+const rawAttachmentCount=new Function(rawCountSource+'; return rawAttachmentCount_;')();
 const parseStart=base.indexOf('function parseAttachments(raw)');
-const parseEnd=base.indexOf('\\nfunction renderAttachThumb(a)',parseStart);
+const parseEnd=base.indexOf('\nfunction renderAttachThumb(a)',parseStart);
 assert.ok(parseStart>=0&&parseEnd>parseStart,'existing attachment normalizer exists for parity comparison');
 const parseSource=base.slice(parseStart,parseEnd);
 const parseAttachmentsForParity=new Function('inferUploadMime_','openLightbox',parseSource+'; return parseAttachments;')(()=> 'application/octet-stream',()=>{});
 for(const [raw] of [
   ['',0],['   ',0],[[],0],[[{},{}],2],['[]',0],
   ['[{"name":"one"},{"name":"two"}]',2],['{"name":"one"}',1],
-  ['https://example.test/one.jpg\\nhttps://example.test/two.jpg',2],
+  ['https://example.test/one.jpg\nhttps://example.test/two.jpg',2],
   ['bad-url',1],[null,0],[{name:'one'},0]
 ]){
   assert.equal(rawAttachmentCount(raw),parseAttachmentsForParity(raw).length,'lightweight count matches the existing normalizer');
 }
-const rawAttachmentCount=new Function(rawCountSource+'; return rawAttachmentCount_;')();
 for(const [raw,expected] of [
   ['',0],['   ',0],[[],0],[[{},{}],2],['[]',0],
   ['[{"name":"one"},{"name":"two"}]',2],['{"name":"one"}',1],
