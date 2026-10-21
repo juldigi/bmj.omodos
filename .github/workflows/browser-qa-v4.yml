@@ -33,6 +33,11 @@ jobs:
         run: |
           set -euo pipefail
           node --check src/worker.js
+          node --check public/omodos4/technical-performance.js
+          grep -Fq 'TECHNICAL_PERFORMANCE_MVP_V1' public/omodos4/technical-performance.js
+          grep -Fq "String(u.role||u.Role||'').toLowerCase()==='superadmin'" public/omodos4/technical-performance.js
+          grep -Fq 'breakdown maintenance|maintenance breakdown' public/omodos4/technical-performance.js
+          grep -Fq 'Belum dihitung dari sumber ini' public/omodos4/technical-performance.js
           node tools/test_factory_home_card_detail.cjs
           node tools/test_logbook_review_fixes.cjs
 
