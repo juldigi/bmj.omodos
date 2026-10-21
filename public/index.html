@@ -8674,7 +8674,8 @@ async function prepareAllData_(){
     while(pending.length){
       const action = pending.shift();
       try{
-        data[action] = await apiGet(action, {}, 1);
+        const readParams = action === 'list' ? { summary:'1' } : {};
+        data[action] = await apiGet(action, readParams, 1);
       }catch(e){
         errors.push({action,message:String(e&&e.message||e)});
       }
@@ -9310,6 +9311,7 @@ let LOGBOOK_SORTED_SOURCE_REF_ = null;
 let LOGBOOK_SORTED_SOURCE_CACHE_ = [];
 let LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
 let LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap();
+let LOGBOOK_ATTACHMENT_LOAD_PROMISES_ = new WeakMap();
 let LOGBOOK_MACHINE_INDEX_CACHE_ = { entriesRef:null, machinesRef:null, value:null };
 let LOGBOOK_STATS_CACHE_ = { entriesRef:null, value:null };
 let LOGBOOK_SEARCH_DEBOUNCE_TIMER_ = null;
@@ -9351,15 +9353,70 @@ function rawAttachmentCount_(raw){
 function logbookAttachmentCount_(entry){
   if(!entry || typeof entry!=='object') return 0;
   const raw=entry['Lampiran (JSON)'];
-  let signature=raw;
-  if(raw && typeof raw!=='string'){try{signature=JSON.stringify(raw);}catch(e){signature='';}}
+  const arrayLoaded=Array.isArray(raw);
+  const provided=entry['Lampiran Count'];
+  const hasProvided=!arrayLoaded&&provided!==undefined&&provided!==null&&String(provided).trim()!==''&&Number.isFinite(Number(provided));
+  const signature=(arrayLoaded?'array:'+raw.length:(typeof raw==='string'?'string:'+raw:'raw:'+String(raw??'')))+'|count:'+(hasProvided?String(provided):'');
   const cached=LOGBOOK_ATTACHMENT_COUNT_CACHE_.get(entry);
   if(cached && cached.signature===signature) return cached.count;
   let count=0;
-  try{count=rawAttachmentCount_(raw);}catch(e){}
+  try{count=arrayLoaded?raw.length:(hasProvided?Math.max(0,Math.floor(Number(provided))):rawAttachmentCount_(raw));}catch(e){}
   LOGBOOK_ATTACHMENT_COUNT_CACHE_.set(entry,{signature,count});
   return count;
 }
+ 
+async function ensureLogbookAttachments_(entry){
+  if(!entry||typeof entry!=='object')throw new Error('Catatan Logbook tidak valid.');
+  const raw=entry['Lampiran (JSON)'];
+  if(Array.isArray(raw))return raw;
+  if(typeof raw==='string'&&raw.trim()){
+    const parsed=parseAttachments(raw);
+    entry['Lampiran (JSON)']=parsed;
+    entry['Lampiran Count']=parsed.length;
+    LOGBOOK_ATTACHMENT_COUNT_CACHE_.delete(entry);
+    return parsed;
+  }
+  if(logbookAttachmentCount_(entry)<=0){
+    entry['Lampiran (JSON)']=[];
+    entry['Lampiran Count']=0;
+    LOGBOOK_ATTACHMENT_COUNT_CACHE_.delete(entry);
+    return [];
+  }
+  const active=LOGBOOK_ATTACHMENT_LOAD_PROMISES_.get(entry);
+  if(active)return active;
+  const id=String(entry.ID||entry.id||'').trim();
+  if(!id)throw new Error('ID Logbook tidak tersedia.');
+  const promise=apiGet('logbookAttachments',{id},1).then(data=>{
+    const list=Array.isArray(data)?data:(data&&Array.isArray(data.attachments)?data.attachments:null);
+    if(!list)throw new Error('Format lampiran dari server tidak valid.');
+    entry['Lampiran (JSON)']=list;
+    entry['Lampiran Count']=list.length;
+    LOGBOOK_ATTACHMENT_COUNT_CACHE_.delete(entry);
+    return list;
+  }).finally(()=>{
+    if(LOGBOOK_ATTACHMENT_LOAD_PROMISES_.get(entry)===promise)LOGBOOK_ATTACHMENT_LOAD_PROMISES_.delete(entry);
+  });
+  LOGBOOK_ATTACHMENT_LOAD_PROMISES_.set(entry,promise);
+  return promise;
+}
+async function loadLogbookAttachmentPreview_(entry,id,slot){
+  try{
+    const loaded=await ensureLogbookAttachments_(entry);
+    const content=$('#modal-content');
+    if(!slot||!slot.isConnected||!content||content.dataset.entryId!==String(id))return;
+    slot.innerHTML=renderAttachGrid(parseAttachments(loaded,12),'Lampiran');
+    bindAttachGridClicks(slot);
+    const showAll=$('#btn-entry-show-all-attachments');
+    if(showAll)showAll.textContent='Tampilkan semua '+loaded.length+' lampiran';
+  }catch(err){
+    const content=$('#modal-content');
+    if(!slot||!slot.isConnected||!content||content.dataset.entryId!==String(id))return;
+    slot.innerHTML='<div class="section-title" style="margin-top:16px"><i class="ph-bold ph-paperclip"></i> Lampiran</div><div class="empty-state" style="padding:12px;font-size:12px">Lampiran belum dapat dimuat. <button type="button" class="btn btn-ghost btn-sm" id="btn-retry-logbook-attachments">Coba lagi</button></div>';
+    const retry=$('#btn-retry-logbook-attachments',slot);
+    if(retry)retry.addEventListener('click',()=>loadLogbookAttachmentPreview_(entry,id,slot),{once:true});
+  }
+}
+
 function logbookSearchText_(entry){
   if(!entry || typeof entry!=='object') return '';
   const cached=LOGBOOK_SEARCH_TEXT_CACHE_.get(entry);
@@ -16877,10 +16934,12 @@ function openDetail(id){
   if(!e) return;
   const rawAttachments = e['Lampiran (JSON)'];
   const attachmentCount = logbookAttachmentCount_(e);
-  const atts = attachmentCount > 12 ? parseAttachments(rawAttachments, 12) : parseAttachments(rawAttachments);
+  const attachmentsLoaded = Array.isArray(rawAttachments) || (typeof rawAttachments==='string'&&rawAttachments.trim()!=='');
+  const atts = attachmentsLoaded ? (attachmentCount > 12 ? parseAttachments(rawAttachments, 12) : parseAttachments(rawAttachments)) : [];
+  const loadingAttachmentsHtml = '<div class="empty-state" style="padding:12px;font-size:12px">Memuat lampiran…</div>';
   const attachHtml = attachmentCount > 12
-    ? '<div id="entry-attachments-slot">'+renderAttachGrid(atts, 'Lampiran')+'</div><button type="button" class="btn btn-ghost btn-sm" id="btn-entry-show-all-attachments" style="margin-top:8px">Tampilkan semua '+attachmentCount+' lampiran</button>'
-    : renderAttachGrid(atts, 'Lampiran');
+    ? '<div id="entry-attachments-slot">'+(attachmentsLoaded?renderAttachGrid(atts,'Lampiran'):loadingAttachmentsHtml)+'</div><button type="button" class="btn btn-ghost btn-sm" id="btn-entry-show-all-attachments" style="margin-top:8px">Tampilkan semua '+attachmentCount+' lampiran</button>'
+    : (attachmentCount > 0 && !attachmentsLoaded ? '<div id="entry-attachments-slot">'+loadingAttachmentsHtml+'</div>' : renderAttachGrid(atts, 'Lampiran'));
   const mesinKey = isAreaEntry_(e) ? '' : (e['Kode Mesin'] || e['Nama Mesin']);
   const mesinLabel = [e['Kode Mesin'], e['Nama Mesin']].filter(Boolean).join(' — ');
   const pelaporHtml = splitPelaporNames(e['Nama Pelapor']).map(n=> wikiLinkHtml('personil', n, n)).join(', ');
@@ -16926,6 +16985,7 @@ function openDetail(id){
     ['Keterangan', isOneNoteImport(e['Tanggal']) ? 'Import dari OneNote' : ''],
   ];
   const st = statusClass(e['Status']);
+  $('#modal-content').dataset.entryId = String(id);
   $('#modal-content').innerHTML = `
     <div class="modal-head">
       <div>
@@ -16954,20 +17014,35 @@ function openDetail(id){
   $('#modal-bg').classList.add('active');
   $('#btn-close-modal').addEventListener('click', closeModal);
   const showAllAttachments=$('#btn-entry-show-all-attachments');
-  if(showAllAttachments) showAllAttachments.addEventListener('click',()=>{
+  if(showAllAttachments) showAllAttachments.addEventListener('click',async()=>{
     const slot=$('#entry-attachments-slot');if(!slot)return;
-    slot.innerHTML=renderAttachGrid(parseAttachments(rawAttachments),'Lampiran');
-    showAllAttachments.remove();
-    bindAttachGridClicks(slot);
+    showAllAttachments.disabled=true;
+    try{
+      const loaded=await ensureLogbookAttachments_(e);
+      if(!slot.isConnected||$('#modal-content')?.dataset.entryId!==String(id))return;
+      slot.innerHTML=renderAttachGrid(parseAttachments(loaded),'Lampiran');
+      showAllAttachments.remove();
+      bindAttachGridClicks(slot);
+    }catch(err){
+      showAllAttachments.disabled=false;
+      toast('Gagal memuat lampiran: '+String(err&&err.message||err),true);
+    }
   });
   $('#btn-export-entry-pdf').addEventListener('click', ()=>{
     if(typeof window.exportLogbookPdfForEntry_==='function') window.exportLogbookPdfForEntry_(id);
     else toast('Fitur PDF belum siap. Coba kembali sebentar lagi.',true);
   });
   $('#btn-delete-entry').addEventListener('click', ()=> deleteEntry(id));
-  $('#btn-edit-entry').addEventListener('click', ()=> renderEntryEditForm(e));
+  $('#btn-edit-entry').addEventListener('click', async()=>{
+    try{if(attachmentCount>0)await ensureLogbookAttachments_(e);renderEntryEditForm(e);}
+    catch(err){toast('Gagal memuat lampiran untuk edit: '+String(err&&err.message||err),true);}
+  });
   $('#btn-quick-status').addEventListener('click', ()=> quickUpdateStatus(id));
   bindAttachGridClicks($('#modal-content'));
+  if(attachmentCount>0&&!attachmentsLoaded){
+    const slot=$('#entry-attachments-slot');
+    if(slot)loadLogbookAttachmentPreview_(e,id,slot);
+  }
 }
 // [FITUR EDIT LOGBOOK] Ganti tampilan detail (read-only) di dalam modal yang sama
 // menjadi form yang bisa diedit langsung, lalu kirim ke backend lewat action
