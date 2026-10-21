@@ -47,6 +47,7 @@ assert.match(hot,/function exportPdf\(modal\)/);
 assert.ok(hot.includes("const thumb=[f.thumbUrl,f.previewUrl].find(candidate=>candidate&&candidate!==url)||''"),'full-size media is not reused as thumbnail');
 assert.match(hot,/function installLightweightLogbookAttachmentGrid\(\)/);
 assert.match(hot,/window\.__OMODOS_LOGBOOK_DETAIL_RENDERING_V1/);
+assert.ok(hot.includes("!!(showAll&&modal&&modal.classList.contains('active'))"),'lightweight rendering is restricted to the active Logbook detail');
 assert.ok(hot.includes("!/\\/files\\//.test(String(a.viewUrl||''))"),'lightweight preview applies to /files/ attachments');
 assert.match(hot,/return \{\.\.\.a,type:'file'\}/);
 assert.match(hot,/replace\('— klik untuk memperbesar','— klik untuk membuka lampiran'\)/);
