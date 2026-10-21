@@ -9239,16 +9239,65 @@ function entryCardHtml(e, idx){
 }
 
 function attachEntryClickHandlers(root){
-  $$('.entry', root).forEach(el=>{
-    el.addEventListener('click', (ev)=>{
-      if(ev.target.closest('.wiki-link')) return; // biarkan delegasi klik wiki-link yang menangani navigasi
-      openDetail(el.dataset.id);
-    });
+  if(!root || root.dataset.logbookClickDelegation==='1') return;
+  root.dataset.logbookClickDelegation='1';
+  root.addEventListener('click', ev=>{
+    const card=ev.target.closest('.entry');
+    if(!card || !root.contains(card)) return;
+    if(ev.target.closest('.wiki-link')) return;
+    openDetail(card.dataset.id);
   });
 }
 
 /* ---------------- VIEW: LOGBOOK UTAMA ---------------- */
 let LOGBOOK_CARD_FILTER = 'total';
+const LOGBOOK_PAGE_SIZE_ = 40;
+let LOGBOOK_FILTERED_ENTRIES_ = [];
+let LOGBOOK_RENDERED_COUNT_ = 0;
+let LOGBOOK_SORTED_SOURCE_REF_ = null;
+let LOGBOOK_SORTED_SOURCE_CACHE_ = [];
+function invalidateLogbookSortCache_(){
+  LOGBOOK_SORTED_SOURCE_REF_ = null;
+}
+function logbookOrderedEntries_(){
+  if(LOGBOOK_SORTED_SOURCE_REF_ !== ENTRIES){
+    LOGBOOK_SORTED_SOURCE_REF_ = ENTRIES;
+    LOGBOOK_SORTED_SOURCE_CACHE_ = ENTRIES.slice().sort((a,b)=>{
+      const sa=String(a['Status']||'').trim(), sb=String(b['Status']||'').trim();
+      if(!sa && sb) return 1;
+      if(sa && !sb) return -1;
+      const ta=Date.parse(a['Timestamp Input']||a.Timestamp||'')||0;
+      const tb=Date.parse(b['Timestamp Input']||b.Timestamp||'')||0;
+      return tb-ta;
+    });
+  }
+  return LOGBOOK_SORTED_SOURCE_CACHE_;
+}
+function renderLogbookChunk_(reset){
+  const holder=$('#list-utama');
+  if(!holder) return;
+  if(reset){
+    holder.innerHTML='';
+    LOGBOOK_RENDERED_COUNT_=0;
+  }
+  const oldMore=$('#logbook-load-more-wrap',holder);
+  if(oldMore) oldMore.remove();
+  const total=LOGBOOK_FILTERED_ENTRIES_.length;
+  const start=LOGBOOK_RENDERED_COUNT_;
+  const end=Math.min(start+LOGBOOK_PAGE_SIZE_,total);
+  if(end>start){
+    holder.insertAdjacentHTML('beforeend',LOGBOOK_FILTERED_ENTRIES_.slice(start,end).map((e,i)=>entryCardHtml(e,total-(start+i))).join(''));
+  }
+  LOGBOOK_RENDERED_COUNT_=end;
+  if(end<total){
+    const next=Math.min(LOGBOOK_PAGE_SIZE_,total-end);
+    holder.insertAdjacentHTML('beforeend','<div id="logbook-load-more-wrap" style="display:flex;justify-content:center;padding:14px 0 22px"><button type="button" class="btn btn-ghost btn-sm" id="btn-load-more-logbook">Tampilkan '+next+' catatan berikutnya ('+end.toLocaleString('id-ID')+' dari '+total.toLocaleString('id-ID')+')</button></div>');
+    const more=$('#btn-load-more-logbook',holder);
+    if(more) more.addEventListener('click',()=>renderLogbookChunk_(false),{once:true});
+  }
+  attachEntryClickHandlers(holder);
+}
+
 function computeStats(){
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -9307,7 +9356,7 @@ function applyUtamaFilters(){
   const gr = $('#filter-group').value;
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  let filtered = ENTRIES.filter(e=>{
+  let filtered = logbookOrderedEntries_().filter(e=>{
     if(LOGBOOK_CARD_FILTER==='today' && String(e['Tanggal']||'').slice(0,10)!==today) return false;
     if(['selesai','proses','emergency'].includes(LOGBOOK_CARD_FILTER) && statusClass(e['Status'])!==LOGBOOK_CARD_FILTER) return false;
     if(mk && matchEntryMachineKey_(e,machineIdx)!==mk) return false;
@@ -9320,30 +9369,15 @@ function applyUtamaFilters(){
     }
     return true;
   });
-  // Pastikan urutan tampil SELALU dari yang paling baru diposting ke Google
-  // Sheets (kolom "Timestamp Input"), terlepas dari urutan aslinya di ENTRIES.
-  // Pastikan urutan tampil SELALU dari yang paling baru diposting ke Google 
-// Sheets (kolom "Timestamp Input"), terlepas dari urutan aslinya di ENTRIES.
-// Namun, jika laporan tidak memiliki status, posisikan di bagian paling bawah.
-filtered = filtered.slice().sort((a, b) => {
-  const statusA = (a['Status'] || '').trim();
-  const statusB = (b['Status'] || '').trim();
-
-  // Jika salah satu status kosong, pindahkan ke paling bawah
-  if (statusA === '' && statusB !== '') return 1;
-  if (statusA !== '' && statusB === '') return -1;
-
-  // Jika kedua status sama-sama kosong atau sama-sama memiliki status, 
-  // urutkan berdasarkan Timestamp Input (terbaru di paling atas)
-  return new Date(b['Timestamp Input']) - new Date(a['Timestamp Input']);
-});
   const holder = $('#list-utama');
   if(filtered.length===0){
+    LOGBOOK_FILTERED_ENTRIES_=[];
+    LOGBOOK_RENDERED_COUNT_=0;
     holder.innerHTML = `<div class="empty-state"><div class="ico"><i class="ph-bold ph-notebook"></i></div>Tidak ada data logbook yang cocok.</div>`;
     return;
   }
-  holder.innerHTML = filtered.map((e,i)=>entryCardHtml(e, filtered.length-i)).join('');
-  attachEntryClickHandlers(holder);
+  LOGBOOK_FILTERED_ENTRIES_=filtered;
+  renderLogbookChunk_(true);
 }
 function resetLogbookCardFilterForManual_(){
   if(LOGBOOK_CARD_FILTER!=='total'){
@@ -16756,6 +16790,7 @@ function openDetail(id){
     ['Nama Pelapor', e['Nama Pelapor']],
     ['Personil Tambahan', e['Personil Tambahan']],
     ['Nomor Notifikasi Pekerjaan', e['Nomor Notifikasi Pekerjaan']],
+    ['Nomor MO', e['Nomor MO']],
     ['Lokasi Pekerjaan', e['Lokasi Pekerjaan']||'Mesin'],
     ['Kategori Area', isAreaEntry_(e)?e['Kategori Area']:''],
     ['Area', isAreaEntry_(e)?e['Nama Area']:''],
@@ -16783,6 +16818,7 @@ function openDetail(id){
         <h2 style="font-family:var(--font-display);margin:8px 0 0 0;">${mesinKey ? wikiLinkHtml('mesin', mesinKey, e['Nama Mesin']||'-') : escapeHtml(logbookLocationLabel_(e))}</h2>
       </div>
       <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm" id="btn-export-entry-pdf"><i class="ph-bold ph-file-pdf"></i> PDF</button>
         <button class="btn btn-sm" id="btn-edit-entry"><i class="ph-bold ph-pencil-simple"></i> Edit</button>
         <button class="btn btn-sm btn-danger" id="btn-delete-entry"><i class="ph-bold ph-trash"></i> Hapus</button>
         <button class="modal-close" id="btn-close-modal">✕</button>
@@ -16802,6 +16838,10 @@ function openDetail(id){
   `;
   $('#modal-bg').classList.add('active');
   $('#btn-close-modal').addEventListener('click', closeModal);
+  $('#btn-export-entry-pdf').addEventListener('click', ()=>{
+    if(typeof window.exportLogbookPdfForEntry_==='function') window.exportLogbookPdfForEntry_(id);
+    else toast('Fitur PDF belum siap. Coba kembali sebentar lagi.',true);
+  });
   $('#btn-delete-entry').addEventListener('click', ()=> deleteEntry(id));
   $('#btn-edit-entry').addEventListener('click', ()=> renderEntryEditForm(e));
   $('#btn-quick-status').addEventListener('click', ()=> quickUpdateStatus(id));

@@ -4678,8 +4678,7 @@ function init(){
   attachEditMaterialSuggestions();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-const observer=new MutationObserver(()=>{addUnits();attachEditMaterialSuggestions();});
-observer.observe(document.documentElement,{subtree:true,childList:true});
+/* addUnits is invoked by renderSparepartRows; edit suggestions are attached by the edit-form wrapper. */
 })();
 
 
@@ -5174,6 +5173,7 @@ window.refreshLogbookLocal_=function(entry,saved,mode){
   if(saved&&Array.isArray(saved.attachments))row['Lampiran (JSON)']=JSON.stringify(saved.attachments);else if(add)row['Lampiran (JSON)']='[]';
   if(id&&!rows.some(x=>String(x.ID||x.id||'')===id))rows.unshift(row);
   rows.sort((a,b)=>{const da=dateValue(a['Timestamp Input']||a.Timestamp||a.Tanggal),db=dateValue(b['Timestamp Input']||b.Timestamp||b.Tanggal);return(db?db.getTime():0)-(da?da.getTime():0);});
+  if(typeof window.invalidateLogbookSortCache_==='function')window.invalidateLogbookSortCache_();
   window.ENTRIES=rows;
   try{if(typeof renderDashboardCriticalSummary==='function')renderDashboardCriticalSummary();}catch(e){}
   try{if(typeof renderHomeSmartResume==='function')renderHomeSmartResume();}catch(e){}
@@ -5228,36 +5228,109 @@ window.clearLogbookEditFiles_=id=>{(pendingEditPhotos.get(String(id))||[]).forEa
 
 function installPdfButton(){
  const host=q('#view-utama .topbar');if(!host||byId('btn-logbook-export-pdf'))return;
- const btn=document.createElement('button');btn.type='button';btn.id='btn-logbook-export-pdf';btn.className='btn btn-sm';btn.innerHTML='<i class="ph-bold ph-file-pdf"></i> Export PDF Logbook';btn.addEventListener('click',showPdfDialog);
+ const btn=document.createElement('button');btn.type='button';btn.id='btn-logbook-export-pdf';btn.className='btn btn-sm';btn.innerHTML='<i class="ph-bold ph-file-pdf"></i> Export PDF Logbook';btn.addEventListener('click',()=>showPdfDialog());
  const stat=q('#stat-strip',host);if(stat)stat.insertAdjacentElement('afterend',btn);else host.appendChild(btn);
 }
-function showPdfDialog(){
+function pdfHtmlEscape_(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function logbookMachineChoices_(){
+ const found=new Map();
+ const add=(codeValue,nameValue)=>{
+  const code=String(codeValue||'').trim().toLocaleLowerCase('id');
+  const name=String(nameValue||'').trim().toLocaleLowerCase('id');
+  const cleanCode=/^[—–-]+$/.test(code)?'':code;
+  const cleanName=/^[—–-]+$/.test(name)?'':name;
+  if(!cleanCode&&!cleanName)return;
+  const key=cleanCode?'c:'+cleanCode:'n:'+cleanName;
+  if(!found.has(key))found.set(key,{key,code:cleanCode,name:cleanName,label:[codeValue,nameValue].map(x=>String(x||'').trim()).filter(x=>x&&!/^[—–-]+$/.test(x)).join(' — ')});
+ };
+ try{if(typeof MACHINES!=='undefined'&&Array.isArray(MACHINES))MACHINES.forEach(m=>add(m['Kode Mesin']||m.kodeMesin,m['Nama Mesin']||m.namaMesin));}catch(e){}
+ const rows=Array.isArray(window.ENTRIES)?window.ENTRIES:(typeof ENTRIES!=='undefined'&&Array.isArray(ENTRIES)?ENTRIES:[]);
+ rows.forEach(e=>{if(String(e['Lokasi Pekerjaan']||'').toLowerCase()!=='area')add(e['Kode Mesin'],e['Nama Mesin']);});
+ return Array.from(found.values()).sort((a,b)=>a.label.localeCompare(b.label,'id'));
+}
+function logbookExportTimestamp_(e){
+ if(!e||typeof e!=='object')return null;
+ const raw=e['Timestamp Input']||e.Timestamp||e.timestamp||e['Created At']||e.CreatedAt;
+ if(raw){const direct=raw instanceof Date?new Date(raw.getTime()):new Date(raw);if(Number.isFinite(direct.getTime()))return direct;}
+ const date=String(e['Tanggal']||e.tanggal||'').trim();
+ const time=String(e['Waktu']||e.waktu||'00:00').trim();
+ const hm=time.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+ let d=new Date(date+'T'+(hm?String(hm[1]).padStart(2,'0')+':'+hm[2]+':'+(hm[3]||'00'):'00:00:00'));
+ if(Number.isFinite(d.getTime()))return d;
+ const m=date.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+ if(m){d=new Date(+m[3],+m[2]-1,+m[1],hm?+hm[1]:0,hm?+hm[2]:0,hm&&hm[3]?+hm[3]:0);if(Number.isFinite(d.getTime()))return d;}
+ return null;
+}
+function showPdfDialog(options){
+ options=options||{};
+ const singleId=options.entryId==null?'':String(options.entryId);
  if(byId('omodos-logbook-pdf-modal'))return;
  const m=document.createElement('div');m.id='omodos-logbook-pdf-modal';m.className='omodos-logbook-pdf-overlay';
- m.innerHTML='<section class="omodos-logbook-pdf-dialog" role="dialog" aria-modal="true" aria-labelledby="omodos-logbook-pdf-title"><div class="omodos-logbook-pdf-heading"><div><strong id="omodos-logbook-pdf-title">Export Report Logbook</strong><p>PDF menggunakan teks, bukan screenshot layar.</p></div><button type="button" data-pdf-close aria-label="Tutup">×</button></div><label for="omodos-logbook-pdf-period">Periode laporan</label><select id="omodos-logbook-pdf-period"><option value="90">90 hari terakhir</option><option value="30">30 hari terakhir</option><option value="year">Tahun berjalan</option><option value="all">Semua data yang tersedia</option></select><div class="omodos-logbook-pdf-actions"><button type="button" class="btn btn-ghost btn-sm" data-pdf-close>Batal</button><button type="button" class="btn btn-primary btn-sm" id="btn-logbook-pdf-download">Unduh PDF</button></div><p class="omodos-logbook-pdf-note">Termasuk tanggal, mesin/area, status, uraian, tindakan, nomor notifikasi dan MO.</p></section>';
- document.body.appendChild(m);qa('[data-pdf-close]',m).forEach(b=>b.addEventListener('click',()=>m.remove()));m.addEventListener('click',e=>{if(e.target===m)m.remove();});byId('btn-logbook-pdf-download').addEventListener('click',()=>exportPdf(m));
+ const isSingle=!!singleId;
+ const machineChoices=logbookMachineChoices_();
+ const machineOptions='<option value="">Semua mesin / area</option>'+machineChoices.map(x=>'<option value="'+pdfHtmlEscape_(x.key)+'" data-code="'+pdfHtmlEscape_(x.code)+'" data-name="'+pdfHtmlEscape_(x.name)+'">'+pdfHtmlEscape_(x.label)+'</option>').join('');
+ const filters=isSingle?'':'<div id="omodos-logbook-pdf-filters"><label for="omodos-logbook-pdf-period">Periode laporan</label><select id="omodos-logbook-pdf-period"><option value="90">90 hari terakhir</option><option value="24h">24 jam terakhir</option><option value="30">30 hari terakhir</option><option value="year">Tahun berjalan</option><option value="all">Semua data yang tersedia</option></select><label for="omodos-logbook-pdf-machine" style="margin-top:12px">Mesin (opsional)</label><select id="omodos-logbook-pdf-machine">'+machineOptions+'</select></div>';
+ m.innerHTML='<section class="omodos-logbook-pdf-dialog" role="dialog" aria-modal="true" aria-labelledby="omodos-logbook-pdf-title"><div class="omodos-logbook-pdf-heading"><div><strong id="omodos-logbook-pdf-title">'+(isSingle?'Export Detail Logbook':'Export Report Logbook')+'</strong><p>'+(isSingle?'PDF hanya berisi catatan yang sedang dibuka.':'Pilih periode dan/atau mesin. Filter mesin dapat digabung dengan periode.')+'</p></div><button type="button" data-pdf-close aria-label="Tutup">×</button></div>'+filters+'<div class="omodos-logbook-pdf-actions"><button type="button" class="btn btn-ghost btn-sm" data-pdf-close>Batal</button><button type="button" class="btn btn-primary btn-sm" id="btn-logbook-pdf-download">Unduh PDF</button></div><p class="omodos-logbook-pdf-note">Termasuk tanggal/waktu, mesin atau area, status, uraian, tindakan, nomor notifikasi, MO dan catatan.</p></section>';
+ m.dataset.entryId=singleId;
+ document.body.appendChild(m);
+ qa('[data-pdf-close]',m).forEach(b=>b.addEventListener('click',()=>m.remove()));
+ m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+ byId('btn-logbook-pdf-download').addEventListener('click',()=>exportPdf(m));
 }
+window.exportLogbookPdfForEntry_=function(id){showPdfDialog({entryId:id});};
 function safePdfText(v){return String(v==null||v===''?'-':v).replace(/\r/g,'').replace(/\t/g,' ').replace(/[^\x20-\x7E]/g,' ').replace(/\s+/g,' ').trim()||'-';}
 function exportPdf(modal){
  if(!window.jspdf||typeof window.jspdf.jsPDF!=='function'){notice('Library PDF belum termuat. Coba kembali saat koneksi stabil.',true);return;}
- const source=Array.isArray(window.ENTRIES)?window.ENTRIES:[],period=q('#omodos-logbook-pdf-period',modal)?.value||'90',now=new Date(),cutoff=new Date(now);
- if(period==='30')cutoff.setDate(cutoff.getDate()-30);else if(period==='90')cutoff.setDate(cutoff.getDate()-90);else if(period==='year'){cutoff.setMonth(0,1);cutoff.setHours(0,0,0,0);}
- const rows=source.filter(e=>{if(period==='all')return true;const d=dateValue(e['Tanggal'])||dateValue(e['Timestamp Input'])||dateValue(e.Timestamp);return d&&d>=cutoff&&d<=now;}).slice().sort((a,b)=>{const da=dateValue(a['Tanggal'])||dateValue(a['Timestamp Input'])||new Date(0),db=dateValue(b['Tanggal'])||dateValue(b['Timestamp Input'])||new Date(0);return db-da;});
- if(!rows.length){notice('Tidak ada entri Logbook pada periode itu.',true);return;}if(rows.length>3000){notice('Lebih dari 3.000 entri. Pilih periode yang lebih singkat untuk mencegah Out Of Memory.',true);return;}if(period==='all'&&rows.length>1200&&!window.confirm('Ada '+rows.length+' entri. Export semua dapat membebani browser. Lanjutkan?'))return;
+ const allSource=Array.isArray(window.ENTRIES)?window.ENTRIES:(typeof ENTRIES!=='undefined'&&Array.isArray(ENTRIES)?ENTRIES:[]);
+ const singleId=String(modal&&modal.dataset.entryId||'');
+ const period=q('#omodos-logbook-pdf-period',modal)?.value||'90';
+ const machineSelect=q('#omodos-logbook-pdf-machine',modal);
+ const machineOption=machineSelect&&machineSelect.selectedOptions?machineSelect.selectedOptions[0]:null;
+ const machineCode=String(machineOption&&machineOption.dataset.code||'');
+ const machineName=String(machineOption&&machineOption.dataset.name||'');
+ const machineLabel=machineOption&&machineOption.value?String(machineOption.textContent||''):'';
+ const now=new Date();
+ const cutoff=new Date(now);
+ if(period==='24h')cutoff.setTime(now.getTime()-24*60*60*1000);
+ else if(period==='30')cutoff.setDate(cutoff.getDate()-30);
+ else if(period==='90')cutoff.setDate(cutoff.getDate()-90);
+ else if(period==='year'){cutoff.setMonth(0,1);cutoff.setHours(0,0,0,0);}
+ let rows=singleId?allSource.filter(e=>String(e.ID||e.id||'')===singleId):allSource.filter(e=>{
+  if(period!=='all'){
+   const d=logbookExportTimestamp_(e);
+   if(!d||d<cutoff||d>now)return false;
+  }
+  if(machineSelect&&machineSelect.value){
+   if(String(e['Lokasi Pekerjaan']||'').toLowerCase()==='area')return false;
+   const code=String(e['Kode Mesin']||'').trim().toLocaleLowerCase('id').replace(/^[—–-]+$/,'');
+   const name=String(e['Nama Mesin']||'').trim().toLocaleLowerCase('id').replace(/^[—–-]+$/,'');
+   if(machineCode){if(code===machineCode)return true;if(!code&&machineName&&name===machineName)return true;return false;}
+   return !!machineName&&name===machineName;
+  }
+  return true;
+ });
+ rows=rows.slice().sort((a,b)=>(logbookExportTimestamp_(b)?.getTime()||0)-(logbookExportTimestamp_(a)?.getTime()||0));
+ if(!rows.length){notice(singleId?'Catatan Logbook tidak ditemukan.':'Tidak ada entri Logbook yang cocok dengan filter.',true);return;}
+ if(rows.length>3000){notice('Lebih dari 3.000 entri. Pilih periode yang lebih singkat atau filter satu mesin untuk mencegah Out Of Memory.',true);return;}
+ if(!singleId&&period==='all'&&rows.length>1200&&!window.confirm('Ada '+rows.length+' entri. Export semua dapat membebani browser. Lanjutkan?'))return;
  const {jsPDF}=window.jspdf,pdf=new jsPDF('p','pt','a4',{compress:true}),pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight(),left=36,right=36,bottom=42;
- let y=42;const label=period==='all'?'Semua data':period==='year'?'Tahun berjalan':period+' hari terakhir';
- const header=()=>{pdf.setFont('helvetica','bold');pdf.setFontSize(14);pdf.text('LAPORAN LOGBOOK MAINTENANCE',left,y);y+=18;pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.text('Periode: '+label+' | Dibuat: '+now.toLocaleString('id-ID'),left,y);y+=12;pdf.text('Jumlah entri: '+rows.length,left,y);y+=15;pdf.setDrawColor(180);pdf.line(left,y,pw-right,y);y+=12;};
+ const periodLabel=period==='all'?'Semua data':period==='year'?'Tahun berjalan':period==='24h'?'24 jam terakhir':period+' hari terakhir';
+ const label=singleId?'Detail satu Logbook':periodLabel+(machineLabel?' | Mesin: '+machineLabel:'');
+ let y=42;
+ const header=()=>{pdf.setFont('helvetica','bold');pdf.setFontSize(14);pdf.text(singleId?'DETAIL LOGBOOK MAINTENANCE':'LAPORAN LOGBOOK MAINTENANCE',left,y);y+=18;pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.text('Filter: '+safePdfText(label)+' | Dibuat: '+now.toLocaleString('id-ID'),left,y);y+=12;pdf.text('Jumlah entri: '+rows.length,left,y);y+=15;pdf.setDrawColor(180);pdf.line(left,y,pw-right,y);y+=12;};
  header();
  const line=(name,value)=>{const lines=pdf.splitTextToSize(name+': '+safePdfText(value),pw-left-right);if(y+lines.length*11>ph-bottom){pdf.addPage();y=34;header();}pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text(lines,left,y);y+=lines.length*11;};
  rows.forEach((e,i)=>{
   if(y+52>ph-bottom){pdf.addPage();y=34;header();}
   const location=String(e['Lokasi Pekerjaan']||'').toLowerCase()==='area'?(e['Lokasi/Area']||e['Nama Area']||'-'):[e['Kode Mesin'],e['Nama Mesin']].filter(Boolean).join(' - ');
-  pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);const d=dateValue(e['Tanggal']);pdf.text((i+1)+'. '+(d?d.toLocaleDateString('id-ID'):(e['Tanggal']||'-'))+' | '+safePdfText(location).slice(0,110),left,y);y+=14;
-  line('Status / Prioritas',safePdfText(e['Status'])+' / '+safePdfText(e['Prioritas']));line('Nomor MO',e['Nomor MO']);line('Nomor Notifikasi',e['Nomor Notifikasi Pekerjaan']);line('Jenis Pekerjaan',e['Jenis Pekerjaan']);line('Pelapor / Shift',[e['Nama Pelapor'],e['Shift']].filter(Boolean).join(' / '));line('Deskripsi Masalah',e['Deskripsi Masalah']);line('Tindakan Perbaikan',e['Tindakan Perbaikan']);line('Catatan',e['Catatan Tambahan']);pdf.setDrawColor(220);pdf.line(left,y+2,pw-right,y+2);y+=12;
+  const d=logbookExportTimestamp_(e);
+  pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.text((i+1)+'. '+(d?d.toLocaleDateString('id-ID'):(e['Tanggal']||'-'))+' | '+safePdfText(location).slice(0,110),left,y);y+=14;
+  line('Waktu Lapor',e['Waktu']);line('Status / Prioritas',safePdfText(e['Status'])+' / '+safePdfText(e['Prioritas']));line('Nomor MO',e['Nomor MO']);line('Nomor Notifikasi',e['Nomor Notifikasi Pekerjaan']);line('Jenis Pekerjaan',e['Jenis Pekerjaan']);line('Pelapor / Shift',[e['Nama Pelapor'],e['Shift']].filter(Boolean).join(' / '));line('Deskripsi Masalah',e['Deskripsi Masalah']);line('Tindakan Perbaikan',e['Tindakan Perbaikan']);line('Catatan',e['Catatan Tambahan']);pdf.setDrawColor(220);pdf.line(left,y+2,pw-right,y+2);y+=12;
  });
  const total=pdf.internal.getNumberOfPages();for(let page=1;page<=total;page++){pdf.setPage(page);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(110);pdf.text('OMODOS | Report Logbook | Halaman '+page+' / '+total,pw-right,ph-18,{align:'right'});}
- pdf.save('Report_Logbook_'+now.toISOString().replace(/[-:]/g,'').slice(0,15)+'.pdf');modal.remove();notice('PDF berhasil dibuat ('+rows.length+' entri).');
+ pdf.save((singleId?'Detail_Logbook':'Report_Logbook')+'_'+now.toISOString().replace(/[-:]/g,'').slice(0,15)+'.pdf');modal.remove();notice('PDF berhasil dibuat ('+rows.length+' entri).');
 }
+
 function boot(){installMoField();installPdfButton();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',boot,{passive:true});
 const css=document.createElement('style');css.textContent=[
