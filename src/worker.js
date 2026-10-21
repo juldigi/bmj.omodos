@@ -4487,13 +4487,45 @@ function createBackend(services, env = {}) {
     if (typeof raw !== "string") return 0;
     var trimmed = raw.trim();
     if (!trimmed) return 0;
+    // Scan valid-looking JSON arrays without building an array of attachment objects.
+    // The summary needs only the top-level item count, not the decoded media payloads.
+    if (trimmed.charAt(0) === "[" && trimmed.charAt(trimmed.length - 1) === "]") {
+      var count = 0;
+      var depth = 0;
+      var inString = false;
+      var escaped = false;
+      var hasValue = false;
+      for (var i = 1; i < trimmed.length - 1; i++) {
+        var ch = trimmed.charAt(i);
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (ch === "\\") escaped = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+        if (ch === '"') {
+          inString = true;
+          hasValue = true;
+        } else if (ch === "{" || ch === "[") {
+          depth++;
+          hasValue = true;
+        } else if (ch === "}" || ch === "]") {
+          depth--;
+        } else if (ch === "," && depth === 0) {
+          count++;
+        } else if (!/\\s/.test(ch)) {
+          hasValue = true;
+        }
+      }
+      return hasValue ? count + 1 : 0;
+    }
     try {
       var parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) return parsed.length;
       if (parsed && typeof parsed === "object") return 1;
     } catch (e) {
     }
-    return trimmed.split(/[\n,]+/).map(function(s) { return s.trim(); }).filter(Boolean).length;
+    return trimmed.split(/[\\n,]+/).map(function(s) { return s.trim(); }).filter(Boolean).length;
   }
   __name(logbookAttachmentCountRaw_, "logbookAttachmentCountRaw_");
   function summarizeLogbookRows_(rows) {
