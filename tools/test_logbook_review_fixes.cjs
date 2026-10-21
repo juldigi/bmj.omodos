@@ -31,7 +31,7 @@ const compactHelpers=new Function('__name',compactSource+'; return {logbookAttac
 const compactRows=compactHelpers.summarizeLogbookRows_([
   {ID:'one',Status:'Selesai','Lampiran (JSON)':[{},{}]},
   {ID:'two',Status:'Proses','Lampiran (JSON)':'[{"name":"a"},{"name":"b"},{"name":"c"}]'},
-  {ID:'three',Status:'Pending','Lampiran (JSON)':'https://example.test/a.jpg\\nhttps://example.test/b.jpg'}
+  {ID:'three',Status:'Pending','Lampiran (JSON)':'https://example.test/a.jpg\nhttps://example.test/b.jpg'}
 ]);
 assert.deepEqual(compactRows.map(r=>r['Lampiran Count']),[2,3,2],'summary count matches source attachment shapes');
 assert.ok(compactRows.every(r=>!Object.prototype.hasOwnProperty.call(r,'Lampiran (JSON)')),'summary rows omit full attachment payloads');
