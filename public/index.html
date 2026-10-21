@@ -9256,7 +9256,7 @@ document.addEventListener('keydown', (ev)=>{
 /* ---------------- ENTRY CARD RENDER ---------------- */
 function entryCardHtml(e, idx){
   const st = statusClass(e['Status']);
-  const attCount = parseAttachments(e['Lampiran (JSON)']).length;
+  const attCount = logbookAttachmentCount_(e);
   const groupBits = [e['Grouping Pekerjaan'], e['Grouping Team'] ? ('Team '+e['Grouping Team']) : null].filter(Boolean).join(' · ');
   const mesinKey = isAreaEntry_(e) ? '' : (e['Kode Mesin'] || e['Nama Mesin']);
   const pelaporNames = splitPelaporNames(e['Nama Pelapor']);
@@ -9301,6 +9301,7 @@ let LOGBOOK_RENDERED_COUNT_ = 0;
 let LOGBOOK_SORTED_SOURCE_REF_ = null;
 let LOGBOOK_SORTED_SOURCE_CACHE_ = [];
 let LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
+let LOGBOOK_ATTACHMENT_COUNT_CACHE_ = new WeakMap();
 let LOGBOOK_SEARCH_DEBOUNCE_TIMER_ = null;
 const LOGBOOK_SEARCH_DEBOUNCE_MS_ = 130;
 function invalidateLogbookSortCache_(){
@@ -9321,6 +9322,18 @@ function logbookOrderedEntries_(){
     LOGBOOK_SEARCH_TEXT_CACHE_ = new WeakMap();
   }
   return LOGBOOK_SORTED_SOURCE_CACHE_;
+}
+function logbookAttachmentCount_(entry){
+  if(!entry || typeof entry!=='object') return 0;
+  const raw=entry['Lampiran (JSON)'];
+  let signature=raw;
+  if(raw && typeof raw!=='string'){try{signature=JSON.stringify(raw);}catch(e){signature='';}}
+  const cached=LOGBOOK_ATTACHMENT_COUNT_CACHE_.get(entry);
+  if(cached && cached.signature===signature) return cached.count;
+  let count=0;
+  try{count=parseAttachments(raw).length;}catch(e){}
+  LOGBOOK_ATTACHMENT_COUNT_CACHE_.set(entry,{signature,count});
+  return count;
 }
 function logbookSearchText_(entry){
   if(!entry || typeof entry!=='object') return '';
@@ -16829,6 +16842,9 @@ function openDetail(id){
   const e = ENTRIES.find(x=>x['ID']===id);
   if(!e) return;
   const atts = parseAttachments(e['Lampiran (JSON)']);
+  const attachHtml = atts.length > 12
+    ? '<div id="entry-attachments-slot">'+renderAttachGrid(atts.slice(0,12), 'Lampiran')+'</div><button type="button" class="btn btn-ghost btn-sm" id="btn-entry-show-all-attachments" style="margin-top:8px">Tampilkan semua '+atts.length+' lampiran</button>'
+    : renderAttachGrid(atts, 'Lampiran');
   const mesinKey = isAreaEntry_(e) ? '' : (e['Kode Mesin'] || e['Nama Mesin']);
   const mesinLabel = [e['Kode Mesin'], e['Nama Mesin']].filter(Boolean).join(' — ');
   const pelaporHtml = splitPelaporNames(e['Nama Pelapor']).map(n=> wikiLinkHtml('personil', n, n)).join(', ');
@@ -16889,7 +16905,7 @@ function openDetail(id){
     </div>
     <div id="entry-view-mode">
       ${rows.filter(r=>r[1]).map(r=>`<div class="detail-row"><div class="k">${r[0]}</div><div class="v">${customRowHtml.hasOwnProperty(r[0]) ? customRowHtml[r[0]] : escapeHtml(r[1])}</div></div>`).join('')}
-      ${renderAttachGrid(atts, 'Lampiran')}
+      ${attachHtml}
       <div style="margin-top:20px;display:flex;gap:10px;">
         <select id="quick-status" style="width:auto;">
           <option value="">Ubah status...</option>
@@ -16901,6 +16917,13 @@ function openDetail(id){
   `;
   $('#modal-bg').classList.add('active');
   $('#btn-close-modal').addEventListener('click', closeModal);
+  const showAllAttachments=$('#btn-entry-show-all-attachments');
+  if(showAllAttachments) showAllAttachments.addEventListener('click',()=>{
+    const slot=$('#entry-attachments-slot');if(!slot)return;
+    slot.innerHTML=renderAttachGrid(atts,'Lampiran');
+    showAllAttachments.remove();
+    bindAttachGridClicks(slot);
+  });
   $('#btn-export-entry-pdf').addEventListener('click', ()=>{
     if(typeof window.exportLogbookPdfForEntry_==='function') window.exportLogbookPdfForEntry_(id);
     else toast('Fitur PDF belum siap. Coba kembali sebentar lagi.',true);

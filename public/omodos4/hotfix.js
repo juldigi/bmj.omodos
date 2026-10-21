@@ -915,8 +915,14 @@ function renderEditPhotos(holder,entry,id){
   const thumb=f.thumbUrl||f.previewUrl||'';
   const preview=thumb?'<img src="'+esc(thumb)+'" alt="Foto tersimpan" loading="lazy" decoding="async" fetchpriority="low">':'<span style="display:flex;align-items:center;justify-content:center;width:100px;height:76px;border-radius:5px;background:var(--panel-2,#f0f4f7);font-size:10px;text-align:center;padding:4px">Buka foto tersimpan</span>';
   return '<a class="omodos-edit-photo-current" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+preview+'<span>Foto lama '+(i+1)+'</span></a>';
- });
- host.innerHTML=[...oldCards,...pending.map((f,i)=>'<div class="omodos-edit-photo-current"><img src="'+esc(f.localUrl)+'" alt="Foto baru" loading="lazy" decoding="async"><span>Foto baru '+(i+1)+'</span><button type="button" data-edit-photo-remove="'+i+'">Hapus</button></div>')].filter(Boolean).join('')||'<span class="omodos-edit-photo-empty">Belum ada foto.</span>';
+ }).filter(Boolean);
+ const showingAll=host.dataset.showAllOldPhotos==='1';
+ const visibleOld=showingAll?oldCards:oldCards.slice(0,6);
+ const remaining=oldCards.length-visibleOld.length;
+ const newCards=pending.map((f,i)=>'<div class="omodos-edit-photo-current"><img src="'+esc(f.localUrl)+'" alt="Foto baru" loading="lazy" decoding="async"><span>Foto baru '+(i+1)+'</span><button type="button" data-edit-photo-remove="'+i+'">Hapus</button></div>');
+ host.innerHTML=[...visibleOld,...newCards,remaining?'<button type="button" class="btn btn-ghost btn-sm" data-edit-photo-show-all>Tampilkan '+remaining+' foto lama lainnya</button>':''].join('')||'<span class="omodos-edit-photo-empty">Belum ada foto.</span>';
+ const showAll=host.querySelector('[data-edit-photo-show-all]');
+ if(showAll)showAll.addEventListener('click',()=>{host.dataset.showAllOldPhotos='1';renderEditPhotos(holder,entry,id);});
  qa('[data-edit-photo-remove]',host).forEach(btn=>btn.addEventListener('click',()=>{const files=pendingEditPhotos.get(String(id))||[],removed=files.splice(+btn.dataset.editPhotoRemove,1)[0];if(removed&&removed.localUrl)URL.revokeObjectURL(removed.localUrl);pendingEditPhotos.set(String(id),files);renderEditPhotos(holder,entry,id);}));
 }
 function attachEditUi(entry){
