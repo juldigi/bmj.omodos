@@ -28,7 +28,7 @@ assert.match(hot,/invalidateLogbookSortCache_\(\)/);
 assert.doesNotMatch(edit,/await loadAll\(\)/);
 assert.match(base,/function loadOmodos4Intelligence_\(\)/);
 assert.match(base,/superadmin-intelligence\.js/);
-assert.match(base,/Technician sessions never fetch it/);
+assert.match(base,/technicians never fetch this optional script/);
 const switchStart=base.indexOf('function switchToView(enteringView)');
 const switchEnd=base.indexOf('const leavingView = PREVIOUS_ACTIVE_VIEW;',switchStart);
 const switchHead=base.slice(switchStart,switchEnd);
