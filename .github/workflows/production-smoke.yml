@@ -42,9 +42,13 @@ jobs:
           grep -q '"no_bundle": true' wrangler.jsonc
           node --check public/omodos4/hotfix.js
           node --check public/omodos4/offset-ways.js
+          node --check public/omodos4/technical-performance.js
+          grep -Fq 'technicalPerformanceRead' src/worker.js
+          grep -Fq 'requireSuperadmin_(body.actor)' src/worker.js
+          grep -Fq 'TECHNICAL_PERFORMANCE_MODULE_LOADER_V1' public/omodos4/hotfix.js
           test -s public/omodos4/hotfix.css
           test -s public/omodos4/offset-ways.css
-          grep -Fq "X-OMODOS-Build: omodos-20261001-r1" public/_headers
+          grep -Fq "X-OMODOS-Build: omodos-20261021-technical-performance-r1" public/_headers
           grep -Fq '__Host-OMODOSFileSession' src/worker.js
           grep -Fq 'requireFileSession(request, backend)' src/worker.js
           grep -Fq '"Cache-Control": "private, no-store, max-age=0"' src/worker.js
@@ -63,7 +67,7 @@ jobs:
           CSS_URL="https://omodos.juldigi.workers.dev/omodos4/hotfix.css"
           OW_JS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.js"
           OW_CSS_URL="https://omodos.juldigi.workers.dev/omodos4/offset-ways.css"
-          EXPECTED_BUILD="omodos-20261001-r1"
+          EXPECTED_BUILD="omodos-20261021-technical-performance-r1"
           passed=0
 
           has_marker() { grep -Fq "$1" <<< "$2"; }
