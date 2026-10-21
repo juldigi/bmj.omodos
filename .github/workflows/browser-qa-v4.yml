@@ -35,6 +35,10 @@ jobs:
           node --check src/worker.js
           node --check public/omodos4/technical-performance.js
           grep -Fq "return /^mtc$/i.test(String(val(r,'category')).trim())" public/omodos4/technical-performance.js
+          grep -Fq 'function calcOeeRows()' public/omodos4/technical-performance.js
+          grep -Fq 'Availability × Performance × Quality' public/omodos4/technical-performance.js
+          grep -Fq 'OEE × Utilization' public/omodos4/technical-performance.js
+          grep -Fq "fieldSelect('utilization','Utilization untuk TEEP')" public/omodos4/technical-performance.js
           grep -Fq 'Belum dihitung dari sumber ini' public/omodos4/technical-performance.js
           grep -Fq 'TECHNICAL_PERFORMANCE_MVP_V1' public/omodos4/technical-performance.js
           grep -Fq "String(u.role||u.Role||'').toLowerCase()==='superadmin'" public/omodos4/technical-performance.js
