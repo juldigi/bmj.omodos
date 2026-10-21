@@ -43,7 +43,7 @@ const oldCountRaw=(raw)=>{
   if(typeof raw!=='string')return 0;
   const trimmed=raw.trim();if(!trimmed)return 0;
   try{const parsed=JSON.parse(trimmed);if(Array.isArray(parsed))return parsed.length;if(parsed&&typeof parsed==='object')return 1;}catch(e){}
-  return trimmed.split(/[\\n,]+/).map(s=>s.trim()).filter(Boolean).length;
+  return trimmed.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).length;
 };
 const countCases=[
   ['',0],['   ',0],['[]',0],[' [ ] ',0],[[{},{}],2],
