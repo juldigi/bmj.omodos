@@ -6,17 +6,24 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync('public/omodos4/technical-performance.js', 'utf8');
-const hotfixSource = fs.readFileSync('public/omodos4/hotfix.js', 'utf8');
-const loaderStart = hotfixSource.indexOf('/* TECHNICAL_PERFORMANCE_IMPORT_MVP_V1');
-assert.ok(loaderStart >= 0, 'Technical Performance loader block must exist');
-const technicalLoader = hotfixSource.slice(loaderStart);
-assert.ok(technicalLoader.includes('if(!isSuperadmin())return;'),
-  'Technical Performance module must not load for non-Superadmin accounts');
-assert.ok(technicalLoader.includes('function bindAuthWatchers()') &&
-          technicalLoader.includes('MutationObserver') &&
-          technicalLoader.includes("getElementById('form-login')") &&
-          technicalLoader.includes("addEventListener('focus',loadTechnicalPerformance)"),
-  'Deferred loading must handle login role changes without polling');
+const indexSource = fs.readFileSync('public/index.html', 'utf8');
+const loaderStart = indexSource.indexOf('OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1');
+assert.ok(loaderStart >= 0, 'Single Technical Performance lazy loader must exist in the app shell');
+const technicalLoader = indexSource.slice(loaderStart);
+assert.ok(technicalLoader.includes("script.src='/omodos4/technical-performance.js'"),
+  'The app shell must load the Technical Performance module from its local asset path');
+assert.ok(technicalLoader.includes('if(!isSuperadmin())return Promise.resolve(false);'),
+  'Technical Performance module must remain unloaded for non-Superadmin accounts');
+assert.ok(indexSource.includes("if(view === 'technical-performance') return isSuperadmin();"),
+  'Direct view navigation must enforce the Superadmin gate');
+assert.ok(technicalLoader.includes('function hookRbac()') &&
+          technicalLoader.includes("window.addEventListener('focus',sync)") &&
+          technicalLoader.includes("document.addEventListener('visibilitychange'"),
+  'Lazy loading must resynchronize when authentication/RBAC changes');
+assert.ok(technicalLoader.includes('attempts>=40') && technicalLoader.includes('clearInterval(pollTimer)'),
+  'RBAC rehooking must remain bounded rather than poll indefinitely');
+assert.ok(!fs.readFileSync('public/omodos4/hotfix.js', 'utf8').includes('TECHNICAL_PERFORMANCE_IMPORT_MVP_V1'),
+  'The hotfix bundle must not register a duplicate Technical Performance loader');
 assert.ok(source.includes("s.src='/vendor/xlsx.min.js'"), 'Excel import should use the locally bundled XLSX reader');
 assert.ok(!source.includes('cdn.jsdelivr.net/npm/xlsx'), 'Excel import must not depend on a remote CDN');
 
