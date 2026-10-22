@@ -9032,7 +9032,7 @@ function createBackend(services, env = {}) {
   }
   __name(handleSaveRoleAccessConfig_, "handleSaveRoleAccessConfig_");
   const OFFSET_WAYS_HEADERS = ["ID","Type","Title","Machine","Owner","DueDate","Status","PayloadJSON","CreatedAt","UpdatedAt","CreatedBy","UpdatedBy","DeletedAt"];
-  const OFFSET_WAYS_TYPES = ["oee-calculation","teep-calculation","behavior-action"];
+  const OFFSET_WAYS_TYPES = ["oee-calculation","teep-calculation","behavior-action","technical-performance-import"];
   function handleOffsetWaysRead_(body) {
     requireSuperadmin_(body.actor);
     var rows = getGenericRows_("OMODOS_OffsetWays", OFFSET_WAYS_HEADERS);
