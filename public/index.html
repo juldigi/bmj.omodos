@@ -8482,6 +8482,9 @@ function permissionViewFor_(view){
 function canAccessView_(view){
   view = String(view||'').trim();
   if(!view) return false;
+  // Technical Performance is an explicitly Superadmin-only imported-report workspace.
+  // Never depend on nav visibility alone: direct goToView/switchToView must be gated too.
+  if(view === 'technical-performance') return isSuperadmin();
   if(view === 'omodos4' || view.startsWith('omodos4-')) return isSuperadmin();
   const permissionView = permissionViewFor_(view);
   if(permissionView === 'dashboard') return true;
