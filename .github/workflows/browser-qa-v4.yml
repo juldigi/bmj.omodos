@@ -39,6 +39,9 @@ jobs:
           grep -Fq 'function readOdinFile(file)' public/omodos4/technical-performance.js
           grep -Fq 'function odinTopRows()' public/omodos4/technical-performance.js
           grep -Fq "if(state.tab==='actions')return odinActionContent();" public/omodos4/technical-performance.js
+          grep -Fq 'function odinCanonicalIssue(machine,issue)' public/omodos4/technical-performance.js
+          grep -Fq "'Variasi deskripsi sumber':g.variants.join(' | ')" public/omodos4/technical-performance.js
+          node tools/test_technical_performance_odin.cjs
           grep -Fq 'for(var i=1;i<a.length;i++)if(Math.abs(a[i]-a[0])>1e-9)return NaN;' public/omodos4/technical-performance.js
           grep -Fq "var mtcRows=state.rows.filter(function(r){return /^mtc$/i.test(String(val(r,'category')).trim());});" public/omodos4/technical-performance.js
           grep -Fq "if(n===1&&!explicitPercent)return NaN" public/omodos4/technical-performance.js
