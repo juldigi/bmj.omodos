@@ -291,6 +291,10 @@ assert.ok(source.includes('Nilai SUBTOTAL tersimpan (semua kategori)'),
   'Audit UI must label the saved SUBTOTAL as all-category worksheet context');
 assert.ok(source.includes('Jam MTC detail pada rentang formula'),
   'Audit UI must separately label the recalculated exact-MTC detail sum');
+assert.ok(source.includes('var hoursMismatch=!Number.isFinite(pivotHours)||Math.abs(detailHours-pivotHours)>0.05;'),
+  'Pivot Sum of Hour must be reconciled against all exact-MTC detail hours, including TRIAL, because the pivot filter is Category=MTC');
+assert.ok(source.includes('Pivot memfilter Category=MTC, sehingga Count of Hour dibandingkan'),
+  'MTC audit must state the actual source filter scope used by the saved pivot');
 assert.equal(audit.mismatch, false,
   'A worksheet-wide cached SUBTOTAL must not be compared directly with MTC-only Pivot totals');
 assert.equal(audit.incidentCountReliable, true, 'Complete full-sheet PRO data should independently validate event count');
