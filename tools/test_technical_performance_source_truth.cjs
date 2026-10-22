@@ -6,9 +6,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync('public/omodos4/technical-performance.js', 'utf8');
+assert.ok(source.includes('function defaultDataStartRow(name,headerRow){'),
+  'Worksheet import must separate header row from data start row');
 const oeeStart = source.indexOf('function extractOfficialOee(wb){');
 const mtcStart = source.indexOf('function extractMtcAudit(X,wb){', oeeStart);
-const end = source.indexOf('function applyMatrix(matrix,headerRow){', mtcStart);
+const end = source.indexOf('function applyMatrix(matrix,headerRow,dataStartRow){', mtcStart);
 assert.ok(oeeStart >= 0 && mtcStart > oeeStart && end > mtcStart,
   'Official OEE and MTC source-audit functions must exist');
 
