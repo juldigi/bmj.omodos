@@ -360,6 +360,8 @@ function renderMtcAuditCard(){
  rows.push({
   'Grup':'TOTAL','Rentang SUBTOTAL':'—',
   'Baris MTC seluruh sheet':fmt(a.rows.reduce(function(n,r){return n+r.sourceMtcRows;},0),0),
+  'Baris MTC terlihat':fmt(a.rows.reduce(function(n,r){return n+r.visibleMtcRows;},0),0),
+  'Baris MTC tersembunyi':fmt(a.rows.reduce(function(n,r){return n+r.hiddenMtcRows;},0),0),
   'Baris MTC dalam SUBTOTAL':fmt(a.rows.reduce(function(n,r){return n+r.detailRecords;},0),0),
   'PRO unik non-TRIAL':a.incidentCountReliable?fmt(a.incidentCount,0):'—',
   'PRO unik dalam SUBTOTAL':fmt(a.rows.reduce(function(n,r){return n+r.detailEvents;},0),0),
