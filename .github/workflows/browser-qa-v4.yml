@@ -47,7 +47,7 @@ jobs:
           grep -Fq "'Variasi deskripsi sumber':g.variants.join(' | ')" public/omodos4/technical-performance.js
           grep -Fq 'function extractOfficialOee(wb)' public/omodos4/technical-performance.js
           grep -Fq 'function monthFromDateCell(sheet,ref)' public/omodos4/technical-performance.js
-          grep -Fq 'var periods=required.map(function(n){return monthFromDateCell(n,'"'A8'"');});' public/omodos4/technical-performance.js
+          grep -Fq "var periods=required.map(function(n){return monthFromDateCell(n,'A8');});" public/omodos4/technical-performance.js
           grep -Fq "Ringkasan OEE &amp; TEEP resmi · '+esc(o.period)+'" public/omodos4/technical-performance.js
           grep -Fq 'function extractMtcAudit(X,wb)' public/omodos4/technical-performance.js
           grep -Fq 'var subtotalCachedHours=n(ws&&ws[d.totalCell]&&ws[d.totalCell].v);' public/omodos4/technical-performance.js
