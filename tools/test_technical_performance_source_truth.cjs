@@ -152,6 +152,8 @@ const mixedPeriodWorkbook = {
 mixedPeriodWorkbook.Sheets['OEE FG'].A8 = { v:46296 };
 assert.equal(context.extractOfficialOee(mixedPeriodWorkbook), null,
   'Official OEE summary must be withheld when source group sheets represent different months');
+assert.ok(source.includes('Ringkasan OEE/TEEP resmi ditahan karena data grup belum lengkap'),
+  'The Technical Performance UI must explain why a recognized but inconsistent OEE workbook has no official summary');
 assert.equal(official.rows.length, 3);
 const [printing, apm, fgm] = official.rows;
 near(printing.oeeCalculated, printingA*printingP*printingQ, 'Printing OEE formula');
