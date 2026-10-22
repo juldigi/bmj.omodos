@@ -1,6 +1,6 @@
 import worker from "./worker.js";
 const marker="<!-- OMODOS4_RECOVERY_V2 -->";
-const injection=`${marker}<link rel="stylesheet" href="/omodos4/hotfix.css"><script src="/omodos4/hotfix.js" defer></script><script src="/omodos4/patrol-area-feedback.js" defer></script>`;
+const injection=`${marker}<link rel="stylesheet" href="/omodos4/hotfix.css"><script src="/omodos4/hotfix.js" defer></script><script src="/omodos4/patrol-area-feedback.js" defer></script><link rel="stylesheet" href="/omodos4/technical-performance.css"><script src="/omodos4/technical-performance.js" defer></script>`;
 export { MaintenanceStore } from "./worker.js";
 export default {
   async fetch(request, env, ctx) {
