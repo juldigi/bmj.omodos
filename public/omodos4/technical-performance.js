@@ -348,7 +348,13 @@ return {mtcRows:mtcRows,incidents:incidents,mtcHours:lost,totalHours:total,ratio
 }
 function metric(title,value,sub){return '<div class="tp-card tp-metric"><small>'+esc(title)+'</small><b>'+esc(value)+'</b><span>'+esc(sub||'')+'</span></div>';}
 function renderOfficialOeeSummaryCard(){
- var o=state.officialOee;if(!o)return '';
+ var o=state.officialOee;
+ if(!o){
+  var required=['OEE Printing (2)','OEE AP','OEE FG'];
+  if(state.workbook&&required.every(function(n){return !!(state.workbook.Sheets&&state.workbook.Sheets[n]);}))
+   return '<div class="tp-card" style="margin:12px 0"><h3 class="tp-section-title">Validasi sumber OEE/TEEP</h3><p class="tp-muted">Ringkasan OEE/TEEP resmi ditahan karena data grup belum lengkap atau tanggal/periode pada sel A8 di ketiga worksheet sumber tidak ada atau tidak sama. Periksa sheet OEE Printing (2), OEE AP, dan OEE FG sebelum memakai hasil. Tidak ada periode yang ditebak.</p></div>';
+  return '';
+ }
  var rows=o.rows.map(function(r){return {
   'Grup':r.group,'Jumlah mesin':fmt(r.machineCount,0),'Availability':pctText(r.availability),'Performance':pctText(r.performance),'Quality':pctText(r.quality),
   'OEE sumber':pctText(r.oee),'OEE hitung':pctText(r.oeeCalculated),'Validasi OEE':r.oeeCheck,
