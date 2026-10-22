@@ -121,21 +121,37 @@ const oeeWorkbook = {
   SheetNames: machineNames.concat(['OEE Printing (2)','OEE AP','OEE FG']),
   Sheets: {
     'OEE Printing (2)': sheet({
-      K2: printingA*printingP*printingQ, K3:printingA, K4:printingP, K5:printingQ,
+      A8:46266, K2: printingA*printingP*printingQ, K3:printingA, K4:printingP, K5:printingQ,
       E7:240, F7:357.4
     }),
     'OEE AP': sheet({
-      J2: apA*apP*apQ, J3:apA, J4:apP, J5:apQ,
+      A8:46266, J2: apA*apP*apQ, J3:apA, J4:apP, J5:apQ,
       D7:193.06111666666669, E7:1299.5386000000003
     }),
     'OEE FG': sheet({
-      J2: fgA*fgP*fgQ, J3:fgA, J4:fgP, J5:fgQ,
+      A8:46266, J2: fgA*fgP*fgQ, J3:fgA, J4:fgP, J5:fgQ,
       D7:34.833333333333329, E7:635
     })
   }
 };
 const official = context.extractOfficialOee(oeeWorkbook);
-assert.ok(official, 'The recognized three-group official OEE workbook should produce a summary');
+assert.ok(official, 'The recognized three-group official OEE workbook with matching source months should produce a summary');
+assert.equal(official.period, 'September 2026',
+  'Official OEE summary period must be derived from the shared A8 date on the source sheets');
+const missingPeriodWorkbook = {
+  SheetNames: oeeWorkbook.SheetNames,
+  Sheets: Object.fromEntries(Object.entries(oeeWorkbook.Sheets).map(([name, ws]) => [name, { ...ws }]))
+};
+delete missingPeriodWorkbook.Sheets['OEE AP'].A8;
+assert.equal(context.extractOfficialOee(missingPeriodWorkbook), null,
+  'Official OEE summary must be withheld when any required group sheet lacks its source period');
+const mixedPeriodWorkbook = {
+  SheetNames: oeeWorkbook.SheetNames,
+  Sheets: Object.fromEntries(Object.entries(oeeWorkbook.Sheets).map(([name, ws]) => [name, { ...ws }]))
+};
+mixedPeriodWorkbook.Sheets['OEE FG'].A8 = { v:46296 };
+assert.equal(context.extractOfficialOee(mixedPeriodWorkbook), null,
+  'Official OEE summary must be withheld when source group sheets represent different months');
 assert.equal(official.rows.length, 3);
 const [printing, apm, fgm] = official.rows;
 near(printing.oeeCalculated, printingA*printingP*printingQ, 'Printing OEE formula');
