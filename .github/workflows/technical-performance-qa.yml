@@ -1,0 +1,36 @@
+name: Technical Performance QA
+on:
+  pull_request:
+    paths:
+      - 'public/omodos4/technical-performance.*'
+      - 'src/entry.js'
+      - 'src/worker.js'
+      - 'tools/test_technical_performance.cjs'
+      - '.github/workflows/technical-performance-qa.yml'
+  push:
+    branches:
+      - feature/technical-performance-oee-teep
+    paths:
+      - 'public/omodos4/technical-performance.*'
+      - 'src/entry.js'
+      - 'src/worker.js'
+      - 'tools/test_technical_performance.cjs'
+      - '.github/workflows/technical-performance-qa.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check public/omodos4/technical-performance.js
+          node --check src/entry.js
+          node --check src/worker.js
+          node --check tools/test_technical_performance.cjs
+      - name: Formula and validation tests
+        run: node tools/test_technical_performance.cjs
