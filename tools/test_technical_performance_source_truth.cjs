@@ -31,9 +31,9 @@ function near(actual, expected, message) {
   assert.ok(Math.abs(actual - expected) < 1e-9, message + ': expected ' + expected + ', got ' + actual);
 }
 
-const printingA = 0.5983, printingP = 0.6420, printingQ = 0.9856;
-const apA = 0.8707, apP = 0.5871, apQ = 0.9988;
-const fgA = 0.9480, fgP = 0.4685, fgQ = 0.9925;
+const printingA = 0.59825912286575167, printingP = 0.64196045513896671, printingQ = 0.98558788917784135;
+const apA = 0.87065445979192702, apP = 0.58706840686036976, apQ = 0.99876788864393107;
+const fgA = 0.94799701418263249, fgP = 0.468523009623797, fgQ = 0.99252361590757532;
 // Mirror the official workbook: 2 Printing machine sheets, 6 APM sheets, 3 FGM sheets.
 const machineNames = [
   'OFS-5','OFS-8',
