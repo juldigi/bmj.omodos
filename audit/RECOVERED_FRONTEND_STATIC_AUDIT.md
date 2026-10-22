@@ -1,9 +1,9 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-21T13:38:02.565624+00:00
-- File bytes: 1683277
-- Lines: 29222
-- SHA-256: 650630b04702c20e25dcdcd860a7c648f94c7e1faec1ba0250d2e8aea1e99ba8
+- Audited UTC: 2026-10-22T07:45:45.926019+00:00
+- File bytes: 1686273
+- Lines: 29294
+- SHA-256: 92214ac2638c9d99ee58a5bc74760a43c4ed12dd7bf9972b5f946098adf1357c
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
@@ -223,7 +223,7 @@
 - L8511: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L23548: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
 - L29217: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
-### Superadmin — 47 match(es)
+### Superadmin — 52 match(es)
 - L4227: <div class="sub">Command Center Superadmin yang membaca data existing tanpa membuat duplikasi sumber data.</div>
 - L5448: <div class="setting-tab-empty" id="rbac-empty-hint" style="display:none;">Memuat data user... Jika tetap kosong, pastikan kamu login sebagai Superadmin.</div>
 - L6398: if(CURRENT_USER.role === 'Superadmin') return true; // selalu full access, tidak dapat dibatasi
@@ -269,6 +269,9 @@
 - L29068: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
 - L29166: if(!v4IsSuperadmin()){
 - L29211: isAllowed:v4IsSuperadmin,
+- L29222: <!-- OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1: superadmin-only module loader -->
+- L29228: function isSuperadmin(){
+- L29231: return !!u&&String(u.role||u.Role||'').toLowerCase()==='superadmin';
 
 ## Copilot & Bantuan
 ### Copilot — 367 match(es)
