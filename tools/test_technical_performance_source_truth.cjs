@@ -126,8 +126,8 @@ vm.runInNewContext(
   calcContext
 );
 calcContext.state.rows = [
-  { Category:'MTC', LT:1.5, DT:2, BD:1 },
-  { Category:'IPM', LT:8, DT:3, BD:0 }
+  { Category:'MTC', LT:1.5, DT:2, BD:1, MTBF:20, MTTR:1.5 },
+  { Category:'IPM', LT:8, DT:3, BD:0, MTBF:0, MTTR:0 }
 ];
 const unmapped = calcContext.calc();
 assert.ok(Number.isNaN(unmapped.mtcHours), 'MTC lost time must be unavailable before category/duration mappings');
@@ -135,12 +135,23 @@ assert.ok(Number.isNaN(unmapped.totalHours), 'Total downtime must be unavailable
 assert.ok(Number.isNaN(unmapped.ratio), 'MTC share must be unavailable before both sources are mapped');
 assert.ok(Number.isNaN(unmapped.incidents), 'MTC incident count must not default to zero before category mapping');
 
-calcContext.state.mapping = { category:'Category', lt:'LT', downtime:'DT' };
+calcContext.state.mapping = { category:'Category', lt:'LT', downtime:'DT', bd:'BD', mtbf:'MTBF', mttr:'MTTR' };
 const mapped = calcContext.calc();
 near(mapped.mtcHours, 1.5, 'Mapped exact-MTC lost time');
 near(mapped.totalHours, 5, 'Mapped total downtime');
 near(mapped.ratio, 0.3, 'Mapped MTC share');
 assert.equal(mapped.incidents, 1, 'Mapped fallback incident count only includes exact MTC rows');
+
+// A source detail-vs-pivot mismatch should hold back MTC-only KPI values even if
+// the currently selected detail sheet can be mapped and produces numeric values.
+calcContext.state.mtcAudit = mismatch;
+const blockedByMismatch = calcContext.calc();
+assert.ok(Number.isNaN(blockedByMismatch.mtcHours), 'MTC lost time must be withheld during source reconciliation');
+assert.ok(Number.isNaN(blockedByMismatch.incidents), 'MTC event count must be withheld during source reconciliation');
+assert.ok(Number.isNaN(blockedByMismatch.ratio), 'MTC share must be withheld during source reconciliation');
+assert.ok(Number.isNaN(blockedByMismatch.mtbf), 'MTBF must be withheld during source reconciliation');
+assert.ok(Number.isNaN(blockedByMismatch.mttr), 'MTTR must be withheld during source reconciliation');
+calcContext.state.mtcAudit = null;
 
 calcContext.state.rows = [
   { Category:'MTC', LT:'', DT:2 },
