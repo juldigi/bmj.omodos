@@ -30,28 +30,26 @@ const state = {
   }
 };
 
-const context = {
-  state,
-  oVal(row, key) {
-    const col = state.odin.mapping[key];
-    return col ? row[col] : '';
-  },
-  odinHours(row) {
-    const keys = ['elec', 'mech', 'comp'].filter(key => Boolean(state.odin.mapping[key]));
-    let total = 0;
-    let found = false;
-    for (const key of keys) {
-      const raw = this.oVal(row, key);
-      const value = raw === '' || raw === null || raw === undefined ? NaN : Number(String(raw).replace(',', '.'));
-      if (Number.isFinite(value) && value >= 0) {
-        total += value;
-        found = true;
-      }
+function valueFor(row, key) {
+  const col = state.odin.mapping[key];
+  return col ? row[col] : '';
+}
+function hoursFor(row) {
+  const keys = ['elec', 'mech', 'comp'].filter(key => Boolean(state.odin.mapping[key]));
+  let total = 0;
+  let found = false;
+  for (const key of keys) {
+    const raw = valueFor(row, key);
+    const value = raw === '' || raw === null || raw === undefined ? NaN : Number(String(raw).replace(',', '.'));
+    if (Number.isFinite(value) && value >= 0) {
+      total += value;
+      found = true;
     }
-    if (!found) return NaN;
-    return state.odin.durationUnit === 'minutes' ? total / 60 : total;
   }
-};
+  if (!found) return NaN;
+  return state.odin.durationUnit === 'minutes' ? total / 60 : total;
+}
+const context = { state, oVal: valueFor, odinHours: hoursFor };
 
 vm.runInNewContext(source.slice(start, end) + '\nthis.odinTopRows = odinTopRows;', context);
 const row = (machine, problem, minutes, notif, section = 'MECHANICAL FAILURE') => ({
