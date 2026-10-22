@@ -624,7 +624,11 @@ jobs:
                   }
 
                   const back = page.locator('#v4-safe-stage [data-v4-back-workspace="' + workspaceIndex + '"]');
-                  await back.click({ timeout: 2500, force: true });
+                  // Feature details can be taller than the viewport. The UI button's
+                  // click handler is the behavior under test; avoiding a second
+                  // scroll-to-element action prevents the harness from cascading
+                  // failures when Playwright cannot scroll the nested detail panel.
+                  await back.evaluate(el => el.click());
                   await waitForWorkspace(5000);
                 } catch (e) {
                   featureClickQA.failures.push({
