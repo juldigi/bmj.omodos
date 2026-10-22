@@ -152,7 +152,7 @@ async function readOdinFile(file){
   applyOdinMatrix(o.rawMatrix,2);state.tab='actions';render();
   var latest=odinLatestMonth(o.sheetNames);
   notify('ODIN terbaca: '+o.rows.length+' baris pada '+o.sheetName+'. Bulan worksheet terbaru yang tersedia: '+(latest>=0?ODIN_MONTHS[latest]+' 2026':'tidak teridentifikasi')+'.','warn');
- }catch(e){o.rows=[];o.headers=[];o.workbook=null;o.rawMatrix=null;render();notify(e.message||'File ODIN gagal dibaca.','error');}
+ }catch(e){o.rows=[];o.headers=[];o.fileName='';o.sheetName='';o.sheetNames=[];o.workbook=null;o.rawMatrix=null;render();notify(e.message||'File ODIN gagal dibaca.','error');}
 }
 function oVal(row,key){var col=state.odin.mapping[key];return col?row[col]:'';}
 function odinFieldSelect(key,label){var o=state.odin,selected=o.mapping[key]||'',opts='<option value="">— Tidak dipetakan —</option>'+o.headers.map(function(h){return '<option value="'+esc(h)+'" '+(selected===h?'selected':'')+'>'+esc(h)+'</option>';}).join('');return '<label>'+esc(label)+'<select data-odin-map="'+esc(key)+'">'+opts+'</select></label>';}
@@ -168,7 +168,7 @@ function odinTopRows(){
  var groups={};
  o.rows.forEach(function(row){
   var issue=String(oVal(row,'problem')||'').trim(),machine=String(oVal(row,'machine')||'').trim();
-  if(!issue)return;
+  if(!issue||/^(grand\\s+)?total$|^subtotal$|^jumlah(\\s+total)?$/i.test(issue))return;
   var norm=(machine+' | '+issue).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   if(!norm)return;
   var g=groups[norm];if(!g)g=groups[norm]={machine:machine||'—',issue:issue,section:String(oVal(row,'section')||'—').trim()||'—',rootCause:String(oVal(row,'rootCause')||'').trim(),corrective:String(oVal(row,'corrective')||'').trim(),actionPlan:String(oVal(row,'actionPlan')||'').trim(),hours:0,hasDuration:false,rows:0,notifications:{},fallbackEvents:0};
