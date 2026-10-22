@@ -25,6 +25,45 @@ assert.equal(dataStartContext.defaultDataStartRow('OEE Printing (2)', 6), 7,
   'OEE detail uses first data row immediately below header');
 assert.equal(dataStartContext.defaultDataStartRow('Lost Time Printing', 4), 5,
   'Lost Time detail uses first data row immediately below header');
+
+const applyMatrixStart = source.indexOf('function applyMatrix(matrix,headerRow,dataStartRow){');
+const applyMatrixEnd = source.indexOf('function loadSheetMatrix(name,headerRow,announce){', applyMatrixStart);
+assert.ok(applyMatrixStart >= 0 && applyMatrixEnd > applyMatrixStart,
+  'Worksheet matrix importer must be directly testable');
+const kertasState = {sheetName:'Kertas Kerja',headers:[],rows:[],headerRow:0,dataStartRow:0};
+const kertasContext = {state:kertasState,defaultDataStartRow:dataStartContext.defaultDataStartRow};
+vm.runInNewContext(
+  source.slice(applyMatrixStart, applyMatrixEnd) + String.fromCharCode(10) + 'this.applyMatrix = applyMatrix;',
+  kertasContext
+);
+const kertasMatrix = Array.from({length:12}, () => []);
+kertasMatrix[6] = ['Kategori','LT'];
+kertasMatrix[7] = ['Header bantu 1',''];
+kertasMatrix[8] = ['Header bantu 2',''];
+kertasMatrix[9] = ['Nilai bantu',''];
+kertasMatrix[10] = ['MTC','1.5'];
+kertasMatrix[11] = ['IPM','8'];
+kertasContext.applyMatrix(kertasMatrix,7,11);
+assert.equal(kertasState.headerRow,7);
+assert.equal(kertasState.dataStartRow,11);
+assert.equal(kertasState.rows.length,2,
+  'Kertas Kerja helper rows 8–10 must not be treated as KPI data');
+assert.equal(kertasState.rows[0].Kategori,'MTC');
+
+const oeeState = {sheetName:'OEE Printing (2)',headers:[],rows:[],headerRow:0,dataStartRow:0};
+const oeeContext = {state:oeeState,defaultDataStartRow:dataStartContext.defaultDataStartRow};
+vm.runInNewContext(
+  source.slice(applyMatrixStart, applyMatrixEnd) + String.fromCharCode(10) + 'this.applyMatrix = applyMatrix;',
+  oeeContext
+);
+const oeeMatrix = Array.from({length:8}, () => []);
+oeeMatrix[5] = ['Mesin','OEE'];
+oeeMatrix[6] = ['OFS-5','0.3785'];
+oeeMatrix[7] = ['Total','0.3785'];
+oeeContext.applyMatrix(oeeMatrix,6,7);
+assert.equal(oeeState.rows.length,1,
+  'OEE worksheet Total line must not become a machine KPI row');
+assert.equal(oeeState.rows[0].Mesin,'OFS-5');
 const oeeStart = source.indexOf('function extractOfficialOee(wb){');
 const mtcStart = source.indexOf('function extractMtcAudit(X,wb){', oeeStart);
 const end = source.indexOf('function applyMatrix(matrix,headerRow,dataStartRow){', mtcStart);
