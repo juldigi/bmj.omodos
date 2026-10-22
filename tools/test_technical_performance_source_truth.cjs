@@ -259,7 +259,7 @@ function detailSheet(categoryHeader, hourHeader, entries, firstDataRow, totalCel
 const X = { utils: { sheet_to_json: (ws) => ws.matrix } };
 const mtcWorkbook = {
   Sheets: {
-    'Report MTC': sheet({E18:3,E9:5,J19:1,J10:1.25,N18:1,N9:0.75}),
+    'Report MTC': sheet({E18:3,E9:55,J19:1,J10:1.25,N18:1,N9:0.75}),
     'Lost Time Printing': detailSheet('Category','Hour',[
       ['WO-1','MTC',2],['WO-2',' IPM ',100],['WO-1','MTC',3],['TRIAL','MTC',50],['WO-3','MTC REPAIR',9]
     ],13,'I',[['OLD-WO',' IPM ',99]]),
@@ -303,7 +303,7 @@ assert.equal(audit.incidentCount, 3, 'Event count is based on distinct non-TRIAL
 const uniqueProMisreadWorkbook = {
   Sheets: {
     ...mtcWorkbook.Sheets,
-    'Report MTC': sheet({E18:1,E9:5,J19:1,J10:1.25,N18:1,N9:0.75})
+    'Report MTC': sheet({E18:1,E9:55,J19:1,J10:1.25,N18:1,N9:0.75})
   }
 };
 const uniqueProMisreadAudit = context.extractMtcAudit(X, uniqueProMisreadWorkbook);
