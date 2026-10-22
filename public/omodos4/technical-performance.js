@@ -50,17 +50,20 @@ function extractMtcAudit(X,wb){
   {group:'FGM',sheet:'Lost Time FG',category:'Category',hour:'Hour',pro:'PRO',totalCell:'J3',fallbackStartRow:5}
  ];
  var pivots=[{records:'E18',hours:'E9'},{records:'J19',hours:'J10'},{records:'N18',hours:'N9'}];
+ var allSourceEventIds=new Set(),sourceMtcRows=0,sourceTrialRows=0,sourceMtcComplete=true,sourceSheetsComplete=true;
  function n(v){if(typeof v==='number')return Number.isFinite(v)?v:NaN;var x=String(v==null?'':v).trim();if(!x)return NaN;var a=Number(x);return Number.isFinite(a)?a:NaN;}
  function rangeEnd(ref){var m=String(ref||'').match(/(?:^|:)\$?[A-Z]{1,3}\$?(\d+)$/i);return m?Number(m[1]):NaN;}
- function filterInfo(ws,subtotalEnd){
+ function filterInfo(ws,subtotalEnd,outsideMtcRows){
   var usedRange=String(ws&&ws['!ref']||''),auto=ws&&ws['!autofilter'];
   var filterRange=String(typeof auto==='string'?auto:(auto&&auto.ref)||'');
   var usedEnd=rangeEnd(usedRange),filterEnd=rangeEnd(filterRange);
   var autoFilterCoverageIssue=!!filterRange&&Number.isFinite(usedEnd)&&Number.isFinite(filterEnd)&&filterEnd<usedEnd;
-  var subtotalCoverageIssue=Number.isFinite(usedEnd)&&Number.isFinite(subtotalEnd)&&subtotalEnd<usedEnd;
+  var subtotalFormulaShortIssue=Number.isFinite(usedEnd)&&Number.isFinite(subtotalEnd)&&subtotalEnd<usedEnd;
+  var subtotalMtcOutside=outsideMtcRows>0;
   return {usedRange:usedRange||'—',filterRange:filterRange||'—',usedEnd:usedEnd,
-   autoFilterCoverageIssue:autoFilterCoverageIssue,subtotalCoverageIssue:subtotalCoverageIssue,
-   rangeCoverageIssue:autoFilterCoverageIssue||subtotalCoverageIssue};
+   autoFilterCoverageIssue:autoFilterCoverageIssue,subtotalFormulaShortIssue:subtotalFormulaShortIssue,
+   subtotalMtcOutside:subtotalMtcOutside,subtotalCoverageIssue:subtotalFormulaShortIssue||subtotalMtcOutside,
+   rangeCoverageIssue:autoFilterCoverageIssue||subtotalFormulaShortIssue||subtotalMtcOutside};
  }
  function effectiveRange(ws,d,matrix){
   var formula=String(ws&&ws[d.totalCell]&&ws[d.totalCell].f||'');
@@ -72,14 +75,27 @@ function extractMtcAudit(X,wb){
  var result=details.map(function(d,i){
   var ws=wb.Sheets[d.sheet],detailRecords=0,detailHours=0,nonTrialHours=0,trialRecords=0,complete=true;
   var startRow=d.fallbackStartRow,endRow=NaN,rangeFromFormula=false,eventIds=new Set();
+  var sourceGroupEventIds=new Set(),sourceGroupMtcRows=0,sourceGroupTrialRows=0,sourceGroupComplete=true,outsideMtcRows=0;
   if(ws){
-   // Keep physical worksheet positions; the SUBTOTAL source range is authoritative for row bounds.
+   // Preserve physical row positions: the saved SUBTOTAL range is audited separately from the complete detail list.
    var matrix=X.utils.sheet_to_json(ws,{header:1,defval:'',raw:true,blankrows:true});
    var header=matrix[3]||[];
    var catIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.category.toLowerCase();});
    var hourIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.hour.toLowerCase();});
    var proIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.pro.toLowerCase();});
    var range=effectiveRange(ws,d,matrix);startRow=range.start;endRow=range.end;rangeFromFormula=range.fromFormula;
+   if(catIndex<0||proIndex<0){sourceGroupComplete=false;sourceSheetsComplete=false;sourceMtcComplete=false;}
+   else matrix.slice(4).forEach(function(row,offset){
+    if(String(row&&row[catIndex]||'').trim().toUpperCase()!=='MTC')return;
+    sourceGroupMtcRows++;
+    var rowNumber=offset+5,pro=String(row&&row[proIndex]||'').trim(),isTrial=/^TRIAL$/i.test(pro);
+    if(rowNumber<startRow||rowNumber>endRow)outsideMtcRows++;
+    if(isTrial)sourceGroupTrialRows++;
+    else if(pro){sourceGroupEventIds.add(pro.toUpperCase());allSourceEventIds.add(pro.toUpperCase());}
+    else sourceGroupComplete=false;
+   });
+   if(!sourceGroupComplete)sourceMtcComplete=false;
+   sourceMtcRows+=sourceGroupMtcRows;sourceTrialRows+=sourceGroupTrialRows;
    if(catIndex<0||hourIndex<0||proIndex<0)complete=false;
    else matrix.slice(startRow-1,endRow).forEach(function(row){
     if(String(row&&row[catIndex]||'').trim().toUpperCase()!=='MTC')return;
@@ -90,24 +106,31 @@ function extractMtcAudit(X,wb){
     else complete=false;
     if(Number.isFinite(h)&&h>=0){detailHours+=h;if(!isTrial)nonTrialHours+=h;}else complete=false;
    });
-  }else complete=false;
-  var ranges=filterInfo(ws,endRow),p=pivots[i],pw=wb.Sheets['Report MTC'];
+  }else{complete=false;sourceGroupComplete=false;sourceSheetsComplete=false;sourceMtcComplete=false;}
+  var ranges=filterInfo(ws,endRow,outsideMtcRows),p=pivots[i],pw=wb.Sheets['Report MTC'];
   var pivotRecords=n(pw[p.records]&&pw[p.records].v),pivotHours=n(pw[p.hours]&&pw[p.hours].v);
   var detailEvents=eventIds.size,eventMismatch=!Number.isFinite(pivotRecords)||detailEvents!==pivotRecords;
   var hoursMismatch=!Number.isFinite(pivotHours)||Math.abs(nonTrialHours-pivotHours)>0.05;
-  var mismatch=!complete||eventMismatch||hoursMismatch||ranges.rangeCoverageIssue;
+  var mismatch=!complete||!sourceGroupComplete||eventMismatch||hoursMismatch||ranges.rangeCoverageIssue;
   return {group:d.group,detailStartRow:startRow,detailEndRow:endRow,detailRangeFromFormula:rangeFromFormula,
    detailRecords:detailRecords,detailEvents:detailEvents,trialRecords:trialRecords,detailHours:detailHours,nonTrialHours:nonTrialHours,
-   pivotRecords:pivotRecords,pivotHours:pivotHours,deltaHours:nonTrialHours-pivotHours,
-   usedRange:ranges.usedRange,filterRange:ranges.filterRange,subtotalCoverageEnd:ranges.usedEnd,autoFilterCoverageIssue:ranges.autoFilterCoverageIssue,subtotalCoverageIssue:ranges.subtotalCoverageIssue,rangeCoverageIssue:ranges.rangeCoverageIssue,
+   sourceMtcRows:sourceGroupMtcRows,sourceEventCount:sourceGroupEventIds.size,sourceTrialRows:sourceGroupTrialRows,sourceComplete:sourceGroupComplete,
+   outsideSubtotalMtcRows:outsideMtcRows,pivotRecords:pivotRecords,pivotHours:pivotHours,deltaHours:nonTrialHours-pivotHours,
+   usedRange:ranges.usedRange,filterRange:ranges.filterRange,usedRowEnd:ranges.usedEnd,
+   autoFilterCoverageIssue:ranges.autoFilterCoverageIssue,subtotalFormulaShortIssue:ranges.subtotalFormulaShortIssue,
+   subtotalMtcOutside:ranges.subtotalMtcOutside,subtotalCoverageIssue:ranges.subtotalCoverageIssue,rangeCoverageIssue:ranges.rangeCoverageIssue,
    complete:complete,eventMismatch:eventMismatch,hoursMismatch:hoursMismatch,mismatch:mismatch};
  });
  var truncatedAuto=result.filter(function(r){return r.autoFilterCoverageIssue;}).map(function(r){return r.group;});
- var truncatedSubtotal=result.filter(function(r){return r.subtotalCoverageIssue;}).map(function(r){return r.group;});
- var note='Audit menghitung baris Category=MTC hanya dalam rentang sumber yang dirujuk formula SUBTOTAL. Jumlah kejadian diagnostik memakai PRO unik dan mengecualikan nilai PRO=TRIAL; jam detail mentah ditampilkan terpisah dari jam non-TRIAL. Nilai dibandingkan dengan Pivot Report MTC; selisih tidak menetapkan salah satu sisi sebagai KPI final.';
- if(truncatedAuto.length)note+=' Rentang AutoFilter lebih pendek daripada data worksheet pada: '+truncatedAuto.join(', ')+'.';
- if(truncatedSubtotal.length)note+=' Rentang formula SUBTOTAL lebih pendek daripada data worksheet pada: '+truncatedSubtotal.join(', ')+', sehingga ada baris yang belum terliput oleh formula sumber.';
- return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),note:note};
+ var truncatedSubtotal=result.filter(function(r){return r.subtotalFormulaShortIssue;}).map(function(r){return r.group;});
+ var outOfRangeMtc=result.filter(function(r){return r.subtotalMtcOutside;}).map(function(r){return r.group;});
+ var note='Jumlah kejadian MTC dihitung dari PRO unik pada seluruh baris detail berkategori persis MTC di tiga worksheet, dengan PRO=TRIAL dikecualikan. Ini terpisah dari cakupan angka jam SUBTOTAL dan Pivot Report MTC. Lost Time/MTBF/MTTR tetap ditahan selama rentang dan jam belum cocok.';
+ if(truncatedAuto.length)note+=' Rentang AutoFilter lebih pendek daripada rentang worksheet pada: '+truncatedAuto.join(', ')+'.';
+ if(truncatedSubtotal.length)note+=' Formula SUBTOTAL berhenti sebelum akhir data worksheet pada: '+truncatedSubtotal.join(', ')+'.';
+ if(outOfRangeMtc.length)note+=' Ada baris Category=MTC di luar rentang formula SUBTOTAL pada: '+outOfRangeMtc.join(', ')+'.';
+ return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),
+  incidentCount:allSourceEventIds.size,incidentCountReliable:sourceSheetsComplete&&sourceMtcComplete,
+  sourceMtcRows:sourceMtcRows,sourceTrialRows:sourceTrialRows,note:note};
 }
 function applyMatrix(matrix,headerRow){
  var start=Math.max(1,parseInt(headerRow,10)||1);
@@ -269,7 +292,8 @@ var incidentIds=mtcRows.map(function(r){return String(val(r,'incident')==null?''
 var incidentMapped=!!state.mapping.incident;
 var incidentIdsComplete=incidentMapped&&incidentIds.every(function(id){return id!=='';});
 var uniqueIncidents=new Set(incidentIds.filter(function(id){return id!==''&&!/^TRIAL$/i.test(id);}).map(function(id){return id.toUpperCase();}));
-var incidents=mtcReconciliationBlocked||!categorySourceReady?NaN:!mtcRows.length?0:bdComplete?bdValues.reduce(function(a,b){return a+b;},0):incidentIdsComplete?uniqueIncidents.size:NaN;
+var officialIncidentCountReady=!!(state.mtcAudit&&state.mtcAudit.incidentCountReliable&&Number.isFinite(state.mtcAudit.incidentCount));
+var incidents=officialIncidentCountReady?state.mtcAudit.incidentCount:(mtcReconciliationBlocked||!categorySourceReady?NaN:!mtcRows.length?0:bdComplete?bdValues.reduce(function(a,b){return a+b;},0):incidentIdsComplete?uniqueIncidents.size:NaN);
 var paired=state.rows.map(function(r){return {energy:number(val(r,'energy')),sheets:number(val(r,'sheets'))};}).filter(function(x){return Number.isFinite(x.energy)&&x.energy>=0&&Number.isFinite(x.sheets)&&x.sheets>0;});
 var energy=paired.map(function(x){return x.energy;}),sheets=paired.map(function(x){return x.sheets;});
 var enpiSource=state.rows.map(function(r){return number(val(r,'enpi'));}).filter(function(v){return Number.isFinite(v)&&v>=0;});var enpi=enpiSource.length?enpiSource[enpiSource.length-1]:(paired.length?energy.reduce(function(a,b){return a+b;},0)/sheets.reduce(function(a,b){return a+b;},0):NaN);
