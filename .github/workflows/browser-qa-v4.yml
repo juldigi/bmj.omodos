@@ -545,6 +545,16 @@ jobs:
                 window.OMODOS4.isAllowed = () => true;
                 window.__qaAccessGuardStubbed = true;
               }
+              // The app refreshes backend RBAC on a 3-minute interval and on
+              // visibility changes. The 100-feature sweep can outlast that
+              // interval, but it intentionally has no backend session. Keep
+              // the synthetic identity stable for this UI-only sweep.
+              if (typeof window.refreshRbacFromServer_ === 'function' &&
+                  !window.__qaOriginalRbacRefresh) {
+                window.__qaOriginalRbacRefresh = window.refreshRbacFromServer_;
+                window.refreshRbacFromServer_ = async () => true;
+                window.__qaRbacRefreshStubbed = true;
+              }
             });
             for (let i = 0; i < moduleCount; i++) {
               const workspaceIndex = i + 1;
@@ -732,21 +742,22 @@ jobs:
                 delete window.__qaOriginalServerRead;
                 delete window.__qaServerReadStubbed;
               }
+              if (window.__qaAccessGuardStubbed && window.__qaOriginalIsAllowed && window.OMODOS4) {
+                window.OMODOS4.isAllowed = window.__qaOriginalIsAllowed;
+                delete window.__qaOriginalIsAllowed;
+                delete window.__qaAccessGuardStubbed;
+              }
+              if (window.__qaRbacRefreshStubbed && window.__qaOriginalRbacRefresh) {
+                window.refreshRbacFromServer_ = window.__qaOriginalRbacRefresh;
+                delete window.__qaOriginalRbacRefresh;
+                delete window.__qaRbacRefreshStubbed;
+              }
             });
             result.featureClickQA = featureClickQA;
             if (featureClickQA.checked !== 100 || featureClickQA.failures.length) {
               throw new Error('OMODOS 4 feature click regression failed: ' + JSON.stringify(featureClickQA.failures.slice(0, 12)));
             }
-            await page.evaluate(() => {
-              if (window.OMODOS4 && window.__qaOriginalServerRead) {
-                window.OMODOS4.serverRead = window.__qaOriginalServerRead;
-                delete window.__qaOriginalServerRead;
-              }
-              if (window.OMODOS4 && window.__qaOriginalIsAllowed) {
-                window.OMODOS4.isAllowed = window.__qaOriginalIsAllowed;
-                delete window.__qaOriginalIsAllowed;
-              }
-            });
+
             result.phases.push('all-100-feature-clicks');
 
             console.log('[QA] KPI target simulator is distinct from maintenance scenario');
