@@ -53,6 +53,9 @@ jobs:
           grep -Fq "Ringkasan OEE &amp; TEEP resmi · '+esc(o.period)+'" public/omodos4/technical-performance.js
           grep -Fq 'Ringkasan OEE/TEEP resmi ditahan karena data grup belum lengkap' public/omodos4/technical-performance.js
           grep -Fq 'function extractMtcAudit(X,wb)' public/omodos4/technical-performance.js
+          grep -Fq 'var detailEvents=eventIds.size,pivotRecordMismatch=!Number.isFinite(pivotRecords)||detailHourRecords!==pivotRecords;' public/omodos4/technical-performance.js
+          grep -Fq "if(r.pivotRecordMismatch)reasons.push('baris MTC dengan Hour numerik ≠ Count of Hour Pivot');" public/omodos4/technical-performance.js
+          grep -Fq 'A pivot count that matches unique PROs but not Hour rows must be flagged' tools/test_technical_performance_source_truth.cjs
           grep -Fq 'var subtotalCachedHours=n(ws&&ws[d.totalCell]&&ws[d.totalCell].v);' public/omodos4/technical-performance.js
           grep -Fq 'Nilai SUBTOTAL tersimpan (semua kategori)' public/omodos4/technical-performance.js
           grep -Fq 'Formula SUBTOTAL' public/omodos4/technical-performance.js
