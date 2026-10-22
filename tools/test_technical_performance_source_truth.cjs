@@ -6,6 +6,17 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync('public/omodos4/technical-performance.js', 'utf8');
+const hotfixSource = fs.readFileSync('public/omodos4/hotfix.js', 'utf8');
+const loaderStart = hotfixSource.indexOf('/* TECHNICAL_PERFORMANCE_IMPORT_MVP_V1');
+assert.ok(loaderStart >= 0, 'Technical Performance loader block must exist');
+const technicalLoader = hotfixSource.slice(loaderStart);
+assert.ok(technicalLoader.includes('if(!isSuperadmin())return;'),
+  'Technical Performance module must not load for non-Superadmin accounts');
+assert.ok(technicalLoader.includes('function bindAuthWatchers()') &&
+          technicalLoader.includes('MutationObserver') &&
+          technicalLoader.includes("getElementById('form-login')") &&
+          technicalLoader.includes("addEventListener('focus',loadTechnicalPerformance)"),
+  'Deferred loading must handle login role changes without polling');
 assert.ok(source.includes("s.src='/vendor/xlsx.min.js'"), 'Excel import should use the locally bundled XLSX reader');
 assert.ok(!source.includes('cdn.jsdelivr.net/npm/xlsx'), 'Excel import must not depend on a remote CDN');
 
