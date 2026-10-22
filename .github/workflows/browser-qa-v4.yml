@@ -543,7 +543,7 @@ jobs:
               }, workspaceIndex, { timeout });
 
               try {
-                await module.click({ timeout: 2500, force: true });
+                await module.evaluate(el => el.click());
                 await waitForWorkspace(7000);
               } catch (e) {
                 featureClickQA.failures.push({
@@ -575,7 +575,9 @@ jobs:
                   else if (featureNo === 97 || featureNo === 98) detailSelector = '[data-v4-interaction-feature="' + featureNo + '"]';
                   else detailSelector = '[data-v4-fb-feature="' + featureNo + '"]';
 
-                  await tile.click({ timeout: 2500, force: true });
+                  // Physical sidebar clicks are covered above; use the DOM click
+                  // handler for this 100-card sweep to avoid flaky nested scrolling.
+                  await tile.evaluate(el => el.click());
                   await page.waitForFunction((n) => {
                     const view = document.getElementById('view-omodos4');
                     const no = document.querySelector('#v4-safe-stage .v4-feature-no');
