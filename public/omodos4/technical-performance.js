@@ -16,7 +16,7 @@ function ensureNav(){var side=document.querySelector('.sidebar,.side-nav,.sideba
 function ensurePage(){var page=$(PAGE);if(page)return page;var main=document.querySelector('.main');if(!main)return null;page=document.createElement('section');page.id=PAGE;page.className='view tp-page';page.innerHTML='<div class="tp-head"><div><div class="tp-eyebrow">BMJ PACKAGING OFFSET · SUPERADMIN</div><h1>Technical Performance</h1><div class="tp-sub">Dashboard berbasis Excel/laporan resmi. Impor data terlebih dahulu, periksa pemetaan kolom, lalu tinjau KPI, downtime, energi, dan tindak lanjut.</div></div><span class="tp-pill">Tahap awal · Read-only</span></div><div id="tp-message" class="tp-message" hidden role="status"></div><div id="tp-body"></div>';main.appendChild(page);return page;}
 function manualNavigate(){var p=ensurePage();if(!p||!allowed())return;document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});p.classList.add('active');p.hidden=false;document.querySelectorAll('.nav-btn[data-view],.bottom-nav-btn[data-view]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-view')==='technical-performance');});}
 function syncAuth(){ensureNav();var n=$(NAV),p=$(PAGE);if(n)n.style.display=allowed()?'':'none';if(p&&!allowed()){p.hidden=true;p.style.display='none';p.setAttribute('aria-hidden','true');if(p.classList.contains('active')){p.classList.remove('active');var d=$('view-dashboard');if(d)d.classList.add('active');}}else if(p){p.hidden=false;p.style.display='';p.setAttribute('aria-hidden','false');}}
-function loadXLSX(){return new Promise(function(resolve,reject){if(window.XLSX){resolve(window.XLSX);return;}var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=function(){window.XLSX?resolve(window.XLSX):reject(new Error('Pustaka Excel tidak tersedia.'));};s.onerror=function(){reject(new Error('Pustaka pembaca Excel gagal dimuat. Periksa koneksi atau impor CSV.'));};document.head.appendChild(s);});}
+function loadXLSX(){return new Promise(function(resolve,reject){if(window.XLSX){resolve(window.XLSX);return;}var id='tp-xlsx-script',old=document.getElementById(id);if(old){old.addEventListener('load',function(){window.XLSX?resolve(window.XLSX):reject(new Error('Pustaka Excel lokal tidak tersedia.'));},{once:true});old.addEventListener('error',function(){reject(new Error('Pustaka Excel lokal gagal dimuat. Gunakan CSV jika XLSX tidak dapat dibaca.'));},{once:true});return;}var s=document.createElement('script');s.id=id;s.src='/vendor/xlsx.min.js';s.async=true;s.onload=function(){window.XLSX?resolve(window.XLSX):reject(new Error('Pustaka Excel lokal tidak tersedia.'));};s.onerror=function(){s.remove();reject(new Error('Pustaka Excel lokal gagal dimuat dari /vendor/xlsx.min.js. Gunakan CSV jika perlu.'));};document.head.appendChild(s);});}
 function parseCSV(text){var rows=[],row=[],cell='',quoted=false;for(var i=0;i<text.length;i++){var c=text[i],n=text[i+1];if(c==='"'&&quoted&&n==='"'){cell+='"';i++;}else if(c==='"'){quoted=!quoted;}else if((c===','||c===';'||c==='\t')&&!quoted){row.push(cell);cell='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&n==='\n')i++;row.push(cell);if(row.some(function(x){return String(x).trim()!=='';}))rows.push(row);row=[];cell='';}else cell+=c;}row.push(cell);if(row.some(function(x){return String(x).trim()!=='';}))rows.push(row);return rows;}
 function defaultHeaderRow(name){name=String(name||'');if(/^OEE (Printing(?: \(2\))?|AP|HS|DC|FG)$/i.test(name))return 6;if(/^Lost Time (Printing|AP|FG|IP)$/i.test(name))return 4;if(/^Report MTC$/i.test(name))return 6;if(/^Kertas Kerja \(Simple View\)$/i.test(name))return 7;if(/^Kertas Kerja$/i.test(name))return 7;return 1;}
 function defaultDataStartRow(name,headerRow){var h=Math.max(1,parseInt(headerRow,10)||1);if(/^Kertas Kerja$/i.test(String(name||'')))return Math.max(11,h+1);return h+1;}
@@ -45,23 +45,30 @@ function extractOfficialOee(wb){
  if(!periods[0]||periods.some(function(p){return p!==periods[0];}))return null;
  var period=monthLabel(periods[0]);
  if(!period)return null;
+ var periodParts=String(periods[0]).split('-').map(Number);
+ var daysInMonth=periodParts.length===2&&periodParts.every(Number.isFinite)?new Date(Date.UTC(periodParts[0],periodParts[1],0)).getUTCDate():0;
+ var calendarHoursPerMachine=daysInMonth*24;
+ if(!Number.isFinite(calendarHoursPerMachine)||calendarHoursPerMachine<=0)return null;
+ if(!period)return null;
  function countMatches(re){return (wb.SheetNames||[]).filter(function(n){return re.test(n);}).length;}
  var defs=[
-  {group:'Printing',sheet:'OEE Printing (2)',cells:{oee:'K2',availability:'K3',performance:'K4',quality:'K5',productionDowntime:'E7',netOperatingTime:'F7'},machineCount:countMatches(/^OFS-\d+$/i)},
-  {group:'APM',sheet:'OEE AP',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',netOperatingTime:'E7'},machineCount:countMatches(/^AP#\d+$/i)},
-  {group:'FGM',sheet:'OEE FG',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',netOperatingTime:'E7'},machineCount:countMatches(/^FG#\d+$/i)}
+  {group:'Printing',sheet:'OEE Printing (2)',cells:{oee:'K2',availability:'K3',performance:'K4',quality:'K5',productionDowntime:'E7',operatingTime:'F7'},machineCount:countMatches(/^OFS-\d+$/i)},
+  {group:'APM',sheet:'OEE AP',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},machineCount:countMatches(/^AP#\d+$/i)},
+  {group:'FGM',sheet:'OEE FG',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},machineCount:countMatches(/^FG#\d+$/i)}
  ];
  var rows=defs.map(function(d){
   var r={group:d.group,sheet:d.sheet,machineCount:d.machineCount||0};
   Object.keys(d.cells).forEach(function(k){r[k]=cell(d.sheet,d.cells[k]);});
   r.oeeCalculated=[r.availability,r.performance,r.quality].every(Number.isFinite)?r.availability*r.performance*r.quality:NaN;
   r.oeeCheck=Number.isFinite(r.oeeCalculated)&&Number.isFinite(r.oee)?(Math.abs(r.oeeCalculated-r.oee)<=0.005?'Cocok':'Perlu pemeriksaan'):'Tidak lengkap';
-  r.utilization=Number.isFinite(r.productionDowntime)&&Number.isFinite(r.netOperatingTime)&&r.machineCount>0?(r.productionDowntime+r.netOperatingTime)/(720*r.machineCount):NaN;
+  r.utilization=Number.isFinite(r.productionDowntime)&&Number.isFinite(r.operatingTime)&&r.machineCount>0?(r.productionDowntime+r.operatingTime)/(calendarHoursPerMachine*r.machineCount):NaN;
   r.teep=Number.isFinite(r.oee)&&Number.isFinite(r.utilization)?r.oee*r.utilization:NaN;
   return r;
  });
- var valid=rows.every(function(r){return Number.isFinite(r.oee)&&Number.isFinite(r.availability)&&Number.isFinite(r.performance)&&Number.isFinite(r.quality)&&Number.isFinite(r.productionDowntime)&&Number.isFinite(r.netOperatingTime)&&r.machineCount>0;});
- return valid?{period:period,calendarHoursPerMachine:720,rows:rows,totalProductionDowntime:rows.reduce(function(a,r){return a+r.productionDowntime;},0),sourceFileNote:'Ringkasan dibaca dari cached values workbook pada sheet OEE Printing (2), OEE AP, dan OEE FG.'}:null;
+ var valid=rows.every(function(r){return Number.isFinite(r.oee)&&Number.isFinite(r.availability)&&Number.isFinite(r.performance)&&Number.isFinite(r.quality)&&Number.isFinite(r.productionDowntime)&&Number.isFinite(r.operatingTime)&&r.machineCount>0;});
+ var qualityFormula=String(sheets['OEE Printing (2)']&&sheets['OEE Printing (2)'].K5&&sheets['OEE Printing (2)'].K5.f||'').replace(/^[=+]/,'').replace(/\s/g,'').toUpperCase();
+ var qualityIncludesNc=/B7\+C7/.test(qualityFormula)&&/\/D7/.test(qualityFormula);
+ return valid?{period:period,calendarHoursPerMachine:calendarHoursPerMachine,rows:rows,totalProductionDowntime:rows.reduce(function(a,r){return a+r.productionDowntime;},0),sourceFileNote:'Ringkasan dibaca dari cached values workbook pada sheet OEE Printing (2), OEE AP, dan OEE FG.'}:null;
 }
 function extractMtcAudit(X,wb){
  if(!X||!wb||!wb.Sheets||!wb.Sheets['Report MTC'])return null;
@@ -358,10 +365,10 @@ function renderOfficialOeeSummaryCard(){
  var rows=o.rows.map(function(r){return {
   'Grup':r.group,'Jumlah mesin':fmt(r.machineCount,0),'Availability':pctText(r.availability),'Performance':pctText(r.performance),'Quality':pctText(r.quality),
   'OEE sumber':pctText(r.oee),'OEE hitung':pctText(r.oeeCalculated),'Validasi OEE':r.oeeCheck,
-  'Downtime produksi':fmt(r.productionDowntime,2)+' jam','Operating time':fmt(r.netOperatingTime,2)+' jam',
+  'Downtime produksi':fmt(r.productionDowntime,2)+' jam','Operating time (OT)':fmt(r.operatingTime,2)+' jam',
   'Utilization kalender':pctText(r.utilization),'TEEP hitung':pctText(r.teep)
  };});
- return '<div class="tp-card" style="margin:12px 0"><h3 class="tp-section-title">Ringkasan OEE &amp; TEEP resmi · '+esc(o.period)+'</h3><p class="tp-muted">Dibaca langsung dari workbook: OEE Printing (2), OEE AP, dan OEE FG. OEE hitung = Availability × Performance × Quality. Utilization kalender = (Net Operating Time + Downtime produksi) ÷ (720 jam × jumlah mesin); TEEP = OEE × Utilization. Ringkasan grup ini terpisah dari baris harian pada worksheet aktif.</p>'+table(rows,['Grup','Jumlah mesin','Availability','Performance','Quality','OEE sumber','OEE hitung','Validasi OEE','Downtime produksi','Operating time','Utilization kalender','TEEP hitung'])+'<p class="tp-muted">Total downtime produksi tiga grup: '+fmt(o.totalProductionDowntime,2)+' jam. Nilai ini bukan Lost Time MTC.</p></div>';
+ return '<div class="tp-card" style="margin:12px 0"><h3 class="tp-section-title">Ringkasan OEE &amp; TEEP resmi · '+esc(o.period)+'</h3><p class="tp-muted">Dibaca langsung dari workbook: OEE Printing (2), OEE AP, dan OEE FG. OEE hitung = Availability × Performance × Quality. Utilization kalender = (Operating Time + Downtime produksi) ÷ (jam kalender pada bulan sumber × jumlah mesin); TEEP = OEE × Utilization. Ringkasan grup ini terpisah dari baris harian pada worksheet aktif.</p>'+table(rows,['Grup','Jumlah mesin','Availability','Performance','Quality','OEE sumber','OEE hitung','Validasi OEE','Downtime produksi','Operating time','Utilization kalender','TEEP hitung'])+'<p class="tp-muted">Total downtime produksi tiga grup: '+fmt(o.totalProductionDowntime,2)+' jam. Nilai ini bukan Lost Time MTC.</p>'+(o.qualityIncludesNc?'<p class="tp-muted"><strong>Catatan audit Quality:</strong> formula sumber pada sheet OEE Printing (2) menggunakan (Good Qty + NC Qty) ÷ Total Qty. Definisi NC perlu dikonfirmasi sebelum OEE dinyatakan final; angka tetap mengikuti rumus sumber.</p>':'')+'</div>';
 }
 function renderMtcAuditCard(){
  var a=state.mtcAudit;if(!a)return '';
@@ -422,7 +429,7 @@ var odinSheet=$('tp-odin-sheet');if(odinSheet)odinSheet.addEventListener('change
 var odinHeader=$('tp-odin-header-row');if(odinHeader)odinHeader.addEventListener('change',function(){try{if(!state.odin.rawMatrix)return;applyOdinMatrix(state.odin.rawMatrix,odinHeader.value);render();notify('Baris header ODIN diterapkan. Periksa kembali pemetaan kolom.','warn');}catch(e){notify(e.message||'Baris header ODIN tidak valid.','error');}});
 var odinApply=$('tp-odin-apply-map');if(odinApply)odinApply.addEventListener('click',function(){body.querySelectorAll('[data-odin-map]').forEach(function(el){state.odin.mapping[el.getAttribute('data-odin-map')]=el.value;});var unit=$('tp-odin-unit');if(unit)state.odin.durationUnit=unit.value;render();notify('Pemetaan ODIN diterapkan untuk menghitung Top 3 pada worksheet aktif. Periksa periode dan unit sumber.','warn');});
 var odinReset=$('tp-odin-reset');if(odinReset)odinReset.addEventListener('click',function(){state.odin={rows:[],headers:[],fileName:'',sheetName:'',sheetNames:[],workbook:null,rawMatrix:null,headerRow:2,mapping:{},durationUnit:'minutes'};render();});}
-function init(){ensureStyle();ensureNav();ensurePage();syncAuth();if(!window.__tpAuthObserver){window.__tpAuthObserver=true;var tpAuthChecks=0;var tpAuthTimer=setInterval(function(){syncAuth();tpAuthChecks++;if(tpAuthChecks>=40)clearInterval(tpAuthTimer);},1800);document.addEventListener('visibilitychange',function(){if(!document.hidden)syncAuth();});window.addEventListener('focus',syncAuth);}if(!window.__tpRenderHook){window.__tpRenderHook=true;document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-view="technical-performance"]');if(b&&allowed())setTimeout(render,60);});}}
+function init(){ensureStyle();ensureNav();ensurePage();syncAuth();if(!window.__tpAuthObserver){window.__tpAuthObserver=true;var badge=$('rbac-user-badge');if(badge&&window.MutationObserver){var observer=new MutationObserver(function(){syncAuth();});observer.observe(badge,{childList:true,subtree:true,characterData:true});}var login=$('form-login');if(login&&!login.__tpAuthListener){login.__tpAuthListener=true;login.addEventListener('submit',function(){setTimeout(syncAuth,250);setTimeout(syncAuth,900);});}var logout=$('btn-logout');if(logout&&!logout.__tpLogoutListener){logout.__tpLogoutListener=true;logout.addEventListener('click',function(){setTimeout(syncAuth,100);});}document.addEventListener('visibilitychange',function(){if(!document.hidden)syncAuth();});window.addEventListener('focus',syncAuth);}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 window.OMODOS_TechnicalPerformance={render:render,syncAuth:syncAuth};
 })();
