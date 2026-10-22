@@ -1125,18 +1125,47 @@ const css=document.createElement('style');css.textContent=[
 })();
 
 
-/* TECHNICAL_PERFORMANCE_IMPORT_MVP_V1 — isolated additive module */
+/* TECHNICAL_PERFORMANCE_IMPORT_MVP_V1 — load only for authenticated Superadmin */
 (function(){
 'use strict';
-function loadTechnicalPerformance(){
-  if(!document.getElementById('omodos-technical-performance-script')){
-    var script=document.createElement('script');
-    script.id='omodos-technical-performance-script';
-    script.src='/omodos4/technical-performance.js';
-    script.async=true;
-    document.head.appendChild(script);
-  }
+function currentUser(){
+  try{if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)return CURRENT_USER;}catch(e){}
+  return window.CURRENT_USER||window.currentUser||null;
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadTechnicalPerformance,{once:true});
-else loadTechnicalPerformance();
+function isSuperadmin(){
+  var u=currentUser();
+  var role=String(u&&(u.role||u.Role||u.roleName||u.role_name||u.level)||'').toLowerCase().replace(/[\s_-]+/g,'');
+  return role==='superadmin';
+}
+function loadTechnicalPerformance(){
+  if(!isSuperadmin())return;
+  if(document.getElementById('omodos-technical-performance-script'))return;
+  var script=document.createElement('script');
+  script.id='omodos-technical-performance-script';
+  script.src='/omodos4/technical-performance.js';
+  script.async=true;
+  script.onerror=function(){script.remove();};
+  (document.head||document.documentElement).appendChild(script);
+}
+function bindAuthWatchers(){
+  loadTechnicalPerformance();
+  var badge=document.getElementById('rbac-user-badge');
+  if(badge&&window.MutationObserver&&!badge.__tpLoadAuthObserver){
+    badge.__tpLoadAuthObserver=true;
+    var observer=new MutationObserver(function(){loadTechnicalPerformance();});
+    observer.observe(badge,{childList:true,subtree:true,characterData:true});
+  }
+  var login=document.getElementById('form-login');
+  if(login&&!login.__tpLoadAuthListener){
+    login.__tpLoadAuthListener=true;
+    login.addEventListener('submit',function(){
+      setTimeout(loadTechnicalPerformance,250);
+      setTimeout(loadTechnicalPerformance,900);
+    });
+  }
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)loadTechnicalPerformance();});
+  window.addEventListener('focus',loadTechnicalPerformance);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindAuthWatchers,{once:true});
+else bindAuthWatchers();
 })();
