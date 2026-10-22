@@ -197,6 +197,31 @@ assert.equal(audit.rows[0].detailRangeFromFormula, true, 'MTC audit should prefe
 assert.equal(audit.incidentCountReliable, true, 'Complete full-sheet PRO data should independently validate event count');
 assert.equal(audit.incidentCount, 3, 'Event count is based on distinct non-TRIAL PRO IDs across every detail sheet');
 
+// A saved worksheet filter can hide MTC rows while the cached SUBTOTAL/Pivot is stale.
+// Keep the full-source event identity count independent, but block duration KPIs.
+const hiddenPrintingRows = Array.from({length:17}, () => ({ hidden:false }));
+hiddenPrintingRows[12] = { hidden:true }; // worksheet row 13
+const hiddenMtcWorkbook = {
+  Sheets: {
+    ...mtcWorkbook.Sheets,
+    'Lost Time Printing': {
+      ...mtcWorkbook.Sheets['Lost Time Printing'],
+      '!rows': hiddenPrintingRows
+    }
+  }
+};
+const hiddenMtcAudit = context.extractMtcAudit(X, hiddenMtcWorkbook);
+assert.equal(hiddenMtcAudit.rows[0].visibleMtcRows, 2,
+  'Visible exact-MTC source rows must be counted separately from hidden rows');
+assert.equal(hiddenMtcAudit.rows[0].hiddenMtcRows, 1,
+  'Hidden exact-MTC source rows must be surfaced in the audit');
+assert.equal(hiddenMtcAudit.rows[0].visibilityIssue, true,
+  'Any hidden MTC row in the saved worksheet state must require filter review');
+assert.equal(hiddenMtcAudit.mismatch, true,
+  'Hidden MTC rows must hold Lost Time/MTBF/MTTR pending source reconciliation');
+assert.equal(hiddenMtcAudit.incidentCountReliable, true,
+  'Full-sheet PRO identity counting remains independent of hidden row visibility');
+
 // A row with exact MTC category outside the SUBTOTAL bounds still counts as a source event,
 // but the unaligned loss-hour summary is marked for reconciliation.
 const outsideRangeMtcWorkbook = {
