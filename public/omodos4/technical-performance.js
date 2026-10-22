@@ -175,7 +175,7 @@ function odinCanonicalIssue(machine,issue){
  if(/feeder|sucker|vacum|vacuum/.test(low))return 'Feeder / Suction — Abnormal';
  return String(issue||'').trim().replace(/\s+/g,' ');
 }
-function odinTopRows(){
+function odinGroupedRows(){
  var o=state.odin;if(!o.rows.length||!o.mapping.problem)return [];
  var groups={};
  o.rows.forEach(function(row){
@@ -194,8 +194,9 @@ function odinTopRows(){
   if(!g.corrective&&oVal(row,'corrective'))g.corrective=String(oVal(row,'corrective')).trim();
   if(!g.actionPlan&&oVal(row,'actionPlan'))g.actionPlan=String(oVal(row,'actionPlan')).trim();
  });
- return Object.keys(groups).map(function(k){var g=groups[k];g.events=Object.keys(g.notifications).length+g.fallbackEvents;g.variants=Object.keys(g.sourceVariants);return g;}).sort(function(a,b){return (b.hasDuration?b.hours:-1)-(a.hasDuration?a.hours:-1);}).slice(0,3);
+ return Object.keys(groups).map(function(k){var g=groups[k];g.events=Object.keys(g.notifications).length+g.fallbackEvents;g.variants=Object.keys(g.sourceVariants);return g;}).sort(function(a,b){return (b.hasDuration?b.hours:-1)-(a.hasDuration?a.hours:-1);});
 }
+function odinTopRows(){return odinGroupedRows().slice(0,3);}
 function odinLatestMonthLabel(){var n=odinLatestMonth(state.odin.sheetNames);return n>=0?ODIN_MONTHS[n]+' 2026':'bulan belum teridentifikasi';}
 function odinActionContent(){
  var o=state.odin;
