@@ -83,12 +83,18 @@ assert.equal(fgm.oeeCheck, 'Cocok');
 
 // Row 4 is the header. Only the exact trimmed Category value MTC may be counted.
 // IPM, MECHANICAL FAILURE, and MTC REPAIR must not be included as MTC.
-function detailSheet(categoryHeader, hourHeader, entries) {
-  return { matrix: [
-    [], [], [],
-    [categoryHeader, hourHeader],
-    ...entries.map(([category, hours]) => [category, hours])
-  ] };
+function detailSheet(categoryHeader, hourHeader, entries, firstDataRow, totalCellColumn, prefaceEntries = []) {
+  const matrix = Array.from({length:firstDataRow - 1}, () => []);
+  matrix[3] = [categoryHeader, hourHeader]; // worksheet row 4
+  prefaceEntries.forEach((entry, i) => { matrix[4 + i] = entry; });
+  entries.forEach((entry, i) => { matrix[firstDataRow - 1 + i] = entry; });
+  const ws = { matrix };
+  const lastDataRow = firstDataRow + entries.length - 1;
+  ws[totalCellColumn + '3'] = {
+    v: entries.reduce((sum, entry) => sum + (Number(entry[1]) || 0), 0),
+    f: 'SUBTOTAL(9,' + totalCellColumn + firstDataRow + ':' + totalCellColumn + Math.max(firstDataRow, lastDataRow) + ')'
+  };
+  return ws;
 }
 const X = { utils: { sheet_to_json: (ws) => ws.matrix } };
 const mtcWorkbook = {
@@ -96,20 +102,20 @@ const mtcWorkbook = {
     'Report MTC': sheet({E18:2,E9:5,J19:1,J10:1.25,N18:1,N9:0.75}),
     'Lost Time Printing': detailSheet('Category','Hour',[
       ['MTC',2],[' IPM ',100],['MTC',3],['MTC REPAIR',50],['MECHANICAL FAILURE',9]
-    ]),
+    ],13,'I',[['MTC',99]]),
     'Lost Time AP': detailSheet('Category','Hour',[
       ['MTC',1.25],['IPM',80],['MTC Repair',7]
-    ]),
+    ],39,'J',[['MTC',70]]),
     'Lost Time FG': detailSheet('Category','Hour',[
       ['MTC',0.75],['IPM',5],['ELECTRICAL FAILURE',12]
-    ])
+    ],5,'J')
   }
 };
 const audit = context.extractMtcAudit(X, mtcWorkbook);
 assert.ok(audit, 'MTC audit should be produced when detail and pivot sheets exist');
 assert.equal(audit.mismatch, false, 'Matching exact-MTC detail and pivot values should pass');
-assert.deepEqual(Array.from(audit.rows, r => [r.detailRecords,r.detailHours,r.pivotRecords,r.pivotHours]), [
-  [2,5,2,5], [1,1.25,1,1.25], [1,0.75,1,0.75]
+assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r.detailHours,r.pivotRecords,r.pivotHours]), [
+  [13,2,5,2,5], [39,1,1.25,1,1.25], [5,1,0.75,1,0.75]
 ]);
 
 const stalePivot = {
