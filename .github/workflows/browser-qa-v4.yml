@@ -529,11 +529,21 @@ jobs:
             // Stub data reads during the 100-card sweep so an absent CI backend session
             // cannot log out the synthetic Superadmin and cascade into navigation errors.
             await page.evaluate(() => {
-              if (window.OMODOS4 && typeof window.OMODOS4.serverRead === 'function' &&
+              if (!window.OMODOS4) return;
+              // Routing sweep tests the 100-card UI, not a synthetic backend session.
+              // RBAC has already been tested above with both denied and Superadmin users.
+              // Isolate the sweep from background auth refreshes triggered by the unavailable CI backend.
+              if (typeof window.OMODOS4.serverRead === 'function' &&
                   !window.__qaOriginalServerRead) {
                 window.__qaOriginalServerRead = window.OMODOS4.serverRead;
                 window.OMODOS4.serverRead = async () => null;
                 window.__qaServerReadStubbed = true;
+              }
+              if (typeof window.OMODOS4.isAllowed === 'function' &&
+                  !window.__qaOriginalIsAllowed) {
+                window.__qaOriginalIsAllowed = window.OMODOS4.isAllowed;
+                window.OMODOS4.isAllowed = () => true;
+                window.__qaAccessGuardStubbed = true;
               }
             });
             for (let i = 0; i < moduleCount; i++) {
@@ -727,6 +737,16 @@ jobs:
             if (featureClickQA.checked !== 100 || featureClickQA.failures.length) {
               throw new Error('OMODOS 4 feature click regression failed: ' + JSON.stringify(featureClickQA.failures.slice(0, 12)));
             }
+            await page.evaluate(() => {
+              if (window.OMODOS4 && window.__qaOriginalServerRead) {
+                window.OMODOS4.serverRead = window.__qaOriginalServerRead;
+                delete window.__qaOriginalServerRead;
+              }
+              if (window.OMODOS4 && window.__qaOriginalIsAllowed) {
+                window.OMODOS4.isAllowed = window.__qaOriginalIsAllowed;
+                delete window.__qaOriginalIsAllowed;
+              }
+            });
             result.phases.push('all-100-feature-clicks');
 
             console.log('[QA] KPI target simulator is distinct from maintenance scenario');
