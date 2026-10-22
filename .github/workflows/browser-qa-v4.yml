@@ -515,15 +515,15 @@ jobs:
             console.log('[QA] all 100 OMODOS 4 feature clicks');
             const featureClickQA = { checked: 0, failures: [] };
             for (let i = 0; i < moduleCount; i++) {
-              const module = page.locator('#v4-nav-group [data-v4-safe-module]').nth(i);
+              const module = page.locator('#v4-nav-group [data-v4-safe-module="' + (i + 1) + '"]');
               for (let j = 0; j < 10; j++) {
                 const beforeErr = errors.length;
                 try {
-                  await module.evaluate(el => el.click());
+                  await module.click({ timeout: 2500, force: true });
                   // Wait for the workspace grid to be fully restored. Feature-specific
                   // modules can mount asynchronously after a prior click; a fixed 20 ms
                   // delay can inspect the detail panel instead of the next grid.
-                  await page.waitForFunction((workspaceIndex) => {
+                  const waitForWorkspace = (timeout) => page.waitForFunction((workspaceIndex) => {
                     const view = document.getElementById('view-omodos4');
                     const stage = document.getElementById('v4-safe-stage');
                     const activeModule = document.querySelector(
@@ -536,12 +536,41 @@ jobs:
                       !!activeModule?.classList.contains('active') &&
                       tiles.length === 10 &&
                       tiles.every(el => !!el.querySelector('strong') && !!el.getAttribute('data-v4-feature'));
-                  }, i + 1, { timeout: 5000 });
+                  }, i + 1, { timeout });
+                  try {
+                    await waitForWorkspace(2500);
+                  } catch {
+                    // One retry through the stable data attribute handles a lost transition
+                    // without silently ignoring a persistent navigation regression.
+                    await module.click({ timeout: 2500, force: true });
+                    await waitForWorkspace(6000);
+                  }
                   const tile = page.locator('#v4-safe-stage [data-v4-feature]').nth(j);
                   const featureNo = Number(await tile.getAttribute('data-v4-feature'));
                   const featureLabel = ((await tile.locator('strong').textContent()) || '').trim();
-                  await tile.evaluate(el => el.click());
-                  await page.waitForTimeout(35);
+                  let detailSelector = '';
+                  if (featureNo <= 20) detailSelector = '[data-v4-mp-feature="' + featureNo + '"]';
+                  else if (featureNo <= 30) detailSelector = '[data-v4-sf-feature="' + featureNo + '"]';
+                  else if (featureNo <= 40) detailSelector = '[data-v4-sp-feature="' + featureNo + '"]';
+                  else if (featureNo <= 50) detailSelector = '[data-v4-rel-feature="' + featureNo + '"]';
+                  else if (featureNo <= 60) detailSelector = '[data-v4-op-feature="' + featureNo + '"]';
+                  else if (featureNo <= 70) detailSelector = '[data-v4-pi-feature="' + featureNo + '"]';
+                  else if (featureNo <= 80) detailSelector = '[data-v4-ai2-feature="' + featureNo + '"]';
+                  else if (featureNo <= 90) detailSelector = '[data-v4-imp-feature="' + featureNo + '"]';
+                  else if (featureNo === 97 || featureNo === 98) detailSelector = '[data-v4-interaction-feature="' + featureNo + '"]';
+                  else detailSelector = '[data-v4-fb-feature="' + featureNo + '"]';
+                  await tile.click({ timeout: 2500, force: true });
+                  await page.waitForFunction((n) => {
+                    const view = document.getElementById('view-omodos4');
+                    const no = document.querySelector('#v4-safe-stage .v4-feature-no');
+                    return !!view?.classList.contains('v4-feature-open') &&
+                      Number.parseInt(no?.textContent || '0', 10) === n;
+                  }, featureNo, { timeout: 4000 });
+                  await page.waitForFunction(({n, selector}) => {
+                    const stage = document.getElementById('v4-safe-stage');
+                    const no = Number.parseInt(stage?.querySelector('.v4-feature-no')?.textContent || '0', 10);
+                    return no === n && !!selector && stage?.querySelectorAll(selector).length === 1;
+                  }, {n:featureNo, selector:detailSelector}, {timeout: 2500});
                   const state = await page.evaluate(({expected, featureNo}) => {
                     const view = document.getElementById('view-omodos4');
                     const stage = document.getElementById('v4-safe-stage');
