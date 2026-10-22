@@ -53,7 +53,7 @@ const oeeWorkbook = {
     }),
     'OEE FG': sheet({
       J2: fgA*fgP*fgQ, J3:fgA, J4:fgP, J5:fgQ,
-      D7:34.83, E7:634.986
+      D7:34.833333333333329, E7:635
     })
   }
 };
