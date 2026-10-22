@@ -8,6 +8,23 @@ const vm = require('node:vm');
 const source = fs.readFileSync('public/omodos4/technical-performance.js', 'utf8');
 assert.ok(source.includes('function defaultDataStartRow(name,headerRow){'),
   'Worksheet import must separate header row from data start row');
+const dataStartStart = source.indexOf('function defaultDataStartRow(name,headerRow){');
+const dataStartEnd = source.indexOf('function extractOfficialOee(wb){', dataStartStart);
+assert.ok(dataStartStart >= 0 && dataStartEnd > dataStartStart,
+  'Default worksheet data-start helper must be directly testable');
+const dataStartContext = {};
+vm.runInNewContext(
+  source.slice(dataStartStart, dataStartEnd) + '\\nthis.defaultDataStartRow = defaultDataStartRow;',
+  dataStartContext
+);
+assert.equal(dataStartContext.defaultDataStartRow('Kertas Kerja', 7), 11,
+  'Formatted Kertas Kerja starts data at row 11, not immediately below its header');
+assert.equal(dataStartContext.defaultDataStartRow('Kertas Kerja (Simple View)', 7), 11,
+  'Simple View Kertas Kerja starts data at row 11');
+assert.equal(dataStartContext.defaultDataStartRow('OEE Printing (2)', 6), 7,
+  'OEE detail uses first data row immediately below header');
+assert.equal(dataStartContext.defaultDataStartRow('Lost Time Printing', 4), 5,
+  'Lost Time detail uses first data row immediately below header');
 const oeeStart = source.indexOf('function extractOfficialOee(wb){');
 const mtcStart = source.indexOf('function extractMtcAudit(X,wb){', oeeStart);
 const end = source.indexOf('function applyMatrix(matrix,headerRow,dataStartRow){', mtcStart);
