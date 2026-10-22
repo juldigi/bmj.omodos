@@ -29218,5 +29218,77 @@ table.omodos-responsive-table>tbody>tr>td::before,#sparepart-lokasi-table td::be
 })();
 </script>
 <!-- OMODOS4_FRONTEND_SAFE_V3 --><script src="/omodos4/hotfix.js" defer></script>
+
+<!-- OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1: superadmin-only module loader -->
+<script>
+(function(){
+  'use strict';
+  var scriptId='omodos-technical-performance-lazy-script';
+  var loadPromise=null, pollTimer=null, attempts=0;
+  function isSuperadmin(){
+    try{
+      var u=(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)||window.CURRENT_USER||null;
+      return !!u&&String(u.role||u.Role||'').toLowerCase()==='superadmin';
+    }catch(e){return false}
+  }
+  function loadModule(){
+    if(!isSuperadmin())return Promise.resolve(false);
+    if(window.OMODOS_TechnicalPerformance&&typeof window.OMODOS_TechnicalPerformance.render==='function'){
+      try{window.OMODOS_TechnicalPerformance.syncAuth()}catch(e){}
+      return Promise.resolve(true);
+    }
+    if(loadPromise)return loadPromise;
+    loadPromise=new Promise(function(resolve,reject){
+      var stale=document.getElementById(scriptId);if(stale)stale.remove();
+      var script=document.createElement('script');
+      script.id=scriptId;
+      script.src='/omodos4/technical-performance.js';
+      script.async=true;
+      script.onload=function(){
+        if(window.OMODOS_TechnicalPerformance&&typeof window.OMODOS_TechnicalPerformance.render==='function')resolve(true);
+        else reject(new Error('Technical Performance script loaded without initializing.'));
+      };
+      script.onerror=function(){script.remove();reject(new Error('Technical Performance script failed to load.'))};
+      document.head.appendChild(script);
+    }).then(function(ok){
+      if(ok&&window.OMODOS_TechnicalPerformance&&window.OMODOS_TechnicalPerformance.syncAuth)window.OMODOS_TechnicalPerformance.syncAuth();
+      if(pollTimer){clearInterval(pollTimer);pollTimer=null}
+      return true;
+    }).catch(function(err){
+      loadPromise=null;
+      console.warn('[OMODOS] Technical Performance is temporarily unavailable:',err);
+      return false;
+    });
+    return loadPromise;
+  }
+  function sync(){
+    if(isSuperadmin()){loadModule();return}
+    if(window.OMODOS_TechnicalPerformance&&window.OMODOS_TechnicalPerformance.syncAuth){
+      try{window.OMODOS_TechnicalPerformance.syncAuth()}catch(e){}
+    }
+  }
+  function hookRbac(){
+    if(window.__OMODOS_TP_RBAC_HOOKED)return true;
+    var original=window.applyRbacToUi;
+    if(typeof original!=='function')return false;
+    window.__OMODOS_TP_RBAC_HOOKED=true;
+    window.applyRbacToUi=function(){
+      var result=original.apply(this,arguments);
+      setTimeout(sync,0);
+      return result;
+    };
+    return true;
+  }
+  hookRbac();
+  window.addEventListener('focus',sync);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)sync()});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(sync,0)},{once:true});
+  else setTimeout(sync,0);
+  pollTimer=setInterval(function(){
+    hookRbac();sync();attempts++;
+    if(attempts>=120&&pollTimer){clearInterval(pollTimer);pollTimer=null}
+  },1800);
+})();
+</script>
 </body>
 </html>
