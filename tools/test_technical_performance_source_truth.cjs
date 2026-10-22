@@ -199,6 +199,11 @@ assert.equal(audit.rows[0].detailRangeFromFormula, true, 'MTC audit should prefe
 assert.deepEqual(Array.from(audit.rows, r => [r.subtotalCell,r.subtotalCachedHours]), [
   ['I3',164], ['J3',88.25], ['J3',17.75]
 ], 'Audit must expose the saved all-category SUBTOTAL separately from exact-MTC detail sums');
+assert.deepEqual(Array.from(audit.rows, r => r.subtotalFormula), [
+  'SUBTOTAL(9,I13:I17)', 'SUBTOTAL(9,J39:J41)', 'SUBTOTAL(9,J5:J7)'
+], 'Audit must preserve the saved SUBTOTAL formula per source worksheet');
+assert.ok(source.includes('Formula SUBTOTAL'),
+  'Audit UI must display the actual saved formula alongside its cell and cached value');
 assert.ok(source.includes('Nilai SUBTOTAL tersimpan (semua kategori)'),
   'Audit UI must label the saved SUBTOTAL as all-category worksheet context');
 assert.ok(source.includes('Jam MTC detail pada rentang formula'),
