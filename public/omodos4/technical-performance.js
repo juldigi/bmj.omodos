@@ -301,6 +301,15 @@ function renderOfficialOeeSummaryCard(){
 }
 function renderMtcAuditCard(){
  var a=state.mtcAudit;if(!a)return '';
+ function auditReason(r){
+  var reasons=[];
+  if(!r.complete)reasons.push('kolom sumber tidak lengkap');
+  if(r.eventMismatch)reasons.push('PRO unik ≠ Pivot');
+  if(r.hoursMismatch)reasons.push('jam non-TRIAL ≠ Pivot');
+  if(r.autoFilterCoverageIssue)reasons.push('AutoFilter terpotong');
+  if(r.subtotalCoverageIssue)reasons.push('rentang SUBTOTAL lebih pendek dari data');
+  return reasons.length?reasons.join('; '):'Cocok';
+ }
  var rows=a.rows.map(function(r){return {
   'Grup':r.group,'Rentang SUBTOTAL':r.detailRangeFromFormula?(r.detailStartRow+'–'+r.detailEndRow):'Fallback',
   'Baris MTC':fmt(r.detailRecords,0),'PRO unik non-TRIAL':fmt(r.detailEvents,0),'Baris TRIAL':fmt(r.trialRecords,0),
@@ -308,7 +317,7 @@ function renderMtcAuditCard(){
   'Kejadian Pivot':Number.isFinite(r.pivotRecords)?fmt(r.pivotRecords,0):'—','Jam Pivot':Number.isFinite(r.pivotHours)?fmt(r.pivotHours,2):'—',
   'Δ jam non-TRIAL − Pivot':Number.isFinite(r.deltaHours)?fmt(r.deltaHours,2):'—',
   'Rentang AutoFilter':r.filterRange,'Rentang data':r.usedRange,
-  'Status':!r.complete?'Data sumber tidak lengkap':r.mismatch?'Perlu rekonsiliasi':'Cocok'
+  'Status':auditReason(r)
  };});
  rows.push({
   'Grup':'TOTAL','Rentang SUBTOTAL':'—',
