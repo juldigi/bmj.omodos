@@ -259,7 +259,7 @@ function detailSheet(categoryHeader, hourHeader, entries, firstDataRow, totalCel
 const X = { utils: { sheet_to_json: (ws) => ws.matrix } };
 const mtcWorkbook = {
   Sheets: {
-    'Report MTC': sheet({E18:1,E9:5,J19:1,J10:1.25,N18:1,N9:0.75}),
+    'Report MTC': sheet({E18:3,E9:5,J19:1,J10:1.25,N18:1,N9:0.75}),
     'Lost Time Printing': detailSheet('Category','Hour',[
       ['WO-1','MTC',2],['WO-2',' IPM ',100],['WO-1','MTC',3],['TRIAL','MTC',50],['WO-3','MTC REPAIR',9]
     ],13,'I',[['OLD-WO',' IPM ',99]]),
@@ -274,8 +274,8 @@ const mtcWorkbook = {
 const audit = context.extractMtcAudit(X, mtcWorkbook);
 assert.ok(audit, 'MTC audit should be produced when detail and pivot sheets exist');
 assert.equal(audit.mismatch, false, 'Matching exact-MTC detail and pivot values should pass');
-assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r.detailEvents,r.trialRecords,r.detailHours,r.nonTrialHours,r.pivotRecords,r.pivotHours,r.deltaHours]), [
-  [13,3,1,1,55,5,1,5,0], [39,1,1,0,1.25,1.25,1,1.25,0], [5,1,1,0,0.75,0.75,1,0.75,0]
+assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r.detailHourRecords,r.detailEvents,r.trialRecords,r.detailHours,r.nonTrialHours,r.pivotRecords,r.pivotHours,r.deltaHours]), [
+  [13,3,3,1,1,55,5,3,5,0], [39,1,1,1,0,1.25,1.25,1,1.25,0], [5,1,1,1,0,0.75,0.75,1,0.75,0]
 ]);
 assert.equal(audit.rows[0].detailEndRow, 17, 'MTC audit must preserve the SUBTOTAL end row');
 assert.equal(audit.rows[0].detailRangeFromFormula, true, 'MTC audit should prefer explicit SUBTOTAL bounds');
@@ -295,6 +295,28 @@ assert.equal(audit.mismatch, false,
   'A worksheet-wide cached SUBTOTAL must not be compared directly with MTC-only Pivot totals');
 assert.equal(audit.incidentCountReliable, true, 'Complete full-sheet PRO data should independently validate event count');
 assert.equal(audit.incidentCount, 3, 'Event count is based on distinct non-TRIAL PRO IDs across every detail sheet');
+
+// The Report MTC pivot is labelled "Count of Hour", so it counts rows with a
+// numeric Hour value rather than distinct PRO identities. Printing deliberately
+// repeats the same PRO across two MTC rows and has one TRIAL MTC row: Hour count=3,
+// unique non-TRIAL PRO count=1. A stale pivot of 1 must not falsely reconcile.
+const uniqueProMisreadWorkbook = {
+  Sheets: {
+    ...mtcWorkbook.Sheets,
+    'Report MTC': sheet({E18:1,E9:5,J19:1,J10:1.25,N18:1,N9:0.75})
+  }
+};
+const uniqueProMisreadAudit = context.extractMtcAudit(X, uniqueProMisreadWorkbook);
+assert.equal(uniqueProMisreadAudit.rows[0].detailEvents, 1,
+  'Repeated PRO rows collapse to one unique event ID');
+assert.equal(uniqueProMisreadAudit.rows[0].detailHourRecords, 3,
+  'Count of Hour semantics retain all three MTC rows with numeric Hour values');
+assert.equal(uniqueProMisreadAudit.rows[0].pivotRecordMismatch, true,
+  'A pivot count that matches unique PROs but not Hour rows must be flagged');
+assert.equal(uniqueProMisreadAudit.mismatch, true,
+  'The audit cannot pass by comparing unlike Count of Hour and unique-PRO metrics');
+assert.equal(uniqueProMisreadAudit.incidentCount, 3,
+  'Unique PRO incident total remains separately available during count reconciliation');
 
 // A saved worksheet filter can hide MTC rows while the cached SUBTOTAL/Pivot is stale.
 // Keep the full-source event identity count independent, but block duration KPIs.
