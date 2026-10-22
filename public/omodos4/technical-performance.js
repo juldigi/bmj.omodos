@@ -163,15 +163,29 @@ function odinHours(row){
  if(!seen)return NaN;
  return o.durationUnit==='minutes'?sum/60:sum;
 }
+function odinCanonicalIssue(machine,issue){
+ var m=String(machine||'').toUpperCase().replace(/[^A-Z0-9]+/g,'').trim();
+ var low=String(issue||'').toLowerCase().replace(/\\s+/g,' ').trim();
+ /* Curated aliases grounded in the existing ODIN records and approved MOR grouping.
+    The original descriptions are retained alongside this label for auditability. */
+ if((m==='APM2'||m==='APM#2')&&/timm?ing|fedtabel|feed\\s*table/.test(low))return 'Timing Feed Table';
+ if((m==='OFU1'||m==='OFU#1')&&/(roll.*(tinta|bak)|tinta.*roll)/.test(low)&&/(unit\\s*8|\\bu8\\b|putaran|tidak berputar|abnormal|berhenti)/.test(low))return 'Roll Bak Tinta Unit 8 — Tidak Berputar / Abnormal';
+ if(/gripper|griper/.test(low))return 'Gripper Transfer';
+ if(/register/.test(low))return 'Register Berubah / Abnormal';
+ if(/feeder|sucker|vacum|vacuum/.test(low))return 'Feeder / Suction — Abnormal';
+ return String(issue||'').trim().replace(/\\s+/g,' ');
+}
 function odinTopRows(){
  var o=state.odin;if(!o.rows.length||!o.mapping.problem)return [];
  var groups={};
  o.rows.forEach(function(row){
   var issue=String(oVal(row,'problem')||'').trim(),machine=String(oVal(row,'machine')||'').trim();
-  if(!issue||/^(grand\s+)?total$|^subtotal$|^jumlah(\s+total)?$/i.test(issue))return;
-  var norm=(machine+' | '+issue).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  if(!issue||/^(grand\\s+)?total$|^subtotal$|^jumlah(\\s+total)?$/i.test(issue))return;
+  var canonical=odinCanonicalIssue(machine,issue);
+  var norm=(machine+' | '+canonical).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   if(!norm)return;
-  var g=groups[norm];if(!g)g=groups[norm]={machine:machine||'—',issue:issue,section:String(oVal(row,'section')||'—').trim()||'—',rootCause:String(oVal(row,'rootCause')||'').trim(),corrective:String(oVal(row,'corrective')||'').trim(),actionPlan:String(oVal(row,'actionPlan')||'').trim(),hours:0,hasDuration:false,rows:0,notifications:{},fallbackEvents:0};
+  var g=groups[norm];if(!g)g=groups[norm]={machine:machine||'—',issue:canonical,section:String(oVal(row,'section')||'—').trim()||'—',rootCause:String(oVal(row,'rootCause')||'').trim(),corrective:String(oVal(row,'corrective')||'').trim(),actionPlan:String(oVal(row,'actionPlan')||'').trim(),hours:0,hasDuration:false,rows:0,notifications:{},fallbackEvents:0,sourceVariants:{}};
+  g.sourceVariants[issue]=true;
   var h=odinHours(row);if(Number.isFinite(h)){g.hours+=h;g.hasDuration=true;}
   g.rows++;
   var notif=String(oVal(row,'notif')||'').trim();if(notif)g.notifications[notif]=true;else g.fallbackEvents++;
@@ -180,7 +194,7 @@ function odinTopRows(){
   if(!g.corrective&&oVal(row,'corrective'))g.corrective=String(oVal(row,'corrective')).trim();
   if(!g.actionPlan&&oVal(row,'actionPlan'))g.actionPlan=String(oVal(row,'actionPlan')).trim();
  });
- return Object.keys(groups).map(function(k){var g=groups[k];g.events=Object.keys(g.notifications).length+g.fallbackEvents;return g;}).sort(function(a,b){return (b.hasDuration?b.hours:-1)-(a.hasDuration?a.hours:-1);}).slice(0,3);
+ return Object.keys(groups).map(function(k){var g=groups[k];g.events=Object.keys(g.notifications).length+g.fallbackEvents;g.variants=Object.keys(g.sourceVariants);return g;}).sort(function(a,b){return (b.hasDuration?b.hours:-1)-(a.hasDuration?a.hours:-1);}).slice(0,3);
 }
 function odinLatestMonthLabel(){var n=odinLatestMonth(state.odin.sheetNames);return n>=0?ODIN_MONTHS[n]+' 2026':'bulan belum teridentifikasi';}
 function odinActionContent(){
@@ -189,9 +203,9 @@ function odinActionContent(){
  var latest=odinLatestMonth(o.sheetNames),top=odinTopRows(),warn=latest>=0&&latest<8;
  var sourceControls='<div class="tp-card"><h3 class="tp-section-title">Sumber Top 3 — ODIN</h3><div class="tp-form"><label>Worksheet ODIN<select id="tp-odin-sheet">'+o.sheetNames.map(function(n){return '<option value="'+esc(n)+'" '+(n===o.sheetName?'selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select></label><label>Baris header<input id="tp-odin-header-row" type="number" min="1" max="100" step="1" value="'+o.headerRow+'"></label><label>File aktif<input value="'+esc(o.fileName)+'" disabled></label></div><p class="tp-muted">Sheet aktif: '+esc(o.sheetName)+' · '+o.rows.length+' baris data. Durasi ditampilkan sebagai jam dengan asumsi kolom Elec/Mech/Comp memakai menit; verifikasi definisi unit pada workbook asli sebelum memakai angka.</p>'+(warn?'<p class="tp-message warn">PERINGATAN PERIODE: worksheet ODIN terbaru yang ditemukan hanya sampai '+esc(odinLatestMonthLabel())+'. Data sheet ini tidak boleh dianggap sebagai Top 3 September 2026.</p>':'')+'</div>';
  var mapping='<div class="tp-card" style="margin-top:12px"><h3 class="tp-section-title">Pemetaan kolom ODIN</h3><div class="tp-form">'+odinFieldSelect('machine','Mesin')+odinFieldSelect('date','Tanggal mulai')+odinFieldSelect('notif','Nomor notifikasi')+odinFieldSelect('section','Kategori / section')+odinFieldSelect('problem','Problem / isu')+odinFieldSelect('elec','Durasi Elec')+odinFieldSelect('mech','Durasi Mech')+odinFieldSelect('comp','Durasi Comp')+odinFieldSelect('rootCause','Root cause')+odinFieldSelect('corrective','Corrective action')+odinFieldSelect('actionPlan','Action plan')+'</div><div class="tp-actions"><label class="tp-muted">Satuan durasi sumber<select id="tp-odin-unit"><option value="minutes" '+(o.durationUnit==='minutes'?'selected':'')+'>Menit (÷ 60 menjadi jam)</option><option value="hours" '+(o.durationUnit==='hours'?'selected':'')+'>Jam</option></select></label><button class="tp-btn primary" id="tp-odin-apply-map">Terapkan pemetaan ODIN</button><button class="tp-btn" id="tp-odin-reset">Ganti file ODIN</button></div></div>';
- var issueRows=top.map(function(g,i){return {'Rank':i+1,'Issue / mesin (ODIN)':g.issue,'Mesin':g.machine,'Section':g.section,'Kejadian / notif':g.events,'LT ODIN (jam)':g.hasDuration?fmt(g.hours,2):'—','Root cause':g.rootCause||'—','Corrective action':g.corrective||'—','Action plan':g.actionPlan||'—'};});
+ var issueRows=top.map(function(g,i){return {'Rank':i+1,'Issue / mesin (ODIN)':g.issue,'Mesin':g.machine,'Section':g.section,'Kejadian / notif':g.events,'LT ODIN (jam)':g.hasDuration?fmt(g.hours,2):'—','Variasi deskripsi sumber':g.variants.join(' | '),'Root cause':g.rootCause||'—','Corrective action':g.corrective||'—','Action plan':g.actionPlan||'—'};});
  var ready=!!o.mapping.problem&&['elec','mech','comp'].some(function(k){return !!o.mapping[k];});
- var topSection='<div class="tp-card" style="margin-top:12px"><h3 class="tp-section-title">Top 3 Issue dari ODIN</h3><p class="tp-muted">Dikelompokkan berdasarkan mesin + deskripsi Problem pada worksheet aktif dan diurutkan dari total durasi yang dipetakan. Data ODIN tidak dipakai untuk menghitung OEE atau Lost Time agregat MTC.</p>'+(!ready?'<div class="tp-empty">Petakan kolom Problem serta minimal satu kolom durasi Elec/Mech/Comp agar Top 3 dapat dihitung.</div>':table(issueRows,['Rank','Issue / mesin (ODIN)','Mesin','Section','Kejadian / notif','LT ODIN (jam)','Root cause','Corrective action','Action plan']))+'<div class="tp-muted">Bila kolom Root cause, Corrective action, atau Action plan tidak tersedia pada sheet, isinya ditampilkan sebagai —. Tidak dibuat otomatis dari deskripsi isu.</div></div>';
+ var topSection='<div class="tp-card" style="margin-top:12px"><h3 class="tp-section-title">Top 3 Issue dari ODIN</h3><p class="tp-muted">Dikelompokkan berdasarkan mesin + deskripsi Problem pada worksheet aktif dan diurutkan dari total durasi yang dipetakan. Data ODIN tidak dipakai untuk menghitung OEE atau Lost Time agregat MTC.</p>'+(!ready?'<div class="tp-empty">Petakan kolom Problem serta minimal satu kolom durasi Elec/Mech/Comp agar Top 3 dapat dihitung.</div>':table(issueRows,['Rank','Issue / mesin (ODIN)','Mesin','Section','Kejadian / notif','LT ODIN (jam)','Variasi deskripsi sumber','Root cause','Corrective action','Action plan']))+'<div class="tp-muted">Bila kolom Root cause, Corrective action, atau Action plan tidak tersedia pada sheet, isinya ditampilkan sebagai —. Tidak dibuat otomatis dari deskripsi isu.</div></div>';
  return sourceControls+mapping+topSection;
 }
 function number(v){if(typeof v==='number')return Number.isFinite(v)?v:NaN;var s=String(v==null?'':v).trim().replace(/\s/g,'');if(!s)return NaN;if(s.indexOf(',')>=0&&s.indexOf('.')>=0)s=s.replace(/\./g,'').replace(',','.');else if(s.indexOf(',')>=0)s=s.replace(',','.');var n=Number(s.replace(/%$/,''));if(String(v).indexOf('%')>=0)n=n/100;return Number.isFinite(n)?n:NaN;}
