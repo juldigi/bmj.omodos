@@ -122,7 +122,7 @@ assert.ok(helperStart >= 0 && calcStart > helperStart && calcEnd > calcStart,
   'Calculation helpers must remain directly testable');
 const calcContext = { state: { rows: [], headers: [], mapping: {} } };
 vm.runInNewContext(
-  source.slice(helperStart, calcEnd) + '\\nthis.calc = calc;',
+  source.slice(helperStart, calcEnd) + '\nthis.calc = calc;',
   calcContext
 );
 calcContext.state.rows = [
