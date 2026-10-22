@@ -114,4 +114,46 @@ assert.equal(mismatch.rows[0].mismatch, true);
 assert.equal(mismatch.rows[1].mismatch, true);
 assert.equal(mismatch.rows[2].mismatch, true);
 
-console.log('Technical Performance source-truth tests passed: OEE/TEEP formulas, exact-MTC filtering, and detail-vs-pivot mismatch detection.');
+// Missing source mappings must display as unavailable, not as zero downtime/events.
+const calcStart = source.indexOf('function calc(){');
+const helperStart = source.indexOf('function val(row,key){');
+const calcEnd = source.indexOf('function metric(', calcStart);
+assert.ok(helperStart >= 0 && calcStart > helperStart && calcEnd > calcStart,
+  'Calculation helpers must remain directly testable');
+const calcContext = { state: { rows: [], headers: [], mapping: {} } };
+vm.runInNewContext(
+  source.slice(helperStart, calcEnd) + '\\nthis.calc = calc;',
+  calcContext
+);
+calcContext.state.rows = [
+  { Category:'MTC', LT:1.5, DT:2, BD:1 },
+  { Category:'IPM', LT:8, DT:3, BD:0 }
+];
+const unmapped = calcContext.calc();
+assert.ok(Number.isNaN(unmapped.mtcHours), 'MTC lost time must be unavailable before category/duration mappings');
+assert.ok(Number.isNaN(unmapped.totalHours), 'Total downtime must be unavailable before downtime mapping');
+assert.ok(Number.isNaN(unmapped.ratio), 'MTC share must be unavailable before both sources are mapped');
+assert.ok(Number.isNaN(unmapped.incidents), 'MTC incident count must not default to zero before category mapping');
+
+calcContext.state.mapping = { category:'Category', lt:'LT', downtime:'DT' };
+const mapped = calcContext.calc();
+near(mapped.mtcHours, 1.5, 'Mapped exact-MTC lost time');
+near(mapped.totalHours, 5, 'Mapped total downtime');
+near(mapped.ratio, 0.3, 'Mapped MTC share');
+assert.equal(mapped.incidents, 1, 'Mapped fallback incident count only includes exact MTC rows');
+
+calcContext.state.rows = [
+  { Category:'MTC', LT:'', DT:2 },
+  { Category:'IPM', LT:8, DT:3 }
+];
+const incompleteMtcDuration = calcContext.calc();
+assert.ok(Number.isNaN(incompleteMtcDuration.mtcHours),
+  'Mapped but blank MTC Lost Time must not silently fall back to general downtime');
+
+calcContext.state.rows = [{ Category:'IPM', LT:8, DT:3 }];
+const mappedNoMtcRows = calcContext.calc();
+near(mappedNoMtcRows.mtcHours, 0, 'Mapped source with no exact-MTC rows should legitimately show zero');
+near(mappedNoMtcRows.totalHours, 3, 'Mapped total downtime without MTC rows');
+near(mappedNoMtcRows.ratio, 0, 'Mapped MTC share without MTC rows');
+
+console.log('Technical Performance source-truth tests passed: OEE/TEEP formulas, exact-MTC reconciliation, and missing-mapping safety.');
