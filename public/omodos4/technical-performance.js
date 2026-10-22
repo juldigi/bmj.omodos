@@ -143,7 +143,7 @@ function dashboardMarkup(){
  var detailRows=all.filter(function(r){return (!STATE.group||r.group===STATE.group)&&(!STATE.machine||r.machine===STATE.machine);}).map(deriveRow);
  var cards=[['OEE',kOee,'Availability × Performance × Quality','primary'],['TEEP',kTeep,'Utilization × OEE','teep'],['Availability',kA,'Operating Time ÷ PPT',''],['Performance',kP,'Net Operating Time ÷ OT',''],['Quality',kQ,'FPT ÷ NOT; Good/Total ditandai sementara',''],['Utilization',kU,'PPT ÷ POT','']];
  return '<div class="tp-filter-row"><div class="tp-field"><label for="tp-period-filter">Periode</label><select id="tp-period-filter"><option value="">Periode terbaru</option>'+periodOptions+'</select></div><div class="tp-field"><label for="tp-group-filter">Grup mesin</label><select id="tp-group-filter"><option value="">Semua grup</option>'+groupOptions+'</select></div><div class="tp-field"><label for="tp-machine-filter">Mesin (opsional)</label><select id="tp-machine-filter"><option value="">Ringkasan grup</option>'+machineOptions+'</select></div></div>'+
- '<div class="tp-message'+(ds?'':' visible warning')+'" id="tp-data-context">'+(ds?'Sumber: '+esc(ds.sourceName)+' · sheet '+esc(ds.sheetName||'—')+' · '+esc(ds.rows.length)+' baris ternormalisasi · '+esc(shortPeriod(ds.period))+(ds.incomplete?' · <escape>Impor tidak lengkap</escape>':''):'Belum ada workbook yang diimpor. Dashboard tidak menampilkan data contoh.')+'</div>'+
+ '<div class="tp-message'+(ds?'':' visible warning')+'" id="tp-data-context">'+(ds?'Sumber: '+esc(ds.sourceName)+' · sheet '+esc(ds.sheetName||'—')+' · '+esc(ds.rows.length)+' baris ternormalisasi · '+esc(shortPeriod(ds.period))+(ds.incomplete?' · Impor tidak lengkap':''):'Belum ada workbook yang diimpor. Dashboard tidak menampilkan data contoh.')+'</div>'+
  '<div class="tp-kpis">'+cards.map(function(c){return '<div class="tp-kpi '+c[3]+(c[1]==null?' needs-data':'')+'"><span>'+esc(c[0])+'</span><strong>'+ratioPct(c[1])+'</strong><small>'+esc(c[2])+'</small></div>';}).join('')+'</div>'+
  '<div class="tp-dashboard-grid"><section class="tp-panel"><div class="tp-panel-head"><div><h2>Perbandingan OEE</h2><div class="tp-muted">OEE dari hasil rumus A × P × Q bila faktor lengkap.</div></div></div>'+barRows(rows,'oee','OEE')+'</section>'+
  '<section class="tp-panel"><div class="tp-panel-head"><div><h2>Perbandingan TEEP</h2><div class="tp-muted">TEEP memerlukan Utilization dan OEE yang sebanding.</div></div></div>'+barRows(rows,'teep','TEEP')+'</section></div>'+
@@ -227,7 +227,7 @@ function validateAndPreview(){
  var noPptPot=dataRows.some(function(r){return r.plannedTime==null||r.calendarTime==null;});if(noPptPot)STATE.importWarnings.push('Sebagian baris belum memiliki PPT/POT. TEEP akan ditandai belum tervalidasi jika basis waktu tidak lengkap.');
  var noQuality=dataRows.some(function(r){return r.fullyProductiveTime==null&&r.qualityInput==null&&!(r.goodQty!=null&&r.totalQty>0);});if(noQuality)STATE.importWarnings.push('Sebagian baris belum memiliki Quality, FPT/NOT, atau Good/Total. OEE mungkin belum bisa dihitung.');
  var ncOnly=dataRows.some(function(r){return r.ncQty!=null&&r.goodQty==null;});if(ncOnly)STATE.importWarnings.push('Kolom NC ditemukan tanpa Good Qty. NC tidak ditambahkan ke produk baik secara otomatis.');
- var period=$('tp-import-period')?$('tp-import-period').value:'';if(period){dataRows.forEach(function(r){if(!r.period)r.period=period;});}
+ var period=$('tp-import-period')?$('tp-import-period').value:'';if(period)STATE.period=period;if(period){dataRows.forEach(function(r){if(!r.period)r.period=period;});}
  var invalid=dataRows.some(function(r){return (r.plannedTime!=null&&r.calendarTime!=null&&r.plannedTime>r.calendarTime*1.05)||(r.operatingTime!=null&&r.plannedTime!=null&&r.operatingTime>r.plannedTime*1.05)||(r.netOperatingTime!=null&&r.operatingTime!=null&&r.netOperatingTime>r.operatingTime*1.05)||(r.fullyProductiveTime!=null&&r.netOperatingTime!=null&&r.fullyProductiveTime>r.netOperatingTime*1.05);});if(invalid)STATE.importWarnings.push('Ada rasio waktu yang melebihi batas logis. Periksa satuan, sumber, dan cakupan data sebelum dipakai.');
  STATE.preview=dataRows;STATE.importWarnings=Array.from(new Set(STATE.importWarnings));renderImportOnly();
  if(STATE.importErrors.length)notify(STATE.importErrors.join(' '),'error');else notify('Validasi selesai: '+dataRows.length+' baris dinormalisasi. Cek peringatan dan hasil rumus sebelum menyimpan.',STATE.importWarnings.length?'warning':'success');
@@ -241,9 +241,8 @@ function chunkRows(rows,metadata){
 }
 async function saveImport(){
  if(!isSuperadmin()||STATE.saving)return;if(!STATE.preview.length||STATE.importErrors.length){notify('Validasi harus berhasil sebelum impor disimpan.','error');return;}
- STATE.saving=true;renderImportOnly();
- var datasetId='TP-'+randomId(),importedAt=new Date().toISOString(),period=$('tp-import-period')?$('tp-import-period').value:'';
- if(!period)period=STATE.preview.find(function(r){return r.period;})?.period||'';
+ var period=$('tp-import-period')?$('tp-import-period').value:'';if(!period)period=STATE.preview.find(function(r){return r.period;})?.period||'';STATE.period=period;STATE.saving=true;renderImportOnly();
+ var datasetId='TP-'+randomId(),importedAt=new Date().toISOString();
  var rows=STATE.preview.slice();var metadata={datasetId:datasetId,sourceName:STATE.fileName,sheetName:STATE.sheetName,period:period,importedAt:importedAt,sourceSize:STATE.fileSize};
  var chunks;
  try{chunks=chunkRows(rows,metadata);}catch(e){STATE.saving=false;renderImportOnly();notify(e.message,'error');return;}
