@@ -136,6 +136,28 @@ assert.equal(truncatedFilterAudit.rows[0].mismatch, true,
 assert.ok(truncatedFilterAudit.note.includes('AutoFilter'),
   'Audit note must explain incomplete AutoFilter coverage');
 
+// Even if AutoFilter spans the used rows, a SUBTOTAL formula that stops early
+// must flag the later worksheet rows as outside the formula's coverage.
+const staleSubtotalRangeWorkbook = {
+  Sheets: {
+    ...mtcWorkbook.Sheets,
+    'Lost Time Printing': {
+      ...mtcWorkbook.Sheets['Lost Time Printing'],
+      '!ref':'A1:J2944',
+      '!autofilter':{ref:'A4:J2944'}
+    }
+  }
+};
+const staleSubtotalRangeAudit = context.extractMtcAudit(X, staleSubtotalRangeWorkbook);
+assert.equal(staleSubtotalRangeAudit.rows[0].autoFilterCoverageIssue, false,
+  'A full-width AutoFilter should not be flagged as truncated');
+assert.equal(staleSubtotalRangeAudit.rows[0].subtotalCoverageIssue, true,
+  'A SUBTOTAL formula ending before used data must be flagged');
+assert.equal(staleSubtotalRangeAudit.rows[0].rangeCoverageIssue, true,
+  'A short SUBTOTAL range must still block clean reconciliation');
+assert.ok(staleSubtotalRangeAudit.note.includes('SUBTOTAL'),
+  'Audit note must explain incomplete SUBTOTAL coverage');
+
 const stalePivot = {
   Sheets: {
     ...mtcWorkbook.Sheets,
