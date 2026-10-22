@@ -45,12 +45,20 @@ function extractOfficialOee(wb){
 function extractMtcAudit(X,wb){
  if(!X||!wb||!wb.Sheets||!wb.Sheets['Report MTC'])return null;
  var details=[
-  {group:'Printing',sheet:'Lost Time Printing',category:'Category',hour:'Hour',totalCell:'I3',fallbackStartRow:13},
-  {group:'APM',sheet:'Lost Time AP',category:'Category',hour:'Hour',totalCell:'J3',fallbackStartRow:39},
-  {group:'FGM',sheet:'Lost Time FG',category:'Category',hour:'Hour',totalCell:'J3',fallbackStartRow:5}
+  {group:'Printing',sheet:'Lost Time Printing',category:'Category',hour:'Hour',pro:'PRO',totalCell:'I3',fallbackStartRow:13},
+  {group:'APM',sheet:'Lost Time AP',category:'Category',hour:'Hour',pro:'PRO',totalCell:'J3',fallbackStartRow:39},
+  {group:'FGM',sheet:'Lost Time FG',category:'Category',hour:'Hour',pro:'PRO',totalCell:'J3',fallbackStartRow:5}
  ];
  var pivots=[{records:'E18',hours:'E9'},{records:'J19',hours:'J10'},{records:'N18',hours:'N9'}];
  function n(v){if(typeof v==='number')return Number.isFinite(v)?v:NaN;var x=String(v==null?'':v).trim();if(!x)return NaN;var a=Number(x);return Number.isFinite(a)?a:NaN;}
+ function rangeEnd(ref){var m=String(ref||'').match(/(?:^|:)\$?[A-Z]{1,3}\$?(\d+)$/i);return m?Number(m[1]):NaN;}
+ function filterInfo(ws){
+  var usedRange=String(ws&&ws['!ref']||''),auto=ws&&ws['!autofilter'];
+  var filterRange=String(typeof auto==='string'?auto:(auto&&auto.ref)||'');
+  var usedEnd=rangeEnd(usedRange),filterEnd=rangeEnd(filterRange);
+  return {usedRange:usedRange||'—',filterRange:filterRange||'—',
+   rangeCoverageIssue:!!filterRange&&Number.isFinite(usedEnd)&&Number.isFinite(filterEnd)&&filterEnd<usedEnd};
+ }
  function effectiveStartRow(ws,d){
   var formula=String(ws&&ws[d.totalCell]&&ws[d.totalCell].f||'');
   var match=formula.match(/SUBTOTAL\s*\(\s*9\s*,\s*\$?[A-Z]{1,3}\$?(\d+)\s*:/i);
@@ -58,26 +66,41 @@ function extractMtcAudit(X,wb){
   return Number.isInteger(start)&&start>=5?start:d.fallbackStartRow;
  }
  var result=details.map(function(d,i){
-  var ws=wb.Sheets[d.sheet],detailRecords=0,detailHours=0,complete=true,startRow=d.fallbackStartRow;
+  var ws=wb.Sheets[d.sheet],detailRecords=0,detailHours=0,nonTrialHours=0,trialRecords=0,complete=true,startRow=d.fallbackStartRow,eventIds=new Set();
   if(ws){
-   // Keep physical row positions intact: formula ranges refer to worksheet row numbers.
+   // Keep physical row positions intact: the source subtotal formula points to a specific data range.
    var matrix=X.utils.sheet_to_json(ws,{header:1,defval:'',raw:true,blankrows:true});
    var header=matrix[3]||[];
    var catIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.category.toLowerCase();});
    var hourIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.hour.toLowerCase();});
+   var proIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.pro.toLowerCase();});
    startRow=effectiveStartRow(ws,d);
-   if(catIndex<0||hourIndex<0)complete=false;
+   if(catIndex<0||hourIndex<0||proIndex<0)complete=false;
    else matrix.slice(startRow-1).forEach(function(row){
     if(String(row&&row[catIndex]||'').trim().toUpperCase()!=='MTC')return;
-    detailRecords++;var h=n(row&&row[hourIndex]);if(Number.isFinite(h)&&h>=0)detailHours+=h;else complete=false;
+    detailRecords++;
+    var pro=String(row&&row[proIndex]||'').trim(),isTrial=/^TRIAL$/i.test(pro),h=n(row&&row[hourIndex]);
+    if(isTrial)trialRecords++;
+    else if(pro)eventIds.add(pro.toUpperCase());
+    else complete=false;
+    if(Number.isFinite(h)&&h>=0){detailHours+=h;if(!isTrial)nonTrialHours+=h;}else complete=false;
    });
   }else complete=false;
-  var p=pivots[i],pw=wb.Sheets['Report MTC'];
+  var ranges=filterInfo(ws),p=pivots[i],pw=wb.Sheets['Report MTC'];
   var pivotRecords=n(pw[p.records]&&pw[p.records].v),pivotHours=n(pw[p.hours]&&pw[p.hours].v);
-  var mismatch=!complete||!Number.isFinite(pivotRecords)||!Number.isFinite(pivotHours)||detailRecords!==pivotRecords||Math.abs(detailHours-pivotHours)>0.05;
-  return {group:d.group,detailStartRow:startRow,detailRecords:detailRecords,detailHours:detailHours,pivotRecords:pivotRecords,pivotHours:pivotHours,deltaHours:detailHours-pivotHours,complete:complete,mismatch:mismatch};
+  var detailEvents=eventIds.size;
+  var eventMismatch=!Number.isFinite(pivotRecords)||detailEvents!==pivotRecords;
+  var hoursMismatch=!Number.isFinite(pivotHours)||Math.abs(nonTrialHours-pivotHours)>0.05;
+  var mismatch=!complete||eventMismatch||hoursMismatch||ranges.rangeCoverageIssue;
+  return {group:d.group,detailStartRow:startRow,detailRecords:detailRecords,detailEvents:detailEvents,trialRecords:trialRecords,
+   detailHours:detailHours,nonTrialHours:nonTrialHours,pivotRecords:pivotRecords,pivotHours:pivotHours,
+   deltaHours:nonTrialHours-pivotHours,usedRange:ranges.usedRange,filterRange:ranges.filterRange,
+   rangeCoverageIssue:ranges.rangeCoverageIssue,complete:complete,eventMismatch:eventMismatch,hoursMismatch:hoursMismatch,mismatch:mismatch};
  });
- return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),note:'Detail MTC dihitung hanya dari rentang data efektif yang dirujuk formula SUBTOTAL (baris awal menjadi fallback bila formula tak tersedia), lalu dibandingkan dengan nilai tersimpan pada Pivot Report MTC. Selisih menandai sumber perlu direkonsiliasi; tidak otomatis menetapkan salah satu sisi sebagai KPI final.'};
+ var truncated=result.filter(function(r){return r.rangeCoverageIssue;}).map(function(r){return r.group;});
+ var note='Audit menghitung baris Category=MTC dalam rentang sumber yang dirujuk formula SUBTOTAL. Jumlah kejadian diagnostik memakai PRO unik dan mengecualikan nilai PRO=TRIAL; jam detail ditampilkan sebagai jumlah baris mentah tanpa menduplikasi atau mengoreksi durasi secara otomatis. Nilai dibandingkan dengan Pivot Report MTC; selisih tidak menetapkan salah satu sisi sebagai KPI final.';
+ if(truncated.length)note+=' Rentang AutoFilter tidak mencakup seluruh rentang data pada: '+truncated.join(', ')+'. Filter atau Pivot mungkin tidak memasukkan seluruh baris.';
+ return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),note:note};
 }
 function applyMatrix(matrix,headerRow){
  var start=Math.max(1,parseInt(headerRow,10)||1);
@@ -231,9 +254,15 @@ var categorySourceReady=!!state.mapping.category&&state.rows.some(function(r){re
 var downtimeSourceReady=!!state.mapping.downtime&&state.rows.some(function(r){return Number.isFinite(hours(r,false));});
 var mtcDurationSourceReady=categorySourceReady&&!!(state.mapping.lt||state.mapping.downtime);
 var allHours=state.rows.map(function(r){return hours(r,false);}).filter(Number.isFinite),mtcHourValues=mtcRows.map(function(r){return hours(r,true);}),mtcHours=mtcHourValues.filter(Number.isFinite);
-var incidentValues=mtcRows.map(function(r){return number(val(r,'bd'));}).filter(Number.isFinite);
 var mtcReconciliationBlocked=!!(state.mtcAudit&&state.mtcAudit.mismatch);
-var incidents=mtcReconciliationBlocked||!categorySourceReady?NaN:(incidentValues.length?incidentValues.reduce(function(a,b){return a+b;},0):mtcRows.filter(function(r){return val(r,'incident')!==''||val(r,'downtime')!==''||val(r,'lt')!=='';}).length);
+var bdValues=mtcRows.map(function(r){return number(val(r,'bd'));});
+var bdMapped=!!state.mapping.bd;
+var bdComplete=bdMapped&&bdValues.every(function(v){return Number.isFinite(v)&&v>=0;});
+var incidentIds=mtcRows.map(function(r){return String(val(r,'incident')==null?'':val(r,'incident')).trim();});
+var incidentMapped=!!state.mapping.incident;
+var incidentIdsComplete=incidentMapped&&incidentIds.every(function(id){return id!=='';});
+var uniqueIncidents=new Set(incidentIds.filter(function(id){return id!==''&&!/^TRIAL$/i.test(id);}).map(function(id){return id.toUpperCase();}));
+var incidents=mtcReconciliationBlocked||!categorySourceReady?NaN:!mtcRows.length?0:bdComplete?bdValues.reduce(function(a,b){return a+b;},0):incidentIdsComplete?uniqueIncidents.size:NaN;
 var paired=state.rows.map(function(r){return {energy:number(val(r,'energy')),sheets:number(val(r,'sheets'))};}).filter(function(x){return Number.isFinite(x.energy)&&x.energy>=0&&Number.isFinite(x.sheets)&&x.sheets>0;});
 var energy=paired.map(function(x){return x.energy;}),sheets=paired.map(function(x){return x.sheets;});
 var enpiSource=state.rows.map(function(r){return number(val(r,'enpi'));}).filter(function(v){return Number.isFinite(v)&&v>=0;});var enpi=enpiSource.length?enpiSource[enpiSource.length-1]:(paired.length?energy.reduce(function(a,b){return a+b;},0)/sheets.reduce(function(a,b){return a+b;},0):NaN);
@@ -266,22 +295,27 @@ function renderOfficialOeeSummaryCard(){
 function renderMtcAuditCard(){
  var a=state.mtcAudit;if(!a)return '';
  var rows=a.rows.map(function(r){return {
-  'Grup':r.group,'Baris detail MTC':fmt(r.detailRecords,0),'Detail MTC (jam)':fmt(r.detailHours,2),
-  'Kejadian Pivot':Number.isFinite(r.pivotRecords)?fmt(r.pivotRecords,0):'—','Jam Pivot MTC':Number.isFinite(r.pivotHours)?fmt(r.pivotHours,2):'—',
-  'Selisih detail − Pivot (jam)':Number.isFinite(r.deltaHours)?fmt(r.deltaHours,2):'—','Status':r.complete?(r.mismatch?'Perlu rekonsiliasi':'Cocok'):'Data sumber tidak lengkap'
+  'Grup':r.group,'Baris MTC':fmt(r.detailRecords,0),'PRO unik non-TRIAL':fmt(r.detailEvents,0),'Baris TRIAL':fmt(r.trialRecords,0),
+  'Jam MTC mentah':fmt(r.detailHours,2),'Jam mentah non-TRIAL':fmt(r.nonTrialHours,2),
+  'Kejadian Pivot':Number.isFinite(r.pivotRecords)?fmt(r.pivotRecords,0):'—','Jam Pivot':Number.isFinite(r.pivotHours)?fmt(r.pivotHours,2):'—',
+  'Δ jam non-TRIAL − Pivot':Number.isFinite(r.deltaHours)?fmt(r.deltaHours,2):'—',
+  'Rentang AutoFilter':r.filterRange,'Rentang data':r.usedRange,
+  'Status':!r.complete?'Data sumber tidak lengkap':r.mismatch?'Perlu rekonsiliasi':'Cocok'
  };});
  rows.push({
   'Grup':'TOTAL',
-  'Baris detail MTC':fmt(a.rows.reduce(function(n,r){return n+r.detailRecords;},0),0),
-  'Detail MTC (jam)':fmt(a.rows.reduce(function(n,r){return n+r.detailHours;},0),2),
+  'Baris MTC':fmt(a.rows.reduce(function(n,r){return n+r.detailRecords;},0),0),
+  'PRO unik non-TRIAL':fmt(a.rows.reduce(function(n,r){return n+r.detailEvents;},0),0),
+  'Baris TRIAL':fmt(a.rows.reduce(function(n,r){return n+r.trialRecords;},0),0),
+  'Jam MTC mentah':fmt(a.rows.reduce(function(n,r){return n+r.detailHours;},0),2),
+  'Jam mentah non-TRIAL':fmt(a.rows.reduce(function(n,r){return n+r.nonTrialHours;},0),2),
   'Kejadian Pivot':fmt(a.rows.reduce(function(n,r){return n+(Number.isFinite(r.pivotRecords)?r.pivotRecords:0);},0),0),
-  'Jam Pivot MTC':fmt(a.rows.reduce(function(n,r){return n+(Number.isFinite(r.pivotHours)?r.pivotHours:0);},0),2),
-  'Selisih detail − Pivot (jam)':fmt(a.rows.reduce(function(n,r){return n+(Number.isFinite(r.deltaHours)?r.deltaHours:0);},0),2),
-  'Status':a.mismatch?'Perlu rekonsiliasi':'Cocok'
+  'Jam Pivot':fmt(a.rows.reduce(function(n,r){return n+(Number.isFinite(r.pivotHours)?r.pivotHours:0);},0),2),
+  'Δ jam non-TRIAL − Pivot':fmt(a.rows.reduce(function(n,r){return n+(Number.isFinite(r.deltaHours)?r.deltaHours:0);},0),2),
+  'Rentang AutoFilter':'—','Rentang data':'—','Status':a.mismatch?'Perlu rekonsiliasi':'Cocok'
  });
- return '<div class="tp-card" style="margin:12px 0"><h3 class="tp-section-title">Audit sumber Lost Time MTC</h3><p class="tp-muted">Membandingkan seluruh baris detail berkategori persis MTC (termasuk baris yang sedang tersembunyi oleh filter Excel) dengan nilai tersimpan pada Pivot Report MTC. Angka detail dan Pivot saat ini tidak sama, sehingga aplikasi tidak memilih salah satunya sebagai Lost Time maintenance final.</p>'+table(rows,['Grup','Baris detail MTC','Detail MTC (jam)','Kejadian Pivot','Jam Pivot MTC','Selisih detail − Pivot (jam)','Status'])+'<div class="tp-message warn">'+esc(a.note)+'</div></div>';
+ return '<div class="tp-card" style="margin:12px 0"><h3 class="tp-section-title">Audit sumber Lost Time MTC</h3><p class="tp-muted">'+esc(a.note)+'</p>'+table(rows,['Grup','Baris MTC','PRO unik non-TRIAL','Baris TRIAL','Jam MTC mentah','Jam mentah non-TRIAL','Kejadian Pivot','Jam Pivot','Δ jam non-TRIAL − Pivot','Rentang AutoFilter','Rentang data','Status'])+'<p class="tp-muted">KPI Lost Time, jumlah kejadian, MTBF, MTTR, dan rasio MTC ditahan dari ringkasan utama selama audit masih mismatch. OEE/TEEP resmi tetap ditampilkan terpisah.</p></div>';
 }
-function table(rows,headers){if(!rows.length)return '<div class="tp-empty">Belum ada baris yang cocok dengan filter atau kolom belum dipetakan.</div>';return '<div class="tp-table-wrap"><table class="tp-table"><thead><tr>'+headers.map(function(h){return '<th>'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.slice(0,100).map(function(r){return '<tr>'+headers.map(function(h){return '<td>'+esc(r[h]===undefined?'—':r[h])+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table><div class="tp-muted">Menampilkan maksimal 100 baris.</div></div>';}
 function tabContent(){if(!state.rows.length&&state.tab!=='actions')return '<div class="tp-card"><h3 class="tp-section-title">Impor laporan resmi</h3><p class="tp-muted">Pilih file sumber OEE, downtime, maintenance, atau energi. File tidak diunggah ke server dalam tahap ini.</p><input id="tp-file" type="file" accept=".xlsx,.xls,.xlsm,.csv"><div class="tp-actions"><button class="tp-btn primary" id="tp-load">Baca file</button></div><p class="tp-muted">Excel multi-sheet: pilih sheet dan baris header setelah file dibaca. Untuk OEE Printing, sheet sumber yang tersedia dapat berbeda dari sheet Compare atau Dashboard. KPI hanya dihitung dari sheet aktif; sumber lintas-sheet belum digabung otomatis.</p></div><div class="tp-two"><div class="tp-card"><h3 class="tp-section-title">Modul yang disiapkan</h3><div class="tp-kv"><span>OEE &amp; TEEP</span><b>Menunggu pemetaan sumber</b></div><div class="tp-kv"><span>Downtime Pareto</span><b>Menunggu pemetaan sumber</b></div><div class="tp-kv"><span>Maintenance KPI</span><b>MTC-only</b></div><div class="tp-kv"><span>Top issue &amp; action plan</span><b>Menunggu kolom sumber</b></div><div class="tp-kv"><span>Energy / ENPI</span><b>Menunggu pemetaan sumber</b></div></div><div class="tp-card"><h3 class="tp-section-title">Aturan validasi</h3><ul class="tp-list"><li>MTBF, MTTR, dan maintenance lost time hanya memakai kejadian kategori MTC.</li><li>OEE dan TEEP ditampilkan terpisah; tidak dihitung dari downtime maintenance saja.</li><li>ENPI membutuhkan data energi dan jumlah sheet/output yang sepadan.</li><li>Nilai tanpa definisi kolom atau unit tidak ditafsirkan otomatis.</li></ul></div></div>';
 if(state.tab==='mapping')return '<div class="tp-card"><h3 class="tp-section-title">Pemetaan kolom sumber</h3><p class="tp-muted">Pilih kolom yang sesuai. Pemetaan ini eksplisit agar nama kolom yang berbeda tidak menghasilkan KPI keliru. Satu worksheet aktif digunakan untuk tabel saat ini; pilih sumber yang cocok dan jangan campur basis periode atau cakupan mesin.</p><div class="tp-form">'+fieldSelect('machine','Mesin')+fieldSelect('date','Tanggal / periode')+fieldSelect('category','Kategori downtime (MTC)')+fieldSelect('downtime','Downtime')+fieldSelect('incident','ID / nama kejadian')+fieldSelect('issue','Issue / mesin')+fieldSelect('cause','Kategori / penyebab downtime')+fieldSelect('rootCause','Root cause')+fieldSelect('action','Corrective action')+fieldSelect('actionPlan','Action plan')+fieldSelect('owner','PIC')+fieldSelect('due','Due date')+fieldSelect('status','Status action')+fieldSelect('energy','Energi (kWh)')+fieldSelect('sheets','Jumlah sheet / output')+fieldSelect('enpi','ENPI sumber (kWh/sheet)')+fieldSelect('availability','Availability (%)')+fieldSelect('performance','Performance (%)')+fieldSelect('quality','Quality (%)')+fieldSelect('oee','OEE sumber (%)')+fieldSelect('utilization','Utilization untuk TEEP')+fieldSelect('teep','TEEP sumber (%)')+fieldSelect('targetOee','Target OEE (%)')+fieldSelect('mtbf','MTBF (jam)')+fieldSelect('targetMtbf','Target MTBF (jam)')+fieldSelect('mttr','MTTR (jam)')+fieldSelect('targetMttr','Target MTTR (jam)')+fieldSelect('targetLost','Target Lost Time (%)')+fieldSelect('bd','Jumlah breakdown MTC')+fieldSelect('lt','Lost Time MTC (jam)')+'</div><div class="tp-actions"><label class="tp-muted">Satuan downtime <select id="tp-downtime-unit"><option value="hours">Jam</option><option value="minutes">Menit</option><option value="seconds">Detik</option></select></label><button class="tp-btn primary" id="tp-save-map">Terapkan pemetaan</button><button class="tp-btn" id="tp-reset">Ganti file</button></div></div><div class="tp-card" style="margin-top:12px"><h3 class="tp-section-title">Pratinjau data sumber</h3>'+table(state.rows.slice(0,10),state.headers)+'</div>';
 var c=calc(),oeeSample=c.oeeRows.find(function(r){return Number.isFinite(r.oee);}),teepSample=c.oeeRows.find(function(r){return Number.isFinite(r.teep);});if(state.tab==='overview')return renderOfficialOeeSummaryCard()+renderMtcAuditCard()+'<div class="tp-grid">'+metric('Baris impor',fmt(state.rows.length,0),state.fileName)+metric('OEE',oeeSample?pctText(oeeSample.oee):'—','Availability × Performance × Quality')+metric('TEEP',teepSample?pctText(teepSample.teep):'—','OEE × Utilization')+metric('Total downtime',Number.isFinite(c.totalHours)?fmt(c.totalHours)+' jam':'—','Baris dengan downtime terpetakan')+metric('Downtime MTC',Number.isFinite(c.mtcHours)?fmt(c.mtcHours)+' jam':'—','Kategori persis MTC saja')+metric('Rasio MTC / total',Number.isFinite(c.ratio)?fmt(c.ratio*100)+'%':'—','Hanya jika basis periode dan sumber sama')+'</div><div class="tp-two"><div class="tp-card"><h3 class="tp-section-title">Status sumber</h3><div class="tp-kv"><span>File</span><b>'+esc(state.fileName)+'</b></div><div class="tp-kv"><span>Sheet</span><b>'+esc(state.sheetName||'CSV')+'</b></div><div class="tp-kv"><span>Pemetaan</span><b>'+Object.keys(state.mapping).filter(function(k){return state.mapping[k];}).length+' kolom</b></div><div class="tp-kv"><span>Kejadian MTC</span><b>'+fmt(c.incidents,0)+' terdeteksi</b></div></div><div class="tp-card"><h3 class="tp-section-title">Batas interpretasi</h3><p class="tp-muted">Angka berasal dari file yang diimpor ke sesi browser ini. Periksa definisi downtime, periode, unit, dan basis output sebelum dipakai dalam review manajemen.</p><p class="tp-muted">MTBF/MTTR hanya diringkas dari nilai eksplisit yang dipetakan pada baris kategori MTC; tidak diestimasi dari data yang tidak lengkap.</p></div></div>';
