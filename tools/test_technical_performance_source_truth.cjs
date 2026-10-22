@@ -102,10 +102,10 @@ const mtcWorkbook = {
     'Report MTC': sheet({E18:1,E9:5,J19:1,J10:1.25,N18:1,N9:0.75}),
     'Lost Time Printing': detailSheet('Category','Hour',[
       ['WO-1','MTC',2],['WO-2',' IPM ',100],['WO-1','MTC',3],['TRIAL','MTC',50],['WO-3','MTC REPAIR',9]
-    ],13,'I',[['OLD-WO','MTC',99]]),
+    ],13,'I',[['OLD-WO',' IPM ',99]]),
     'Lost Time AP': detailSheet('Category','Hour',[
       ['AP-WO-1','MTC',1.25],['AP-WO-2','IPM',80],['AP-WO-3','MTC Repair',7]
-    ],39,'J',[['OLD-AP','MTC',70]]),
+    ],39,'J',[['OLD-AP','IPM',70]]),
     'Lost Time FG': detailSheet('Category','Hour',[
       ['FG-WO-1','MTC',0.75],['FG-WO-2','IPM',5],['FG-WO-3','ELECTRICAL FAILURE',12]
     ],5,'J')
@@ -119,6 +119,25 @@ assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r
 ]);
 assert.equal(audit.rows[0].detailEndRow, 17, 'MTC audit must preserve the SUBTOTAL end row');
 assert.equal(audit.rows[0].detailRangeFromFormula, true, 'MTC audit should prefer explicit SUBTOTAL bounds');
+assert.equal(audit.incidentCountReliable, true, 'Complete full-sheet PRO data should independently validate event count');
+assert.equal(audit.incidentCount, 3, 'Event count is based on distinct non-TRIAL PRO IDs across every detail sheet');
+
+// A row with exact MTC category outside the SUBTOTAL bounds still counts as a source event,
+// but the unaligned loss-hour summary is marked for reconciliation.
+const outsideRangeMtcWorkbook = {
+  Sheets: {
+    ...mtcWorkbook.Sheets,
+    'Lost Time Printing': {
+      ...mtcWorkbook.Sheets['Lost Time Printing'],
+      matrix: [...mtcWorkbook.Sheets['Lost Time Printing'].matrix, ['AFTER-SUBTOTAL','MTC',999]]
+    }
+  }
+};
+const outsideRangeMtcAudit = context.extractMtcAudit(X, outsideRangeMtcWorkbook);
+assert.equal(outsideRangeMtcAudit.incidentCount, 4, 'MTC PRO IDs outside formula bounds remain in the complete source-event count');
+assert.equal(outsideRangeMtcAudit.incidentCountReliable, true, 'Complete PRO identity remains reliable when only the duration subtotal range is stale');
+assert.equal(outsideRangeMtcAudit.rows[0].subtotalMtcOutside, true, 'MTC outside the SUBTOTAL range must be flagged');
+assert.equal(outsideRangeMtcAudit.mismatch, true, 'MTC outside SUBTOTAL bounds must hold duration KPIs for reconciliation');
 
 // A valid-looking MTC line after the source SUBTOTAL's end row must not leak into the audit.
 const beyondSubtotalWorkbook = {
@@ -237,7 +256,7 @@ assert.ok(Number.isNaN(noIncidentSource.incidents),
 calcContext.state.mtcAudit = mismatch;
 const blockedByMismatch = calcContext.calc();
 assert.ok(Number.isNaN(blockedByMismatch.mtcHours), 'MTC lost time must be withheld during source reconciliation');
-assert.ok(Number.isNaN(blockedByMismatch.incidents), 'MTC event count must be withheld during source reconciliation');
+assert.equal(blockedByMismatch.incidents, 3, 'Complete unique PRO event count remains available when only Pivot/duration reconciliation is blocked');
 assert.ok(Number.isNaN(blockedByMismatch.ratio), 'MTC share must be withheld during source reconciliation');
 assert.ok(Number.isNaN(blockedByMismatch.mtbf), 'MTBF must be withheld during source reconciliation');
 assert.ok(Number.isNaN(blockedByMismatch.mttr), 'MTTR must be withheld during source reconciliation');
