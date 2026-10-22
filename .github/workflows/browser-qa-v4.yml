@@ -34,6 +34,9 @@ jobs:
           set -euo pipefail
           node --check src/worker.js
           node --check public/omodos4/technical-performance.js
+          grep -Fq 'OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1' public/index.html
+          grep -Fq "script.src='/omodos4/technical-performance.js'" public/index.html
+          grep -Fq "String(u.role||u.Role||'').toLowerCase()==='superadmin'" public/omodos4/technical-performance.js
           grep -Fq 'async function readFile(file)' public/omodos4/technical-performance.js
           # Top 3 now has a separate ODIN source; do not require the retired OEE/MTC proxy.
           grep -Fq 'function readOdinFile(file)' public/omodos4/technical-performance.js
@@ -242,6 +245,19 @@ jobs:
             }
             result.phases.push('non-superadmin');
 
+            console.log('[QA] Technical Performance stays unloaded for non-Superadmin');
+            await page.waitForTimeout(100);
+            const technicalPerformanceDenied = await page.evaluate(() => ({
+              script: !!document.getElementById('omodos-technical-performance-lazy-script'),
+              nav: !!document.getElementById('nav-technical-performance'),
+              module: !!window.OMODOS_TechnicalPerformance
+            }));
+            result.technicalPerformanceDenied = technicalPerformanceDenied;
+            if (technicalPerformanceDenied.script || technicalPerformanceDenied.nav || technicalPerformanceDenied.module) {
+              throw new Error('Technical Performance was loaded for a non-Superadmin: ' + JSON.stringify(technicalPerformanceDenied));
+            }
+            result.phases.push('technical-performance-not-loaded-for-admin');
+
             console.log('[QA] superadmin');
             const supGate = await page.evaluate(() => {
               CURRENT_USER = { username: 'qa-super', displayName: 'QA Superadmin', role: 'Superadmin' };
@@ -272,6 +288,25 @@ jobs:
               throw new Error('Superadmin V4 access failed: ' + JSON.stringify(sup));
             }
             result.phases.push('superadmin');
+
+            console.log('[QA] Technical Performance lazy-loads for Superadmin');
+            await page.waitForFunction(() => !!window.OMODOS_TechnicalPerformance &&
+              !!document.getElementById('nav-technical-performance') &&
+              getComputedStyle(document.getElementById('nav-technical-performance')).display !== 'none',
+              null, { timeout: 10000, polling: 100 });
+            const technicalPerformanceAdmin = await page.evaluate(() => ({
+              module: !!window.OMODOS_TechnicalPerformance,
+              nav: !!document.getElementById('nav-technical-performance'),
+              navVisible: !!document.getElementById('nav-technical-performance') &&
+                getComputedStyle(document.getElementById('nav-technical-performance')).display !== 'none',
+              page: !!document.getElementById('view-technical-performance')
+            }));
+            result.technicalPerformanceAdmin = technicalPerformanceAdmin;
+            if (!technicalPerformanceAdmin.module || !technicalPerformanceAdmin.nav ||
+                !technicalPerformanceAdmin.navVisible || !technicalPerformanceAdmin.page) {
+              throw new Error('Technical Performance Superadmin access failed: ' + JSON.stringify(technicalPerformanceAdmin));
+            }
+            result.phases.push('technical-performance-superadmin-lazy-load');
 
             console.log('[QA] frontend recovery + UI safety');
             await page.evaluate(() => window.dispatchEvent(new Event('storage')));
@@ -321,11 +356,14 @@ jobs:
               return {
                 allowed: canAccessView_('omodos4'),
                 authorizedClass: !!v4?.classList.contains('v4-authorized'),
-                recoveredModules: document.querySelectorAll('#v4-nav-group [data-v4-safe-module]').length
+                recoveredModules: document.querySelectorAll('#v4-nav-group [data-v4-safe-module]').length,
+                technicalPerformanceHidden: !document.getElementById('nav-technical-performance') ||
+                  getComputedStyle(document.getElementById('nav-technical-performance')).display === 'none'
               };
             });
             result.recoveredDeny = recoveredDeny;
-            if (recoveredDeny.allowed !== false || recoveredDeny.authorizedClass !== false || recoveredDeny.recoveredModules !== 0) {
+            if (recoveredDeny.allowed !== false || recoveredDeny.authorizedClass !== false ||
+                recoveredDeny.recoveredModules !== 0 || !recoveredDeny.technicalPerformanceHidden) {
               throw new Error('Recovered V4 fail-closed check failed: ' + JSON.stringify(recoveredDeny));
             }
             result.phases.push('recovered-deny');
