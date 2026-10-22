@@ -139,6 +139,23 @@ assert.equal(outsideRangeMtcAudit.incidentCountReliable, true, 'Complete PRO ide
 assert.equal(outsideRangeMtcAudit.rows[0].subtotalMtcOutside, true, 'MTC outside the SUBTOTAL range must be flagged');
 assert.equal(outsideRangeMtcAudit.mismatch, true, 'MTC outside SUBTOTAL bounds must hold duration KPIs for reconciliation');
 
+// The distinct-incident metric must be unavailable if any exact-MTC source row
+// lacks a PRO identity; blank IDs must not be silently counted or discarded.
+const missingProWorkbook = {
+  Sheets: {
+    ...mtcWorkbook.Sheets,
+    'Lost Time FG': {
+      ...mtcWorkbook.Sheets['Lost Time FG'],
+      matrix: mtcWorkbook.Sheets['Lost Time FG'].matrix.map((row,i) =>
+        i === 4 ? ['', 'MTC', 0.75] : row
+      )
+    }
+  }
+};
+const missingProAudit = context.extractMtcAudit(X, missingProWorkbook);
+assert.equal(missingProAudit.incidentCountReliable, false,
+  'A missing PRO on an exact-MTC row must block official incident count');
+
 // A valid-looking MTC line after the source SUBTOTAL's end row must not leak into the audit.
 const beyondSubtotalWorkbook = {
   Sheets: {
