@@ -29227,7 +29227,7 @@ table.omodos-responsive-table>tbody>tr>td::before,#sparepart-lokasi-table td::be
 (function(){
   'use strict';
   var scriptId='omodos-technical-performance-lazy-script';
-  var loadPromise=null, pollTimer=null, attempts=0;
+  var loadPromise=null, pollTimer=null, attempts=0, rbacWrapped=null;
   function isSuperadmin(){
     try{
       var u=(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)||window.CURRENT_USER||null;
@@ -29255,7 +29255,8 @@ table.omodos-responsive-table>tbody>tr>td::before,#sparepart-lokasi-table td::be
       document.head.appendChild(script);
     }).then(function(ok){
       if(ok&&window.OMODOS_TechnicalPerformance&&window.OMODOS_TechnicalPerformance.syncAuth)window.OMODOS_TechnicalPerformance.syncAuth();
-      if(pollTimer){clearInterval(pollTimer);pollTimer=null}
+      // Keep the lightweight auth sync alive for a bounded period. Other app scripts
+      // may replace applyRbacToUi after this lazy loader initializes.
       return true;
     }).catch(function(err){
       loadPromise=null;
@@ -29271,15 +29272,19 @@ table.omodos-responsive-table>tbody>tr>td::before,#sparepart-lokasi-table td::be
     }
   }
   function hookRbac(){
-    if(window.__OMODOS_TP_RBAC_HOOKED)return true;
     var original=window.applyRbacToUi;
     if(typeof original!=='function')return false;
-    window.__OMODOS_TP_RBAC_HOOKED=true;
-    window.applyRbacToUi=function(){
+    if(original===rbacWrapped)return true;
+    // Re-wrap if a later frontend hotfix replaces applyRbacToUi.
+    var wrapped=function(){
       var result=original.apply(this,arguments);
       setTimeout(sync,0);
       return result;
     };
+    wrapped.__tpWrappedRbac=true;
+    window.applyRbacToUi=wrapped;
+    rbacWrapped=wrapped;
+    window.__OMODOS_TP_RBAC_HOOKED=true;
     return true;
   }
   hookRbac();
@@ -29289,7 +29294,7 @@ table.omodos-responsive-table>tbody>tr>td::before,#sparepart-lokasi-table td::be
   else setTimeout(sync,0);
   pollTimer=setInterval(function(){
     hookRbac();sync();attempts++;
-    if(attempts>=120&&pollTimer){clearInterval(pollTimer);pollTimer=null}
+    if(attempts>=40&&pollTimer){clearInterval(pollTimer);pollTimer=null}
   },1800);
 })();
 </script>
