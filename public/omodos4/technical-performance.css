@@ -10,7 +10,7 @@
 .tp-source-badge:before{content:"";width:7px;height:7px;border-radius:50%;background:#94a3b8}
 .tp-source-badge.is-ready:before{background:#16a34a}
 .tp-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 15px;padding:4px;border:1px solid var(--line,#d5e0e7);border-radius:12px;background:var(--panel-2,#f3f6f8)}
-.tp-tab{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:8px 13px;border:0;border-radius:9px;background:transparent;color:var(--text-dim,#627888);font:750 12px/1.2 inherit;cursor:pointer;touch-action:manipulation}
+.tp-tab{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:8px 13px;border:0;border-radius:9px;background:transparent;color:var(--text-dim,#627888);font:750 12px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;touch-action:manipulation}
 .tp-tab.active{background:var(--panel,#fff);color:var(--text,#173348);box-shadow:0 1px 3px rgba(17,45,63,.1)}
 .tp-panel{margin:0 0 14px;padding:16px;border:1px solid var(--line,#d8e2e8);border-radius:14px;background:var(--panel,#fff);min-width:0}
 .tp-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 0 12px}
