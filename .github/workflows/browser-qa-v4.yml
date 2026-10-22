@@ -35,6 +35,7 @@ jobs:
           node --check src/worker.js
           node --check public/omodos4/technical-performance.js
           grep -Fq 'OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1' public/index.html
+          grep -Fq "if(view === 'technical-performance') return isSuperadmin();" public/index.html
           grep -Fq "script.src='/omodos4/technical-performance.js'" public/index.html
           grep -Fq "String(u.role||u.Role||'').toLowerCase()==='superadmin'" public/omodos4/technical-performance.js
           grep -Fq 'async function readFile(file)' public/omodos4/technical-performance.js
@@ -237,26 +238,43 @@ jobs:
               const display = document.getElementById('v4-nav-group').style.display;
               const go = goToView('omodos4');
               const active = document.getElementById('view-omodos4').classList.contains('active');
-              return { allowed, display, go, active };
+              const technicalPerformanceAllowed = canAccessView_('technical-performance');
+              const technicalPerformanceGo = goToView('technical-performance');
+              const tpPage = document.getElementById('view-technical-performance');
+              const technicalPerformanceActive = !!tpPage?.classList.contains('active');
+              return { allowed, display, go, active, technicalPerformanceAllowed,
+                technicalPerformanceGo, technicalPerformanceActive };
             });
             result.admin = admin;
-            if (admin.allowed !== false || admin.display !== 'none' || admin.go !== false || admin.active !== false) {
+            if (admin.allowed !== false || admin.display !== 'none' || admin.go !== false || admin.active !== false ||
+                admin.technicalPerformanceAllowed !== false || admin.technicalPerformanceGo !== false ||
+                admin.technicalPerformanceActive) {
               throw new Error('Non-Superadmin gate failed: ' + JSON.stringify(admin));
             }
             result.phases.push('non-superadmin');
 
             console.log('[QA] Technical Performance stays unloaded for non-Superadmin');
             await page.waitForTimeout(100);
-            const technicalPerformanceDenied = await page.evaluate(() => ({
-              script: !!document.getElementById('omodos-technical-performance-lazy-script'),
-              nav: !!document.getElementById('nav-technical-performance'),
-              module: !!window.OMODOS_TechnicalPerformance
-            }));
+            const technicalPerformanceDenied = await page.evaluate(() => {
+              const nav = document.getElementById('nav-technical-performance');
+              const tpPage = document.getElementById('view-technical-performance');
+              return {
+                script: !!document.getElementById('omodos-technical-performance-lazy-script'),
+                routeAllowed: canAccessView_('technical-performance'),
+                routeVisible: !!tpPage && getComputedStyle(tpPage).display !== 'none' &&
+                  !tpPage.hidden && tpPage.getAttribute('aria-hidden') !== 'true',
+                navVisible: !!nav && getComputedStyle(nav).display !== 'none',
+                modulePresent: !!window.OMODOS_TechnicalPerformance
+              };
+            });
             result.technicalPerformanceDenied = technicalPerformanceDenied;
-            if (technicalPerformanceDenied.script || technicalPerformanceDenied.nav || technicalPerformanceDenied.module) {
-              throw new Error('Technical Performance was loaded for a non-Superadmin: ' + JSON.stringify(technicalPerformanceDenied));
+            // A JS module that was loaded earlier cannot be unloaded from a live page.
+            // The enforced security boundary is the route gate plus hidden nav/page.
+            if (technicalPerformanceDenied.routeAllowed || technicalPerformanceDenied.routeVisible ||
+                technicalPerformanceDenied.navVisible) {
+              throw new Error('Technical Performance was accessible for a non-Superadmin: ' + JSON.stringify(technicalPerformanceDenied));
             }
-            result.phases.push('technical-performance-not-loaded-for-admin');
+            result.phases.push('technical-performance-denied-for-admin');
 
             console.log('[QA] superadmin');
             const supGate = await page.evaluate(() => {
@@ -295,6 +313,7 @@ jobs:
               getComputedStyle(document.getElementById('nav-technical-performance')).display !== 'none',
               null, { timeout: 10000, polling: 100 });
             const technicalPerformanceAdmin = await page.evaluate(() => ({
+              routeAllowed: canAccessView_('technical-performance'),
               module: !!window.OMODOS_TechnicalPerformance,
               nav: !!document.getElementById('nav-technical-performance'),
               navVisible: !!document.getElementById('nav-technical-performance') &&
@@ -302,7 +321,8 @@ jobs:
               page: !!document.getElementById('view-technical-performance')
             }));
             result.technicalPerformanceAdmin = technicalPerformanceAdmin;
-            if (!technicalPerformanceAdmin.module || !technicalPerformanceAdmin.nav ||
+            if (technicalPerformanceAdmin.routeAllowed !== true ||
+                !technicalPerformanceAdmin.module || !technicalPerformanceAdmin.nav ||
                 !technicalPerformanceAdmin.navVisible || !technicalPerformanceAdmin.page) {
               throw new Error('Technical Performance Superadmin access failed: ' + JSON.stringify(technicalPerformanceAdmin));
             }
@@ -353,17 +373,22 @@ jobs:
               applyRbacToUi();
               window.dispatchEvent(new Event('storage'));
               const v4 = document.getElementById('v4-nav-group');
+              const tpNav = document.getElementById('nav-technical-performance');
+              const tpPage = document.getElementById('view-technical-performance');
               return {
                 allowed: canAccessView_('omodos4'),
+                technicalPerformanceAllowed: canAccessView_('technical-performance'),
                 authorizedClass: !!v4?.classList.contains('v4-authorized'),
                 recoveredModules: document.querySelectorAll('#v4-nav-group [data-v4-safe-module]').length,
-                technicalPerformanceHidden: !document.getElementById('nav-technical-performance') ||
-                  getComputedStyle(document.getElementById('nav-technical-performance')).display === 'none'
+                technicalPerformanceHidden: !tpNav || getComputedStyle(tpNav).display === 'none',
+                technicalPerformancePageHidden: !tpPage || getComputedStyle(tpPage).display === 'none' ||
+                  tpPage.hidden || tpPage.getAttribute('aria-hidden') === 'true'
               };
             });
             result.recoveredDeny = recoveredDeny;
-            if (recoveredDeny.allowed !== false || recoveredDeny.authorizedClass !== false ||
-                recoveredDeny.recoveredModules !== 0 || !recoveredDeny.technicalPerformanceHidden) {
+            if (recoveredDeny.allowed !== false || recoveredDeny.technicalPerformanceAllowed !== false ||
+                recoveredDeny.authorizedClass !== false || recoveredDeny.recoveredModules !== 0 ||
+                !recoveredDeny.technicalPerformanceHidden || !recoveredDeny.technicalPerformancePageHidden) {
               throw new Error('Recovered V4 fail-closed check failed: ' + JSON.stringify(recoveredDeny));
             }
             result.phases.push('recovered-deny');
