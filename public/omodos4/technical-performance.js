@@ -168,7 +168,7 @@ function odinTopRows(){
  var groups={};
  o.rows.forEach(function(row){
   var issue=String(oVal(row,'problem')||'').trim(),machine=String(oVal(row,'machine')||'').trim();
-  if(!issue||/^(grand\\s+)?total$|^subtotal$|^jumlah(\\s+total)?$/i.test(issue))return;
+  if(!issue||/^(grand\s+)?total$|^subtotal$|^jumlah(\s+total)?$/i.test(issue))return;
   var norm=(machine+' | '+issue).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   if(!norm)return;
   var g=groups[norm];if(!g)g=groups[norm]={machine:machine||'—',issue:issue,section:String(oVal(row,'section')||'—').trim()||'—',rootCause:String(oVal(row,'rootCause')||'').trim(),corrective:String(oVal(row,'corrective')||'').trim(),actionPlan:String(oVal(row,'actionPlan')||'').trim(),hours:0,hasDuration:false,rows:0,notifications:{},fallbackEvents:0};
