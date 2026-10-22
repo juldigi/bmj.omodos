@@ -520,7 +520,23 @@ jobs:
                 const beforeErr = errors.length;
                 try {
                   await module.evaluate(el => el.click());
-                  await page.waitForTimeout(20);
+                  // Wait for the workspace grid to be fully restored. Feature-specific
+                  // modules can mount asynchronously after a prior click; a fixed 20 ms
+                  // delay can inspect the detail panel instead of the next grid.
+                  await page.waitForFunction((workspaceIndex) => {
+                    const view = document.getElementById('view-omodos4');
+                    const stage = document.getElementById('v4-safe-stage');
+                    const activeModule = document.querySelector(
+                      '#v4-nav-group [data-v4-safe-module="' + workspaceIndex + '"]'
+                    );
+                    const tiles = [...(stage?.querySelectorAll('[data-v4-feature]') || [])];
+                    return !!view &&
+                      view.classList.contains('v4-safe-module-open') &&
+                      !view.classList.contains('v4-feature-open') &&
+                      !!activeModule?.classList.contains('active') &&
+                      tiles.length === 10 &&
+                      tiles.every(el => !!el.querySelector('strong') && !!el.getAttribute('data-v4-feature'));
+                  }, i + 1, { timeout: 5000 });
                   const tile = page.locator('#v4-safe-stage [data-v4-feature]').nth(j);
                   const featureNo = Number(await tile.getAttribute('data-v4-feature'));
                   const featureLabel = ((await tile.locator('strong').textContent()) || '').trim();
