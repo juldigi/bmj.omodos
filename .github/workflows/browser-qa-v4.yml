@@ -555,11 +555,7 @@ jobs:
 
                   let detailSelector = '';
                   if (featureNo <= 20) detailSelector = '[data-v4-mp-feature="' + featureNo + '"]';
-                  else if (featureNo <= 30) detailSelector = '[data-v4-sf-feature="' + featureNo + '"]';
-                  else if (featureNo <= 40) detailSelector = '[data-v4-sp-feature="' + featureNo + '"]';
-                  else if (featureNo <= 50) detailSelector = '[data-v4-rel-feature="' + featureNo + '"]';
-                  else if (featureNo <= 60) detailSelector = '[data-v4-op-feature="' + featureNo + '"]';
-                  else if (featureNo <= 70) detailSelector = '[data-v4-pi-feature="' + featureNo + '"]';
+                  else if (featureNo <= 70) detailSelector = '[data-v4-interaction-feature="' + featureNo + '"]';
                   else if (featureNo <= 80) detailSelector = '[data-v4-ai2-feature="' + featureNo + '"]';
                   else if (featureNo <= 90) detailSelector = '[data-v4-imp-feature="' + featureNo + '"]';
                   else if (featureNo === 97 || featureNo === 98) detailSelector = '[data-v4-interaction-feature="' + featureNo + '"]';
@@ -585,11 +581,7 @@ jobs:
                     const heading = stage?.querySelector('.v4-detail-card .v4-module-head h2')?.textContent?.trim() || '';
                     let selector = '';
                     if (featureNo <= 20) selector = '[data-v4-mp-feature="' + featureNo + '"]';
-                    else if (featureNo <= 30) selector = '[data-v4-sf-feature="' + featureNo + '"]';
-                    else if (featureNo <= 40) selector = '[data-v4-sp-feature="' + featureNo + '"]';
-                    else if (featureNo <= 50) selector = '[data-v4-rel-feature="' + featureNo + '"]';
-                    else if (featureNo <= 60) selector = '[data-v4-op-feature="' + featureNo + '"]';
-                    else if (featureNo <= 70) selector = '[data-v4-pi-feature="' + featureNo + '"]';
+                    else if (featureNo <= 70) selector = '[data-v4-interaction-feature="' + featureNo + '"]';
                     else if (featureNo <= 80) selector = '[data-v4-ai2-feature="' + featureNo + '"]';
                     else if (featureNo <= 90) selector = '[data-v4-imp-feature="' + featureNo + '"]';
                     else if (featureNo === 97 || featureNo === 98) selector = '[data-v4-interaction-feature="' + featureNo + '"]';
