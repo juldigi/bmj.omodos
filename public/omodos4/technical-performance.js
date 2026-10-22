@@ -224,12 +224,13 @@ var downtimeSourceReady=!!state.mapping.downtime&&state.rows.some(function(r){re
 var mtcDurationSourceReady=categorySourceReady&&!!(state.mapping.lt||state.mapping.downtime);
 var allHours=state.rows.map(function(r){return hours(r,false);}).filter(Number.isFinite),mtcHourValues=mtcRows.map(function(r){return hours(r,true);}),mtcHours=mtcHourValues.filter(Number.isFinite);
 var incidentValues=mtcRows.map(function(r){return number(val(r,'bd'));}).filter(Number.isFinite);
-var incidents=!categorySourceReady?NaN:(incidentValues.length?incidentValues.reduce(function(a,b){return a+b;},0):mtcRows.filter(function(r){return val(r,'incident')!==''||val(r,'downtime')!==''||val(r,'lt')!=='';}).length);
+var mtcReconciliationBlocked=!!(state.mtcAudit&&state.mtcAudit.mismatch);
+var incidents=mtcReconciliationBlocked||!categorySourceReady?NaN:(incidentValues.length?incidentValues.reduce(function(a,b){return a+b;},0):mtcRows.filter(function(r){return val(r,'incident')!==''||val(r,'downtime')!==''||val(r,'lt')!=='';}).length);
 var paired=state.rows.map(function(r){return {energy:number(val(r,'energy')),sheets:number(val(r,'sheets'))};}).filter(function(x){return Number.isFinite(x.energy)&&x.energy>=0&&Number.isFinite(x.sheets)&&x.sheets>0;});
 var energy=paired.map(function(x){return x.energy;}),sheets=paired.map(function(x){return x.sheets;});
 var enpiSource=state.rows.map(function(r){return number(val(r,'enpi'));}).filter(function(v){return Number.isFinite(v)&&v>=0;});var enpi=enpiSource.length?enpiSource[enpiSource.length-1]:(paired.length?energy.reduce(function(a,b){return a+b;},0)/sheets.reduce(function(a,b){return a+b;},0):NaN);
 var mtcDurationsComplete=!mtcRows.length||mtcHourValues.every(Number.isFinite);
-var lost=mtcDurationSourceReady&&mtcDurationsComplete?mtcHours.reduce(function(a,b){return a+b;},0):NaN;
+var lost=!mtcReconciliationBlocked&&mtcDurationSourceReady&&mtcDurationsComplete?mtcHours.reduce(function(a,b){return a+b;},0):NaN;
 var total=downtimeSourceReady&&allHours.length?allHours.reduce(function(a,b){return a+b;},0):NaN;
 var mtbfValues=mtcRows.map(function(r){return number(val(r,'mtbf'));}).filter(Number.isFinite),targetMtbfValues=mtcRows.map(function(r){return number(val(r,'targetMtbf'));}).filter(Number.isFinite),mttrValues=mtcRows.map(function(r){return number(val(r,'mttr'));}).filter(Number.isFinite),targetMttrValues=mtcRows.map(function(r){return number(val(r,'targetMttr'));}).filter(Number.isFinite),targetLostValues=mtcRows.map(function(r){return ratioValue('targetLost',r);}).filter(Number.isFinite);
 var avg=function(a){if(!a.length)return NaN;for(var i=1;i<a.length;i++)if(Math.abs(a[i]-a[0])>1e-9)return NaN;return a[0];};
@@ -241,7 +242,7 @@ var calculatedTeep=Number.isFinite(oee)&&Number.isFinite(u)?oee*u:NaN;
 var teep=Number.isFinite(calculatedTeep)?calculatedTeep:sourceTeep;
 return {machine:val(r,'machine'),period:val(r,'date'),availability:a,performance:p,quality:q,oeeSource:sourceOee,oeeCalculated:calculatedOee,oee:oee,utilization:u,teepSource:sourceTeep,teep:teep,targetOee:target,mtbf:number(val(r,'mtbf')),targetMtbf:number(val(r,'targetMtbf')),mttr:number(val(r,'mttr')),targetMttr:number(val(r,'targetMttr')),targetLost:ratioValue('targetLost',r),oeeCheck:Number.isFinite(sourceOee)&&Number.isFinite(calculatedOee)?(Math.abs(sourceOee-calculatedOee)<=0.005?'Cocok':'Periksa selisih'):'Belum dapat dibandingkan'};
 });
-return {mtcRows:mtcRows,incidents:incidents,mtcHours:lost,totalHours:total,ratio:Number.isFinite(lost)&&Number.isFinite(total)&&total>0?lost/total:NaN,enpi:enpi,mtbf:avg(mtbfValues),targetMtbf:avg(targetMtbfValues),mttr:avg(mttrValues),targetMttr:avg(targetMttrValues),targetLost:avg(targetLostValues),oeeRows:oeeRows};
+return {mtcRows:mtcRows,incidents:incidents,mtcHours:lost,totalHours:total,ratio:Number.isFinite(lost)&&Number.isFinite(total)&&total>0?lost/total:NaN,enpi:enpi,mtbf:mtcReconciliationBlocked?NaN:avg(mtbfValues),targetMtbf:avg(targetMtbfValues),mttr:mtcReconciliationBlocked?NaN:avg(mttrValues),targetMttr:avg(targetMttrValues),targetLost:avg(targetLostValues),oeeRows:oeeRows};
 }
 function metric(title,value,sub){return '<div class="tp-card tp-metric"><small>'+esc(title)+'</small><b>'+esc(value)+'</b><span>'+esc(sub||'')+'</span></div>';}
 function renderOfficialOeeSummaryCard(){
