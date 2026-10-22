@@ -47,6 +47,9 @@ jobs:
           grep -Fq "'Variasi deskripsi sumber':g.variants.join(' | ')" public/omodos4/technical-performance.js
           grep -Fq 'function extractOfficialOee(wb)' public/omodos4/technical-performance.js
           grep -Fq 'function extractMtcAudit(X,wb)' public/omodos4/technical-performance.js
+          grep -Fq 'var subtotalCachedHours=n(ws&&ws[d.totalCell]&&ws[d.totalCell].v);' public/omodos4/technical-performance.js
+          grep -Fq 'Nilai SUBTOTAL tersimpan (semua kategori)' public/omodos4/technical-performance.js
+          grep -Fq 'Jam MTC detail pada rentang formula' public/omodos4/technical-performance.js
           grep -Fq "X.read(buf,{type:'array',cellDates:false,cellStyles:true})" public/omodos4/technical-performance.js
           grep -Fq 'mismatch:result.some(function(r){return r.mismatch;})' public/omodos4/technical-performance.js
           node tools/test_technical_performance_odin.cjs
