@@ -45,62 +45,40 @@ function extractOfficialOee(wb){
 function extractMtcAudit(X,wb){
  if(!X||!wb||!wb.Sheets||!wb.Sheets['Report MTC'])return null;
  var details=[
-  {group:'Printing',sheet:'Lost Time Printing',category:'Category',hour:'Hour',pro:'PRO',totalCell:'I3',fallbackStartRow:13},
-  {group:'APM',sheet:'Lost Time AP',category:'Category',hour:'Hour',pro:'PRO',totalCell:'J3',fallbackStartRow:39},
-  {group:'FGM',sheet:'Lost Time FG',category:'Category',hour:'Hour',pro:'PRO',totalCell:'J3',fallbackStartRow:5}
+  {group:'Printing',sheet:'Lost Time Printing',category:'Category',hour:'Hour',totalCell:'I3',fallbackStartRow:13},
+  {group:'APM',sheet:'Lost Time AP',category:'Category',hour:'Hour',totalCell:'J3',fallbackStartRow:39},
+  {group:'FGM',sheet:'Lost Time FG',category:'Category',hour:'Hour',totalCell:'J3',fallbackStartRow:5}
  ];
  var pivots=[{records:'E18',hours:'E9'},{records:'J19',hours:'J10'},{records:'N18',hours:'N9'}];
  function n(v){if(typeof v==='number')return Number.isFinite(v)?v:NaN;var x=String(v==null?'':v).trim();if(!x)return NaN;var a=Number(x);return Number.isFinite(a)?a:NaN;}
- function rangeEnd(ref){var m=String(ref||'').match(/(?:^|:)\$?[A-Z]{1,3}\$?(\d+)$/i);return m?Number(m[1]):NaN;}
- function filterInfo(ws){
-  var usedRange=String(ws&&ws['!ref']||''),auto=ws&&ws['!autofilter'];
-  var filterRange=String(typeof auto==='string'?auto:(auto&&auto.ref)||'');
-  var usedEnd=rangeEnd(usedRange),filterEnd=rangeEnd(filterRange);
-  return {usedRange:usedRange||'—',filterRange:filterRange||'—',
-   rangeCoverageIssue:!!filterRange&&Number.isFinite(usedEnd)&&Number.isFinite(filterEnd)&&filterEnd<usedEnd};
- }
- function effectiveStartRow(ws,d){
+ function effectiveRange(ws,d,matrix){
   var formula=String(ws&&ws[d.totalCell]&&ws[d.totalCell].f||'');
-  var match=formula.match(/SUBTOTAL\s*\(\s*9\s*,\s*\$?[A-Z]{1,3}\$?(\d+)\s*:/i);
-  var start=match?Number(match[1]):NaN;
-  return Number.isInteger(start)&&start>=5?start:d.fallbackStartRow;
+  var match=formula.match(/SUBTOTAL\s*\(\s*9\s*,\s*\$?[A-Z]{1,3}\$?(\d+)\s*:\s*\$?[A-Z]{1,3}\$?(\d+)\s*\)/i);
+  var start=match?Number(match[1]):NaN,end=match?Number(match[2]):NaN;
+  if(Number.isInteger(start)&&Number.isInteger(end)&&start>=5&&end>=start)return {start:start,end:end,fromFormula:true};
+  return {start:d.fallbackStartRow,end:Math.max(d.fallbackStartRow,matrix.length),fromFormula:false};
  }
  var result=details.map(function(d,i){
-  var ws=wb.Sheets[d.sheet],detailRecords=0,detailHours=0,nonTrialHours=0,trialRecords=0,complete=true,startRow=d.fallbackStartRow,eventIds=new Set();
+  var ws=wb.Sheets[d.sheet],detailRecords=0,detailHours=0,complete=true,startRow=d.fallbackStartRow,endRow=NaN,rangeFromFormula=false;
   if(ws){
-   // Keep physical row positions intact: the source subtotal formula points to a specific data range.
+   // Keep worksheet row positions intact: the SUBTOTAL formula defines the source range.
    var matrix=X.utils.sheet_to_json(ws,{header:1,defval:'',raw:true,blankrows:true});
    var header=matrix[3]||[];
    var catIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.category.toLowerCase();});
    var hourIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.hour.toLowerCase();});
-   var proIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.pro.toLowerCase();});
-   startRow=effectiveStartRow(ws,d);
-   if(catIndex<0||hourIndex<0||proIndex<0)complete=false;
-   else matrix.slice(startRow-1).forEach(function(row){
+   var range=effectiveRange(ws,d,matrix);startRow=range.start;endRow=range.end;rangeFromFormula=range.fromFormula;
+   if(catIndex<0||hourIndex<0)complete=false;
+   else matrix.slice(startRow-1,endRow).forEach(function(row){
     if(String(row&&row[catIndex]||'').trim().toUpperCase()!=='MTC')return;
-    detailRecords++;
-    var pro=String(row&&row[proIndex]||'').trim(),isTrial=/^TRIAL$/i.test(pro),h=n(row&&row[hourIndex]);
-    if(isTrial)trialRecords++;
-    else if(pro)eventIds.add(pro.toUpperCase());
-    else complete=false;
-    if(Number.isFinite(h)&&h>=0){detailHours+=h;if(!isTrial)nonTrialHours+=h;}else complete=false;
+    detailRecords++;var h=n(row&&row[hourIndex]);if(Number.isFinite(h)&&h>=0)detailHours+=h;else complete=false;
    });
   }else complete=false;
-  var ranges=filterInfo(ws),p=pivots[i],pw=wb.Sheets['Report MTC'];
+  var p=pivots[i],pw=wb.Sheets['Report MTC'];
   var pivotRecords=n(pw[p.records]&&pw[p.records].v),pivotHours=n(pw[p.hours]&&pw[p.hours].v);
-  var detailEvents=eventIds.size;
-  var eventMismatch=!Number.isFinite(pivotRecords)||detailEvents!==pivotRecords;
-  var hoursMismatch=!Number.isFinite(pivotHours)||Math.abs(nonTrialHours-pivotHours)>0.05;
-  var mismatch=!complete||eventMismatch||hoursMismatch||ranges.rangeCoverageIssue;
-  return {group:d.group,detailStartRow:startRow,detailRecords:detailRecords,detailEvents:detailEvents,trialRecords:trialRecords,
-   detailHours:detailHours,nonTrialHours:nonTrialHours,pivotRecords:pivotRecords,pivotHours:pivotHours,
-   deltaHours:nonTrialHours-pivotHours,usedRange:ranges.usedRange,filterRange:ranges.filterRange,
-   rangeCoverageIssue:ranges.rangeCoverageIssue,complete:complete,eventMismatch:eventMismatch,hoursMismatch:hoursMismatch,mismatch:mismatch};
+  var mismatch=!complete||!Number.isFinite(pivotRecords)||!Number.isFinite(pivotHours)||detailRecords!==pivotRecords||Math.abs(detailHours-pivotHours)>0.05;
+  return {group:d.group,detailStartRow:startRow,detailEndRow:endRow,detailRangeFromFormula:rangeFromFormula,detailRecords:detailRecords,detailHours:detailHours,pivotRecords:pivotRecords,pivotHours:pivotHours,deltaHours:detailHours-pivotHours,complete:complete,mismatch:mismatch};
  });
- var truncated=result.filter(function(r){return r.rangeCoverageIssue;}).map(function(r){return r.group;});
- var note='Audit menghitung baris Category=MTC dalam rentang sumber yang dirujuk formula SUBTOTAL. Jumlah kejadian diagnostik memakai PRO unik dan mengecualikan nilai PRO=TRIAL; jam detail ditampilkan sebagai jumlah baris mentah tanpa menduplikasi atau mengoreksi durasi secara otomatis. Nilai dibandingkan dengan Pivot Report MTC; selisih tidak menetapkan salah satu sisi sebagai KPI final.';
- if(truncated.length)note+=' Rentang AutoFilter tidak mencakup seluruh rentang data pada: '+truncated.join(', ')+'. Filter atau Pivot mungkin tidak memasukkan seluruh baris.';
- return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),note:note};
+ return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),note:'Detail MTC dihitung hanya dalam rentang baris yang dirujuk formula SUBTOTAL, bila tersedia; data di luar rentang tidak ikut dihitung. Ringkasan Pivot dibandingkan terpisah karena filter worksheet/pivot bisa berbeda. Selisih menahan KPI MTC sampai cakupan data direkonsiliasi.'};
 }
 function applyMatrix(matrix,headerRow){
  var start=Math.max(1,parseInt(headerRow,10)||1);
