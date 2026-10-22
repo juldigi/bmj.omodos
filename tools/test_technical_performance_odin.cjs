@@ -72,6 +72,7 @@ state.odin.rows = [
   row('OFU-1', 'ROLL BAK TINTA UNIT 8 TIDAK BERPUTAR (ABNORMAL)', 90, '1400075406'),
   row('OFU-1', 'Putaran Roll tinta u8 UbNormal berhenti', 80, '1400075437'),
   row('OFS-8', 'PEBAIKAN FEEDER SUCKER TIDAK NGISEP', 165, '1400075606'),
+  row('OFS-8', 'LANJUT PERBAIKAN SUCKER', 60, '1400075607'),
   row('FGM-1', 'Total', 720, '1400070000')
 ];
 
@@ -87,7 +88,9 @@ assert.equal(top[1].events, 4);
 assert.equal(top[1].variants.length, 4);
 assert.ok(Math.abs(top[1].hours - 7.5) < 1e-9, 'Roll Tinta Unit 8 variants should sum to 7.5 hours');
 assert.equal(top[2].issue, 'Feeder / Suction — Abnormal');
-assert.ok(Math.abs(top[2].hours - 2.75) < 1e-9, 'Feeder duration should be 165 minutes / 60');
+assert.equal(top[2].events, 2, 'Feeder sucker repair and continuation should count two notifications');
+assert.equal(top[2].variants.length, 2, 'Retain both source variants for the recurring feeder issue');
+assert.ok(Math.abs(top[2].hours - 3.75) < 1e-9, 'OFS-8 feeder sucker issue and continuation should sum to 225 minutes / 60');
 assert.ok(top.every(x => x.issue !== 'Total'), 'Summary rows must not be ranked as issues');
 
 console.log('Technical Performance ODIN tests passed: recurring variants, notification count, duration conversion, traceable raw variants, and total-row exclusion.');
