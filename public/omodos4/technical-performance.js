@@ -25,6 +25,26 @@ function extractOfficialOee(wb){
  var sheets=wb.Sheets,required=['OEE Printing (2)','OEE AP','OEE FG'];
  if(!required.every(function(n){return !!sheets[n];}))return null;
  function cell(sheet,ref){var c=sheets[sheet]&&sheets[sheet][ref];var n=c&&c.v!==undefined?Number(c.v):NaN;return Number.isFinite(n)?n:NaN;}
+ function monthFromDateCell(sheet,ref){
+  var c=sheets[sheet]&&sheets[sheet][ref],raw=c&&c.v,dt=null;
+  if(raw instanceof Date&&Number.isFinite(raw.getTime()))dt=new Date(Date.UTC(raw.getUTCFullYear(),raw.getUTCMonth(),raw.getUTCDate()));
+  else if(typeof raw==='number'&&Number.isFinite(raw)&&raw>=20000&&raw<=80000)dt=new Date(Date.UTC(1899,11,30)+Math.floor(raw)*86400000);
+  else if(typeof raw==='string'&&raw.trim()){
+   var parsed=new Date(raw.trim());
+   if(Number.isFinite(parsed.getTime()))dt=new Date(Date.UTC(parsed.getUTCFullYear(),parsed.getUTCMonth(),parsed.getUTCDate()));
+  }
+  if(!dt||!Number.isFinite(dt.getTime()))return '';
+  return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0');
+ }
+ function monthLabel(key){
+  var a=String(key||'').split('-').map(Number);
+  if(a.length!==2||!a.every(Number.isFinite)||a[0]<1900||a[1]<1||a[1]>12)return '';
+  return new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(a[0],a[1]-1,1)));
+ }
+ var periods=required.map(function(n){return monthFromDateCell(n,'A8');});
+ if(!periods[0]||periods.some(function(p){return p!==periods[0];}))return null;
+ var period=monthLabel(periods[0]);
+ if(!period)return null;
  function countMatches(re){return (wb.SheetNames||[]).filter(function(n){return re.test(n);}).length;}
  var defs=[
   {group:'Printing',sheet:'OEE Printing (2)',cells:{oee:'K2',availability:'K3',performance:'K4',quality:'K5',productionDowntime:'E7',netOperatingTime:'F7'},machineCount:countMatches(/^OFS-\d+$/i)},
@@ -41,7 +61,7 @@ function extractOfficialOee(wb){
   return r;
  });
  var valid=rows.every(function(r){return Number.isFinite(r.oee)&&Number.isFinite(r.availability)&&Number.isFinite(r.performance)&&Number.isFinite(r.quality)&&Number.isFinite(r.productionDowntime)&&Number.isFinite(r.netOperatingTime)&&r.machineCount>0;});
- return valid?{period:'September 2026',calendarHoursPerMachine:720,rows:rows,totalProductionDowntime:rows.reduce(function(a,r){return a+r.productionDowntime;},0),sourceFileNote:'Ringkasan dibaca dari cached values workbook pada sheet OEE Printing (2), OEE AP, dan OEE FG.'}:null;
+ return valid?{period:period,calendarHoursPerMachine:720,rows:rows,totalProductionDowntime:rows.reduce(function(a,r){return a+r.productionDowntime;},0),sourceFileNote:'Ringkasan dibaca dari cached values workbook pada sheet OEE Printing (2), OEE AP, dan OEE FG.'}:null;
 }
 function extractMtcAudit(X,wb){
  if(!X||!wb||!wb.Sheets||!wb.Sheets['Report MTC'])return null;
@@ -335,7 +355,7 @@ function renderOfficialOeeSummaryCard(){
   'Downtime produksi':fmt(r.productionDowntime,2)+' jam','Operating time':fmt(r.netOperatingTime,2)+' jam',
   'Utilization kalender':pctText(r.utilization),'TEEP hitung':pctText(r.teep)
  };});
- return '<div class="tp-card" style="margin:12px 0"><h3 class="tp-section-title">Ringkasan OEE &amp; TEEP resmi · September 2026</h3><p class="tp-muted">Dibaca langsung dari workbook: OEE Printing (2), OEE AP, dan OEE FG. OEE hitung = Availability × Performance × Quality. Utilization kalender = (Net Operating Time + Downtime produksi) ÷ (720 jam × jumlah mesin); TEEP = OEE × Utilization. Ringkasan grup ini terpisah dari baris harian pada worksheet aktif.</p>'+table(rows,['Grup','Jumlah mesin','Availability','Performance','Quality','OEE sumber','OEE hitung','Validasi OEE','Downtime produksi','Operating time','Utilization kalender','TEEP hitung'])+'<p class="tp-muted">Total downtime produksi tiga grup: '+fmt(o.totalProductionDowntime,2)+' jam. Nilai ini bukan Lost Time MTC.</p></div>';
+ return '<div class="tp-card" style="margin:12px 0"><h3 class="tp-section-title">Ringkasan OEE &amp; TEEP resmi · '+esc(o.period)+'</h3><p class="tp-muted">Dibaca langsung dari workbook: OEE Printing (2), OEE AP, dan OEE FG. OEE hitung = Availability × Performance × Quality. Utilization kalender = (Net Operating Time + Downtime produksi) ÷ (720 jam × jumlah mesin); TEEP = OEE × Utilization. Ringkasan grup ini terpisah dari baris harian pada worksheet aktif.</p>'+table(rows,['Grup','Jumlah mesin','Availability','Performance','Quality','OEE sumber','OEE hitung','Validasi OEE','Downtime produksi','Operating time','Utilization kalender','TEEP hitung'])+'<p class="tp-muted">Total downtime produksi tiga grup: '+fmt(o.totalProductionDowntime,2)+' jam. Nilai ini bukan Lost Time MTC.</p></div>';
 }
 function renderMtcAuditCard(){
  var a=state.mtcAudit;if(!a)return '';
