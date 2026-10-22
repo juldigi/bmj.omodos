@@ -54,7 +54,7 @@ function extractOfficialOee(wb){
  var defs=[
   {group:'Printing',sheet:'OEE Printing (2)',cells:{oee:'K2',availability:'K3',performance:'K4',quality:'K5',productionDowntime:'E7',operatingTime:'F7'},qualityFormulaCell:'K5',machineCount:countMatches(/^OFS-\d+$/i)},
   {group:'APM',sheet:'OEE AP',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},qualityFormulaCell:'J5',machineCount:countMatches(/^AP#\d+$/i)},
-  {group:'FGM',sheet:'OEE FG',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},machineCount:countMatches(/^FG#\d+$/i)}
+  {group:'FGM',sheet:'OEE FG',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},qualityFormulaCell:'J5',machineCount:countMatches(/^FG#\d+$/i)}
  ];
  var rows=defs.map(function(d){
   var r={group:d.group,sheet:d.sheet,machineCount:d.machineCount||0};
