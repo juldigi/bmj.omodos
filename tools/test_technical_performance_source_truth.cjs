@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync('public/omodos4/technical-performance.js', 'utf8');
+assert.ok(source.includes("s.src='/vendor/xlsx.min.js'"), 'Excel import should use the locally bundled XLSX reader');
+assert.ok(!source.includes('cdn.jsdelivr.net/npm/xlsx'), 'Excel import must not depend on a remote CDN');
 assert.ok(source.includes("X.read(buf,{type:'array',cellDates:false,cellStyles:true})"),
   'Official workbook reader must preserve hidden-row metadata for the MTC SUBTOTAL/Pivot audit');
 assert.ok(source.includes('function defaultDataStartRow(name,headerRow){'),
@@ -134,10 +136,13 @@ const oeeWorkbook = {
     })
   }
 };
+oeeWorkbook.Sheets['OEE Printing (2)'].K5.f = '(B7+C7)/D7';
 const official = context.extractOfficialOee(oeeWorkbook);
 assert.ok(official, 'The recognized three-group official OEE workbook with matching source months should produce a summary');
 assert.equal(official.period, 'September 2026',
   'Official OEE summary period must be derived from the shared A8 date on the source sheets');
+assert.equal(official.calendarHoursPerMachine, 720, 'September calendar basis must be 30 × 24 hours');
+assert.equal(official.qualityIncludesNc, true, 'Source Quality formula including NC must be detected');
 const missingPeriodWorkbook = {
   SheetNames: oeeWorkbook.SheetNames,
   Sheets: Object.fromEntries(Object.entries(oeeWorkbook.Sheets).map(([name, ws]) => [name, { ...ws }]))
@@ -172,9 +177,26 @@ near(fgm.utilization, 0.310108024691358, 'FGM calendar utilization should reconc
 near(printing.teep, 0.15703472222222226, 'Printing TEEP September source-truth checkpoint');
 near(apm.teep, 0.1763838091563786, 'APM TEEP September source-truth checkpoint');
 near(fgm.teep, 0.1367073131001372, 'FGM TEEP September source-truth checkpoint');
-assert.equal(printing.oeeCheck, 'Cocok');
-assert.equal(apm.oeeCheck, 'Cocok');
-assert.equal(fgm.oeeCheck, 'Cocok');
+assert.equal(printing.oeeCheck, 'Rumus cocok; cek definisi NC');
+assert.equal(apm.oeeCheck, 'Rumus cocok; cek definisi NC');
+assert.equal(fgm.oeeCheck, 'Rumus cocok; cek definisi NC');
+
+const februaryWorkbook = {
+  SheetNames: oeeWorkbook.SheetNames,
+  Sheets: Object.fromEntries(Object.entries(oeeWorkbook.Sheets).map(([name, ws]) => [name, {...ws, A8:{v:45323}}]))
+};
+const february = context.extractOfficialOee(februaryWorkbook);
+assert.equal(february.period, 'Februari 2024');
+assert.equal(february.calendarHoursPerMachine, 696, 'Leap-year February uses 29 × 24 calendar hours');
+near(february.rows[0].utilization, (240+357.4)/(696*2), 'February TEEP utilization uses February calendar hours');
+const qualityExcludesNcWorkbook = {
+  SheetNames: oeeWorkbook.SheetNames,
+  Sheets: Object.fromEntries(Object.entries(oeeWorkbook.Sheets).map(([name, ws]) => [name, {...ws}]))
+};
+qualityExcludesNcWorkbook.Sheets['OEE Printing (2)'].K5.f = 'B7/D7';
+const qualityExcludesNc = context.extractOfficialOee(qualityExcludesNcWorkbook);
+assert.equal(qualityExcludesNc.qualityIncludesNc, false, 'Quality formula without NC must not trigger the NC warning');
+assert.equal(qualityExcludesNc.rows[0].oeeCheck, 'Cocok', 'OEE formula remains a match when the source Quality definition does not include NC');
 
 // Row 4 is the header. Only the exact trimmed Category value MTC may be counted.
 // IPM, MECHANICAL FAILURE, and MTC REPAIR must not be included as MTC.
