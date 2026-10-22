@@ -8,6 +8,29 @@ const vm = require('node:vm');
 const source = fs.readFileSync('public/omodos4/technical-performance.js', 'utf8');
 assert.ok(source.includes("s.src='/vendor/xlsx.min.js'"), 'Excel import should use the locally bundled XLSX reader');
 assert.ok(!source.includes('cdn.jsdelivr.net/npm/xlsx'), 'Excel import must not depend on a remote CDN');
+
+// RBAC regression: the feature must recognize the same Superadmin role aliases
+// as OMODOS factory-home, while continuing to deny technician/other accounts.
+assert.ok(source.includes('u.role||u.Role||u.roleName||u.role_name||u.level'),
+  'Superadmin guard should recognize OMODOS role field aliases');
+const authStart = source.indexOf('function user(){');
+const authEnd = source.indexOf('function notify(', authStart);
+assert.ok(authStart >= 0 && authEnd > authStart, 'Role guard functions must be directly testable');
+const authContext = { window: {} };
+vm.runInNewContext(source.slice(authStart, authEnd) + '\nthis.allowed = allowed; this.user = user;', authContext);
+authContext.CURRENT_USER = { role: 'Superadmin' };
+assert.equal(authContext.allowed(), true, 'Canonical CURRENT_USER.role Superadmin is allowed');
+authContext.CURRENT_USER = undefined;
+authContext.window.currentUser = { roleName: 'SUPER ADMIN' };
+assert.equal(authContext.allowed(), true, 'window.currentUser.roleName with spaces is allowed');
+authContext.window.currentUser = { role_name: 'super_admin' };
+assert.equal(authContext.allowed(), true, 'role_name with underscores is allowed');
+authContext.window.currentUser = { level: 'super-admin' };
+assert.equal(authContext.allowed(), true, 'level with hyphens is allowed');
+authContext.window.currentUser = { role: 'technician' };
+assert.equal(authContext.allowed(), false, 'Technician must not access Technical Performance');
+authContext.window.currentUser = null;
+assert.equal(authContext.allowed(), false, 'Unauthenticated/unknown role must not access Technical Performance');
 assert.ok(source.includes("X.read(buf,{type:'array',cellDates:false,cellStyles:true})"),
   'Official workbook reader must preserve hidden-row metadata for the MTC SUBTOTAL/Pivot audit');
 assert.ok(source.includes('function defaultDataStartRow(name,headerRow){'),
