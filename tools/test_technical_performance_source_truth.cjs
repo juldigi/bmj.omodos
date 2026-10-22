@@ -137,6 +137,8 @@ const oeeWorkbook = {
   }
 };
 oeeWorkbook.Sheets['OEE Printing (2)'].K5.f = '(B7+C7)/D7';
+oeeWorkbook.Sheets['OEE AP'].J5.f = '+B7/C7';
+oeeWorkbook.Sheets['OEE FG'].J5.f = '+B7/C7';
 const official = context.extractOfficialOee(oeeWorkbook);
 assert.ok(official, 'The recognized three-group official OEE workbook with matching source months should produce a summary');
 assert.equal(official.period, 'September 2026',
@@ -178,8 +180,8 @@ near(printing.teep, 0.15703472222222226, 'Printing TEEP September source-truth c
 near(apm.teep, 0.1763838091563786, 'APM TEEP September source-truth checkpoint');
 near(fgm.teep, 0.1367073131001372, 'FGM TEEP September source-truth checkpoint');
 assert.equal(printing.oeeCheck, 'Rumus cocok; cek definisi NC');
-assert.equal(apm.oeeCheck, 'Rumus cocok; cek definisi NC');
-assert.equal(fgm.oeeCheck, 'Rumus cocok; cek definisi NC');
+assert.equal(apm.oeeCheck, 'Cocok', 'APM Quality formula excludes NC; do not apply Printing caveat to this group');
+assert.equal(fgm.oeeCheck, 'Cocok', 'FGM Quality formula excludes NC; do not apply Printing caveat to this group');
 
 const februaryWorkbook = {
   SheetNames: oeeWorkbook.SheetNames,
