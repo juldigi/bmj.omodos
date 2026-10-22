@@ -19,7 +19,7 @@ function syncAuth(){ensureNav();var n=$(NAV),p=$(PAGE);if(n)n.style.display=allo
 function loadXLSX(){return new Promise(function(resolve,reject){if(window.XLSX){resolve(window.XLSX);return;}var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=function(){window.XLSX?resolve(window.XLSX):reject(new Error('Pustaka Excel tidak tersedia.'));};s.onerror=function(){reject(new Error('Pustaka pembaca Excel gagal dimuat. Periksa koneksi atau impor CSV.'));};document.head.appendChild(s);});}
 function parseCSV(text){var rows=[],row=[],cell='',quoted=false;for(var i=0;i<text.length;i++){var c=text[i],n=text[i+1];if(c==='"'&&quoted&&n==='"'){cell+='"';i++;}else if(c==='"'){quoted=!quoted;}else if((c===','||c===';'||c==='\t')&&!quoted){row.push(cell);cell='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&n==='\n')i++;row.push(cell);if(row.some(function(x){return String(x).trim()!=='';}))rows.push(row);row=[];cell='';}else cell+=c;}row.push(cell);if(row.some(function(x){return String(x).trim()!=='';}))rows.push(row);return rows;}
 function defaultHeaderRow(name){name=String(name||'');if(/^OEE (Printing(?: \(2\))?|AP|HS|DC|FG)$/i.test(name))return 6;if(/^Lost Time (Printing|AP|FG|IP)$/i.test(name))return 4;if(/^Report MTC$/i.test(name))return 6;if(/^Kertas Kerja \(Simple View\)$/i.test(name))return 7;if(/^Kertas Kerja$/i.test(name))return 7;return 1;}
-function defaultDataStartRow(name,headerRow){var h=Math.max(1,parseInt(headerRow,10)||1);if(/^Kertas Kerja(?: \\(Simple View\\))?$/i.test(String(name||'')))return Math.max(11,h+1);return h+1;}
+function defaultDataStartRow(name,headerRow){var h=Math.max(1,parseInt(headerRow,10)||1);if(/^Kertas Kerja(?: \(Simple View\))?$/i.test(String(name||'')))return Math.max(11,h+1);return h+1;}
 function extractOfficialOee(wb){
  if(!wb||!wb.Sheets)return null;
  var sheets=wb.Sheets,required=['OEE Printing (2)','OEE AP','OEE FG'];
@@ -141,7 +141,7 @@ function applyMatrix(matrix,headerRow,dataStartRow){
  state.headerRow=header;state.dataStartRow=dataStart;
  state.headers=source.map(function(v,i){return String(v==null||v===''?'Kolom '+(i+1):v).trim();});
  var data=matrix.slice(dataStart-1).filter(function(r){return r&&r.some(function(v){return String(v==null?'':v).trim()!=='';});});
- if(/^OEE (Printing(?: \\(2\\))?|AP|HS|DC|FG)$/i.test(String(state.sheetName||'')))data=data.filter(function(r){return String(r[0]||'').trim().toLowerCase()!=='total';});
+ if(/^OEE (Printing(?: \(2\))?|AP|HS|DC|FG)$/i.test(String(state.sheetName||'')))data=data.filter(function(r){return String(r[0]||'').trim().toLowerCase()!=='total';});
  state.rows=data.map(function(r){var o={};state.headers.forEach(function(h,i){o[h]=r[i]==null?'':r[i];});return o;});
  if(!state.rows.length)throw new Error('Tidak ada baris data mulai '+dataStart+' pada sheet '+(state.sheetName||'CSV')+'.');
 }
