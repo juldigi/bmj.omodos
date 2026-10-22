@@ -424,7 +424,7 @@ function syncNav(){
  var root=g.querySelector('[data-v4-root]');
  if(root){root.setAttribute('aria-label','Ringkasan Utama');root.classList.add('v4-nav-btn');root.lastChild.textContent=' Ringkasan Utama'}
  var existing=sub.querySelectorAll('[data-v4-safe-module]');
- if(existing.length===10){var activeView=document.getElementById('view-omodos4');if(activeView&&activeView.classList.contains('active')&&activeView.classList.contains('v4-safe-module-open')&&!activeView.classList.contains('v4-feature-open'))setActiveNav(ACTIVE_WORKSPACE);return;}
+ if(existing.length===10){var activeView=document.getElementById('view-omodos4'),workspaceCard=document.querySelector('#v4-safe-stage .v4-workspace-card[data-v4-workspace]'),workspaceIndex=Number(workspaceCard&&workspaceCard.getAttribute('data-v4-workspace'));if(activeView&&activeView.classList.contains('active')&&activeView.classList.contains('v4-safe-module-open')&&!activeView.classList.contains('v4-feature-open')&&Number.isInteger(workspaceIndex)&&workspaceIndex>0)setActiveNav(workspaceIndex);return;}
  existing.forEach(function(x){x.remove()});
  for(var i=1;i<WORKSPACES.length;i++){
   var b=document.createElement('button');
@@ -499,7 +499,7 @@ function renderWorkspace(idx){
    '<span class="v4-tile-copy"><strong>'+esc(info.name)+'</strong><small>'+esc(info.help)+'</small></span>'+
    '<span class="v4-tile-arrow" aria-hidden="true"><i class="ph-bold ph-caret-right"></i></span></button>';
  }).join('');
- s.innerHTML='<div class="v4-card v4-workspace-card">'+
+ s.innerHTML='<div class="v4-card v4-workspace-card" data-v4-workspace="'+idx+'">'+
   '<div class="v4-module-head"><div><div class="v4-simple-kicker">Pilih yang ingin dilihat</div><h2><i class="ph-bold '+ws.icon+'"></i> '+esc(simpleWs.name)+'</h2><p>'+esc(simpleWs.help)+' Pilih satu kartu di bawah.</p></div>'+
   '<button class="btn btn-sm" data-v4-back-command><i class="ph-bold ph-house"></i> Ringkasan Utama</button></div>'+
   '<details class="v4-simple-details"><summary><i class="ph-bold ph-database"></i> Data yang dipakai</summary><div class="v4-source-strip">'+sourceChips+'</div></details>'+
