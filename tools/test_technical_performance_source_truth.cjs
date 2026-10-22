@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync('public/omodos4/technical-performance.js', 'utf8');
+assert.ok(source.includes("X.read(buf,{type:'array',cellDates:false,cellStyles:true})"),
+  'Official workbook reader must preserve hidden-row metadata for the MTC SUBTOTAL/Pivot audit');
 assert.ok(source.includes('function defaultDataStartRow(name,headerRow){'),
   'Worksheet import must separate header row from data start row');
 const dataStartStart = source.indexOf('function defaultDataStartRow(name,headerRow){');
