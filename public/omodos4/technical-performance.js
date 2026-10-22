@@ -45,31 +45,39 @@ function extractOfficialOee(wb){
 function extractMtcAudit(X,wb){
  if(!X||!wb||!wb.Sheets||!wb.Sheets['Report MTC'])return null;
  var details=[
-  {group:'Printing',sheet:'Lost Time Printing',category:'Category',hour:'Hour'},
-  {group:'APM',sheet:'Lost Time AP',category:'Category',hour:'Hour'},
-  {group:'FGM',sheet:'Lost Time FG',category:'Category',hour:'Hour'}
+  {group:'Printing',sheet:'Lost Time Printing',category:'Category',hour:'Hour',totalCell:'I3',fallbackStartRow:13},
+  {group:'APM',sheet:'Lost Time AP',category:'Category',hour:'Hour',totalCell:'J3',fallbackStartRow:39},
+  {group:'FGM',sheet:'Lost Time FG',category:'Category',hour:'Hour',totalCell:'J3',fallbackStartRow:5}
  ];
  var pivots=[{records:'E18',hours:'E9'},{records:'J19',hours:'J10'},{records:'N18',hours:'N9'}];
  function n(v){if(typeof v==='number')return Number.isFinite(v)?v:NaN;var x=String(v==null?'':v).trim();if(!x)return NaN;var a=Number(x);return Number.isFinite(a)?a:NaN;}
+ function effectiveStartRow(ws,d){
+  var formula=String(ws&&ws[d.totalCell]&&ws[d.totalCell].f||'');
+  var match=formula.match(/SUBTOTAL\s*\(\s*9\s*,\s*\$?[A-Z]{1,3}\$?(\d+)\s*:/i);
+  var start=match?Number(match[1]):NaN;
+  return Number.isInteger(start)&&start>=5?start:d.fallbackStartRow;
+ }
  var result=details.map(function(d,i){
-  var ws=wb.Sheets[d.sheet],detailRecords=0,detailHours=0,complete=true;
+  var ws=wb.Sheets[d.sheet],detailRecords=0,detailHours=0,complete=true,startRow=d.fallbackStartRow;
   if(ws){
-   var matrix=X.utils.sheet_to_json(ws,{header:1,defval:'',raw:true,blankrows:false});
+   // Keep physical row positions intact: formula ranges refer to worksheet row numbers.
+   var matrix=X.utils.sheet_to_json(ws,{header:1,defval:'',raw:true,blankrows:true});
    var header=matrix[3]||[];
    var catIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.category.toLowerCase();});
    var hourIndex=header.findIndex(function(h){return String(h||'').trim().toLowerCase()===d.hour.toLowerCase();});
+   startRow=effectiveStartRow(ws,d);
    if(catIndex<0||hourIndex<0)complete=false;
-   else matrix.slice(4).forEach(function(row){
-    if(String(row[catIndex]||'').trim().toUpperCase()!=='MTC')return;
-    detailRecords++;var h=n(row[hourIndex]);if(Number.isFinite(h)&&h>=0)detailHours+=h;else complete=false;
+   else matrix.slice(startRow-1).forEach(function(row){
+    if(String(row&&row[catIndex]||'').trim().toUpperCase()!=='MTC')return;
+    detailRecords++;var h=n(row&&row[hourIndex]);if(Number.isFinite(h)&&h>=0)detailHours+=h;else complete=false;
    });
   }else complete=false;
   var p=pivots[i],pw=wb.Sheets['Report MTC'];
   var pivotRecords=n(pw[p.records]&&pw[p.records].v),pivotHours=n(pw[p.hours]&&pw[p.hours].v);
   var mismatch=!complete||!Number.isFinite(pivotRecords)||!Number.isFinite(pivotHours)||detailRecords!==pivotRecords||Math.abs(detailHours-pivotHours)>0.05;
-  return {group:d.group,detailRecords:detailRecords,detailHours:detailHours,pivotRecords:pivotRecords,pivotHours:pivotHours,deltaHours:detailHours-pivotHours,complete:complete,mismatch:mismatch};
+  return {group:d.group,detailStartRow:startRow,detailRecords:detailRecords,detailHours:detailHours,pivotRecords:pivotRecords,pivotHours:pivotHours,deltaHours:detailHours-pivotHours,complete:complete,mismatch:mismatch};
  });
- return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),note:'Perbandingan dilakukan terhadap kategori persis MTC di detail dan nilai tersimpan pada Pivot Report MTC. Selisih bukan otomatis kesalahan satu sisi; verifikasi filter, cakupan, sumber, dan refresh Pivot sebelum menetapkan KPI final.'};
+ return {rows:result,mismatch:result.some(function(r){return r.mismatch;}),note:'Detail MTC dihitung hanya dari rentang data efektif yang dirujuk formula SUBTOTAL (baris awal menjadi fallback bila formula tak tersedia), lalu dibandingkan dengan nilai tersimpan pada Pivot Report MTC. Selisih menandai sumber perlu direkonsiliasi; tidak otomatis menetapkan salah satu sisi sebagai KPI final.'};
 }
 function applyMatrix(matrix,headerRow){
  var start=Math.max(1,parseInt(headerRow,10)||1);
