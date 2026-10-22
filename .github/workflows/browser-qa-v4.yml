@@ -627,13 +627,31 @@ jobs:
                     featureClickQA.failures.push({module:workspaceIndex,index:j,featureNo,featureLabel,state,errors:newErrors.slice(0,5)});
                   }
 
-                  const back = page.locator('#v4-safe-stage [data-v4-back-workspace="' + workspaceIndex + '"]');
-                  // Feature details can be taller than the viewport. The UI button's
-                  // click handler is the behavior under test; avoiding a second
-                  // scroll-to-element action prevents the harness from cascading
-                  // failures when Playwright cannot scroll the nested detail panel.
-                  await back.evaluate(el => el.click());
-                  await waitForWorkspace(5000);
+                  const backState = await page.evaluate((index) => {
+                    const stage = document.getElementById('v4-safe-stage');
+                    const back = stage?.querySelector('[data-v4-back-workspace="' + index + '"]');
+                    const head = stage?.querySelector('.v4-detail-card .v4-module-head');
+                    return {
+                      count: stage?.querySelectorAll('[data-v4-back-workspace="' + index + '"]').length || 0,
+                      headButtons: [...(head?.querySelectorAll('button') || [])].map(b => ({
+                        text: (b.textContent || '').trim(),
+                        attrs: [...b.attributes].reduce((o,a) => (o[a.name]=a.value,o), {})
+                      })),
+                      header: (head?.innerHTML || '').slice(0, 1800)
+                    };
+                  }, workspaceIndex);
+                  if (!backState.count) {
+                    featureClickQA.failures.push({
+                      module: workspaceIndex, index: j, featureNo, featureLabel,
+                      phase: 'missing-back-workspace-control', backState
+                    });
+                  } else {
+                    await page.evaluate((index) => {
+                      const back = document.querySelector('#v4-safe-stage [data-v4-back-workspace="' + index + '"]');
+                      if (back) back.click();
+                    }, workspaceIndex);
+                    await waitForWorkspace(5000);
+                  }
                 } catch (e) {
                   const diagnostic = await page.evaluate(({ n, index }) => {
                     const stage = document.getElementById('v4-safe-stage');
@@ -662,7 +680,15 @@ jobs:
                   // Recover through DOM click delegation directly. Playwright's normal
                   // click can fail to scroll a sidebar item into view after a long detail.
                   try {
-                    await module.evaluate(el => el.click());
+                    await page.evaluate((index) => {
+                      const view = document.getElementById('view-omodos4');
+                      const stage = document.getElementById('v4-safe-stage');
+                      const tiles = [...(stage?.querySelectorAll('[data-v4-feature]') || [])];
+                      if (view?.classList.contains('v4-safe-module-open') &&
+                          !view.classList.contains('v4-feature-open') && tiles.length === 10) return;
+                      const btn = document.querySelector('#v4-nav-group [data-v4-safe-module="' + index + '"]');
+                      if (btn) btn.click();
+                    }, workspaceIndex);
                     await waitForWorkspace(5000);
                   } catch (recoveryError) {
                     featureClickQA.failures.push({
