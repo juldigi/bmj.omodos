@@ -6,6 +6,8 @@
 var V4_CUTOFF = Date.parse('2026-09-01T00:00:00+07:00');
 var ACTIVE_WORKSPACE = 0;
 var ACTIVE_FEATURE = 0;
+// A render token cancels delayed feature mounts from a prior card/workspace.
+function bumpFeatureRenderToken(){window.__OMODOS4_FEATURE_RENDER_TOKEN=(Number(window.__OMODOS4_FEATURE_RENDER_TOKEN)||0)+1;return window.__OMODOS4_FEATURE_RENDER_TOKEN;}
 
 var WORKSPACES = [
  {name:'Command Center',icon:'ph-command',features:[]},
@@ -449,6 +451,7 @@ function card(label,value,note,icon){
  return '<div class="v4-card"><div class="v4-k"><i class="ph-bold '+icon+'"></i> '+esc(label)+'</div><div class="v4-v">'+esc(value)+'</div><div class="v4-note">'+esc(note)+'</div></div>';
 }
 function renderCommandCenter(){
+ bumpFeatureRenderToken();
  if(!permitted())return false;
  ACTIVE_WORKSPACE=0;ACTIVE_FEATURE=0;setActiveNav(0);
  var view=document.getElementById('view-omodos4');if(!view)return false;
@@ -479,6 +482,7 @@ function renderCommandCenter(){
 }
 function featureNumber(workspaceIndex,localIndex){return (workspaceIndex-1)*10+localIndex+1}
 function renderWorkspace(idx){
+ bumpFeatureRenderToken();
  if(!permitted())return false;
  idx=Number(idx)||0;if(idx<=0)return renderCommandCenter();
  var ws=WORKSPACES[idx];if(!ws)return false;
@@ -674,6 +678,7 @@ function renderWarRoom(){
  return '<div class="v4-war-room"><div class="v4-warning-box"><strong>Koordinasi masalah oleh Superadmin</strong><p>Daftar ini menampilkan masalah penting dari Logbook sebagai bahan koordinasi.</p></div>'+(rows.length?rows.map(function(x){return recordRow(x,'Calon masalah penting')}).join(''):'<div class="v4-empty">Tidak ada masalah penting pada data yang dimuat.</div>')+'</div>';
 }
 function renderFeature(n){
+ bumpFeatureRenderToken();
  if(!permitted())return false;
  var f=featureByNumber(n);if(!f)return false;
  var simpleWs=SIMPLE_WORKSPACE[f.wi]||{name:f.workspace.name};
@@ -1957,7 +1962,7 @@ document.addEventListener('click',function(ev){
  if(tile){
   stopSensors();
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=21&&n<=30)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=21&&n<=30)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var load=ev.target.closest&&ev.target.closest('[data-v4-sf-load]');if(load){ev.preventDefault();loadMission(load,Number(load.getAttribute('data-v4-sf-load')));return}
@@ -2171,7 +2176,7 @@ document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=31&&n<=40)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=31&&n<=40)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-sp-load]');
@@ -2418,7 +2423,7 @@ document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=41&&n<=50)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=41&&n<=50)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-rel-load]');
@@ -2695,7 +2700,7 @@ document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=51&&n<=60)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=51&&n<=60)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-op-load]');
@@ -2948,7 +2953,7 @@ document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=61&&n<=70)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=61&&n<=70)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-pi-load]');
@@ -3228,7 +3233,7 @@ document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=71&&n<=80)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=71&&n<=80)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-ai2-run]');
@@ -3501,7 +3506,7 @@ document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=81&&n<=90)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=81&&n<=90)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-imp-load]');
@@ -3797,7 +3802,7 @@ document.addEventListener('click',function(ev){
  var tile=ev.target.closest&&ev.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=91&&n<=100&&n!==97&&n!==98)setTimeout(function(){if(openN(n))mount(n)},0);
+  if(n>=91&&n<=100&&n!==97&&n!==98)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openN(n))mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=ev.target.closest&&ev.target.closest('[data-v4-fb-load]');
@@ -4061,7 +4066,7 @@ document.addEventListener('click',function(e){
  var tile=e.target.closest&&e.target.closest('[data-v4-feature]');
  if(tile){
   var n=Number(tile.getAttribute('data-v4-feature'));
-  if(n>=1&&n<=20)setTimeout(function(){if(openNo()===n)mount(n)},0);
+  if(n>=1&&n<=20)(function(token){setTimeout(function(){if(token===window.__OMODOS4_FEATURE_RENDER_TOKEN&&openNo()===n)mount(n)},0)})(window.__OMODOS4_FEATURE_RENDER_TOKEN);
   return;
  }
  var b=e.target.closest&&e.target.closest('[data-v4-mp-load]');
