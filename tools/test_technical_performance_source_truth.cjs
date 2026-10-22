@@ -19,8 +19,8 @@ vm.runInNewContext(
 );
 assert.equal(dataStartContext.defaultDataStartRow('Kertas Kerja', 7), 11,
   'Formatted Kertas Kerja starts data at row 11, not immediately below its header');
-assert.equal(dataStartContext.defaultDataStartRow('Kertas Kerja (Simple View)', 7), 11,
-  'Simple View Kertas Kerja starts data at row 11');
+assert.equal(dataStartContext.defaultDataStartRow('Kertas Kerja (Simple View)', 7), 8,
+  'Simple View Kertas Kerja starts data immediately after its header');
 assert.equal(dataStartContext.defaultDataStartRow('OEE Printing (2)', 6), 7,
   'OEE detail uses first data row immediately below header');
 assert.equal(dataStartContext.defaultDataStartRow('Lost Time Printing', 4), 5,
@@ -49,6 +49,23 @@ assert.equal(kertasState.dataStartRow,11);
 assert.equal(kertasState.rows.length,2,
   'Kertas Kerja helper rows 8–10 must not be treated as KPI data');
 assert.equal(kertasState.rows[0].Kategori,'MTC');
+
+const simpleViewState = {sheetName:'Kertas Kerja (Simple View)',headers:[],rows:[],headerRow:0,dataStartRow:0};
+const simpleViewContext = {state:simpleViewState,defaultDataStartRow:dataStartContext.defaultDataStartRow};
+vm.runInNewContext(
+  source.slice(applyMatrixStart, applyMatrixEnd) + String.fromCharCode(10) + 'this.applyMatrix = applyMatrix;',
+  simpleViewContext
+);
+const simpleViewMatrix = Array.from({length:9}, () => []);
+simpleViewMatrix[6] = ['NO','KEY PERFORMANCE INDICATOR','TARGET'];
+simpleViewMatrix[7] = ['1','Machine Loss Time - Printing (%)','5'];
+simpleViewMatrix[8] = ['5','MTBF- Printing (Hrs)','56.19'];
+simpleViewContext.applyMatrix(simpleViewMatrix,7);
+assert.equal(simpleViewState.headerRow,7);
+assert.equal(simpleViewState.dataStartRow,8);
+assert.equal(simpleViewState.rows.length,2,
+  'Simple View KPI rows immediately after the header must not be skipped');
+assert.equal(simpleViewState.rows[0]['KEY PERFORMANCE INDICATOR'],'Machine Loss Time - Printing (%)');
 
 const oeeState = {sheetName:'OEE Printing (2)',headers:[],rows:[],headerRow:0,dataStartRow:0};
 const oeeContext = {state:oeeState,defaultDataStartRow:dataStartContext.defaultDataStartRow};
