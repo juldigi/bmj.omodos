@@ -52,8 +52,8 @@ function extractOfficialOee(wb){
  if(!period)return null;
  function countMatches(re){return (wb.SheetNames||[]).filter(function(n){return re.test(n);}).length;}
  var defs=[
-  {group:'Printing',sheet:'OEE Printing (2)',cells:{oee:'K2',availability:'K3',performance:'K4',quality:'K5',productionDowntime:'E7',operatingTime:'F7'},machineCount:countMatches(/^OFS-\d+$/i)},
-  {group:'APM',sheet:'OEE AP',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},machineCount:countMatches(/^AP#\d+$/i)},
+  {group:'Printing',sheet:'OEE Printing (2)',cells:{oee:'K2',availability:'K3',performance:'K4',quality:'K5',productionDowntime:'E7',operatingTime:'F7'},qualityFormulaCell:'K5',machineCount:countMatches(/^OFS-\d+$/i)},
+  {group:'APM',sheet:'OEE AP',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},qualityFormulaCell:'J5',machineCount:countMatches(/^AP#\d+$/i)},
   {group:'FGM',sheet:'OEE FG',cells:{oee:'J2',availability:'J3',performance:'J4',quality:'J5',productionDowntime:'D7',operatingTime:'E7'},machineCount:countMatches(/^FG#\d+$/i)}
  ];
  var rows=defs.map(function(d){
@@ -61,14 +61,15 @@ function extractOfficialOee(wb){
   Object.keys(d.cells).forEach(function(k){r[k]=cell(d.sheet,d.cells[k]);});
   r.oeeCalculated=[r.availability,r.performance,r.quality].every(Number.isFinite)?r.availability*r.performance*r.quality:NaN;
   r.oeeCheck=Number.isFinite(r.oeeCalculated)&&Number.isFinite(r.oee)?(Math.abs(r.oeeCalculated-r.oee)<=0.005?'Cocok':'Perlu pemeriksaan'):'Tidak lengkap';
+   var qFormula=String(sheets[d.sheet]&&sheets[d.sheet][d.qualityFormulaCell]&&sheets[d.sheet][d.qualityFormulaCell].f||'').replace(/^[=+]/,'').replace(/\s/g,'').toUpperCase();
+   r.qualityIncludesNc=/B7\+C7/.test(qFormula)&&/\/D7/.test(qFormula);
   r.utilization=Number.isFinite(r.productionDowntime)&&Number.isFinite(r.operatingTime)&&r.machineCount>0?(r.productionDowntime+r.operatingTime)/(calendarHoursPerMachine*r.machineCount):NaN;
   r.teep=Number.isFinite(r.oee)&&Number.isFinite(r.utilization)?r.oee*r.utilization:NaN;
   return r;
  });
  var valid=rows.every(function(r){return Number.isFinite(r.oee)&&Number.isFinite(r.availability)&&Number.isFinite(r.performance)&&Number.isFinite(r.quality)&&Number.isFinite(r.productionDowntime)&&Number.isFinite(r.operatingTime)&&r.machineCount>0;});
- var qualityFormula=String(sheets['OEE Printing (2)']&&sheets['OEE Printing (2)'].K5&&sheets['OEE Printing (2)'].K5.f||'').replace(/^[=+]/,'').replace(/\s/g,'').toUpperCase();
- var qualityIncludesNc=/B7\+C7/.test(qualityFormula)&&/\/D7/.test(qualityFormula);
- if(qualityIncludesNc)rows.forEach(function(r){if(r.oeeCheck==='Cocok')r.oeeCheck='Rumus cocok; cek definisi NC';});
+ var qualityIncludesNc=rows.some(function(r){return r.qualityIncludesNc;});
+ rows.forEach(function(r){if(r.qualityIncludesNc&&r.oeeCheck==='Cocok')r.oeeCheck='Rumus cocok; cek definisi NC';});
  return valid?{period:period,calendarHoursPerMachine:calendarHoursPerMachine,qualityIncludesNc:qualityIncludesNc,rows:rows,totalProductionDowntime:rows.reduce(function(a,r){return a+r.productionDowntime;},0),sourceFileNote:'Ringkasan dibaca dari cached values workbook pada sheet OEE Printing (2), OEE AP, dan OEE FG.'}:null;
 }
 function extractMtcAudit(X,wb){
