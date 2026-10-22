@@ -14,7 +14,7 @@ assert.ok(dataStartStart >= 0 && dataStartEnd > dataStartStart,
   'Default worksheet data-start helper must be directly testable');
 const dataStartContext = {};
 vm.runInNewContext(
-  source.slice(dataStartStart, dataStartEnd) + '\\nthis.defaultDataStartRow = defaultDataStartRow;',
+  source.slice(dataStartStart, dataStartEnd) + '\nthis.defaultDataStartRow = defaultDataStartRow;',
   dataStartContext
 );
 assert.equal(dataStartContext.defaultDataStartRow('Kertas Kerja', 7), 11,
