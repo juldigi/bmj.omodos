@@ -34,21 +34,22 @@ function near(actual, expected, message) {
 const printingA = 0.5983, printingP = 0.6420, printingQ = 0.9856;
 const apA = 0.8707, apP = 0.5871, apQ = 0.9988;
 const fgA = 0.9480, fgP = 0.4685, fgQ = 0.9925;
+// Mirror the official workbook: 2 Printing machine sheets, 6 APM sheets, 3 FGM sheets.
 const machineNames = [
-  ...Array.from({length:9}, (_,i) => 'OFS-' + (i+1)),
-  ...Array.from({length:8}, (_,i) => 'AP#' + (i+2)),
-  ...Array.from({length:3}, (_,i) => 'FG#' + (i+1))
+  'OFS-5','OFS-8',
+  'AP#2','AP#5','AP#6','AP#7','AP#8','AP#9',
+  'FG#1','FG#2','FG#3'
 ];
 const oeeWorkbook = {
   SheetNames: machineNames.concat(['OEE Printing (2)','OEE AP','OEE FG']),
   Sheets: {
     'OEE Printing (2)': sheet({
       K2: printingA*printingP*printingQ, K3:printingA, K4:printingP, K5:printingQ,
-      E7:240, F7:2448.552
+      E7:240, F7:357.4
     }),
     'OEE AP': sheet({
       J2: apA*apP*apQ, J3:apA, J4:apP, J5:apQ,
-      D7:193.06, E7:1797.02
+      D7:193.06111666666669, E7:1299.5386000000003
     }),
     'OEE FG': sheet({
       J2: fgA*fgP*fgQ, J3:fgA, J4:fgP, J5:fgQ,
@@ -61,12 +62,21 @@ assert.ok(official, 'The recognized three-group official OEE workbook should pro
 assert.equal(official.rows.length, 3);
 const [printing, apm, fgm] = official.rows;
 near(printing.oeeCalculated, printingA*printingP*printingQ, 'Printing OEE formula');
-near(printing.utilization, (240+2448.552)/(720*9), 'Printing calendar utilization formula');
+assert.equal(printing.machineCount, 2, 'Printing machine count must match official OFS-5 and OFS-8 worksheets');
+assert.equal(apm.machineCount, 6, 'APM machine count must match official AP#2/#5/#6/#7/#8/#9 worksheets');
+assert.equal(fgm.machineCount, 3, 'FGM machine count must match official FG#1/#2/#3 worksheets');
+near(printing.utilization, (240+357.4)/(720*2), 'Printing calendar utilization formula');
 near(printing.teep, printing.oee*printing.utilization, 'Printing TEEP formula');
-near(apm.utilization, (193.06+1797.02)/(720*8), 'APM calendar utilization formula');
+near(apm.utilization, (193.06111666666669+1299.5386000000003)/(720*6), 'APM calendar utilization formula');
 near(apm.teep, apm.oee*apm.utilization, 'APM TEEP formula');
-near(fgm.utilization, (34.83+634.986)/(720*3), 'FGM calendar utilization formula');
+near(fgm.utilization, (34.833333333333329+635)/(720*3), 'FGM calendar utilization formula');
 near(fgm.teep, fgm.oee*fgm.utilization, 'FGM TEEP formula');
+near(printing.utilization, 0.4148611111111111, 'Printing calendar utilization should reconcile to September MOR');
+near(apm.utilization, 0.3459721566358025, 'APM calendar utilization should reconcile to September MOR');
+near(fgm.utilization, 0.310108024691358, 'FGM calendar utilization should reconcile to September MOR');
+near(printing.teep, 0.1570, 'Printing TEEP September source-truth checkpoint');
+near(apm.teep, 0.1766, 'APM TEEP September source-truth checkpoint');
+near(fgm.teep, 0.1367, 'FGM TEEP September source-truth checkpoint');
 assert.equal(printing.oeeCheck, 'Cocok');
 assert.equal(apm.oeeCheck, 'Cocok');
 assert.equal(fgm.oeeCheck, 'Cocok');
