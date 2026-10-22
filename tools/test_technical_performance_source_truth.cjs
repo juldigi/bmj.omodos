@@ -98,7 +98,7 @@ const mtcWorkbook = {
 const audit = context.extractMtcAudit(X, mtcWorkbook);
 assert.ok(audit, 'MTC audit should be produced when detail and pivot sheets exist');
 assert.equal(audit.mismatch, false, 'Matching exact-MTC detail and pivot values should pass');
-assert.deepEqual(audit.rows.map(r => [r.detailRecords,r.detailHours,r.pivotRecords,r.pivotHours]), [
+assert.deepEqual(Array.from(audit.rows, r => [r.detailRecords,r.detailHours,r.pivotRecords,r.pivotHours]), [
   [2,5,2,5], [1,1.25,1,1.25], [1,0.75,1,0.75]
 ]);
 
