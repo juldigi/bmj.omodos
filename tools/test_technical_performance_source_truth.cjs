@@ -196,6 +196,15 @@ assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r
 ]);
 assert.equal(audit.rows[0].detailEndRow, 17, 'MTC audit must preserve the SUBTOTAL end row');
 assert.equal(audit.rows[0].detailRangeFromFormula, true, 'MTC audit should prefer explicit SUBTOTAL bounds');
+assert.deepEqual(Array.from(audit.rows, r => [r.subtotalCell,r.subtotalCachedHours]), [
+  ['I3',164], ['J3',88.25], ['J3',17.75]
+], 'Audit must expose the saved all-category SUBTOTAL separately from exact-MTC detail sums');
+assert.ok(source.includes('Nilai SUBTOTAL tersimpan (semua kategori)'),
+  'Audit UI must label the saved SUBTOTAL as all-category worksheet context');
+assert.ok(source.includes('Jam MTC detail pada rentang formula'),
+  'Audit UI must separately label the recalculated exact-MTC detail sum');
+assert.equal(audit.mismatch, false,
+  'A worksheet-wide cached SUBTOTAL must not be compared directly with MTC-only Pivot totals');
 assert.equal(audit.incidentCountReliable, true, 'Complete full-sheet PRO data should independently validate event count');
 assert.equal(audit.incidentCount, 3, 'Event count is based on distinct non-TRIAL PRO IDs across every detail sheet');
 
