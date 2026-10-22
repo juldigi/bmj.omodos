@@ -424,7 +424,7 @@ function syncNav(){
  var root=g.querySelector('[data-v4-root]');
  if(root){root.setAttribute('aria-label','Ringkasan Utama');root.classList.add('v4-nav-btn');root.lastChild.textContent=' Ringkasan Utama'}
  var existing=sub.querySelectorAll('[data-v4-safe-module]');
- if(existing.length===10)return;
+ if(existing.length===10){var activeView=document.getElementById('view-omodos4');if(activeView&&activeView.classList.contains('active')&&activeView.classList.contains('v4-safe-module-open')&&!activeView.classList.contains('v4-feature-open'))setActiveNav(ACTIVE_WORKSPACE);return;}
  existing.forEach(function(x){x.remove()});
  for(var i=1;i<WORKSPACES.length;i++){
   var b=document.createElement('button');
@@ -482,7 +482,7 @@ function renderCommandCenter(){
 }
 function featureNumber(workspaceIndex,localIndex){return (workspaceIndex-1)*10+localIndex+1}
 function renderWorkspace(idx){
- bumpFeatureRenderToken();
+ var workspaceRenderToken=bumpFeatureRenderToken();
  if(!permitted())return false;
  idx=Number(idx)||0;if(idx<=0)return renderCommandCenter();
  var ws=WORKSPACES[idx];if(!ws)return false;
@@ -506,6 +506,7 @@ function renderWorkspace(idx){
   '<div class="v4-feature-grid">'+tiles+'</div></div>';
  s.style.display='block';
  try{s.scrollIntoView({block:'start',behavior:'auto'})}catch(e){}
+ setTimeout(function(){var currentView=document.getElementById('view-omodos4');if(window.__OMODOS4_FEATURE_RENDER_TOKEN===workspaceRenderToken&&ACTIVE_WORKSPACE===idx&&currentView&&currentView.classList.contains('active')&&currentView.classList.contains('v4-safe-module-open')&&!currentView.classList.contains('v4-feature-open'))setActiveNav(idx);},0);
  return true;
 }
 function featureByNumber(n){
