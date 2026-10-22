@@ -85,13 +85,13 @@ assert.equal(fgm.oeeCheck, 'Cocok');
 // IPM, MECHANICAL FAILURE, and MTC REPAIR must not be included as MTC.
 function detailSheet(categoryHeader, hourHeader, entries, firstDataRow, totalCellColumn, prefaceEntries = []) {
   const matrix = Array.from({length:firstDataRow - 1}, () => []);
-  matrix[3] = [categoryHeader, hourHeader]; // worksheet row 4
+  matrix[3] = ['PRO', categoryHeader, hourHeader]; // worksheet row 4
   prefaceEntries.forEach((entry, i) => { matrix[4 + i] = entry; });
   entries.forEach((entry, i) => { matrix[firstDataRow - 1 + i] = entry; });
   const ws = { matrix };
   const lastDataRow = firstDataRow + entries.length - 1;
   ws[totalCellColumn + '3'] = {
-    v: entries.reduce((sum, entry) => sum + (Number(entry[1]) || 0), 0),
+    v: entries.reduce((sum, entry) => sum + (Number(entry[2]) || 0), 0),
     f: 'SUBTOTAL(9,' + totalCellColumn + firstDataRow + ':' + totalCellColumn + Math.max(firstDataRow, lastDataRow) + ')'
   };
   return ws;
@@ -99,24 +99,42 @@ function detailSheet(categoryHeader, hourHeader, entries, firstDataRow, totalCel
 const X = { utils: { sheet_to_json: (ws) => ws.matrix } };
 const mtcWorkbook = {
   Sheets: {
-    'Report MTC': sheet({E18:2,E9:5,J19:1,J10:1.25,N18:1,N9:0.75}),
+    'Report MTC': sheet({E18:1,E9:5,J19:1,J10:1.25,N18:1,N9:0.75}),
     'Lost Time Printing': detailSheet('Category','Hour',[
-      ['MTC',2],[' IPM ',100],['MTC',3],['MTC REPAIR',50],['MECHANICAL FAILURE',9]
-    ],13,'I',[['MTC',99]]),
+      ['WO-1','MTC',2],['WO-2',' IPM ',100],['WO-1','MTC',3],['TRIAL','MTC',50],['WO-3','MTC REPAIR',9]
+    ],13,'I',[['OLD-WO','MTC',99]]),
     'Lost Time AP': detailSheet('Category','Hour',[
-      ['MTC',1.25],['IPM',80],['MTC Repair',7]
-    ],39,'J',[['MTC',70]]),
+      ['AP-WO-1','MTC',1.25],['AP-WO-2','IPM',80],['AP-WO-3','MTC Repair',7]
+    ],39,'J',[['OLD-AP','MTC',70]]),
     'Lost Time FG': detailSheet('Category','Hour',[
-      ['MTC',0.75],['IPM',5],['ELECTRICAL FAILURE',12]
+      ['FG-WO-1','MTC',0.75],['FG-WO-2','IPM',5],['FG-WO-3','ELECTRICAL FAILURE',12]
     ],5,'J')
   }
 };
 const audit = context.extractMtcAudit(X, mtcWorkbook);
 assert.ok(audit, 'MTC audit should be produced when detail and pivot sheets exist');
 assert.equal(audit.mismatch, false, 'Matching exact-MTC detail and pivot values should pass');
-assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r.detailHours,r.pivotRecords,r.pivotHours]), [
-  [13,2,5,2,5], [39,1,1.25,1,1.25], [5,1,0.75,1,0.75]
+assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r.detailEvents,r.trialRecords,r.detailHours,r.nonTrialHours,r.pivotRecords,r.pivotHours,r.deltaHours]), [
+  [13,3,1,1,55,5,1,5,0], [39,1,1,0,1.25,1.25,1,1.25,0], [5,1,1,0,0.75,0.75,1,0.75,0]
 ]);
+
+const truncatedFilterWorkbook = {
+  Sheets: {
+    ...mtcWorkbook.Sheets,
+    'Lost Time Printing': {
+      ...mtcWorkbook.Sheets['Lost Time Printing'],
+      '!ref':'A1:J2944',
+      '!autofilter':{ref:'A4:J1313'}
+    }
+  }
+};
+const truncatedFilterAudit = context.extractMtcAudit(X, truncatedFilterWorkbook);
+assert.equal(truncatedFilterAudit.rows[0].rangeCoverageIssue, true,
+  'An AutoFilter range that ends before the used data range must be identified');
+assert.equal(truncatedFilterAudit.rows[0].mismatch, true,
+  'A source table range that does not cover all data must block a clean reconciliation');
+assert.ok(truncatedFilterAudit.note.includes('AutoFilter'),
+  'Audit note must explain incomplete AutoFilter coverage');
 
 const stalePivot = {
   Sheets: {
@@ -156,7 +174,23 @@ const mapped = calcContext.calc();
 near(mapped.mtcHours, 1.5, 'Mapped exact-MTC lost time');
 near(mapped.totalHours, 5, 'Mapped total downtime');
 near(mapped.ratio, 0.3, 'Mapped MTC share');
-assert.equal(mapped.incidents, 1, 'Mapped fallback incident count only includes exact MTC rows');
+assert.equal(mapped.incidents, 1, 'Mapped BD source takes precedence for incident count');
+
+// A mapped PRO/incident field should count distinct non-TRIAL IDs, never detail rows.
+calcContext.state.rows = [
+  { Category:'MTC', LT:1.5, DT:2, Incident:'WO-1' },
+  { Category:'MTC', LT:0.5, DT:1, Incident:'WO-1' },
+  { Category:'MTC', LT:0.25, DT:0.5, Incident:'TRIAL' },
+  { Category:'IPM', LT:8, DT:3, Incident:'WO-2' }
+];
+calcContext.state.mapping = { category:'Category', lt:'LT', downtime:'DT', incident:'Incident' };
+const uniqueIncidentCount = calcContext.calc();
+assert.equal(uniqueIncidentCount.incidents, 1, 'Duplicate PRO values count as one incident and TRIAL is excluded');
+
+calcContext.state.mapping = { category:'Category', lt:'LT', downtime:'DT' };
+const noIncidentSource = calcContext.calc();
+assert.ok(Number.isNaN(noIncidentSource.incidents),
+  'Incident count must be unavailable when neither OEE BD count nor an incident ID source is mapped');
 
 // A source detail-vs-pivot mismatch should hold back MTC-only KPI values even if
 // the currently selected detail sheet can be mapped and produces numeric values.
