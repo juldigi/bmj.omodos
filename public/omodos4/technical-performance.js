@@ -165,22 +165,22 @@ function odinHours(row){
 }
 function odinCanonicalIssue(machine,issue){
  var m=String(machine||'').toUpperCase().replace(/[^A-Z0-9]+/g,'').trim();
- var low=String(issue||'').toLowerCase().replace(/\\s+/g,' ').trim();
+ var low=String(issue||'').toLowerCase().replace(/\s+/g,' ').trim();
  /* Curated aliases grounded in the existing ODIN records and approved MOR grouping.
     The original descriptions are retained alongside this label for auditability. */
- if((m==='APM2'||m==='APM#2')&&/timm?ing|fedtabel|feed\\s*table/.test(low))return 'Timing Feed Table';
- if((m==='OFU1'||m==='OFU#1')&&/(roll.*(tinta|bak)|tinta.*roll)/.test(low)&&/(unit\\s*8|\\bu8\\b|putaran|tidak berputar|abnormal|berhenti)/.test(low))return 'Roll Bak Tinta Unit 8 — Tidak Berputar / Abnormal';
+ if((m==='APM2'||m==='APM#2')&&/timm?ing|fedtabel|feed\s*table/.test(low))return 'Timing Feed Table';
+ if((m==='OFU1'||m==='OFU#1')&&/(roll.*(tinta|bak)|tinta.*roll)/.test(low)&&/(unit\s*8|\bu8\b|putaran|tidak berputar|abnormal|berhenti)/.test(low))return 'Roll Bak Tinta Unit 8 — Tidak Berputar / Abnormal';
  if(/gripper|griper/.test(low))return 'Gripper Transfer';
  if(/register/.test(low))return 'Register Berubah / Abnormal';
  if(/feeder|sucker|vacum|vacuum/.test(low))return 'Feeder / Suction — Abnormal';
- return String(issue||'').trim().replace(/\\s+/g,' ');
+ return String(issue||'').trim().replace(/\s+/g,' ');
 }
 function odinTopRows(){
  var o=state.odin;if(!o.rows.length||!o.mapping.problem)return [];
  var groups={};
  o.rows.forEach(function(row){
   var issue=String(oVal(row,'problem')||'').trim(),machine=String(oVal(row,'machine')||'').trim();
-  if(!issue||/^(grand\\s+)?total$|^subtotal$|^jumlah(\\s+total)?$/i.test(issue))return;
+  if(!issue||/^(grand\s+)?total$|^subtotal$|^jumlah(\s+total)?$/i.test(issue))return;
   var canonical=odinCanonicalIssue(machine,issue);
   var norm=(machine+' | '+canonical).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   if(!norm)return;
