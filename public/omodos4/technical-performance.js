@@ -170,7 +170,7 @@ async function readFile(file){
   if(/\.csv$/i.test(file.name)){
    state.sheetName='CSV';applyMatrix(parseCSV(await file.text()),1,2);
   }else if(/\.(xlsx|xls|xlsm)$/i.test(file.name)){
-   var X=await loadXLSX(),buf=await file.arrayBuffer(),wb=X.read(buf,{type:'array',cellDates:false});
+   var X=await loadXLSX(),buf=await file.arrayBuffer(),wb=X.read(buf,{type:'array',cellDates:false,cellStyles:true});
    if(!wb.SheetNames||!wb.SheetNames.length)throw new Error('Workbook tidak memiliki sheet.');
    state.workbook=wb;state.sheetNames=wb.SheetNames.slice();state.officialOee=extractOfficialOee(wb);state.mtcAudit=extractMtcAudit(X,wb);
    var preferred=/OEE/i.test(file.name)?(state.sheetNames.indexOf('OEE Printing (2)')>=0?'OEE Printing (2)':state.sheetNames.find(function(n){return /^OEE Printing$/i.test(n);})):/Kertas|Technical/i.test(file.name)?(state.sheetNames.indexOf('Kertas Kerja')>=0?'Kertas Kerja':null):null;
