@@ -117,6 +117,24 @@ assert.equal(audit.mismatch, false, 'Matching exact-MTC detail and pivot values 
 assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r.detailEvents,r.trialRecords,r.detailHours,r.nonTrialHours,r.pivotRecords,r.pivotHours,r.deltaHours]), [
   [13,3,1,1,55,5,1,5,0], [39,1,1,0,1.25,1.25,1,1.25,0], [5,1,1,0,0.75,0.75,1,0.75,0]
 ]);
+assert.equal(audit.rows[0].detailEndRow, 17, 'MTC audit must preserve the SUBTOTAL end row');
+assert.equal(audit.rows[0].detailRangeFromFormula, true, 'MTC audit should prefer explicit SUBTOTAL bounds');
+
+// A valid-looking MTC line after the source SUBTOTAL's end row must not leak into the audit.
+const beyondSubtotalWorkbook = {
+  Sheets: {
+    ...mtcWorkbook.Sheets,
+    'Lost Time Printing': {
+      ...mtcWorkbook.Sheets['Lost Time Printing'],
+      matrix: [...mtcWorkbook.Sheets['Lost Time Printing'].matrix, ['AFTER-SUBTOTAL','MTC',999]]
+    }
+  }
+};
+const boundedAudit = context.extractMtcAudit(X, beyondSubtotalWorkbook);
+assert.equal(boundedAudit.rows[0].detailRecords, audit.rows[0].detailRecords,
+  'Rows after SUBTOTAL end must be excluded from MTC record count');
+near(boundedAudit.rows[0].detailHours, audit.rows[0].detailHours,
+  'Rows after SUBTOTAL end must be excluded from MTC Lost Time');
 
 const truncatedFilterWorkbook = {
   Sheets: {
