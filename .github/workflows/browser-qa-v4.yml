@@ -524,6 +524,18 @@ jobs:
 
             console.log('[QA] all 100 OMODOS 4 feature clicks');
             const featureClickQA = { checked: 0, failures: [] };
+            // This sweep validates feature routing/rendering, not backend session expiry.
+            // Network/API behavior and fail-closed RBAC have separate checks above.
+            // Stub data reads during the 100-card sweep so an absent CI backend session
+            // cannot log out the synthetic Superadmin and cascade into navigation errors.
+            await page.evaluate(() => {
+              if (window.OMODOS4 && typeof window.OMODOS4.serverRead === 'function' &&
+                  !window.__qaOriginalServerRead) {
+                window.__qaOriginalServerRead = window.OMODOS4.serverRead;
+                window.OMODOS4.serverRead = async () => null;
+                window.__qaServerReadStubbed = true;
+              }
+            });
             for (let i = 0; i < moduleCount; i++) {
               const workspaceIndex = i + 1;
               const module = page.locator('#v4-nav-group [data-v4-safe-module="' + workspaceIndex + '"]');
@@ -704,6 +716,13 @@ jobs:
                 }
               }
             }
+            await page.evaluate(() => {
+              if (window.__qaServerReadStubbed && window.__qaOriginalServerRead && window.OMODOS4) {
+                window.OMODOS4.serverRead = window.__qaOriginalServerRead;
+                delete window.__qaOriginalServerRead;
+                delete window.__qaServerReadStubbed;
+              }
+            });
             result.featureClickQA = featureClickQA;
             if (featureClickQA.checked !== 100 || featureClickQA.failures.length) {
               throw new Error('OMODOS 4 feature click regression failed: ' + JSON.stringify(featureClickQA.failures.slice(0, 12)));
