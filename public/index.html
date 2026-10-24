@@ -17092,7 +17092,7 @@ function renderEntryEditForm(e){
   const holder = $('#entry-view-mode');
   if(!holder) return;
   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
-    const raw = e[f.key] || '';
+    const raw = e[f.key] === undefined || e[f.key] === null ? '' : e[f.key];
     const val = f.toInput ? f.toInput(raw) : raw;
     if(f.type === 'textarea'){
       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
@@ -17101,6 +17101,7 @@ function renderEntryEditForm(e){
       const options = f.key === 'Menyebabkan Downtime' && !String(val).trim() ? ['','Ya','Tidak'] : f.options;
       const opts = options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${o ? escapeHtml(o) : 'Pilih jawaban...'}</option>`).join('');
       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
+    }
     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
   }).join('');
   holder.innerHTML = `
