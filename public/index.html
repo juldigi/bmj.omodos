@@ -3594,7 +3594,8 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
             <div class="field"><label>Jam Mulai</label><input type="time" name="jamMulai" id="input-jamMulai" required></div>
             <div class="field"><label>Jam Selesai</label><input type="time" name="jamSelesai" id="input-jamSelesai" required></div>
           </div>
-          <div class="field"><label>Estimasi Pekerjaan (Otomatis)</label><input type="text" name="downtime" id="input-downtime" placeholder="Terisi otomatis dari Jam Mulai & Jam Selesai" readonly></div>
+          <div class="field"><label>Apakah pekerjaan ini menyebabkan downtime mesin?</label><select name="menyebabkanDowntime" id="input-menyebabkanDowntime" required><option value="">Pilih jawaban...</option><option value="Ya">Ya</option><option value="Tidak">Tidak</option></select><div class="dt-hint">Pilih Ya jika mesin berhenti karena pekerjaan ini. Pilih Tidak jika hanya mencatat durasi pekerjaan.</div></div>
+          <div class="field"><label>Durasi Pekerjaan (Otomatis)</label><input type="text" id="input-downtime" placeholder="Terisi otomatis dari Jam Mulai & Jam Selesai" readonly><input type="hidden" name="durasiPekerjaanMenit" id="input-durasiPekerjaanMenit"></div>
           <div class="field"><label>Catatan Tambahan
             <button type="button" class="btn-ai-fix" id="btn-ai-fix-catatan" title="Perbaiki typo &amp; ejaan menggunakan AI External"><i class="ph-bold ph-magic-wand"></i> Koreksi AI External</button>
           </label><textarea name="catatan" id="ta-catatan" rows="2" placeholder="Rekomendasi tindak lanjut, kondisi khusus, dll." required></textarea></div>
@@ -9769,13 +9770,39 @@ function renderGroupView(){
 
 /* ---------------- VIEW: TOP DURASI PEKERJAAN ---------------- */
 // Mengambil nilai durasi (dalam menit) dari kolom "Durasi Pekerjaan" / "Downtime (menit)".
-function parseDurationMinutes(e){
-  const raw = e['Durasi Pekerjaan'] ?? e['Downtime (menit)'];
-  if(raw === undefined || raw === null || raw === '') return null;
+function parseNumericMinutes_(raw){
+  if(raw === undefined || raw === null || String(raw).trim() === '') return null;
   const match = String(raw).match(/-?\d+(\.\d+)?/);
   if(!match) return null;
   const val = parseFloat(match[0]);
-  return isNaN(val) ? null : val;
+  return Number.isFinite(val) ? val : null;
+}
+// Parse machine downtime, not elapsed work duration. Used by MTTR, MTBF,
+// lost-time and breakdown analytics.
+function parseDurationMinutes(e){
+  if(!e) return null;
+  const choice = String(e['Menyebabkan Downtime'] || '').trim().toLowerCase();
+  if(choice === 'tidak' || choice === 'no' || choice === 'false' || choice === '0') return 0;
+  const directDowntime = parseNumericMinutes_(e['Downtime (menit)']);
+  if(directDowntime !== null) return directDowntime;
+  const legacyDuration = parseNumericMinutes_(e['Durasi Pekerjaan']);
+  if(legacyDuration !== null) return legacyDuration; // compatibility with older exports
+  if(choice === 'ya' || choice === 'yes' || choice === 'true' || choice === '1'){
+    return parseNumericMinutes_(e['Durasi Pekerjaan (menit)']);
+  }
+  return null;
+}
+// Elapsed time spent working. Used only by views labelled as work duration.
+function parseWorkDurationMinutes(e){
+  if(!e) return null;
+  const candidates = [e['Durasi Pekerjaan (menit)'], e['Durasi Pekerjaan']];
+  for(const raw of candidates){
+    const parsed = parseNumericMinutes_(raw);
+    if(parsed !== null) return parsed;
+  }
+  const choice = String(e['Menyebabkan Downtime'] || '').trim().toLowerCase();
+  if(choice === 'tidak' || choice === 'no' || choice === 'false' || choice === '0') return null;
+  return parseNumericMinutes_(e['Downtime (menit)']); // fallback for legacy rows
 }
 function fmtDurationMinutes(mins){
   if(mins === null || mins === undefined || isNaN(mins)) return '-';
@@ -9810,7 +9837,7 @@ function renderDurasiView(){
   const holder = $('#list-durasi');
   const withDuration = [];
   ENTRIES.forEach(e=>{
-    const mins = parseDurationMinutes(e);
+    const mins = parseWorkDurationMinutes(e);
     if(mins === null) return;
     withDuration.push({ entry: e, mins });
   });
@@ -9838,8 +9865,8 @@ if(btnRefreshDurasi) btnRefreshDurasi.addEventListener('click', async ()=>{ awai
    - "Kejadian breakdown / perbaikan" = entri logbook yang punya nilai
      durasi (parseDurationMinutes(e) != null) ATAU Jenis Pekerjaan-nya
      mengandung kata "Corrective"/"Perbaikan"/"Breakdown".
-   - "Downtime (menit)" per entri = parseDurationMinutes(e) (field yang
-     sama dipakai di menu "Top Durasi Pekerjaan").
+   - "Downtime (menit)" per entri dibaca dari kolom downtime tersendiri;
+     Top Durasi Pekerjaan memakai kolom Durasi Pekerjaan (menit).
    - MTTR = total downtime / jumlah kejadian breakdown (rata-rata waktu
      perbaikan per kejadian).
    - MTBF = (total jam operasi tersedia − total downtime) / jumlah
@@ -9858,7 +9885,7 @@ function anIsBreakdown(e){
   const jp = String(e['Jenis Pekerjaan']||'').toLowerCase();
   if(jp.includes('preventive')) return false;
   if(jp.includes('corrective') || jp.includes('perbaikan') || jp.includes('breakdown') || jp.includes('repair') || jp.includes('emergency')) return true;
-  return parseDurationMinutes(e) !== null && !jp.includes('preventive');
+  return parseDurationMinutes(e) > 0 && !jp.includes('preventive');
 }
 function anEntryHour(e){
   const t = fmtTime(e['Waktu']);
@@ -10344,7 +10371,7 @@ function computeCorrelationData(days){
   /* ---- 4) Jenis Pekerjaan vs rata-rata durasi ---- */
   const jenisDur = {};
   scoped.forEach(e=>{
-    const mins = parseDurationMinutes(e);
+    const mins = parseWorkDurationMinutes(e);
     if(mins === null) return;
     const j = e['Jenis Pekerjaan'] || 'Tidak Ditentukan';
     if(!jenisDur[j]) jenisDur[j] = { total:0, count:0 };
@@ -16991,7 +17018,9 @@ function openDetail(id){
     ['Material Number SAP', e['Material Number SAP']],
     ['Spare Part (catatan)', e['Spare Part Digunakan']],
     ['Jam Mulai / Selesai', [fmtTime(e['Jam Mulai']), fmtTime(e['Jam Selesai'])].filter(Boolean).join(' – ')],
-    ['Estimasi Pekerjaan', e['Downtime (menit)']],
+    ['Durasi Pekerjaan (menit)', e['Durasi Pekerjaan (menit)'] !== undefined && e['Durasi Pekerjaan (menit)'] !== '' ? e['Durasi Pekerjaan (menit)'] : e['Downtime (menit)']],
+    ['Menyebabkan Downtime', e['Menyebabkan Downtime'] || 'Belum dicatat'],
+    ['Downtime Mesin (menit)', e['Downtime (menit)']],
     ['Catatan', e['Catatan Tambahan']],
     ['Keterangan', isOneNoteImport(e['Tanggal']) ? 'Import dari OneNote' : ''],
   ];
@@ -17080,20 +17109,23 @@ const ENTRY_EDIT_FIELDS = [
   { key:'Spare Part Digunakan', label:'Spare Part (catatan)', type:'text' },
   { key:'Jam Mulai', label:'Jam Mulai', type:'time' },
   { key:'Jam Selesai', label:'Jam Selesai', type:'time' },
-  { key:'Downtime (menit)', label:'Estimasi Pekerjaan (menit)', type:'number' },
+  { key:'Menyebabkan Downtime', label:'Menyebabkan Downtime?', type:'select', options:['Ya','Tidak'] },
+  { key:'Durasi Pekerjaan (menit)', label:'Durasi Pekerjaan (menit)', type:'number' },
+  { key:'Downtime (menit)', label:'Downtime Mesin (menit)', type:'number' },
   { key:'Catatan Tambahan', label:'Catatan', type:'textarea' }
 ];
 function renderEntryEditForm(e){
   const holder = $('#entry-view-mode');
   if(!holder) return;
   const fieldHtml = ENTRY_EDIT_FIELDS.map(f=>{
-    const raw = e[f.key] || '';
+    const raw = e[f.key] === undefined || e[f.key] === null ? '' : e[f.key];
     const val = f.toInput ? f.toInput(raw) : raw;
     if(f.type === 'textarea'){
       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><textarea data-edit-field="${f.key}" rows="3">${escapeHtml(val)}</textarea></div>`;
     }
     if(f.type === 'select'){
-      const opts = f.options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
+      const options = f.key === 'Menyebabkan Downtime' && !String(val).trim() ? ['','Ya','Tidak'] : f.options;
+      const opts = options.map(o=>`<option value="${escapeHtml(o)}" ${String(val)===o?'selected':''}>${o ? escapeHtml(o) : 'Pilih jawaban...'}</option>`).join('');
       return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><select data-edit-field="${f.key}">${opts}</select></div>`;
     }
     return `<div class="field" data-edit-wrap="${f.key}"><label>${escapeHtml(f.label)}</label><input type="${f.type}" data-edit-field="${f.key}" value="${escapeHtml(val)}"></div>`;
@@ -17132,7 +17164,8 @@ async function saveEntryEdit(id){
     'Kode Mesin':'kodeMesin', 'Nama Mesin':'namaMesin', 'Nama Unit':'namaUnit', 'Jenis Pekerjaan':'jenisPekerjaan',
     'Prioritas':'prioritas', 'Status':'status', 'Deskripsi Masalah':'deskripsiMasalah', 'Tindakan Perbaikan':'tindakanPerbaikan',
     'Nama Material':'namaMaterial', 'Material Number SAP':'materialNumberSAP', 'Spare Part Digunakan':'sparePart',
-    'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
+    'Jam Mulai':'jamMulai', 'Jam Selesai':'jamSelesai', 'Menyebabkan Downtime':'menyebabkanDowntime',
+    'Durasi Pekerjaan (menit)':'durasiPekerjaanMenit', 'Downtime (menit)':'downtime', 'Catatan Tambahan':'catatan'
   };
   fieldEls.forEach(el=>{
     const key = el.dataset.editField;
@@ -17220,15 +17253,24 @@ function refreshCurrentView(){
 }
 
 /* ---------------- ESTIMASI PEKERJAAN (AUTO-CALCULATED) ---------------- */
+function computeLogbookDurationMinutes_(mulai, selesai){
+  if(!mulai || !selesai) return '';
+  const [h1,m1] = String(mulai).split(':').map(Number);
+  const [h2,m2] = String(selesai).split(':').map(Number);
+  if([h1,m1,h2,m2].some(n=>!Number.isFinite(n))) return '';
+  let mins = (h2*60+m2) - (h1*60+m1);
+  if(mins < 0) mins += 24*60;
+  if(mins < 0 || mins >= 24*60) return '';
+  return mins;
+}
 function computeEstimasi(){
   const mulai = $('#input-jamMulai').value;
   const selesai = $('#input-jamSelesai').value;
   const out = $('#input-downtime');
-  if(!mulai || !selesai){ out.value=''; return; }
-  const [h1,m1] = mulai.split(':').map(Number);
-  const [h2,m2] = selesai.split(':').map(Number);
-  let mins = (h2*60+m2) - (h1*60+m1);
-  if(mins < 0) mins += 24*60; // pekerjaan lewat tengah malam
+  const numericOut = $('#input-durasiPekerjaanMenit');
+  const mins = computeLogbookDurationMinutes_(mulai, selesai);
+  if(mins === ''){ out.value=''; if(numericOut) numericOut.value=''; return; }
+  if(numericOut) numericOut.value = String(mins);
   const jam = Math.floor(mins/60);
   const sisaMenit = mins % 60;
   out.value = mins + ' menit' + (jam>0 ? ` (${jam} jam ${sisaMenit} menit)` : '');
@@ -18064,6 +18106,11 @@ $('#form-entry').addEventListener('submit', async (ev)=>{
   try{
     const fd = new FormData(ev.target);
     const entry = Object.fromEntries(fd.entries());
+    const calculatedDuration = computeLogbookDurationMinutes_(entry.jamMulai, entry.jamSelesai);
+    entry.durasiPekerjaanMenit = calculatedDuration === '' ? '' : calculatedDuration;
+    entry.downtime = entry.menyebabkanDowntime === 'Ya'
+      ? (calculatedDuration === '' ? '' : calculatedDuration)
+      : (entry.menyebabkanDowntime === 'Tidak' ? 0 : '');
     applyLogbookLocationPayload_(entry);
     const additionalNames = (typeof getAdditionalPersonilNames === 'function') ? getAdditionalPersonilNames() : [];
     entry.personilTambahan = additionalNames;
@@ -22702,10 +22749,10 @@ function copilotPageResume(view){
     // [FIX SOT] Sebelumnya tidak dibatasi tanggal sama sekali (durasi
     // terlama sepanjang masa) -- otomatis ikut mencampur data historis
     // OneNote yang belum tervalidasi. Sekarang dibatasi ke source of truth.
-    const top = sotEntries().filter(e=> (parseDurationMinutes(e)||0) > 0).sort((a,b)=> (parseDurationMinutes(b)||0)-(parseDurationMinutes(a)||0)).slice(0,10);
+    const top = sotEntries().filter(e=> (parseWorkDurationMinutes(e)||0) > 0).sort((a,b)=> (parseWorkDurationMinutes(b)||0)-(parseWorkDurationMinutes(a)||0)).slice(0,10);
     if(top.length){
       items.push({ level:'info', icon:'⏱', title:'Pekerjaan dengan Durasi Terlama',
-        text:`Pekerjaan terlama saat ini: "<b>${escapeHtml(top[0]['Deskripsi Masalah']||top[0]['Jenis Pekerjaan']||'-')}</b>" di <b>${escapeHtml(top[0]['Nama Mesin']||'-')}</b> (${fmtDurationMinutes(parseDurationMinutes(top[0]))}).`,
+        text:`Pekerjaan terlama saat ini: "<b>${escapeHtml(top[0]['Deskripsi Masalah']||top[0]['Jenis Pekerjaan']||'-')}</b>" di <b>${escapeHtml(top[0]['Nama Mesin']||'-')}</b> (${fmtDurationMinutes(parseWorkDurationMinutes(top[0]))}).`,
         sub: `${top.length} pekerjaan durasi terlama ditampilkan di halaman ini.`, sources: top.map(copilotSourceFromEntry) });
     }
   }
