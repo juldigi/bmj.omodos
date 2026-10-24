@@ -4737,7 +4737,9 @@ function createBackend(services, env = {}) {
   __name(getLogbookListSot_, "getLogbookListSot_");
   function addEntryLegacyV2_(body) {
     const sh = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
+    try { ensureHeaderColumns_(sh, ["Menyebabkan Downtime", "Durasi Pekerjaan (menit)"]); } catch (e) {}
     const d = body.entry || {};
+    normalizeLogbookDowntime_(d);
     const missing = REQUIRED_ENTRY_FIELDS.filter(function(f) {
       return !d[f] || String(d[f]).trim() === "";
     });
@@ -4785,7 +4787,9 @@ function createBackend(services, env = {}) {
       "Status": d.status || "Proses",
       "Jam Mulai": d.jamMulai || "",
       "Jam Selesai": d.jamSelesai || "",
-      "Downtime (menit)": d.downtime || "",
+      "Menyebabkan Downtime": d.menyebabkanDowntime || "",
+      "Durasi Pekerjaan (menit)": d.durasiPekerjaan !== void 0 ? d.durasiPekerjaan : "",
+      "Downtime (menit)": d.downtime !== void 0 ? d.downtime : "",
       "Lampiran (JSON)": JSON.stringify(attachments),
       "Catatan Tambahan": d.catatan || "",
       "Grouping Pekerjaan": d.groupingPekerjaan || "",
@@ -8192,21 +8196,44 @@ function createBackend(services, env = {}) {
     return (b - a + 1440) % 1440;
   }
   function normalizeLogbookDowntime_(data, existing) {
+    data = data || {};
     existing = existing || {};
-    var originalDowntime = data.downtime !== void 0 ? data.downtime :
-      data["Downtime (menit)"] !== void 0 ? data["Downtime (menit)"] : existing["Downtime (menit)"];
-    var rawChoice = data.menyebabkanDowntime || data["Menyebabkan Downtime"] || existing["Menyebabkan Downtime"] || "";
-    var normalizedChoice = String(rawChoice).trim().toLowerCase();
-    var choice = /^(ya|yes|true|1)/.test(normalizedChoice) ? "Ya" :
-      /^(tidak|no|false|0)/.test(normalizedChoice) ? "Tidak" : "";
-    if (!choice) choice = Number(originalDowntime) > 0 ? "Ya" : "Tidak";
+    var hasIncomingChoice = Object.prototype.hasOwnProperty.call(data, "menyebabkanDowntime") ||
+      Object.prototype.hasOwnProperty.call(data, "Menyebabkan Downtime");
+    var incomingRaw = Object.prototype.hasOwnProperty.call(data, "menyebabkanDowntime") ?
+      data.menyebabkanDowntime : data["Menyebabkan Downtime"];
+    var incomingText = String(incomingRaw == null ? "" : incomingRaw).trim();
+    var existingRaw = existing["Menyebabkan Downtime"];
+    var existingText = String(existingRaw == null ? "" : existingRaw).trim();
+    // An empty choice on an existing legacy row stays empty; never infer "Tidak"
+    // merely because an older row has no choice recorded.
+    var rawChoice = incomingText ? incomingRaw : (existingText ? existingRaw : "");
+    var normalizedChoice = String(rawChoice == null ? "" : rawChoice).trim().toLowerCase();
+    var choice = normalizedChoice === "ya" || normalizedChoice === "yes" ||
+      normalizedChoice === "true" || normalizedChoice === "1" ? "Ya" :
+      normalizedChoice === "tidak" || normalizedChoice === "no" ||
+      normalizedChoice === "false" || normalizedChoice === "0" ? "Tidak" : "";
+    if (normalizedChoice && !choice) {
+      throw { code: "VALIDATION_ERROR", message: "Pilihan Menyebabkan Downtime harus Ya atau Tidak." };
+    }
+    var isExistingRow = Object.keys(existing).length > 0;
+    if (hasIncomingChoice && !incomingText && !isExistingRow) {
+      throw { code: "VALIDATION_ERROR", message: "Pilih apakah pekerjaan ini menyebabkan downtime mesin." };
+    }
+
     var start = data.jamMulai !== void 0 ? data.jamMulai :
       data["Jam Mulai"] !== void 0 ? data["Jam Mulai"] : existing["Jam Mulai"];
     var finish = data.jamSelesai !== void 0 ? data.jamSelesai :
       data["Jam Selesai"] !== void 0 ? data["Jam Selesai"] : existing["Jam Selesai"];
-    var duration = logbookDurationMinutes_(start, finish);
+    var calculatedDuration = logbookDurationMinutes_(start, finish);
+    if (choice && calculatedDuration === null) {
+      throw { code: "VALIDATION_ERROR", message: "Jam Mulai dan Jam Selesai wajib valid untuk menghitung durasi pekerjaan." };
+    }
+
+    var duration = calculatedDuration;
     if (duration === null) {
-      var candidates = [data.durasiPekerjaan, data["Durasi Pekerjaan (menit)"], existing["Durasi Pekerjaan (menit)"], originalDowntime];
+      var candidates = [data.durasiPekerjaan, data.durasiPekerjaanMenit,
+        data["Durasi Pekerjaan (menit)"], existing["Durasi Pekerjaan (menit)"]];
       for (var i = 0; i < candidates.length; i++) {
         var candidate = candidates[i];
         if (candidate !== void 0 && candidate !== null && String(candidate).trim() !== "" &&
@@ -8219,12 +8246,16 @@ function createBackend(services, env = {}) {
     if (duration === null) duration = "";
     data.menyebabkanDowntime = choice;
     data.durasiPekerjaan = duration;
+
+    // Explicit "Tidak" always records zero machine downtime while retaining
+    // the calculated work duration. Explicit "Ya" uses the elapsed duration.
+    // Callers that predate this field keep their existing downtime value.
     if (choice === "Tidak") {
       data.downtime = 0;
-    } else {
-      var counted = duration !== "" ? duration : originalDowntime;
-      data.downtime = counted !== void 0 && counted !== null && String(counted).trim() !== "" &&
-        isFinite(Number(counted)) ? Math.max(0, Math.round(Number(counted))) : 0;
+    } else if (choice === "Ya") {
+      data.downtime = calculatedDuration;
+    } else if (data.downtime === void 0 && Object.prototype.hasOwnProperty.call(existing, "Downtime (menit)")) {
+      data.downtime = existing["Downtime (menit)"];
     }
     return data;
   }
@@ -8330,8 +8361,8 @@ function createBackend(services, env = {}) {
       rowMap["Jam Mulai"] = data.jamMulai || "";
       rowMap["Jam Selesai"] = data.jamSelesai || "";
       rowMap["Downtime (menit)"] = data.downtime !== void 0 ? data.downtime : "";
-      rowMap["Menyebabkan Downtime"] = data.menyebabkanDowntime || "Tidak";
-      rowMap["Durasi Pekerjaan (menit)"] = data.durasiPekerjaan !== void 0 ? data.durasiPekerjaan : "";
+      rowMap["Menyebabkan Downtime"] = data.menyebabkanDowntime || "";
+      rowMap["Durasi Pekerjaan (menit)"] = data.durasiPekerjaan !== void 0 ? data.durasiPekerjaan : (data.durasiPekerjaanMenit !== void 0 ? data.durasiPekerjaanMenit : "");
       rowMap["Lampiran (JSON)"] = JSON.stringify(attachments);
       rowMap["Catatan Tambahan"] = trainingValue_(data.catatan) || "-";
       rowMap["Grouping Pekerjaan"] = data.groupingPekerjaan || "";
@@ -8439,7 +8470,7 @@ function createBackend(services, env = {}) {
       rowMap["Jam Mulai"] = data.jamMulai !== void 0 ? data.jamMulai : getExisting("Jam Mulai");
       rowMap["Jam Selesai"] = data.jamSelesai !== void 0 ? data.jamSelesai : getExisting("Jam Selesai");
       rowMap["Downtime (menit)"] = data.downtime !== void 0 ? data.downtime : getExisting("Downtime (menit)");
-      rowMap["Menyebabkan Downtime"] = data.menyebabkanDowntime || getExisting("Menyebabkan Downtime") || "Tidak";
+      rowMap["Menyebabkan Downtime"] = data.menyebabkanDowntime !== void 0 ? data.menyebabkanDowntime : getExisting("Menyebabkan Downtime");
       rowMap["Durasi Pekerjaan (menit)"] = data.durasiPekerjaan !== void 0 ? data.durasiPekerjaan : getExisting("Durasi Pekerjaan (menit)");
       rowMap["Lampiran (JSON)"] = JSON.stringify(attachmentList);
       rowMap["Catatan Tambahan"] = data.catatan !== void 0 ? data.catatan : getExisting("Catatan Tambahan");
