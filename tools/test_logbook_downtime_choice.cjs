@@ -3,15 +3,23 @@
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 
-const html = readFileSync('public/index.html', 'utf8');
+const hotfix = readFileSync('public/omodos4/hotfix.js', 'utf8');
 const worker = readFileSync('src/worker.js', 'utf8');
 
-assert.match(html, /name="menyebabkanDowntime" id="input-menyebabkanDowntime" required/);
-assert.match(html, /name="durasiPekerjaanMenit" id="input-durasiPekerjaanMenit"/);
-assert.match(html, /entry\.downtime = entry\.menyebabkanDowntime === 'Ya'/);
-assert.match(html, /key:'Menyebabkan Downtime', label:'Menyebabkan Downtime\?', type:'select', options:\['Ya','Tidak'\]/);
-assert.match(html, /'Durasi Pekerjaan \(menit\)':'durasiPekerjaanMenit'/);
-assert.match(worker, /"Menyebabkan Downtime", "Durasi Pekerjaan \(menit\)", "Downtime \(menit\)"/);
+// The production Logbook control is injected by hotfix.js, not hard-coded in index.html.
+assert.match(hotfix, /select-menyebabkanDowntime/);
+assert.match(hotfix, /name="menyebabkanDowntime" required/);
+assert.match(hotfix, /duration\.name='durasiPekerjaan'/);
+assert.match(hotfix, /downtimeField\.value=choice\.value==='Tidak'\?'0':choice\.value==='Ya'&&minutes!==null\?String\(minutes\):''/);
+assert.match(hotfix, /payload\.entry\.menyebabkanDowntime=select\.value/);
+assert.match(hotfix, /payload\.entry\.downtime=select\.value==='Ya'\?duration:0/);
+assert.match(hotfix, /payload\.entry\.durasiPekerjaan=duration/);
+
+// Check that the UI bundle is syntactically valid without running browser-only code.
+new Function(hotfix);
+
+assert.match(worker, /"Menyebabkan Downtime"/);
+assert.match(worker, /"Durasi Pekerjaan \(menit\)"/);
 assert.match(worker, /rowMap\["Downtime \(menit\)"\] = downtimeFields\.hasChoice \? downtimeFields\.downtimeMinutes/);
 assert.match(worker, /"Downtime \(menit\)": downtimeFields\.hasChoice \? downtimeFields\.downtimeMinutes/);
 
@@ -20,7 +28,7 @@ const helperEnd = worker.indexOf('function addEntry_(body)', helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'downtime helper block must exist');
 const helpers = new Function(
   worker.slice(helperStart, helperEnd) +
-  '\nreturn { normalizeLogbookDowntimeChoice_, calculateLogbookDurationMinutes_, resolveLogbookDowntime_ };'
+  '\\nreturn { normalizeLogbookDowntimeChoice_, calculateLogbookDurationMinutes_, resolveLogbookDowntime_ };'
 )();
 
 assert.equal(helpers.normalizeLogbookDowntimeChoice_('Ya'), 'Ya');
