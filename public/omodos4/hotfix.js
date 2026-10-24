@@ -872,7 +872,7 @@ window.refreshLogbookLocal_=function(entry,saved,mode){
  try{
   const add=mode==='add',id=String(add?(saved&&(saved.id||saved.ID)||entry.ID||entry.id||''):(entry.ID||entry.id||''));
   const rows=Array.isArray(window.ENTRIES)?window.ENTRIES:[];let row=rows.find(x=>String(x.ID||x.id||'')===id)||{ID:id};
-  const map={tanggal:'Tanggal',waktu:'Waktu',shift:'Shift',namaPelapor:'Nama Pelapor',personilTambahanStr:'Personil Tambahan',semuaPersonil:'Semua Personil',kodeMesin:'Kode Mesin',namaMesin:'Nama Mesin',namaUnit:'Nama Unit',lokasiPekerjaan:'Lokasi Pekerjaan',kategoriArea:'Kategori Area',namaArea:'Nama Area',lokasi:'Lokasi/Area',jenisPekerjaan:'Jenis Pekerjaan',prioritas:'Prioritas',deskripsiMasalah:'Deskripsi Masalah',tindakanPerbaikan:'Tindakan Perbaikan',sparePart:'Spare Part Digunakan',namaMaterial:'Nama Material',materialNumberSAP:'Material Number SAP',status:'Status',jamMulai:'Jam Mulai',jamSelesai:'Jam Selesai',downtime:'Downtime (menit)',catatan:'Catatan Tambahan',groupingPekerjaan:'Grouping Pekerjaan',groupingTeam:'Grouping Team',nomorNotifikasi:'Nomor Notifikasi Pekerjaan',nomorMO:'Nomor MO'};
+  const map={tanggal:'Tanggal',waktu:'Waktu',shift:'Shift',namaPelapor:'Nama Pelapor',personilTambahanStr:'Personil Tambahan',semuaPersonil:'Semua Personil',kodeMesin:'Kode Mesin',namaMesin:'Nama Mesin',namaUnit:'Nama Unit',lokasiPekerjaan:'Lokasi Pekerjaan',kategoriArea:'Kategori Area',namaArea:'Nama Area',lokasi:'Lokasi/Area',jenisPekerjaan:'Jenis Pekerjaan',prioritas:'Prioritas',deskripsiMasalah:'Deskripsi Masalah',tindakanPerbaikan:'Tindakan Perbaikan',sparePart:'Spare Part Digunakan',namaMaterial:'Nama Material',materialNumberSAP:'Material Number SAP',status:'Status',jamMulai:'Jam Mulai',jamSelesai:'Jam Selesai',downtime:'Downtime (menit)',catatan:'Catatan Tambahan',menyebabkanDowntime:'Menyebabkan Downtime',durasiPekerjaan:'Durasi Pekerjaan (menit)',groupingPekerjaan:'Grouping Pekerjaan',groupingTeam:'Grouping Team',nomorNotifikasi:'Nomor Notifikasi Pekerjaan',nomorMO:'Nomor MO'};
   Object.entries(map).forEach(([a,b])=>{if(Object.prototype.hasOwnProperty.call(entry,a))row[b]=entry[a];});
   if(add){row.ID=id;row['Timestamp Input']=new Date().toISOString();row.Timestamp=row.Timestamp||row['Timestamp Input'];}
   if(saved&&Array.isArray(saved.attachments))row['Lampiran (JSON)']=JSON.stringify(saved.attachments);else if(add)row['Lampiran (JSON)']='[]';
@@ -1122,4 +1122,174 @@ const css=document.createElement('style');css.textContent=[
  '.omodos-logbook-pdf-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.omodos-logbook-pdf-note{margin-top:12px}#btn-logbook-export-pdf{margin-left:8px;flex:0 0 auto}',
  '@media(max-width:700px){#btn-logbook-export-pdf{margin:8px 0 0}.omodos-logbook-pdf-dialog{padding:14px}.omodos-logbook-pdf-actions button{min-height:38px}}'
 ].join('\n');document.head.appendChild(css);
+})();
+
+
+/* LOGBOOK_DOWNTIME_CHOICE_V1 — keep work duration separate from machine downtime. */
+(function(){
+'use strict';
+if(window.__OMODOS_LOGBOOK_DOWNTIME_CHOICE_V1__)return;
+window.__OMODOS_LOGBOOK_DOWNTIME_CHOICE_V1__=true;
+const byId=id=>document.getElementById(id);
+function timeMinutes(value){
+  const match=String(value==null?'':value).trim().match(/^(\d{1,2}):([0-5]\d)(?::[0-5]\d)?$/);
+  if(!match)return null;
+  const hour=Number(match[1]),minute=Number(match[2]);
+  if(hour>23||minute>59)return null;
+  return hour*60+minute;
+}
+function durationMinutes(start,finish){
+  const a=timeMinutes(start),b=timeMinutes(finish);
+  if(a===null||b===null)return null;
+  return (b-a+1440)%1440;
+}
+function toast(message,isError){
+  if(typeof window.toast==='function')window.toast(message,!!isError);
+  else if(isError)console.warn('[OMODOS Logbook]',message);
+}
+function bindCreateForm(){
+  const form=byId('form-entry'),start=byId('input-jamMulai'),finish=byId('input-jamSelesai'),duration=byId('input-downtime');
+  if(!form||!start||!finish||!duration||form.dataset.omodosDowntimeChoiceV1==='1')return false;
+  const durationWrap=duration.closest('.field');
+  if(!durationWrap)return false;
+  let choice=byId('select-menyebabkanDowntime');
+  if(!choice){
+    const field=document.createElement('div');
+    field.className='field';
+    field.id='field-menyebabkanDowntime';
+    field.innerHTML='<label for="select-menyebabkanDowntime">Apakah pekerjaan ini menyebabkan downtime mesin?</label><select id="select-menyebabkanDowntime" name="menyebabkanDowntime" required><option value="">Pilih Ya atau Tidak...</option><option value="Ya">Ya, mesin berhenti</option><option value="Tidak">Tidak, hanya durasi pekerjaan</option></select><div class="sub" style="margin-top:5px">Pilih Ya untuk menghitung durasi ke downtime mesin. Pilih Tidak agar jam tetap tercatat sebagai durasi pekerjaan saja.</div>';
+    durationWrap.insertAdjacentElement('beforebegin',field);
+    choice=byId('select-menyebabkanDowntime');
+  }
+  duration.name='durasiPekerjaan';
+  duration.setAttribute('aria-label','Durasi Pekerjaan (menit, otomatis)');
+  duration.setAttribute('inputmode','numeric');
+  duration.setAttribute('min','0');
+  duration.setAttribute('step','1');
+  const label=durationWrap.querySelector('label');
+  if(label)label.textContent='Durasi Pekerjaan (menit, otomatis)';
+  let downtimeField=byId('input-recorded-downtime');
+  if(!downtimeField){
+    downtimeField=document.createElement('input');
+    downtimeField.type='hidden';
+    downtimeField.id='input-recorded-downtime';
+    downtimeField.name='downtime';
+    form.appendChild(downtimeField);
+  }
+  function refreshDuration(){
+    const minutes=durationMinutes(start.value,finish.value);
+    duration.value=minutes===null?'':String(minutes);
+    downtimeField.value=choice.value==='Tidak'?'0':choice.value==='Ya'&&minutes!==null?String(minutes):'';
+  }
+  start.addEventListener('input',refreshDuration);
+  start.addEventListener('change',refreshDuration);
+  finish.addEventListener('input',refreshDuration);
+  finish.addEventListener('change',refreshDuration);
+  choice.addEventListener('change',refreshDuration);
+  form.addEventListener('reset',()=>setTimeout(refreshDuration,0));
+  form.addEventListener('submit',function(ev){
+    if(!choice.value){
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      toast('Pilih apakah pekerjaan menyebabkan downtime: Ya atau Tidak.',true);
+      choice.focus();
+      return;
+    }
+    refreshDuration();
+  },true);
+  form.dataset.omodosDowntimeChoiceV1='1';
+  refreshDuration();
+  return true;
+}
+function bindEditForm(entry){
+  const holder=byId('entry-view-mode');
+  if(!holder)return;
+  const durationWrap=holder.querySelector('[data-edit-wrap="Downtime (menit)"]');
+  const durationInput=durationWrap&&durationWrap.querySelector('[data-edit-field="Downtime (menit)"]');
+  if(!durationWrap||!durationInput||durationWrap.dataset.omodosDowntimeChoiceV1==='1')return;
+  const storedDuration=entry&&entry['Durasi Pekerjaan (menit)'];
+  const calculated=durationMinutes(entry&&entry['Jam Mulai'],entry&&entry['Jam Selesai']);
+  let durationValue=calculated;
+  if(durationValue===null){
+    const candidate=storedDuration!==undefined&&storedDuration!==null&&String(storedDuration).trim()!==''?storedDuration:entry&&entry['Downtime (menit)'];
+    const n=Number(candidate);
+    durationValue=Number.isFinite(n)&&n>=0?n:null;
+  }
+  durationInput.value=durationValue===null?'':String(durationValue);
+  durationInput.readOnly=true;
+  durationInput.min='0';
+  durationInput.step='1';
+  durationInput.setAttribute('data-edit-field','Durasi Pekerjaan (menit)');
+  const durationLabel=durationWrap.querySelector('label');
+  if(durationLabel)durationLabel.textContent='Durasi Pekerjaan (menit)';
+  const field=document.createElement('div');
+  field.className='field';
+  field.id='edit-field-menyebabkan-downtime';
+  field.innerHTML='<label for="edit-menyebabkan-downtime">Apakah pekerjaan ini menyebabkan downtime mesin?</label><select id="edit-menyebabkan-downtime"><option value="Ya">Ya, mesin berhenti</option><option value="Tidak">Tidak, hanya durasi pekerjaan</option></select>';
+  durationWrap.insertAdjacentElement('afterend',field);
+  const select=byId('edit-menyebabkan-downtime');
+  const rawChoice=String(entry&&entry['Menyebabkan Downtime']||'').trim().toLowerCase();
+  select.value=rawChoice==='ya'||rawChoice==='yes'||rawChoice==='true'||rawChoice==='1'?'Ya':
+    rawChoice==='tidak'||rawChoice==='no'||rawChoice==='false'||rawChoice==='0'?'Tidak':
+    Number(entry&&entry['Downtime (menit)'])>0?'Ya':'Tidak';
+  const start=holder.querySelector('[data-edit-field="Jam Mulai"]');
+  const finish=holder.querySelector('[data-edit-field="Jam Selesai"]');
+  const refresh=()=>{
+    const minutes=durationMinutes(start&&start.value,finish&&finish.value);
+    if(minutes!==null)durationInput.value=String(minutes);
+  };
+  if(start){start.addEventListener('input',refresh);start.addEventListener('change',refresh);}
+  if(finish){finish.addEventListener('input',refresh);finish.addEventListener('change',refresh);}
+  durationWrap.dataset.omodosDowntimeChoiceV1='1';
+}
+function wrapEditRenderer(){
+  if(typeof window.renderEntryEditForm!=='function'||window.renderEntryEditForm.__omodosDowntimeChoiceV1)return false;
+  const original=window.renderEntryEditForm;
+  const wrapped=function(entry){
+    const result=original.apply(this,arguments);
+    try{bindEditForm(entry||{});}catch(e){console.warn('[OMODOS] Downtime edit field unavailable',e);}
+    return result;
+  };
+  wrapped.__omodosDowntimeChoiceV1=true;
+  window.renderEntryEditForm=wrapped;
+  return true;
+}
+function wrapApiPost(){
+  if(typeof window.apiPost!=='function'||window.apiPost.__omodosDowntimeChoiceV1)return false;
+  const original=window.apiPost;
+  const wrapped=function(payload){
+    try{
+      if(payload&&payload.action==='updateEntry'&&payload.entry){
+        const select=byId('edit-menyebabkan-downtime');
+        const durationInput=byId('entry-view-mode')&&byId('entry-view-mode').querySelector('[data-edit-field="Durasi Pekerjaan (menit)"]');
+        if(select){
+          const minutes=durationMinutes(payload.entry.jamMulai,payload.entry.jamSelesai);
+          const fallback=Number(durationInput&&durationInput.value);
+          const duration=minutes!==null?minutes:Number.isFinite(fallback)&&fallback>=0?Math.round(fallback):0;
+          payload.entry.menyebabkanDowntime=select.value;
+          payload.entry.durasiPekerjaan=duration;
+          payload.entry.downtime=select.value==='Ya'?duration:0;
+        }
+      }
+    }catch(e){console.warn('[OMODOS] Downtime payload normalization failed',e);}
+    return original.apply(this,arguments);
+  };
+  wrapped.__omodosDowntimeChoiceV1=true;
+  window.apiPost=wrapped;
+  return true;
+}
+function boot(){
+  bindCreateForm();
+  wrapEditRenderer();
+  wrapApiPost();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+let attempts=0;
+const retry=setInterval(()=>{
+  attempts++;
+  const formReady=bindCreateForm();
+  const editReady=wrapEditRenderer();
+  const apiReady=wrapApiPost();
+  if((formReady&&editReady&&apiReady)||attempts>=40)clearInterval(retry);
+},100);
 })();

@@ -2841,7 +2841,7 @@ function createBackend(services, env = {}) {
   const SHEET_SPAREPART_WAREHOUSE = "Sparepart_Warehouse";
   const PREDICTIVE_SHEET_NAME = "Predictive_Maintenance";
   const IPAL_SHEET_NAME = "IPAL_Reports";
-  const LOGBOOK_HEADERS = ["ID", "Timestamp Input", "Tanggal", "Waktu", "Shift", "Nama Pelapor", "Kode Mesin", "Nama Mesin", "Lokasi/Area", "Jenis Pekerjaan", "Prioritas", "Deskripsi Masalah", "Tindakan Perbaikan", "Spare Part Digunakan", "Status", "Jam Mulai", "Jam Selesai", "Downtime (menit)", "Lampiran (JSON)", "Catatan Tambahan", "Grouping Pekerjaan", "Grouping Team", "Nomor Notifikasi Pekerjaan", "Nomor MO", "Nama Unit", "Nama Material", "Material Number SAP", "Status Sparepart", "TransactionID", "CreatedBy", "DeletedAt", "DeletedBy", "DeleteReason", "UpdatedAt"];
+  const LOGBOOK_HEADERS = ["ID", "Timestamp Input", "Tanggal", "Waktu", "Shift", "Nama Pelapor", "Kode Mesin", "Nama Mesin", "Lokasi/Area", "Jenis Pekerjaan", "Prioritas", "Deskripsi Masalah", "Tindakan Perbaikan", "Spare Part Digunakan", "Status", "Jam Mulai", "Jam Selesai", "Downtime (menit)", "Lampiran (JSON)", "Catatan Tambahan", "Grouping Pekerjaan", "Grouping Team", "Nomor Notifikasi Pekerjaan", "Nomor MO", "Nama Unit", "Nama Material", "Material Number SAP", "Status Sparepart", "TransactionID", "CreatedBy", "DeletedAt", "DeletedBy", "DeleteReason", "UpdatedAt", "Menyebabkan Downtime", "Durasi Pekerjaan (menit)"];
   const REQUIRED_ENTRY_FIELDS = ["tanggal", "shift", "namaPelapor", "kodeMesin", "namaMesin", "jenisPekerjaan", "prioritas", "deskripsiMasalah", "tindakanPerbaikan", "status"];
   const MESIN_HEADERS = ["Kode Mesin", "Nama Mesin", "Lokasi/Area", "Kategori", "Spesifikasi Mesin", "Manual PDF URL", "Model", "Deskripsi Mesin", "Fungsi Mesin", "Link Manual/Referensi", "Keterangan Sumber"];
   const PERSONIL_HEADERS = ["Nama Personil", "Grouping Team", "Jabatan", "Foto URL"];
@@ -8174,6 +8174,60 @@ function createBackend(services, env = {}) {
   }
   __name(savePiHardskill_, "savePiHardskill_");
 
+  function logbookTimeMinutes_(value) {
+    if (value instanceof Date && !isNaN(value.getTime())) return value.getHours() * 60 + value.getMinutes();
+    if (typeof value === "number" && isFinite(value)) {
+      if (value >= 0 && value < 1) return Math.round(value * 1440);
+      if (value >= 0 && value < 1440) return Math.round(value);
+    }
+    var match = String(value == null ? "" : value).trim().match(/^(\d{1,2}):([0-5]\d)(?::[0-5]\d)?$/);
+    if (!match) return null;
+    var hour = Number(match[1]), minute = Number(match[2]);
+    if (hour > 23 || minute > 59) return null;
+    return hour * 60 + minute;
+  }
+  function logbookDurationMinutes_(start, finish) {
+    var a = logbookTimeMinutes_(start), b = logbookTimeMinutes_(finish);
+    if (a === null || b === null) return null;
+    return (b - a + 1440) % 1440;
+  }
+  function normalizeLogbookDowntime_(data, existing) {
+    existing = existing || {};
+    var originalDowntime = data.downtime !== void 0 ? data.downtime :
+      data["Downtime (menit)"] !== void 0 ? data["Downtime (menit)"] : existing["Downtime (menit)"];
+    var rawChoice = data.menyebabkanDowntime || data["Menyebabkan Downtime"] || existing["Menyebabkan Downtime"] || "";
+    var normalizedChoice = String(rawChoice).trim().toLowerCase();
+    var choice = /^(ya|yes|true|1)/.test(normalizedChoice) ? "Ya" :
+      /^(tidak|no|false|0)/.test(normalizedChoice) ? "Tidak" : "";
+    if (!choice) choice = Number(originalDowntime) > 0 ? "Ya" : "Tidak";
+    var start = data.jamMulai !== void 0 ? data.jamMulai :
+      data["Jam Mulai"] !== void 0 ? data["Jam Mulai"] : existing["Jam Mulai"];
+    var finish = data.jamSelesai !== void 0 ? data.jamSelesai :
+      data["Jam Selesai"] !== void 0 ? data["Jam Selesai"] : existing["Jam Selesai"];
+    var duration = logbookDurationMinutes_(start, finish);
+    if (duration === null) {
+      var candidates = [data.durasiPekerjaan, data["Durasi Pekerjaan (menit)"], existing["Durasi Pekerjaan (menit)"], originalDowntime];
+      for (var i = 0; i < candidates.length; i++) {
+        var candidate = candidates[i];
+        if (candidate !== void 0 && candidate !== null && String(candidate).trim() !== "" &&
+            isFinite(Number(candidate)) && Number(candidate) >= 0) {
+          duration = Math.round(Number(candidate));
+          break;
+        }
+      }
+    }
+    if (duration === null) duration = "";
+    data.menyebabkanDowntime = choice;
+    data.durasiPekerjaan = duration;
+    if (choice === "Tidak") {
+      data.downtime = 0;
+    } else {
+      var counted = duration !== "" ? duration : originalDowntime;
+      data.downtime = counted !== void 0 && counted !== null && String(counted).trim() !== "" &&
+        isFinite(Number(counted)) ? Math.max(0, Math.round(Number(counted))) : 0;
+    }
+    return data;
+  }
   function normalizeLogbookWorkLocation_(data, existing) {
     existing=existing||{};
     var kind=data.lokasiPekerjaan||data["Lokasi Pekerjaan"]||existing["Lokasi Pekerjaan"]||"Mesin";
@@ -8202,6 +8256,7 @@ function createBackend(services, env = {}) {
       var data = body.entry || body.data || body;
       if (!data || typeof data !== "object") throw { code: "VALIDATION_ERROR", message: "Data kosong" };
       normalizeLogbookWorkLocation_(data);
+      normalizeLogbookDowntime_(data);
       if (!String(data.lokasi || data["Lokasi/Area"] || "").trim()) {
         try {
           var machineSheet = getOrCreateSheet_(SHEET_MESIN, MESIN_HEADERS);
@@ -8222,7 +8277,7 @@ function createBackend(services, env = {}) {
       var usesSparepart = materialDetails.length > 0;
       var sh = getOrCreateSheet_(SHEET_LOGBOOK, LOGBOOK_HEADERS);
       try {
-        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive", "Sparepart Detail (JSON)", "Lokasi Pekerjaan", "Kategori Area", "Nama Area", "Nomor MO"]);
+        ensureHeaderColumns_(sh, ["Personil Tambahan", "Semua Personil", "Is Preventive", "Sparepart Detail (JSON)", "Lokasi Pekerjaan", "Kategori Area", "Nama Area", "Nomor MO", "Menyebabkan Downtime", "Durasi Pekerjaan (menit)"]);
       } catch (e) {
       }
       try {
@@ -8275,6 +8330,8 @@ function createBackend(services, env = {}) {
       rowMap["Jam Mulai"] = data.jamMulai || "";
       rowMap["Jam Selesai"] = data.jamSelesai || "";
       rowMap["Downtime (menit)"] = data.downtime !== void 0 ? data.downtime : "";
+      rowMap["Menyebabkan Downtime"] = data.menyebabkanDowntime || "Tidak";
+      rowMap["Durasi Pekerjaan (menit)"] = data.durasiPekerjaan !== void 0 ? data.durasiPekerjaan : "";
       rowMap["Lampiran (JSON)"] = JSON.stringify(attachments);
       rowMap["Catatan Tambahan"] = trainingValue_(data.catatan) || "-";
       rowMap["Grouping Pekerjaan"] = data.groupingPekerjaan || "";
@@ -8306,7 +8363,7 @@ function createBackend(services, env = {}) {
       if (!id) throw { code: "VALIDATION_ERROR", message: "ID wajib diisi untuk update" };
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
-      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)", "Lampiran (JSON)", "Nomor MO", "Lokasi Pekerjaan", "Kategori Area", "Nama Area"]);
+      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)", "Lampiran (JSON)", "Nomor MO", "Lokasi Pekerjaan", "Kategori Area", "Nama Area", "Menyebabkan Downtime", "Durasi Pekerjaan (menit)"]);
       var lastColumn = sh.getLastColumn();
       var lastRow = sh.getLastRow();
       var headers = sh.getRange(1, 1, 1, lastColumn).getValues()[0];
@@ -8325,6 +8382,7 @@ function createBackend(services, env = {}) {
       var existingRow = sh.getRange(targetRow, 1, 1, lastColumn).getValues()[0];
       var locationExisting = Object.fromEntries(headers.map(function(h,c){return [h,existingRow[c]];}));
       normalizeLogbookWorkLocation_(data,locationExisting);
+      normalizeLogbookDowntime_(data,locationExisting);
       var missing = REQUIRED_ENTRY_FIELDS.filter(function(f) {
         return !data[f] || String(data[f]).trim() === "";
       });
@@ -8381,6 +8439,8 @@ function createBackend(services, env = {}) {
       rowMap["Jam Mulai"] = data.jamMulai !== void 0 ? data.jamMulai : getExisting("Jam Mulai");
       rowMap["Jam Selesai"] = data.jamSelesai !== void 0 ? data.jamSelesai : getExisting("Jam Selesai");
       rowMap["Downtime (menit)"] = data.downtime !== void 0 ? data.downtime : getExisting("Downtime (menit)");
+      rowMap["Menyebabkan Downtime"] = data.menyebabkanDowntime || getExisting("Menyebabkan Downtime") || "Tidak";
+      rowMap["Durasi Pekerjaan (menit)"] = data.durasiPekerjaan !== void 0 ? data.durasiPekerjaan : getExisting("Durasi Pekerjaan (menit)");
       rowMap["Lampiran (JSON)"] = JSON.stringify(attachmentList);
       rowMap["Catatan Tambahan"] = data.catatan !== void 0 ? data.catatan : getExisting("Catatan Tambahan");
       rowMap["Grouping Pekerjaan"] = data.groupingPekerjaan || getExisting("Grouping Pekerjaan");
