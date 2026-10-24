@@ -1,6 +1,13 @@
 name: Logbook downtime choice guard
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/index.html'
+      - 'src/worker.js'
+      - 'tools/test_logbook_downtime_choice.cjs'
+      - '.github/workflows/test-logbook-downtime.yml'
   pull_request:
     branches: [main]
     paths:
