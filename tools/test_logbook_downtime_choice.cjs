@@ -28,7 +28,7 @@ const helperEnd = worker.indexOf('function addEntry_(body)', helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'downtime helper block must exist');
 const helpers = new Function(
   worker.slice(helperStart, helperEnd) +
-  '\\nreturn { normalizeLogbookDowntimeChoice_, calculateLogbookDurationMinutes_, resolveLogbookDowntime_ };'
+  String.fromCharCode(10) + 'return { normalizeLogbookDowntimeChoice_, calculateLogbookDurationMinutes_, resolveLogbookDowntime_ };'
 )();
 
 assert.equal(helpers.normalizeLogbookDowntimeChoice_('Ya'), 'Ya');
