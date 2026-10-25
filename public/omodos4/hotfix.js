@@ -1154,12 +1154,25 @@ function bindCreateForm(){
   if(!durationWrap)return false;
   let choice=byId('select-menyebabkanDowntime');
   if(!choice){
-    const field=document.createElement('div');
-    field.className='field';
-    field.id='field-menyebabkanDowntime';
-    field.innerHTML='<label for="select-menyebabkanDowntime">Apakah pekerjaan ini menyebabkan downtime mesin?</label><select id="select-menyebabkanDowntime" name="menyebabkanDowntime" required><option value="">Pilih Ya atau Tidak...</option><option value="Ya">Ya, mesin berhenti</option><option value="Tidak">Tidak, hanya durasi pekerjaan</option></select><div class="sub" style="margin-top:5px">Pilih Ya untuk menghitung durasi ke downtime mesin. Pilih Tidak agar jam tetap tercatat sebagai durasi pekerjaan saja.</div>';
-    durationWrap.insertAdjacentElement('beforebegin',field);
-    choice=byId('select-menyebabkanDowntime');
+    /* Reuse a matching field already rendered by the main form. The hotfix must not add a second downtime question. */
+    const matchingFields=Array.from(form.querySelectorAll('.field')).filter(field=>/apakah pekerjaan ini menyebabkan downtime mesin\?/i.test((field.querySelector('label')||{}).textContent||''));
+    const existingField=matchingFields.find(field=>field.querySelector('select'));
+    if(existingField){
+      choice=existingField.querySelector('select');
+      choice.id='select-menyebabkanDowntime';
+      choice.name='menyebabkanDowntime';
+      choice.required=true;
+      const existingLabel=existingField.querySelector('label');
+      if(existingLabel)existingLabel.setAttribute('for','select-menyebabkanDowntime');
+      matchingFields.filter(field=>field!==existingField).forEach(field=>field.remove());
+    }else{
+      const field=document.createElement('div');
+      field.className='field';
+      field.id='field-menyebabkanDowntime';
+      field.innerHTML='<label for="select-menyebabkanDowntime">Apakah pekerjaan ini menyebabkan downtime mesin?</label><select id="select-menyebabkanDowntime" name="menyebabkanDowntime" required><option value="">Pilih Ya atau Tidak...</option><option value="Ya">Ya, mesin berhenti</option><option value="Tidak">Tidak, hanya durasi pekerjaan</option></select><div class="sub" style="margin-top:5px">Pilih Ya untuk menghitung durasi ke downtime mesin. Pilih Tidak agar jam tetap tercatat sebagai durasi pekerjaan saja.</div>';
+      durationWrap.insertAdjacentElement('beforebegin',field);
+      choice=byId('select-menyebabkanDowntime');
+    }
   }
   duration.name='durasiPekerjaan';
   duration.setAttribute('aria-label','Durasi Pekerjaan (menit, otomatis)');
