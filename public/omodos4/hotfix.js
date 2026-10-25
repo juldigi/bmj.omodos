@@ -1175,7 +1175,7 @@ function bindCreateForm(){
     }
   }
   /* Always deduplicate the question, including when the canonical ID already exists. */
-  const allDowntimeFields=Array.from(form.querySelectorAll('.field')).filter(field=>/apakah pekerjaan ini menyebabkan downtime mesin\\?/i.test((field.querySelector('label')||{}).textContent||''));
+  const allDowntimeFields=Array.from(form.querySelectorAll('.field')).filter(field=>/apakah pekerjaan ini menyebabkan downtime mesin\?/i.test((field.querySelector('label')||{}).textContent||''));
   const canonicalDowntimeField=allDowntimeFields.find(field=>field.querySelector('select#select-menyebabkanDowntime'))||allDowntimeFields.find(field=>field.querySelector('select'));
   if(canonicalDowntimeField){
     const canonicalSelect=canonicalDowntimeField.querySelector('select');
