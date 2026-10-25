@@ -10,6 +10,7 @@ on:
       - "public/omodos4/superadmin-intelligence.js"
       - "tools/test_technical_performance_*.cjs"
       - "tools/technical-performance-browser-qa.mjs"
+      - "tools/technical-performance-browser-qa.mjs"
       - ".github/workflows/technical-performance-qa.yml"
   pull_request:
     branches:
