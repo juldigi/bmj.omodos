@@ -800,9 +800,6 @@ jobs:
               const fillRequired = () => {
                 const form = document.getElementById('form-entry');
                 form.classList.remove('wizard-mode');
-                // The Logbook now requires an explicit machine-downtime choice; set it in the fixture so this test validates payload handling, not an unanswered required field.
-                const downtimeChoice = document.getElementById('select-menyebabkanDowntime');
-                if (downtimeChoice) downtimeChoice.value = 'Ya';
                 form.querySelectorAll('[required]').forEach(el => {
                   if (el.tagName === 'SELECT') {
                     if (el.id === 'select-namaPelapor') ensureOption(el, 'QA Teknisi', 'QA Teknisi');
@@ -834,6 +831,12 @@ jobs:
                 if (start) start.value = '10:00';
                 if (finish) finish.value = '11:00';
                 if (typeof computeEstimasi === 'function') computeEstimasi();
+                // Assign this after the generic required-field loop; that loop otherwise resets it to the placeholder.
+                const downtimeChoice = document.getElementById('select-menyebabkanDowntime');
+                if (downtimeChoice) {
+                  downtimeChoice.value = 'Ya';
+                  downtimeChoice.dispatchEvent(new Event('change', { bubbles: true }));
+                }
                 return form;
               };
 
