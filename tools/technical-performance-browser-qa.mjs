@@ -10,6 +10,7 @@ try {
   // Use a small host-shell fixture: the production index is a very large inline bundle,
   // so this test isolates the actual Technical Performance asset and its RBAC boundary.
   await page.setContent(`
+    <base href="http://127.0.0.1:4173/">
     <div class="sidebar"><div class="nav-group-settings"></div></div>
     <main class="main"><section id="view-dashboard" class="view active"><h1>Dashboard</h1></section></main>
     <script>
