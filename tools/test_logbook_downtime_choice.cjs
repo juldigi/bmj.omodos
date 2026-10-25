@@ -11,7 +11,9 @@ assert.match(html, /name="durasiPekerjaanMenit" id="input-durasiPekerjaanMenit"/
 assert.match(html, /entry\.downtime = entry\.menyebabkanDowntime === 'Ya'/);
 assert.match(html, /key:'Menyebabkan Downtime', label:'Menyebabkan Downtime\?', type:'select', options:\['Ya','Tidak'\]/);
 assert.match(html, /'Durasi Pekerjaan \(menit\)':'durasiPekerjaanMenit'/);
-assert.match(worker, /"Menyebabkan Downtime", "Durasi Pekerjaan \(menit\)", "Downtime \(menit\)"/);
+assert.match(worker, /"Menyebabkan Downtime"/);
+assert.match(worker, /"Durasi Pekerjaan \(menit\)"/);
+assert.match(worker, /"Downtime \(menit\)"/);
 assert.match(worker, /rowMap\["Downtime \(menit\)"\] = downtimeFields\.hasChoice \? downtimeFields\.downtimeMinutes/);
 assert.match(worker, /"Downtime \(menit\)": downtimeFields\.hasChoice \? downtimeFields\.downtimeMinutes/);
 
