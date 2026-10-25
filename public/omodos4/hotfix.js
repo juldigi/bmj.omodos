@@ -1174,6 +1174,19 @@ function bindCreateForm(){
       choice=byId('select-menyebabkanDowntime');
     }
   }
+  /* Always deduplicate the question, including when the canonical ID already exists. */
+  const allDowntimeFields=Array.from(form.querySelectorAll('.field')).filter(field=>/apakah pekerjaan ini menyebabkan downtime mesin\\?/i.test((field.querySelector('label')||{}).textContent||''));
+  const canonicalDowntimeField=allDowntimeFields.find(field=>field.querySelector('select#select-menyebabkanDowntime'))||allDowntimeFields.find(field=>field.querySelector('select'));
+  if(canonicalDowntimeField){
+    const canonicalSelect=canonicalDowntimeField.querySelector('select');
+    canonicalSelect.id='select-menyebabkanDowntime';
+    canonicalSelect.name='menyebabkanDowntime';
+    canonicalSelect.required=true;
+    const canonicalLabel=canonicalDowntimeField.querySelector('label');
+    if(canonicalLabel)canonicalLabel.setAttribute('for','select-menyebabkanDowntime');
+    allDowntimeFields.filter(field=>field!==canonicalDowntimeField).forEach(field=>field.remove());
+    choice=canonicalSelect;
+  }
   duration.name='durasiPekerjaan';
   duration.setAttribute('aria-label','Durasi Pekerjaan (menit, otomatis)');
   duration.setAttribute('inputmode','numeric');
