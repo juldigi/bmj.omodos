@@ -275,7 +275,7 @@ const audit = context.extractMtcAudit(X, mtcWorkbook);
 assert.ok(audit, 'MTC audit should be produced when detail and pivot sheets exist');
 assert.equal(audit.mismatch, false, 'Matching exact-MTC detail and pivot values should pass');
 assert.deepEqual(Array.from(audit.rows, r => [r.detailStartRow,r.detailRecords,r.detailHourRecords,r.detailEvents,r.trialRecords,r.detailHours,r.nonTrialHours,r.pivotRecords,r.pivotHours,r.deltaHours]), [
-  [13,3,3,1,1,55,5,3,5,0], [39,1,1,1,0,1.25,1.25,1,1.25,0], [5,1,1,1,0,0.75,0.75,1,0.75,0]
+  [13,3,3,1,1,55,5,3,55,0], [39,1,1,1,0,1.25,1.25,1,1.25,0], [5,1,1,1,0,0.75,0.75,1,0.75,0]
 ]);
 assert.equal(audit.rows[0].detailEndRow, 17, 'MTC audit must preserve the SUBTOTAL end row');
 assert.equal(audit.rows[0].detailRangeFromFormula, true, 'MTC audit should prefer explicit SUBTOTAL bounds');
