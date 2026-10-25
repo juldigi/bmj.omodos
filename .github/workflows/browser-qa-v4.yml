@@ -475,6 +475,41 @@ jobs:
             }
             result.phases.push('route-completeness');
 
+            console.log('[QA] report category internal flows');
+            const reportFlows = {};
+            for (const cat of ['rca','ai','report-hub']) {
+              await page.evaluate(() => goToView('report'));
+              await page.waitForTimeout(30);
+              const card = page.locator('#view-report .report-cat-card[data-cat="' + cat + '"]');
+              if (await card.count()) {
+                await card.evaluate(el => el.click());
+                await page.waitForTimeout(30);
+                reportFlows[cat] = await page.evaluate(c => !!document.getElementById('view-' + c)?.classList.contains('active'), cat);
+              } else {
+                reportFlows[cat] = false;
+              }
+            }
+            await page.evaluate(() => goToView('report'));
+            await page.waitForTimeout(30);
+            const ipalCard = page.locator('#view-report .report-cat-card[data-cat="ipal"]');
+            if (await ipalCard.count()) {
+              await ipalCard.evaluate(el => el.click());
+              await page.waitForTimeout(30);
+              reportFlows.ipal = await page.evaluate(() => {
+                const grid = document.getElementById('report-cat-grid');
+                const form = document.getElementById('ipal-form-wrap');
+                const back = document.getElementById('btn-report-back-cat');
+                return !!form && !!back && getComputedStyle(grid).display === 'none' && getComputedStyle(back).display !== 'none';
+              });
+            } else {
+              reportFlows.ipal = false;
+            }
+            result.reportFlows = reportFlows;
+            if (!reportFlows.rca || !reportFlows.ai || !reportFlows['report-hub'] || !reportFlows.ipal) {
+              throw new Error('Report category flow failed: ' + JSON.stringify(reportFlows));
+            }
+            result.phases.push('report-flows');
+
             console.log('[QA] all 100 OMODOS 4 feature clicks');
             const featureClickQA = { checked: 0, failures: [] };
             for (let i = 0; i < moduleCount; i++) {
@@ -730,40 +765,7 @@ jobs:
             }
             result.phases.push('machine-status-ordering');
 
-            console.log('[QA] report category internal flows');
-            const reportFlows = {};
-            for (const cat of ['rca','ai','report-hub']) {
-              await page.evaluate(() => goToView('report'));
-              await page.waitForTimeout(30);
-              const card = page.locator('#view-report .report-cat-card[data-cat="' + cat + '"]');
-              if (await card.count()) {
-                await card.evaluate(el => el.click());
-                await page.waitForTimeout(30);
-                reportFlows[cat] = await page.evaluate(c => !!document.getElementById('view-' + c)?.classList.contains('active'), cat);
-              } else {
-                reportFlows[cat] = false;
-              }
-            }
-            await page.evaluate(() => goToView('report'));
-            await page.waitForTimeout(30);
-            const ipalCard = page.locator('#view-report .report-cat-card[data-cat="ipal"]');
-            if (await ipalCard.count()) {
-              await ipalCard.evaluate(el => el.click());
-              await page.waitForTimeout(30);
-              reportFlows.ipal = await page.evaluate(() => {
-                const grid = document.getElementById('report-cat-grid');
-                const form = document.getElementById('ipal-form-wrap');
-                const back = document.getElementById('btn-report-back-cat');
-                return !!form && !!back && getComputedStyle(grid).display === 'none' && getComputedStyle(back).display !== 'none';
-              });
-            } else {
-              reportFlows.ipal = false;
-            }
-            result.reportFlows = reportFlows;
-            if (!reportFlows.rca || !reportFlows.ai || !reportFlows['report-hub'] || !reportFlows.ipal) {
-              throw new Error('Report category flow failed: ' + JSON.stringify(reportFlows));
-            }
-            result.phases.push('report-flows');
+
 
             console.log('[QA] Logbook submit payload without/with photo');
             const logbookSubmitQA = await page.evaluate(async () => {
