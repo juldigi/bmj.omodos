@@ -1,0 +1,49 @@
+name: Technical Performance QA
+
+on:
+  push:
+    branches:
+      - feat/technical-performance-mainline
+      - main
+    paths:
+      - "public/omodos4/technical-performance.js"
+      - "public/omodos4/superadmin-intelligence.js"
+      - "tools/test_technical_performance_*.cjs"
+      - ".github/workflows/technical-performance-qa.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "public/omodos4/technical-performance.js"
+      - "public/omodos4/superadmin-intelligence.js"
+      - "tools/test_technical_performance_*.cjs"
+      - ".github/workflows/technical-performance-qa.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  technical-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate JavaScript syntax
+        run: |
+          node --check public/omodos4/technical-performance.js
+          node --check public/omodos4/superadmin-intelligence.js
+          node --check tools/test_technical_performance_source_truth.cjs
+          node --check tools/test_technical_performance_odin.cjs
+      - name: Test official source truth and MTC reconciliation
+        run: node tools/test_technical_performance_source_truth.cjs
+      - name: Test ODIN issue grouping and Top 3
+        run: node tools/test_technical_performance_odin.cjs
+      - name: Guard Superadmin-only lazy loading and read-only import
+        run: |
+          grep -Fq 'OMODOS_TP_LOADER_V1' public/omodos4/superadmin-intelligence.js
+          grep -Fq "script.src='/omodos4/technical-performance.js'" public/omodos4/superadmin-intelligence.js
+          grep -Fq "return role==='superadmin';" public/omodos4/technical-performance.js
+          grep -Fq 'File tidak diunggah ke server' public/omodos4/technical-performance.js
