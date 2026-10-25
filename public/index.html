@@ -9770,13 +9770,40 @@ function renderGroupView(){
 
 /* ---------------- VIEW: TOP DURASI PEKERJAAN ---------------- */
 // Mengambil nilai durasi (dalam menit) dari kolom "Durasi Pekerjaan" / "Downtime (menit)".
-function parseDurationMinutes(e){
-  const raw = e['Durasi Pekerjaan'] ?? e['Downtime (menit)'];
-  if(raw === undefined || raw === null || raw === '') return null;
+function parseNumericMinutes_(raw){
+  if(raw === undefined || raw === null || String(raw).trim() === '') return null;
   const match = String(raw).match(/-?\d+(\.\d+)?/);
   if(!match) return null;
   const val = parseFloat(match[0]);
-  return isNaN(val) ? null : val;
+  return Number.isFinite(val) ? val : null;
+}
+// Duration counted as machine downtime. The explicit "Tidak" choice always
+// wins, so repair/work duration can never leak into lost-time analytics.
+function parseDurationMinutes(e){
+  if(!e) return null;
+  const choice = String(e['Menyebabkan Downtime'] || '').trim().toLowerCase();
+  if(choice === 'tidak' || choice === 'no' || choice === 'false' || choice === '0') return 0;
+  const directDowntime = parseNumericMinutes_(e['Downtime (menit)']);
+  if(directDowntime !== null) return directDowntime;
+  const legacyDuration = parseNumericMinutes_(e['Durasi Pekerjaan']);
+  if(legacyDuration !== null) return legacyDuration;
+  if(choice === 'ya' || choice === 'yes' || choice === 'true' || choice === '1'){
+    return parseNumericMinutes_(e['Durasi Pekerjaan (menit)']);
+  }
+  return null;
+}
+// Actual elapsed work duration. This intentionally reads its own column and
+// only falls back to older fields for historical records without the new schema.
+function parseWorkDurationMinutes(e){
+  if(!e) return null;
+  const candidates = [e['Durasi Pekerjaan (menit)'], e['Durasi Pekerjaan']];
+  for(const raw of candidates){
+    const parsed = parseNumericMinutes_(raw);
+    if(parsed !== null) return parsed;
+  }
+  const choice = String(e['Menyebabkan Downtime'] || '').trim().toLowerCase();
+  if(choice === 'tidak' || choice === 'no' || choice === 'false' || choice === '0') return null;
+  return parseNumericMinutes_(e['Downtime (menit)']);
 }
 function fmtDurationMinutes(mins){
   if(mins === null || mins === undefined || isNaN(mins)) return '-';
@@ -9811,7 +9838,7 @@ function renderDurasiView(){
   const holder = $('#list-durasi');
   const withDuration = [];
   ENTRIES.forEach(e=>{
-    const mins = parseDurationMinutes(e);
+    const mins = parseWorkDurationMinutes(e);
     if(mins === null) return;
     withDuration.push({ entry: e, mins });
   });
@@ -9839,8 +9866,8 @@ if(btnRefreshDurasi) btnRefreshDurasi.addEventListener('click', async ()=>{ awai
    - "Kejadian breakdown / perbaikan" = entri logbook yang punya nilai
      durasi (parseDurationMinutes(e) != null) ATAU Jenis Pekerjaan-nya
      mengandung kata "Corrective"/"Perbaikan"/"Breakdown".
-   - "Downtime (menit)" per entri = parseDurationMinutes(e) (field yang
-     sama dipakai di menu "Top Durasi Pekerjaan").
+   - "Downtime (menit)" per entri dibaca dari kolom downtime mesin.
+   - Menu "Top Durasi Pekerjaan" memakai kolom durasi pengerjaan terpisah.
    - MTTR = total downtime / jumlah kejadian breakdown (rata-rata waktu
      perbaikan per kejadian).
    - MTBF = (total jam operasi tersedia − total downtime) / jumlah
@@ -9856,10 +9883,12 @@ if(btnRefreshDurasi) btnRefreshDurasi.addEventListener('click', async ()=>{ awai
 
 function anIsBreakdown(e){
   if(isAreaEntry_(e)) return false;
+  const downtimeChoice = String(e['Menyebabkan Downtime'] || '').trim().toLowerCase();
+  if(downtimeChoice === 'tidak' || downtimeChoice === 'no' || downtimeChoice === 'false' || downtimeChoice === '0') return false;
   const jp = String(e['Jenis Pekerjaan']||'').toLowerCase();
   if(jp.includes('preventive')) return false;
   if(jp.includes('corrective') || jp.includes('perbaikan') || jp.includes('breakdown') || jp.includes('repair') || jp.includes('emergency')) return true;
-  return parseDurationMinutes(e) !== null && !jp.includes('preventive');
+  return parseDurationMinutes(e) > 0;
 }
 function anEntryHour(e){
   const t = fmtTime(e['Waktu']);
@@ -10345,7 +10374,7 @@ function computeCorrelationData(days){
   /* ---- 4) Jenis Pekerjaan vs rata-rata durasi ---- */
   const jenisDur = {};
   scoped.forEach(e=>{
-    const mins = parseDurationMinutes(e);
+    const mins = parseWorkDurationMinutes(e);
     if(mins === null) return;
     const j = e['Jenis Pekerjaan'] || 'Tidak Ditentukan';
     if(!jenisDur[j]) jenisDur[j] = { total:0, count:0 };
@@ -11625,7 +11654,7 @@ function rcaTopEntryPerMachine(){
     const m = e['Nama Mesin'];
     if(!m) return;
     const mins = parseDurationMinutes(e);
-    if(mins===null) return;
+    if(mins===null || mins<=0) return;
     if(!byMachine[m] || mins > byMachine[m].mins){ byMachine[m] = { entry:e, mins }; }
   });
   return byMachine;
@@ -22723,10 +22752,10 @@ function copilotPageResume(view){
     // [FIX SOT] Sebelumnya tidak dibatasi tanggal sama sekali (durasi
     // terlama sepanjang masa) -- otomatis ikut mencampur data historis
     // OneNote yang belum tervalidasi. Sekarang dibatasi ke source of truth.
-    const top = sotEntries().filter(e=> (parseDurationMinutes(e)||0) > 0).sort((a,b)=> (parseDurationMinutes(b)||0)-(parseDurationMinutes(a)||0)).slice(0,10);
+    const top = sotEntries().filter(e=> (parseWorkDurationMinutes(e)||0) > 0).sort((a,b)=> (parseWorkDurationMinutes(b)||0)-(parseWorkDurationMinutes(a)||0)).slice(0,10);
     if(top.length){
       items.push({ level:'info', icon:'⏱', title:'Pekerjaan dengan Durasi Terlama',
-        text:`Pekerjaan terlama saat ini: "<b>${escapeHtml(top[0]['Deskripsi Masalah']||top[0]['Jenis Pekerjaan']||'-')}</b>" di <b>${escapeHtml(top[0]['Nama Mesin']||'-')}</b> (${fmtDurationMinutes(parseDurationMinutes(top[0]))}).`,
+        text:`Pekerjaan terlama saat ini: "<b>${escapeHtml(top[0]['Deskripsi Masalah']||top[0]['Jenis Pekerjaan']||'-')}</b>" di <b>${escapeHtml(top[0]['Nama Mesin']||'-')}</b> (${fmtDurationMinutes(parseWorkDurationMinutes(top[0]))}).`,
         sub: `${top.length} pekerjaan durasi terlama ditampilkan di halaman ini.`, sources: top.map(copilotSourceFromEntry) });
     }
   }

@@ -6,6 +6,7 @@ const { readFileSync } = require('node:fs');
 const html = readFileSync('public/index.html', 'utf8');
 const worker = readFileSync('src/worker.js', 'utf8');
 
+// UI wiring and persistence fields.
 assert.match(html, /name="menyebabkanDowntime" id="input-menyebabkanDowntime" required/);
 assert.match(html, /name="durasiPekerjaanMenit" id="input-durasiPekerjaanMenit"/);
 assert.match(html, /entry\.downtime = entry\.menyebabkanDowntime === 'Ya'/);
@@ -17,6 +18,7 @@ assert.match(worker, /"Downtime \(menit\)"/);
 assert.match(worker, /rowMap\["Downtime \(menit\)"\] = downtimeFields\.hasChoice \? downtimeFields\.downtimeMinutes/);
 assert.match(worker, /"Downtime \(menit\)": downtimeFields\.hasChoice \? downtimeFields\.downtimeMinutes/);
 
+// Exercise the same backend pure functions embedded in the worker.
 const helperStart = worker.indexOf('function normalizeLogbookDowntimeChoice_');
 const helperEnd = worker.indexOf('function addEntry_(body)', helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, 'downtime helper block must exist');
@@ -56,4 +58,61 @@ assert.throws(
   err => err && err.code === 'VALIDATION_ERROR'
 );
 
-console.log('Logbook downtime choice tests passed.');
+// Exercise client-side duration/downtime readers separately.
+const parserStart = html.indexOf('function parseNumericMinutes_(raw){');
+const parserEnd = html.indexOf('function fmtDurationMinutes(mins){', parserStart);
+assert.ok(parserStart >= 0 && parserEnd > parserStart, 'work/downtime parser block must exist');
+const parsers = new Function(
+  html.slice(parserStart, parserEnd) +
+  '\nreturn { parseDurationMinutes, parseWorkDurationMinutes };'
+)();
+
+assert.equal(
+  parsers.parseDurationMinutes({ 'Menyebabkan Downtime': 'Tidak', 'Downtime (menit)': 120, 'Durasi Pekerjaan (menit)': 120 }),
+  0,
+  'explicit Tidak cannot be counted as machine downtime even if a stale value exists'
+);
+assert.equal(
+  parsers.parseDurationMinutes({ 'Menyebabkan Downtime': 'Ya', 'Downtime (menit)': 45, 'Durasi Pekerjaan (menit)': 120 }),
+  45
+);
+assert.equal(
+  parsers.parseWorkDurationMinutes({ 'Menyebabkan Downtime': 'Tidak', 'Downtime (menit)': 0, 'Durasi Pekerjaan (menit)': 120 }),
+  120,
+  'Top Durasi must still show work duration when downtime is zero'
+);
+assert.equal(
+  parsers.parseWorkDurationMinutes({ 'Downtime (menit)': 30 }),
+  30,
+  'older records remain readable as a fallback'
+);
+
+const breakdownStart = html.indexOf('function anIsBreakdown(e){');
+const breakdownEnd = html.indexOf('function anEntryHour(e)', breakdownStart);
+assert.ok(breakdownStart >= 0 && breakdownEnd > breakdownStart, 'breakdown classifier must exist');
+const isBreakdown = new Function(
+  'function isAreaEntry_(e){ return false; }\n' +
+  html.slice(breakdownStart, breakdownEnd) +
+  '\nreturn anIsBreakdown;'
+)();
+assert.equal(
+  isBreakdown({ 'Jenis Pekerjaan': 'Corrective', 'Menyebabkan Downtime': 'Tidak', 'Downtime (menit)': 0 }),
+  false,
+  'jobs marked Tidak must not inflate breakdown / MTTR counts'
+);
+assert.equal(
+  isBreakdown({ 'Jenis Pekerjaan': 'Corrective', 'Menyebabkan Downtime': 'Ya', 'Downtime (menit)': 45 }),
+  true
+);
+
+const topStart = html.indexOf('function renderDurasiView(){');
+const topEnd = html.indexOf('const btnRefreshDurasi', topStart);
+assert.ok(topStart >= 0 && topEnd > topStart);
+assert.match(html.slice(topStart, topEnd), /parseWorkDurationMinutes\(e\)/);
+const jobTypeStart = html.indexOf('/* ---- 4) Jenis Pekerjaan vs rata-rata durasi ---- */');
+const jobTypeEnd = html.indexOf('const jenisDurList', jobTypeStart);
+assert.ok(jobTypeStart >= 0 && jobTypeEnd > jobTypeStart);
+assert.match(html.slice(jobTypeStart, jobTypeEnd), /parseWorkDurationMinutes\(e\)/);
+assert.match(html, /filter\(e=> \(parseWorkDurationMinutes\(e\)\|\|0\) > 0\)/);
+
+console.log('Logbook downtime choice and analytics tests passed.');
