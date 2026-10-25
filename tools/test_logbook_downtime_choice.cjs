@@ -6,7 +6,13 @@ const { readFileSync } = require('node:fs');
 const html = readFileSync('public/index.html', 'utf8');
 const worker = readFileSync('src/worker.js', 'utf8');
 
-// UI wiring and persistence fields.
+// UI wiring and persistence fields: the choice must exist in the add form and edit schema.
+// This guard also ensures the field stays next to the start/end time inputs in the add form.
+assert.ok(
+  html.indexOf('id="input-jamMulai"') < html.indexOf('id="input-menyebabkanDowntime"') &&
+  html.indexOf('id="input-menyebabkanDowntime"') < html.indexOf('id="input-durasiPekerjaanMenit"'),
+  'Add Logbook must render the downtime choice between start/end time and work duration fields'
+);
 assert.match(html, /name="menyebabkanDowntime" id="input-menyebabkanDowntime" required/);
 assert.match(html, /name="durasiPekerjaanMenit" id="input-durasiPekerjaanMenit"/);
 assert.match(html, /entry\.downtime = entry\.menyebabkanDowntime === 'Ya'/);
