@@ -4166,7 +4166,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   'use strict';
   if(window.__OMODOS_TP_LOADER_V1)return;
   window.__OMODOS_TP_LOADER_V1=true;
-  var pending=null,attempts=0,timer=null;
+  var pending=null,attempts=0,timer=null,wrappedAccess=null;
   function isSuperadmin(){
     try{
       var u=(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)||window.CURRENT_USER||window.currentUser||null;
@@ -4174,7 +4174,21 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       return role==='superadmin';
     }catch(e){return false}
   }
+  function hookAccessGate(){
+    var original=window.canAccessView_;
+    if(typeof original!=='function')return false;
+    if(original===wrappedAccess)return true;
+    var wrapped=function(view){
+      if(String(view||'').trim()==='technical-performance')return isSuperadmin();
+      return original.apply(this,arguments);
+    };
+    wrapped.__tpTechnicalPerformanceGate=true;
+    window.canAccessView_=wrapped;
+    wrappedAccess=wrapped;
+    return true;
+  }
   function sync(){
+    hookAccessGate();
     var api=window.OMODOS_TechnicalPerformance;
     if(!isSuperadmin()){
       if(api&&typeof api.syncAuth==='function'){try{api.syncAuth()}catch(e){}}
