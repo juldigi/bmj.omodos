@@ -19159,10 +19159,30 @@ function populateAiFilters(){
   const mesinSel = $('#ai-filter-mesin');
   if(!mesinSel) return;
   const machineOptions = new Map();
-  ENTRIES.forEach(e=>{
+
+  // Build a small exact-match index once instead of scanning the entire machine
+  // master for every historical Logbook row. This keeps AI navigation responsive
+  // when the history grows to many thousands of entries.
+  const byName = new Map();
+  const byCode = new Map();
+  (Array.isArray(MACHINES) ? MACHINES : []).forEach(m=>{
+    const nameKey = norm_(m && m['Nama Mesin']);
+    const codeKey = norm_(m && m['Kode Mesin']);
+    if(nameKey && !byName.has(nameKey)) byName.set(nameKey, m);
+    if(codeKey){
+      const candidates = byCode.get(codeKey) || [];
+      candidates.push(m);
+      byCode.set(codeKey, candidates);
+    }
+  });
+
+  (Array.isArray(ENTRIES) ? ENTRIES : []).forEach(e=>{
     const raw=e['Kode Mesin']||e['Nama Mesin'];
     if(!raw) return;
-    const m=findMachineByIdentity_(raw);
+    const identity = norm_(raw);
+    // Match findMachineByIdentity_ semantics: name first, then unique code only.
+    const candidates = byCode.get(identity);
+    const m = byName.get(identity) || (candidates && candidates.length === 1 ? candidates[0] : null);
     const key=m ? (m['Kode Mesin']||m['Nama Mesin']) : raw;
     const label=m ? (m['Nama Mesin']||m['Kode Mesin']) : (e['Nama Mesin']||e['Kode Mesin']);
     if(key && label) machineOptions.set(String(key),String(label));
