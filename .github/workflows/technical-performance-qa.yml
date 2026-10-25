@@ -41,6 +41,21 @@ jobs:
         run: node tools/test_technical_performance_source_truth.cjs
       - name: Test ODIN issue grouping and Top 3
         run: node tools/test_technical_performance_odin.cjs
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start local app server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/technical-performance-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/technical-performance-http.log || true
+          exit 1
+      - name: Test Superadmin access and non-Superadmin denial in browser
+        run: node tools/technical-performance-browser-qa.mjs
       - name: Guard Superadmin-only lazy loading and read-only import
         run: |
           grep -Fq 'OMODOS_TP_LOADER_V1' public/omodos4/superadmin-intelligence.js
