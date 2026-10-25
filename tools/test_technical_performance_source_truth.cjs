@@ -14,8 +14,8 @@ assert.ok(technicalLoader.includes("script.src='/omodos4/technical-performance.j
   'The loaded Superadmin asset must load the Technical Performance module from its local asset path');
 assert.ok(technicalLoader.includes("return role==='superadmin';"),
   'Technical Performance module must remain unloaded for non-Superadmin accounts');
-assert.ok(technicalLoader.includes('function manualNavigate()') &&
-          technicalLoader.includes('if(!p||!allowed())return;'),
+assert.ok(source.includes('function manualNavigate()') &&
+          source.includes('if(!p||!allowed())return;'),
   'Direct feature navigation must enforce the Superadmin gate before showing the view');
 assert.ok(technicalLoader.includes("window.addEventListener('focus',sync)") &&
           technicalLoader.includes("document.addEventListener('visibilitychange'"),
