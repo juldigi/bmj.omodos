@@ -324,7 +324,7 @@ assert.match(hot,/btn-logbook-export-pdf/);
 assert.match(hot,/saveFormEntryDraftDebounced==='function'/);
 const pdf=hot.slice(hot.indexOf('function exportPdf(modal)'),hot.indexOf('function boot(){installMoField',hot.indexOf('function exportPdf(modal)')));
 assert.ok(!pdf.includes('html2canvas'),'Logbook export should not allocate a screenshot canvas');
-assert.match(update,/registerTrainingMaterials_\\(materialDetails,id\\)/,'editing Logbook registers newly entered sparepart in the master');
+assert.match(update,/registerTrainingMaterials_\(materialDetails,id\)/,'editing Logbook registers newly entered sparepart in the master');
 assert.match(worker,/Perlu Verifikasi/,'newly discovered sparepart is flagged for master verification');
 assert.match(hot,/LOGBOOK_EDIT_SPAREPART_DEDUP_V1/,'edit form has one-note-per-material deduplication');
 assert.match(hot,/OMODOS akan menambahkan material baru ke master Sparepart_Lokasi/,'edit form explains how unregistered sparepart is added');
