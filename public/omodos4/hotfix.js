@@ -1319,3 +1319,207 @@ const retry=setInterval(()=>{
   if((formReady&&editReady&&apiReady)||attempts>=40)clearInterval(retry);
 },100);
 })();
+
+/* LOGBOOK_SPAREPART_REVIEW_FIXES_20261029_V1
+   Show/persist per-sparepart notes during create and quantities/notes during edit. */
+(function(){
+'use strict';
+if(window.__OMODOS_LOGBOOK_SPAREPART_REVIEW_20261029_V1__)return;
+window.__OMODOS_LOGBOOK_SPAREPART_REVIEW_20261029_V1__=true;
+const byId=function(id){return document.getElementById(id);};
+const q=function(selector,root){return (root||document).querySelector(selector);};
+const qa=function(selector,root){return Array.from((root||document).querySelectorAll(selector));};
+const escValue=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+const stateRows=function(){return Array.isArray(window.SPAREPART_ROWS)?window.SPAREPART_ROWS:[];};
+const getName=function(r){return String(r&&(r.nama||r.name||r.material||r.namaMaterial)||'').trim();};
+const getSap=function(r){return String(r&&(r.sap||r.materialNumberSAP||r.materialNumber||r.sapNumber)||'').trim();};
+const getQty=function(r){return r&&(r.jumlah!==undefined?r.jumlah:r.qty!==undefined?r.qty:'');};
+const getUnit=function(r){return String(r&&(r.unit||r.satuan)||'pcs').trim()||'pcs';};
+const getNote=function(r){return String(r&&(r.catatan||r.note||r.notes)||'').trim();};
+
+function syncCreateNotes(){
+ const holder=byId('sparepart-rows');
+ if(!holder)return;
+ const states=stateRows();
+ holder.querySelectorAll('.sparepart-row').forEach(function(row){
+  const id=Number(row.dataset.id);
+  const state=states.find(function(item){return Number(item.id)===id;})||{};
+  let input=row.querySelector('.sp-catatan');
+  if(!input){
+   const wrap=document.createElement('div');
+   wrap.className='field sp-note-field';
+   wrap.innerHTML='<label>Catatan Sparepart (opsional)</label><textarea class="sp-catatan" rows="2" maxlength="500" placeholder="Keterangan pemakaian sparepart"></textarea>';
+   row.appendChild(wrap);
+   input=wrap.querySelector('.sp-catatan');
+  }
+  if(input&&document.activeElement!==input)input.value=getNote(state);
+  if(input&&input.dataset.noteBound!=='1'){
+   input.dataset.noteBound='1';
+   const saveNote=function(){const item=stateRows().find(function(r){return Number(r.id)===id;});if(item)item.catatan=input.value;};
+   input.addEventListener('input',saveNote);
+   input.addEventListener('change',saveNote);
+  }
+ });
+}
+const oldRender=window.renderSparepartRows;
+if(typeof oldRender==='function'&&!oldRender.__logbookSparepartNotesV1){
+ const wrapped=function(){const result=oldRender.apply(this,arguments);try{syncCreateNotes();}catch(e){}return result;};
+ wrapped.__logbookSparepartNotesV1=true;
+ window.renderSparepartRows=wrapped;
+}
+const oldSync=window.syncSparepartRowsFromDom;
+if(typeof oldSync==='function'&&!oldSync.__logbookSparepartNotesV1){
+ const wrapped=function(){
+  const result=oldSync.apply(this,arguments);
+  try{
+   const holder=byId('sparepart-rows'),states=stateRows();
+   if(holder)holder.querySelectorAll('.sparepart-row').forEach(function(row){
+    const state=states.find(function(item){return Number(item.id)===Number(row.dataset.id);});
+    const input=row.querySelector('.sp-catatan');
+    if(state&&input)state.catatan=String(input.value||'').trim();
+   });
+  }catch(e){}
+  return result;
+ };
+ wrapped.__logbookSparepartNotesV1=true;
+ window.syncSparepartRowsFromDom=wrapped;
+}
+const oldBuild=window.buildMaterialFieldsFromRows;
+if(typeof oldBuild==='function'&&!oldBuild.__logbookSparepartDetailsV1){
+ const wrapped=function(){
+  try{if(typeof window.syncSparepartRowsFromDom==='function')window.syncSparepartRowsFromDom();}catch(e){}
+  const data=oldBuild.apply(this,arguments);
+  if(!data||typeof data!=='object')return data;
+  const original=Array.isArray(data.sparepartDetail)?data.sparepartDetail:(Array.isArray(data.detail)?data.detail:[]);
+  const states=stateRows(),used=new Set();
+  const details=original.map(function(item){
+   item=item||{};
+   const name=getName(item),sap=getSap(item);
+   let state=states.find(function(r){
+    if(!r||used.has(r))return false;
+    const sameName=getName(r).toLocaleLowerCase('id')===name.toLocaleLowerCase('id');
+    const sameSap=getSap(r).toLocaleLowerCase('id')===sap.toLocaleLowerCase('id');
+    return !!(name||sap)&&sameName&&sameSap;
+   });
+   if(!state)state=states.find(function(r){
+    if(!r||used.has(r))return false;
+    return !!((name&&getName(r).toLocaleLowerCase('id')===name.toLocaleLowerCase('id'))||(sap&&getSap(r).toLocaleLowerCase('id')===sap.toLocaleLowerCase('id')));
+   });
+   if(state)used.add(state);
+   return {nama:name,sap:sap,jumlah:getQty(item),unit:getUnit(item.unit?item:(state||item)),catatan:getNote(item)||(state?getNote(state):'')};
+  }).filter(function(item){return item.nama||item.sap||String(item.jumlah||'').trim()||item.catatan;});
+  data.detail=details;
+  data.sparepartDetail=details;
+  return data;
+ };
+ wrapped.__logbookSparepartDetailsV1=true;
+ window.buildMaterialFieldsFromRows=wrapped;
+}
+
+const units=['pcs','unit','set','kg','g','mg','ml','mL','L','liter','meter','m','cm','roll','botol','kaleng','pack','lembar','tube','drum','galon','box','pair','sachet'];
+function parseDetails(entry){
+ const raw=entry&&(entry['Sparepart Detail (JSON)']||entry.sparepartDetail||entry['Sparepart Detail']);
+ let details=null;
+ if(Array.isArray(raw))details=raw;
+ else if(raw){try{const parsed=JSON.parse(String(raw));if(Array.isArray(parsed))details=parsed;}catch(e){}}
+ if(Array.isArray(details))return details.map(function(r){return {nama:getName(r),sap:getSap(r),jumlah:getQty(r),unit:getUnit(r),catatan:getNote(r)};});
+ const names=String(entry&&(entry['Nama Material']||entry.namaMaterial)||'').split(';').map(function(v){return v.trim();}).filter(Boolean);
+ const saps=String(entry&&(entry['Material Number SAP']||entry.materialNumberSAP)||'').split(';').map(function(v){return v.trim();});
+ const parsed=names.map(function(value,index){
+  const match=value.match(/^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*([^()]*)\)\s*$/);
+  return {nama:match?match[1].trim():value,sap:saps[index]||'',jumlah:match?match[2].replace(',','.'): '',unit:match&&match[3]?match[3].trim():'pcs',catatan:''};
+ });
+ if(!names.length)return saps.filter(Boolean).map(function(sap){return {nama:'',sap:sap,jumlah:'',unit:'pcs',catatan:''};});
+ return parsed;
+}
+function readEditDetails(panel){
+ return qa('[data-edit-sparepart-row]',panel).map(function(row){
+  return {nama:String(q('[data-edit-part-name]',row).value||'').trim(),sap:String(q('[data-edit-part-sap]',row).value||'').trim(),jumlah:String(q('[data-edit-part-qty]',row).value||'').trim(),unit:String(q('[data-edit-part-unit]',row).value||'pcs').trim()||'pcs',catatan:String(q('[data-edit-part-note]',row).value||'').trim()};
+ }).filter(function(r){return r.nama||r.sap||r.jumlah||r.catatan;});
+}
+function renderEditRows(panel,details){
+ const host=q('[data-edit-sparepart-list]',panel);
+ if(!host)return;
+ const rows=details.length?details:[{nama:'',sap:'',jumlah:'',unit:'pcs',catatan:''}];
+ host.innerHTML=rows.map(function(r){
+  const unit=String(r.unit||'pcs'),opts=units.slice();
+  if(unit&&!opts.includes(unit))opts.unshift(unit);
+  return '<div class="omodos-edit-sparepart-row" data-edit-sparepart-row>'+
+   '<div class="omodos-edit-sparepart-field"><label>Nama Sparepart</label><input type="text" data-edit-part-name value="'+escValue(r.nama)+'" placeholder="Nama material"></div>'+
+   '<div class="omodos-edit-sparepart-field"><label>Material Number SAP</label><input type="text" data-edit-part-sap value="'+escValue(r.sap)+'" placeholder="Nomor SAP (opsional)"></div>'+
+   '<div class="omodos-edit-sparepart-field"><label>Jumlah pemakaian *</label><input type="number" data-edit-part-qty min="0.001" step="any" inputmode="decimal" value="'+escValue(r.jumlah)+'" placeholder="Qty"></div>'+
+   '<div class="omodos-edit-sparepart-field"><label>Satuan</label><select data-edit-part-unit>'+opts.map(function(u){return '<option value="'+escValue(u)+'" '+(u===unit?'selected':'')+'>'+escValue(u)+'</option>';}).join('')+'</select></div>'+
+   '<div class="omodos-edit-sparepart-field omodos-edit-sparepart-note"><label>Catatan Sparepart (opsional)</label><textarea data-edit-part-note rows="2" maxlength="500" placeholder="Keterangan pemakaian">'+escValue(r.catatan)+'</textarea></div>'+
+   '<div class="omodos-edit-sparepart-row-actions"><button type="button" class="btn btn-ghost btn-sm" data-edit-sparepart-remove>Hapus sparepart</button></div></div>';
+ }).join('');
+ qa('[data-edit-sparepart-remove]',host).forEach(function(button){
+  button.addEventListener('click',function(){const row=button.closest('[data-edit-sparepart-row]');if(row)row.remove();if(!qa('[data-edit-sparepart-row]',host).length)renderEditRows(panel,[]);});
+ });
+}
+function ensureEditPanel(entry){
+ const holder=byId('entry-view-mode');
+ if(!holder||!q('#btn-save-entry-edit',holder))return;
+ const id=String(entry&&(entry.ID||entry.id)||'');
+ if(!id)return;
+ let panel=byId('edit-sparepart-details-panel');
+ if(panel&&panel.dataset.entryId===id)return;
+ if(panel)panel.remove();
+ const nameField=q('[data-edit-field="Nama Material"]',holder),sapField=q('[data-edit-field="Material Number SAP"]',holder);
+ if(nameField&&nameField.closest('.field'))nameField.closest('.field').hidden=true;
+ if(sapField&&sapField.closest('.field'))sapField.closest('.field').hidden=true;
+ panel=document.createElement('section');panel.id='edit-sparepart-details-panel';panel.className='omodos-edit-sparepart-panel';panel.dataset.entryId=id;
+ panel.innerHTML='<div class="omodos-edit-sparepart-heading"><div><strong>Sparepart Digunakan</strong><p>Periksa atau ubah jumlah pemakaian dan catatan setiap material.</p></div><button type="button" class="btn btn-ghost btn-sm" data-edit-sparepart-add>+ Tambah sparepart</button></div><div data-edit-sparepart-list></div><p class="omodos-edit-sparepart-hint">Jumlah wajib diisi jika nama atau nomor SAP sparepart diisi.</p>';
+ const anchor=(sapField&&sapField.closest('.field'))||(nameField&&nameField.closest('.field'));
+ if(anchor)anchor.insertAdjacentElement('afterend',panel);
+ else{const actions=q('#btn-save-entry-edit',holder).closest('div');if(actions)actions.insertAdjacentElement('beforebegin',panel);else holder.appendChild(panel);}
+ renderEditRows(panel,parseDetails(entry));
+ q('[data-edit-sparepart-add]',panel).addEventListener('click',function(){const details=readEditDetails(panel);details.push({nama:'',sap:'',jumlah:'',unit:'pcs',catatan:''});renderEditRows(panel,details);});
+}
+const oldEditRenderer=window.renderEntryEditForm;
+if(typeof oldEditRenderer==='function'&&!oldEditRenderer.__logbookSparepartDetailsV1){
+ const wrapped=function(){const result=oldEditRenderer.apply(this,arguments);try{ensureEditPanel(arguments[0]||{});}catch(e){console.warn('[OMODOS] Edit sparepart details tidak siap',e);}return result;};
+ wrapped.__logbookSparepartDetailsV1=true;
+ window.renderEntryEditForm=wrapped;
+}
+function prepareEditPayload(payload){
+ if(!payload||payload.action!=='updateEntry'||!payload.entry)return;
+ const holder=byId('entry-view-mode'),panel=byId('edit-sparepart-details-panel');
+ if(!holder||!panel||!q('#btn-save-entry-edit',holder))return;
+ const details=readEditDetails(panel);
+ payload.entry.sparepartDetail=details;
+ payload.entry.namaMaterial=details.length?details.map(function(r){const name=r.nama||r.sap;return r.jumlah?name+' ('+r.jumlah+' '+r.unit+')':name;}).join('; '):'-';
+ payload.entry.materialNumberSAP=details.length?details.map(function(r){return r.sap||'';}).join('; '):'-';
+ payload.entry.sparePart=details.length?details.map(function(r){return r.nama||r.sap;}).join('; '):'-';
+ const nameField=q('[data-edit-field="Nama Material"]',holder),sapField=q('[data-edit-field="Material Number SAP"]',holder);
+ if(nameField)nameField.value=payload.entry.namaMaterial;
+ if(sapField)sapField.value=payload.entry.materialNumberSAP;
+ if(payload.entry['Nama Material']!==undefined)payload.entry['Nama Material']=payload.entry.namaMaterial;
+ if(payload.entry['Material Number SAP']!==undefined)payload.entry['Material Number SAP']=payload.entry.materialNumberSAP;
+}
+const oldApiPost=window.apiPost;
+if(typeof oldApiPost==='function'&&!oldApiPost.__logbookSparepartDetailsV1){
+ const wrapped=function(payload){try{prepareEditPayload(payload);}catch(e){console.warn('[OMODOS] Sparepart edit payload normalization failed',e);}return oldApiPost.apply(this,arguments);};
+ wrapped.__logbookSparepartDetailsV1=true;
+ window.apiPost=wrapped;
+}
+const style=document.createElement('style');
+style.textContent=[
+ '#sparepart-rows .sparepart-row .sp-note-field{grid-column:1/-1;flex:1 0 100%;width:100%;min-width:0;margin-top:4px}',
+ '#sparepart-rows .sparepart-row .sp-note-field textarea{box-sizing:border-box;width:100%;min-height:52px;resize:vertical}',
+ '#edit-sparepart-details-panel{grid-column:1/-1;margin:12px 0;padding:14px;border:1px solid var(--line,#dbe3e8);border-radius:12px;background:var(--panel-2,#f7f9fb)}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-heading strong{font-size:14px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-heading p,#edit-sparepart-details-panel .omodos-edit-sparepart-hint{font-size:11px;color:var(--text-dim,#667788);margin:4px 0}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-row{display:grid;grid-template-columns:2fr 1.4fr .8fr .9fr;gap:9px;padding:12px 0;border-top:1px solid var(--line,#dbe3e8)}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-field{min-width:0}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-field label{display:block;font-size:11px;margin-bottom:5px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-field input,#edit-sparepart-details-panel .omodos-edit-sparepart-field select,#edit-sparepart-details-panel .omodos-edit-sparepart-field textarea{box-sizing:border-box;width:100%;min-width:0;padding:8px;border:1px solid var(--line,#cbd5e1);border-radius:7px;background:var(--panel,#fff);color:inherit;font:inherit;font-size:12px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-note,#edit-sparepart-details-panel .omodos-edit-sparepart-row-actions{grid-column:1/-1}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-row-actions{text-align:right}',
+ '@media(max-width:760px){#edit-sparepart-details-panel .omodos-edit-sparepart-row{grid-template-columns:1fr 1fr}}'
+].join('\n');
+document.head.appendChild(style);
+function boot(){try{syncCreateNotes();}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.addEventListener('pageshow',boot,{passive:true});
+})();
