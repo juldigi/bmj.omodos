@@ -1769,6 +1769,14 @@ function targetMatches(source,target,form,holder){
  for(const key of sourceKeys)if(targetKeys.has(key))return true;
  return false;
 }
+function bindLegacyOptionCleanup(select){
+ if(select.dataset.omodosLegacyChangeBound==='1')return;
+ select.dataset.omodosLegacyChangeBound='1';
+ select.addEventListener('change',function(){
+  const old=select.querySelector('option[data-omodos-legacy-option]');
+  if(old&&select.value!==old.value){old.remove();delete select.dataset.omodosLegacyValue;}
+ });
+}
 function addLegacyOption(select,value){
  const legacy=document.createElement('option');
  legacy.value=String(value);
@@ -1779,13 +1787,19 @@ function addLegacyOption(select,value){
  select.insertBefore(legacy,select.firstChild);
  select.value=String(value);
  select.dataset.omodosLegacyValue=String(value);
- if(select.dataset.omodosLegacyChangeBound!=='1'){
-  select.dataset.omodosLegacyChangeBound='1';
-  select.addEventListener('change',function(){
-   const old=select.querySelector('option[data-omodos-legacy-option]');
-   if(old&&select.value!==old.value){old.remove();delete select.dataset.omodosLegacyValue;}
-  });
- }
+ bindLegacyOptionCleanup(select);
+}
+function addEmptyPrompt(select){
+ const prompt=document.createElement('option');
+ prompt.value='';
+ prompt.textContent='Belum diisi — pilih nilai dari opsi Input Logbook';
+ prompt.disabled=true;
+ prompt.selected=true;
+ prompt.dataset.omodosLegacyOption='1';
+ select.insertBefore(prompt,select.firstChild);
+ select.value='';
+ select.dataset.omodosLegacyValue='';
+ bindLegacyOptionCleanup(select);
 }
 function copyInputDropdownOptions(source,target){
  const current=String(target.value==null?'':target.value);
@@ -1817,7 +1831,7 @@ function copyInputDropdownOptions(source,target){
  }else{
   const empty=sourceOptions.some(o=>o.value==='');
   if(empty)target.value='';
-  else target.selectedIndex=0;
+  else addEmptyPrompt(target);
  }
 }
 function syncEditDropdownsToInput(holder){
