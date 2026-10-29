@@ -1626,7 +1626,7 @@ window.omodosAppendEntryImagesToPdf_=async function(pdf,entry,layout){
 'use strict';
 if(window.__OMODOS_LOGBOOK_EDIT_SPAREPART_DEDUP_V1__)return;
 window.__OMODOS_LOGBOOK_EDIT_SPAREPART_DEDUP_V1__=true;
-function textOf(el){return String(el&&(el.textContent||el.innerText)||'').replace(/\\s+/g,' ').trim().toLocaleLowerCase('id');}
+function textOf(el){return String(el&&(el.textContent||el.innerText)||'').replace(/\s+/g,' ').trim().toLocaleLowerCase('id');}
 function editHolder(){return document.getElementById('entry-view-mode');}
 function cleanupEditSparepartNotes(){
  const holder=editHolder();
@@ -1641,7 +1641,7 @@ function cleanupEditSparepartNotes(){
  // If an older/native edit field duplicates the per-material note editor, keep the
  // dedicated per-material field as the single source of truth.
  Array.from(holder.querySelectorAll('label')).forEach(function(label){
-  if(!/^catatan sparepart(?:\\s*\\(opsional\\))?$/.test(textOf(label)))return;
+  if(!/^catatan sparepart(?:\s*\(opsional\))?$/.test(textOf(label)))return;
   if(panel.contains(label))return;
   const field=label.closest('.field')||label.parentElement;
   if(!field||panel.contains(field))return;
