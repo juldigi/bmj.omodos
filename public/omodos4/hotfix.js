@@ -997,7 +997,7 @@ function showPdfDialog(options){
 }
 window.exportLogbookPdfForEntry_=function(id){showPdfDialog({entryId:id});};
 function safePdfText(v){return String(v==null||v===''?'-':v).replace(/\r/g,'').replace(/\t/g,' ').replace(/[^\x20-\x7E]/g,' ').replace(/\s+/g,' ').trim()||'-';}
-function exportPdf(modal){
+async function exportPdf(modal){
  if(!window.jspdf||typeof window.jspdf.jsPDF!=='function'){notice('Library PDF belum termuat. Coba kembali saat koneksi stabil.',true);return;}
  const allSource=Array.isArray(window.ENTRIES)?window.ENTRIES:(typeof ENTRIES!=='undefined'&&Array.isArray(ENTRIES)?ENTRIES:[]);
  const singleId=String(modal&&modal.dataset.entryId||'');
@@ -1038,15 +1038,25 @@ function exportPdf(modal){
  const header=()=>{pdf.setFont('helvetica','bold');pdf.setFontSize(14);pdf.text(singleId?'DETAIL LOGBOOK MAINTENANCE':'LAPORAN LOGBOOK MAINTENANCE',left,y);y+=18;pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.text('Filter: '+safePdfText(label)+' | Dibuat: '+now.toLocaleString('id-ID'),left,y);y+=12;pdf.text('Jumlah entri: '+rows.length,left,y);y+=15;pdf.setDrawColor(180);pdf.line(left,y,pw-right,y);y+=12;};
  header();
  const line=(name,value)=>{const lines=pdf.splitTextToSize(name+': '+safePdfText(value),pw-left-right);if(y+lines.length*11>ph-bottom){pdf.addPage();y=34;header();}pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text(lines,left,y);y+=lines.length*11;};
- rows.forEach((e,i)=>{
+ const pdfImageStats={included:0,skipped:0};
+ for(let i=0;i<rows.length;i++){
+  const e=rows[i];
   if(y+52>ph-bottom){pdf.addPage();y=34;header();}
   const location=String(e['Lokasi Pekerjaan']||'').toLowerCase()==='area'?(e['Lokasi/Area']||e['Nama Area']||'-'):[e['Kode Mesin'],e['Nama Mesin']].filter(Boolean).join(' - ');
   const d=logbookExportTimestamp_(e);
   pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.text((i+1)+'. '+(d?d.toLocaleDateString('id-ID'):(e['Tanggal']||'-'))+' | '+safePdfText(location).slice(0,110),left,y);y+=14;
-  line('Waktu Lapor',e['Waktu']);line('Status / Prioritas',safePdfText(e['Status'])+' / '+safePdfText(e['Prioritas']));line('Nomor MO',e['Nomor MO']);line('Nomor Notifikasi',e['Nomor Notifikasi Pekerjaan']);line('Jenis Pekerjaan',e['Jenis Pekerjaan']);line('Pelapor / Shift',[e['Nama Pelapor'],e['Shift']].filter(Boolean).join(' / '));line('Deskripsi Masalah',e['Deskripsi Masalah']);line('Tindakan Perbaikan',e['Tindakan Perbaikan']);line('Catatan',e['Catatan Tambahan']);pdf.setDrawColor(220);pdf.line(left,y+2,pw-right,y+2);y+=12;
- });
+  line('Waktu Lapor',e['Waktu']);line('Status / Prioritas',safePdfText(e['Status'])+' / '+safePdfText(e['Prioritas']));line('Nomor MO',e['Nomor MO']);line('Nomor Notifikasi',e['Nomor Notifikasi Pekerjaan']);line('Jenis Pekerjaan',e['Jenis Pekerjaan']);line('Pelapor / Shift',[e['Nama Pelapor'],e['Shift']].filter(Boolean).join(' / '));line('Deskripsi Masalah',e['Deskripsi Masalah']);line('Tindakan Perbaikan',e['Tindakan Perbaikan']);line('Catatan',e['Catatan Tambahan']);
+  pdf.setDrawColor(220);pdf.line(left,y+2,pw-right,y+2);y+=12;
+  try{
+   if(typeof window.omodosAppendEntryImagesToPdf_==='function'){
+    const stats=await window.omodosAppendEntryImagesToPdf_(pdf,e,{getY:function(){return y;},setY:function(value){y=value;},pw:pw,ph:ph,left:left,right:right,bottom:bottom,header:header,line:line});
+    pdfImageStats.included+=stats.included||0;
+    pdfImageStats.skipped+=stats.skipped||0;
+   }
+  }catch(imageError){pdfImageStats.skipped++;console.warn('[OMODOS] PDF attachment image skipped',imageError);}
+ }
  const total=pdf.internal.getNumberOfPages();for(let page=1;page<=total;page++){pdf.setPage(page);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(110);pdf.text('OMODOS | Report Logbook | Halaman '+page+' / '+total,pw-right,ph-18,{align:'right'});}
- pdf.save((singleId?'Detail_Logbook':'Report_Logbook')+'_'+now.toISOString().replace(/[-:]/g,'').slice(0,15)+'.pdf');modal.remove();notice('PDF berhasil dibuat ('+rows.length+' entri).');
+ pdf.save((singleId?'Detail_Logbook':'Report_Logbook')+'_'+now.toISOString().replace(/[-:]/g,'').slice(0,15)+'.pdf');modal.remove();notice('PDF berhasil dibuat ('+rows.length+' entri). Foto masuk: '+pdfImageStats.included+(pdfImageStats.skipped?'; foto gagal dimuat: '+pdfImageStats.skipped:'' )+'.');
 }
 
 /* LOGBOOK_LIGHTWEIGHT_FILE_PREVIEWS_V1 — avoid loading full uploaded media just to build Logbook preview cards. */
@@ -1318,4 +1328,293 @@ const retry=setInterval(()=>{
   const apiReady=wrapApiPost();
   if((formReady&&editReady&&apiReady)||attempts>=40)clearInterval(retry);
 },100);
+})();
+
+/* LOGBOOK_SPAREPART_REVIEW_FIXES_20261029_V1
+   Show/persist per-sparepart notes during create and quantities/notes during edit. */
+(function(){
+'use strict';
+if(window.__OMODOS_LOGBOOK_SPAREPART_REVIEW_20261029_V1__)return;
+window.__OMODOS_LOGBOOK_SPAREPART_REVIEW_20261029_V1__=true;
+const byId=function(id){return document.getElementById(id);};
+const q=function(selector,root){return (root||document).querySelector(selector);};
+const qa=function(selector,root){return Array.from((root||document).querySelectorAll(selector));};
+const escValue=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+const stateRows=function(){try{if(typeof SPAREPART_ROWS!=='undefined'&&Array.isArray(SPAREPART_ROWS))return SPAREPART_ROWS;}catch(e){}return Array.isArray(window.SPAREPART_ROWS)?window.SPAREPART_ROWS:[];};
+const getName=function(r){return String(r&&(r.nama||r.name||r.material||r.namaMaterial)||'').trim();};
+const getSap=function(r){return String(r&&(r.sap||r.materialNumberSAP||r.materialNumber||r.sapNumber)||'').trim();};
+const getQty=function(r){return r&&(r.jumlah!==undefined?r.jumlah:r.qty!==undefined?r.qty:'');};
+const getUnit=function(r){return String(r&&(r.unit||r.satuan)||'pcs').trim()||'pcs';};
+const getNote=function(r){return String(r&&(r.catatan||r.note||r.notes)||'').trim();};
+
+function syncCreateNotes(){
+ const holder=byId('sparepart-rows');
+ if(!holder)return;
+ const states=stateRows();
+ holder.querySelectorAll('.sparepart-row').forEach(function(row){
+  const id=Number(row.dataset.id);
+  const state=states.find(function(item){return Number(item.id)===id;})||{};
+  let input=row.querySelector('.sp-catatan');
+  if(!input){
+   const wrap=document.createElement('div');
+   wrap.className='field sp-note-field';
+   wrap.innerHTML='<label>Catatan Sparepart (opsional)</label><textarea class="sp-catatan" rows="2" maxlength="500" placeholder="Keterangan pemakaian sparepart"></textarea>';
+   row.appendChild(wrap);
+   input=wrap.querySelector('.sp-catatan');
+  }
+  if(input&&document.activeElement!==input)input.value=getNote(state);
+  if(input&&input.dataset.noteBound!=='1'){
+   input.dataset.noteBound='1';
+   const saveNote=function(){const item=stateRows().find(function(r){return Number(r.id)===id;});if(item)item.catatan=input.value;};
+   input.addEventListener('input',saveNote);
+   input.addEventListener('change',saveNote);
+  }
+ });
+}
+const oldRender=window.renderSparepartRows;
+if(typeof oldRender==='function'&&!oldRender.__logbookSparepartNotesV1){
+ const wrapped=function(){const result=oldRender.apply(this,arguments);try{syncCreateNotes();}catch(e){}return result;};
+ wrapped.__logbookSparepartNotesV1=true;
+ window.renderSparepartRows=wrapped;
+}
+const oldSync=window.syncSparepartRowsFromDom;
+if(typeof oldSync==='function'&&!oldSync.__logbookSparepartNotesV1){
+ const wrapped=function(){
+  const result=oldSync.apply(this,arguments);
+  try{
+   const holder=byId('sparepart-rows'),states=stateRows();
+   if(holder)holder.querySelectorAll('.sparepart-row').forEach(function(row){
+    const state=states.find(function(item){return Number(item.id)===Number(row.dataset.id);});
+    const input=row.querySelector('.sp-catatan');
+    if(state&&input)state.catatan=String(input.value||'').trim();
+   });
+  }catch(e){}
+  return result;
+ };
+ wrapped.__logbookSparepartNotesV1=true;
+ window.syncSparepartRowsFromDom=wrapped;
+}
+const oldBuild=window.buildMaterialFieldsFromRows;
+if(typeof oldBuild==='function'&&!oldBuild.__logbookSparepartDetailsV1){
+ const wrapped=function(){
+  try{if(typeof window.syncSparepartRowsFromDom==='function')window.syncSparepartRowsFromDom();}catch(e){}
+  const data=oldBuild.apply(this,arguments);
+  if(!data||typeof data!=='object')return data;
+  const original=Array.isArray(data.sparepartDetail)?data.sparepartDetail:(Array.isArray(data.detail)?data.detail:[]);
+  const states=stateRows(),used=new Set();
+  const details=original.map(function(item){
+   item=item||{};
+   const name=getName(item),sap=getSap(item);
+   let state=states.find(function(r){
+    if(!r||used.has(r))return false;
+    const sameName=getName(r).toLocaleLowerCase('id')===name.toLocaleLowerCase('id');
+    const sameSap=getSap(r).toLocaleLowerCase('id')===sap.toLocaleLowerCase('id');
+    return !!(name||sap)&&sameName&&sameSap;
+   });
+   if(!state)state=states.find(function(r){
+    if(!r||used.has(r))return false;
+    return !!((name&&getName(r).toLocaleLowerCase('id')===name.toLocaleLowerCase('id'))||(sap&&getSap(r).toLocaleLowerCase('id')===sap.toLocaleLowerCase('id')));
+   });
+   if(state)used.add(state);
+   return {nama:name,sap:sap,jumlah:getQty(item),unit:getUnit(item.unit?item:(state||item)),catatan:getNote(item)||(state?getNote(state):'')};
+  }).filter(function(item){return item.nama||item.sap||String(item.jumlah||'').trim()||item.catatan;});
+  data.detail=details;
+  data.sparepartDetail=details;
+  return data;
+ };
+ wrapped.__logbookSparepartDetailsV1=true;
+ window.buildMaterialFieldsFromRows=wrapped;
+}
+
+const units=['pcs','unit','set','kg','g','mg','ml','mL','L','liter','meter','m','cm','roll','botol','kaleng','pack','lembar','tube','drum','galon','box','pair','sachet'];
+function parseDetails(entry){
+ const raw=entry&&(entry['Sparepart Detail (JSON)']||entry.sparepartDetail||entry['Sparepart Detail']);
+ let details=null;
+ if(Array.isArray(raw))details=raw;
+ else if(raw){try{const parsed=JSON.parse(String(raw));if(Array.isArray(parsed))details=parsed;}catch(e){}}
+ if(Array.isArray(details))return details.map(function(r){return {nama:getName(r),sap:getSap(r),jumlah:getQty(r),unit:getUnit(r),catatan:getNote(r)};});
+ const names=String(entry&&(entry['Nama Material']||entry.namaMaterial)||'').split(';').map(function(v){return v.trim();}).filter(Boolean);
+ const saps=String(entry&&(entry['Material Number SAP']||entry.materialNumberSAP)||'').split(';').map(function(v){return v.trim();});
+ const parsed=names.map(function(value,index){
+  const match=value.match(/^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*([^()]*)\)\s*$/);
+  return {nama:match?match[1].trim():value,sap:saps[index]||'',jumlah:match?match[2].replace(',','.'): '',unit:match&&match[3]?match[3].trim():'pcs',catatan:''};
+ });
+ if(!names.length)return saps.filter(Boolean).map(function(sap){return {nama:'',sap:sap,jumlah:'',unit:'pcs',catatan:''};});
+ return parsed;
+}
+function readEditDetails(panel){
+ return qa('[data-edit-sparepart-row]',panel).map(function(row){
+  return {nama:String(q('[data-edit-part-name]',row).value||'').trim(),sap:String(q('[data-edit-part-sap]',row).value||'').trim(),jumlah:String(q('[data-edit-part-qty]',row).value||'').trim(),unit:String(q('[data-edit-part-unit]',row).value||'pcs').trim()||'pcs',catatan:String(q('[data-edit-part-note]',row).value||'').trim()};
+ }).filter(function(r){return r.nama||r.sap||r.jumlah||r.catatan;});
+}
+function renderEditRows(panel,details){
+ const host=q('[data-edit-sparepart-list]',panel);
+ if(!host)return;
+ const rows=details.length?details:[{nama:'',sap:'',jumlah:'',unit:'pcs',catatan:''}];
+ host.innerHTML=rows.map(function(r){
+  const unit=String(r.unit||'pcs'),opts=units.slice();
+  if(unit&&!opts.includes(unit))opts.unshift(unit);
+  return '<div class="omodos-edit-sparepart-row" data-edit-sparepart-row>'+
+   '<div class="omodos-edit-sparepart-field"><label>Nama Sparepart</label><input type="text" data-edit-part-name value="'+escValue(r.nama)+'" placeholder="Nama material"></div>'+
+   '<div class="omodos-edit-sparepart-field"><label>Material Number SAP</label><input type="text" data-edit-part-sap value="'+escValue(r.sap)+'" placeholder="Nomor SAP (opsional)"></div>'+
+   '<div class="omodos-edit-sparepart-field"><label>Jumlah pemakaian *</label><input type="number" data-edit-part-qty min="0.001" step="any" inputmode="decimal" value="'+escValue(r.jumlah)+'" placeholder="Qty"></div>'+
+   '<div class="omodos-edit-sparepart-field"><label>Satuan</label><select data-edit-part-unit>'+opts.map(function(u){return '<option value="'+escValue(u)+'" '+(u===unit?'selected':'')+'>'+escValue(u)+'</option>';}).join('')+'</select></div>'+
+   '<div class="omodos-edit-sparepart-field omodos-edit-sparepart-note"><label>Catatan Sparepart (opsional)</label><textarea data-edit-part-note rows="2" maxlength="500" placeholder="Keterangan pemakaian">'+escValue(r.catatan)+'</textarea></div>'+
+   '<div class="omodos-edit-sparepart-row-actions"><button type="button" class="btn btn-ghost btn-sm" data-edit-sparepart-remove>Hapus sparepart</button></div></div>';
+ }).join('');
+ qa('[data-edit-sparepart-remove]',host).forEach(function(button){
+  button.addEventListener('click',function(){const row=button.closest('[data-edit-sparepart-row]');if(row)row.remove();if(!qa('[data-edit-sparepart-row]',host).length)renderEditRows(panel,[]);});
+ });
+}
+function ensureEditPanel(entry){
+ const holder=byId('entry-view-mode');
+ if(!holder||!q('#btn-save-entry-edit',holder))return;
+ const id=String(entry&&(entry.ID||entry.id)||'');
+ if(!id)return;
+ let panel=byId('edit-sparepart-details-panel');
+ if(panel&&panel.dataset.entryId===id)return;
+ if(panel)panel.remove();
+ const nameField=q('[data-edit-field="Nama Material"]',holder),sapField=q('[data-edit-field="Material Number SAP"]',holder);
+ if(nameField&&nameField.closest('.field'))nameField.closest('.field').hidden=true;
+ if(sapField&&sapField.closest('.field'))sapField.closest('.field').hidden=true;
+ panel=document.createElement('section');panel.id='edit-sparepart-details-panel';panel.className='omodos-edit-sparepart-panel';panel.dataset.entryId=id;
+ panel.innerHTML='<div class="omodos-edit-sparepart-heading"><div><strong>Sparepart Digunakan</strong><p>Periksa atau ubah jumlah pemakaian dan catatan setiap material.</p></div><button type="button" class="btn btn-ghost btn-sm" data-edit-sparepart-add>+ Tambah sparepart</button></div><div data-edit-sparepart-list></div><p class="omodos-edit-sparepart-hint">Jumlah wajib diisi jika nama atau nomor SAP sparepart diisi.</p>';
+ const anchor=(sapField&&sapField.closest('.field'))||(nameField&&nameField.closest('.field'));
+ if(anchor)anchor.insertAdjacentElement('afterend',panel);
+ else{const actions=q('#btn-save-entry-edit',holder).closest('div');if(actions)actions.insertAdjacentElement('beforebegin',panel);else holder.appendChild(panel);}
+ renderEditRows(panel,parseDetails(entry));
+ q('[data-edit-sparepart-add]',panel).addEventListener('click',function(){const details=readEditDetails(panel);details.push({nama:'',sap:'',jumlah:'',unit:'pcs',catatan:''});renderEditRows(panel,details);});
+}
+const oldEditRenderer=window.renderEntryEditForm;
+if(typeof oldEditRenderer==='function'&&!oldEditRenderer.__logbookSparepartDetailsV1){
+ const wrapped=function(){const result=oldEditRenderer.apply(this,arguments);try{ensureEditPanel(arguments[0]||{});}catch(e){console.warn('[OMODOS] Edit sparepart details tidak siap',e);}return result;};
+ wrapped.__logbookSparepartDetailsV1=true;
+ window.renderEntryEditForm=wrapped;
+}
+function prepareEditPayload(payload){
+ if(!payload||payload.action!=='updateEntry'||!payload.entry)return;
+ const holder=byId('entry-view-mode'),panel=byId('edit-sparepart-details-panel');
+ if(!holder||!panel||!q('#btn-save-entry-edit',holder))return;
+ const details=readEditDetails(panel);
+ payload.entry.sparepartDetail=details;
+ payload.entry.namaMaterial=details.length?details.map(function(r){const name=r.nama||r.sap;return r.jumlah?name+' ('+r.jumlah+' '+r.unit+')':name;}).join('; '):'-';
+ payload.entry.materialNumberSAP=details.length?details.map(function(r){return r.sap||'';}).join('; '):'-';
+ payload.entry.sparePart=details.length?details.map(function(r){return r.nama||r.sap;}).join('; '):'-';
+ const nameField=q('[data-edit-field="Nama Material"]',holder),sapField=q('[data-edit-field="Material Number SAP"]',holder);
+ if(nameField)nameField.value=payload.entry.namaMaterial;
+ if(sapField)sapField.value=payload.entry.materialNumberSAP;
+ if(payload.entry['Nama Material']!==undefined)payload.entry['Nama Material']=payload.entry.namaMaterial;
+ if(payload.entry['Material Number SAP']!==undefined)payload.entry['Material Number SAP']=payload.entry.materialNumberSAP;
+}
+const oldApiPost=window.apiPost;
+if(typeof oldApiPost==='function'&&!oldApiPost.__logbookSparepartDetailsV1){
+ const wrapped=function(payload){try{prepareEditPayload(payload);}catch(e){console.warn('[OMODOS] Sparepart edit payload normalization failed',e);}return oldApiPost.apply(this,arguments);};
+ wrapped.__logbookSparepartDetailsV1=true;
+ window.apiPost=wrapped;
+}
+const style=document.createElement('style');
+style.textContent=[
+ '#sparepart-rows .sparepart-row .sp-note-field{grid-column:1/-1;flex:1 0 100%;width:100%;min-width:0;margin-top:4px}',
+ '#sparepart-rows .sparepart-row .sp-note-field textarea{box-sizing:border-box;width:100%;min-height:52px;resize:vertical}',
+ '#edit-sparepart-details-panel{grid-column:1/-1;margin:12px 0;padding:14px;border:1px solid var(--line,#dbe3e8);border-radius:12px;background:var(--panel-2,#f7f9fb)}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-heading strong{font-size:14px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-heading p,#edit-sparepart-details-panel .omodos-edit-sparepart-hint{font-size:11px;color:var(--text-dim,#667788);margin:4px 0}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-row{display:grid;grid-template-columns:2fr 1.4fr .8fr .9fr;gap:9px;padding:12px 0;border-top:1px solid var(--line,#dbe3e8)}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-field{min-width:0}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-field label{display:block;font-size:11px;margin-bottom:5px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-field input,#edit-sparepart-details-panel .omodos-edit-sparepart-field select,#edit-sparepart-details-panel .omodos-edit-sparepart-field textarea{box-sizing:border-box;width:100%;min-width:0;padding:8px;border:1px solid var(--line,#cbd5e1);border-radius:7px;background:var(--panel,#fff);color:inherit;font:inherit;font-size:12px}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-note,#edit-sparepart-details-panel .omodos-edit-sparepart-row-actions{grid-column:1/-1}',
+ '#edit-sparepart-details-panel .omodos-edit-sparepart-row-actions{text-align:right}',
+ '@media(max-width:760px){#edit-sparepart-details-panel .omodos-edit-sparepart-row{grid-template-columns:1fr 1fr}}'
+].join('\n');
+document.head.appendChild(style);
+function boot(){try{syncCreateNotes();}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.addEventListener('pageshow',boot,{passive:true});
+})();
+
+
+/* LOGBOOK_PDF_ATTACHMENT_IMAGES_V1 — embed image attachments at page-fitting dimensions. */
+(function(){
+'use strict';
+if(window.__OMODOS_LOGBOOK_PDF_ATTACHMENT_IMAGES_V1__)return;
+window.__OMODOS_LOGBOOK_PDF_ATTACHMENT_IMAGES_V1__=true;
+function getImageAttachments(entry){
+ let values=entry&&entry['Lampiran (JSON)'];
+ if(!Array.isArray(values)){try{values=JSON.parse(String(values||'[]'));}catch(e){values=[];}}
+ if(!Array.isArray(values))return [];
+ return values.filter(function(a){
+  if(!a||typeof a!=='object')return false;
+  const mime=String(a.mimeType||a.type||'').toLowerCase();
+  const urls=[a.viewUrl,a.previewUrl,a.thumbUrl].join(' ');
+  return mime.indexOf('image')!==-1||/\.(jpe?g|png|webp|gif)(\?|\s|$)/i.test(urls)||String(a.name||'').match(/\.(jpe?g|png|webp|gif)$/i);
+ });
+}
+function loadImage(src){
+ return new Promise(function(resolve,reject){
+  const img=new Image();
+  img.onload=function(){if(img.naturalWidth>0&&img.naturalHeight>0)resolve(img);else reject(new Error('Gambar kosong'));};
+  img.onerror=function(){reject(new Error('Gambar tidak dapat dimuat'));};
+  try{const url=new URL(src,window.location.href);if(url.origin!==window.location.origin)img.crossOrigin='anonymous';img.src=url.href;}catch(e){reject(e);}
+ });
+}
+async function convertUrlToPdfImage(src){
+ let objectUrl='';
+ try{
+  const absolute=new URL(src,window.location.href);
+  const response=await fetch(absolute.href,{credentials:absolute.origin===window.location.origin?'same-origin':'omit'});
+  if(response.ok){
+   const blob=await response.blob();
+   if(blob.type&&blob.type.toLowerCase().startsWith('image/'))objectUrl=URL.createObjectURL(blob);
+  }
+ }catch(e){}
+ try{
+  const img=await loadImage(objectUrl||src);
+  const maxSide=1300,scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+  canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+  const ctx=canvas.getContext('2d',{alpha:false});
+  if(!ctx)throw new Error('Canvas tidak tersedia');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  const result={data:canvas.toDataURL('image/jpeg',0.78),width:canvas.width,height:canvas.height};
+  canvas.width=0;canvas.height=0;
+  if(objectUrl)URL.revokeObjectURL(objectUrl);
+  return result;
+ }catch(e){if(objectUrl)URL.revokeObjectURL(objectUrl);throw e;}
+}
+window.omodosAppendEntryImagesToPdf_=async function(pdf,entry,layout){
+ const attachments=getImageAttachments(entry),stats={included:0,skipped:0};
+ if(!attachments.length)return stats;
+ let y=layout.getY();
+ if(y+16>layout.ph-layout.bottom){pdf.addPage();y=34;layout.setY(y);layout.header();}
+ pdf.setFont('helvetica','bold');pdf.setFontSize(9);
+ pdf.text('Foto / Lampiran Gambar ('+attachments.length+')',layout.left,y);
+ y+=12;layout.setY(y);
+ const contentWidth=layout.pw-layout.left-layout.right,maxImageHeight=245;
+ for(const attachment of attachments){
+  const urlList=[attachment.viewUrl,attachment.previewUrl,attachment.thumbUrl].filter(function(v,i,a){return typeof v==='string'&&v.trim()&&a.indexOf(v)===i;});
+  let image=null;
+  for(const url of urlList){try{image=await convertUrlToPdfImage(url);if(image)break;}catch(e){}}
+  if(!image){
+   stats.skipped++;
+   layout.line('Lampiran gambar',String(attachment.name||'gambar')+' (gambar tidak dapat dimuat)');
+   y=layout.getY();
+   continue;
+  }
+  const ratio=image.width/image.height;
+  let width=contentWidth,height=width/ratio;
+  if(height>maxImageHeight){height=maxImageHeight;width=height*ratio;}
+  y=layout.getY();
+  if(y+height+15>layout.ph-layout.bottom){pdf.addPage();y=34;layout.setY(y);layout.header();}
+  pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+  pdf.text('Foto: '+String(attachment.name||'lampiran gambar').replace(/[^\x20-\x7E]/g,' ').slice(0,100),layout.left,layout.getY());
+  y=layout.getY()+8;layout.setY(y);
+  pdf.addImage(image.data,'JPEG',layout.left+(contentWidth-width)/2,y,width,height,undefined,'FAST');
+  y+=height+12;layout.setY(y);
+  stats.included++;
+ }
+ return stats;
+};
 })();
