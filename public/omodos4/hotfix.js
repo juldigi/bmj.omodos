@@ -1730,8 +1730,9 @@ function moveNoteValue(label,panel){
  const value=String(control&&control.value||'').trim();
  if(!value||!panel)return;
  const row=label.closest('[data-edit-sparepart-row]');
- const destination=(row&&row.querySelector('[data-edit-part-note]'))||panel.querySelector('[data-edit-part-note]');
- if(destination&&!String(destination.value||'').trim())destination.value=value;
+ const rowNotes=row?all('[data-edit-part-note]',row):[];
+ const destination=(rowNotes.find(input=>!(field&&field.contains(input))))||(rowNotes[0])||panel.querySelector('[data-edit-part-note]');
+ if(destination&&destination!==control&&!String(destination.value||'').trim())destination.value=value;
 }
 function dedupeSparepartNotes(holder){
  const panel=holder.querySelector('#edit-sparepart-details-panel');
