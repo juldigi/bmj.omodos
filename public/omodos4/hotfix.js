@@ -1340,7 +1340,7 @@ const byId=function(id){return document.getElementById(id);};
 const q=function(selector,root){return (root||document).querySelector(selector);};
 const qa=function(selector,root){return Array.from((root||document).querySelectorAll(selector));};
 const escValue=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
-const stateRows=function(){return Array.isArray(window.SPAREPART_ROWS)?window.SPAREPART_ROWS:[];};
+const stateRows=function(){try{if(typeof SPAREPART_ROWS!=='undefined'&&Array.isArray(SPAREPART_ROWS))return SPAREPART_ROWS;}catch(e){}return Array.isArray(window.SPAREPART_ROWS)?window.SPAREPART_ROWS:[];};
 const getName=function(r){return String(r&&(r.nama||r.name||r.material||r.namaMaterial)||'').trim();};
 const getSap=function(r){return String(r&&(r.sap||r.materialNumberSAP||r.materialNumber||r.sapNumber)||'').trim();};
 const getQty=function(r){return r&&(r.jumlah!==undefined?r.jumlah:r.qty!==undefined?r.qty:'');};
