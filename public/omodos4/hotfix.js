@@ -1834,9 +1834,15 @@ function syncEditDropdownsToInput(holder){
   if(!candidates.length)return;
   // Prefer a direct name/data-field match over a label-only match.
   candidates.sort((a,b)=>{
-   const ak=keysFor(a,holder),bk=keysFor(b,holder);
-   const directA=ak.some(k=>sourceKeys.has(k))?1:0,directB=bk.some(k=>sourceKeys.has(k))?1:0;
-   return directB-directA;
+   const score=target=>{
+    const attr=norm(target.getAttribute('data-edit-field'));
+    const directField=attr&&sourceKeys.has(attr)?4:0;
+    const directId=norm(target.id)&&sourceKeys.has(norm(target.id))?2:0;
+    const nativeSelect=target.tagName==='SELECT'?1:0;
+    const downtimeChoice=sourceKeys.has('menyebabkandowntime')&&target.id==='edit-menyebabkan-downtime'?10:0;
+    return downtimeChoice+directField+directId+nativeSelect;
+   };
+   return score(b)-score(a);
   });
   const target=candidates[0];
   if(!target||target===source)return;
