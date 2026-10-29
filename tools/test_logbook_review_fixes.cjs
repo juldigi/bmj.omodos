@@ -324,4 +324,10 @@ assert.match(hot,/btn-logbook-export-pdf/);
 assert.match(hot,/saveFormEntryDraftDebounced==='function'/);
 const pdf=hot.slice(hot.indexOf('function exportPdf(modal)'),hot.indexOf('function boot(){installMoField',hot.indexOf('function exportPdf(modal)')));
 assert.ok(!pdf.includes('html2canvas'),'Logbook export should not allocate a screenshot canvas');
+
+assert.match(hot,/data-edit-field="Spare Part Digunakan"/);
+assert.match(hot,/Material baru belum terdaftar\?/);
+assert.match(hot,/Master Sparepart dengan status/);
+assert.match(worker,/"Satuan":d\.unit \|\| "pcs"/);
+
 console.log('Logbook custom area, incremental list rendering, delegated clicks, edit photos, MO field, local refresh, scoped observers and PDF filters passed.');
