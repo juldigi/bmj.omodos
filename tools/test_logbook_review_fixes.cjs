@@ -328,4 +328,8 @@ assert.match(update,/registerTrainingMaterials_\(materialDetails,id\)/,'editing 
 assert.match(worker,/Perlu Verifikasi/,'newly discovered sparepart is flagged for master verification');
 assert.match(hot,/LOGBOOK_EDIT_SPAREPART_DEDUP_V1/,'edit form has one-note-per-material deduplication');
 assert.match(hot,/OMODOS akan menambahkan material baru ke master Sparepart_Lokasi/,'edit form explains how unregistered sparepart is added');
+assert.match(hot,/LOGBOOK_EDIT_FORM_MATCH_INPUT_DROPDOWNS_V1/,'Edit Logbook syncs dropdown controls with Input Logbook');
+assert.match(hot,/all\('select',form\)/,'Edit dropdown synchronization reads the live Input Logbook options');
+assert.match(hot,/sparepartcatatan/,'Edit Logbook removes duplicate Spare Part (catatan) label');
+assert.match(hot,/Nilai lama: /,'an invalid legacy selection is preserved visibly without becoming a selectable input option');
 console.log('Logbook custom area, incremental list rendering, delegated clicks, edit photos, MO field, local refresh, scoped observers and PDF filters passed.');
