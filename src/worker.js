@@ -4921,7 +4921,7 @@ function createBackend(services, env = {}) {
     var rows=getSparepartLokasiMerged_(), headers=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0], added=[];
     details.forEach(function(d){
       if (rows.some(function(r){return d.sap ? trainingValue_(r["Material Number SAP"])===d.sap : trainingValue_(r["Nama Material"]).toLowerCase()===d.nama.toLowerCase();})) return;
-      var record={"Material Number SAP":d.sap,"Nama Material":d.nama,"Lokasi Gudang":"-","Satuan":"-","Perlu Verifikasi":true,"Sumber Logbook":logbookId};
+      var record={"Material Number SAP":d.sap,"Nama Material":d.nama,"Lokasi Gudang":"-","Satuan":d.unit || "pcs","Perlu Verifikasi":true,"Sumber Logbook":logbookId};
       sh.appendRow(headers.map(function(h){return record[h] ?? "";})); rows.push(record); added.push(d.nama||d.sap);
     });
     invalidateCacheForSheet_(SHEET_SPAREPART_LOKASI); return added;
