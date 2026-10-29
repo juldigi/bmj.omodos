@@ -1669,7 +1669,7 @@ function cleanupEditSparepartNotes(){
   if(notes.length>1){
    const keep=notes[0];
    for(let i=1;i<notes.length;i++){
-    if(String(notes[i].value||'').trim()&&!String(keep.value||'').trim())keep.value=notes[i].value;
+    mergeNote(keep,notes[i].value);
     notes[i].remove();
    }
   }
@@ -1725,6 +1725,13 @@ function isSparepartNoteLabel(label){
  return key==='catatansparepart'||key==='catatansparepartopsional'||key==='sparepartcatatan'||key==='sparepartcatatanopsional';
 }
 function nearestField(label){return label&&(label.closest('.field')||label.parentElement);}
+function mergeNote(destination,value){
+ if(!destination)return;
+ const incoming=String(value||'').trim(),current=String(destination.value||'').trim();
+ if(!incoming||incoming===current)return;
+ if(!current){destination.value=incoming.slice(0,500);return;}
+ if(!current.split(/\\n+/).some(line=>line.trim()===incoming))destination.value=(current+'\\n'+incoming).slice(0,500);
+}
 function moveNoteValue(label,panel){
  const field=nearestField(label),control=field&&field.querySelector('textarea,input');
  const value=String(control&&control.value||'').trim();
@@ -1732,7 +1739,7 @@ function moveNoteValue(label,panel){
  const row=label.closest('[data-edit-sparepart-row]');
  const rowNotes=row?all('[data-edit-part-note]',row):[];
  const destination=(rowNotes.find(input=>!(field&&field.contains(input))))||(rowNotes[0])||panel.querySelector('[data-edit-part-note]');
- if(destination&&destination!==control&&!String(destination.value||'').trim())destination.value=value;
+ if(destination&&destination!==control)mergeNote(destination,value);
 }
 function dedupeSparepartNotes(holder){
  const panel=holder.querySelector('#edit-sparepart-details-panel');
@@ -1755,7 +1762,7 @@ function dedupeSparepartNotes(holder){
   const notes=all('[data-edit-part-note]',row);
   if(notes.length>1){
    const keep=notes[0];
-   notes.slice(1).forEach(extra=>{if(String(extra.value||'').trim()&&!String(keep.value||'').trim())keep.value=extra.value;extra.remove();});
+   notes.slice(1).forEach(extra=>{mergeNote(keep,extra.value);extra.remove();});
   }
  });
 }
