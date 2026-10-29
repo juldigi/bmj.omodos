@@ -1618,3 +1618,74 @@ window.omodosAppendEntryImagesToPdf_=async function(pdf,entry,layout){
  return stats;
 };
 })();
+
+
+/* LOGBOOK_EDIT_SPAREPART_DEDUP_V1
+   Keep one per-material note field in Edit Logbook and explain unregistered material handling. */
+(function(){
+'use strict';
+if(window.__OMODOS_LOGBOOK_EDIT_SPAREPART_DEDUP_V1__)return;
+window.__OMODOS_LOGBOOK_EDIT_SPAREPART_DEDUP_V1__=true;
+function textOf(el){return String(el&&(el.textContent||el.innerText)||'').replace(/\\s+/g,' ').trim().toLocaleLowerCase('id');}
+function editHolder(){return document.getElementById('entry-view-mode');}
+function cleanupEditSparepartNotes(){
+ const holder=editHolder();
+ if(!holder||!holder.querySelector('#btn-save-entry-edit'))return;
+ let panels=Array.from(holder.querySelectorAll('[id="edit-sparepart-details-panel"]'));
+ if(!panels.length)return;
+ const entryId=String((panels[0].dataset&&panels[0].dataset.entryId)||'');
+ let panel=panels.find(function(p){return entryId&&p.dataset.entryId===entryId;})||panels[0];
+ panels.forEach(function(p){if(p!==panel)p.remove();});
+ const hint=panel.querySelector('.omodos-edit-sparepart-hint');
+ if(hint)hint.textContent='Sparepart belum terdaftar? Ketik nama secara manual dan isi nomor SAP bila tersedia. Isi jumlah serta satuan, lalu simpan. OMODOS akan menambahkan material baru ke master Sparepart_Lokasi dengan status Perlu Verifikasi.';
+ // If an older/native edit field duplicates the per-material note editor, keep the
+ // dedicated per-material field as the single source of truth.
+ Array.from(holder.querySelectorAll('label')).forEach(function(label){
+  if(!/^catatan sparepart(?:\\s*\\(opsional\\))?$/.test(textOf(label)))return;
+  if(panel.contains(label))return;
+  const field=label.closest('.field')||label.parentElement;
+  if(!field||panel.contains(field))return;
+  const candidate=field.querySelector('textarea,input');
+  const value=String(candidate&&candidate.value||'').trim();
+  if(value){
+   const first=panel.querySelector('[data-edit-part-note]');
+   if(first&&!String(first.value||'').trim())first.value=value;
+  }
+  field.remove();
+ });
+ // Guard against duplicated note containers within a single material row. Keep the
+ // first field and carry over any non-empty text before removing redundant copies.
+ panel.querySelectorAll('[data-edit-sparepart-row]').forEach(function(row){
+  const fields=Array.from(row.querySelectorAll('.omodos-edit-sparepart-note'));
+  if(fields.length>1){
+   const keep=fields[0],keepInput=keep.querySelector('[data-edit-part-note]');
+   for(let i=1;i<fields.length;i++){
+    const input=fields[i].querySelector('[data-edit-part-note]');
+    if(keepInput&&input&&String(input.value||'').trim()&&!String(keepInput.value||'').trim())keepInput.value=input.value;
+    fields[i].remove();
+   }
+  }
+  const notes=Array.from(row.querySelectorAll('[data-edit-part-note]'));
+  if(notes.length>1){
+   const keep=notes[0];
+   for(let i=1;i<notes.length;i++){
+    if(String(notes[i].value||'').trim()&&!String(keep.value||'').trim())keep.value=notes[i].value;
+    notes[i].remove();
+   }
+  }
+ });
+}
+const oldRender=window.renderEntryEditForm;
+if(typeof oldRender==='function'&&!oldRender.__editSparepartDedupV1){
+ const wrapped=function(){
+  const result=oldRender.apply(this,arguments);
+  try{cleanupEditSparepartNotes();}catch(e){console.warn('[OMODOS] Deduplikasi catatan sparepart gagal',e);}
+  return result;
+ };
+ wrapped.__editSparepartDedupV1=true;
+ window.renderEntryEditForm=wrapped;
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cleanupEditSparepartNotes,{once:true});
+else cleanupEditSparepartNotes();
+window.addEventListener('pageshow',cleanupEditSparepartNotes,{passive:true});
+})();
