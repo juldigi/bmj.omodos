@@ -4897,8 +4897,9 @@ function createBackend(services, env = {}) {
       var names = trainingValue_(data.namaMaterial || data["Nama Material"]).split(";");
       var codes = trainingValue_(data.materialNumberSAP || data["Material Number SAP"]).split(";");
       details = Array.from({length:Math.max(names.length,codes.length)}, function(_,i) {
-        var name=trainingValue_(names[i]), match=name.match(/^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*pcs\)\s*$/i);
-        return {nama:match ? match[1].trim() : name,sap:trainingValue_(codes[i]),jumlah:match ? match[2].replace(",",".") : data.jumlahMaterial};
+        var name=trainingValue_(names[i]);
+        var match=name.match(/^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*([^()]*)\)\s*$/i);
+        return {nama:match ? match[1].trim() : name, sap:trainingValue_(codes[i]), jumlah:match ? match[2].replace(",",".") : data.jumlahMaterial, unit:match && trainingValue_(match[3]) ? trainingValue_(match[3]) : "pcs", catatan:""};
       });
     }
     if (Array.isArray(data.sparepartDetail) && !details.length && trainingValue_(data.namaMaterial || data.materialNumberSAP)) throw {code:"VALIDATION_ERROR",message:"Detail dan jumlah sparepart wajib diisi."};
@@ -4906,7 +4907,11 @@ function createBackend(services, env = {}) {
       var qty=Number(r.jumlah ?? r.qty);
       if (!Number.isFinite(qty) || qty<=0) throw {code:"VALIDATION_ERROR",message:"Jumlah sparepart baris "+(i+1)+" wajib diisi dengan angka lebih dari 0."};
       if (!trainingValue_(r.nama) && !trainingValue_(r.sap)) throw {code:"VALIDATION_ERROR",message:"Nama atau SAP sparepart wajib diisi."};
-      return {nama:trainingValue_(r.nama),sap:trainingValue_(r.sap),jumlah:qty};
+      var unit=trainingValue_(r.unit || r.satuan || "pcs") || "pcs";
+      if (unit.length>30) throw {code:"VALIDATION_ERROR",message:"Satuan sparepart baris "+(i+1)+" terlalu panjang."};
+      var catatan=String(r.catatan || r.note || r.notes || "").trim();
+      if (catatan.length>500) throw {code:"VALIDATION_ERROR",message:"Catatan sparepart baris "+(i+1)+" maksimal 500 karakter."};
+      return {nama:trainingValue_(r.nama),sap:trainingValue_(r.sap),jumlah:qty,unit:unit,catatan:catatan};
     });
   }
   function registerTrainingMaterials_(details, logbookId) {
