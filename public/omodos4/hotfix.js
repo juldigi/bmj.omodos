@@ -1700,7 +1700,7 @@ window.__OMODOS_LOGBOOK_EDIT_FORM_MATCH_INPUT_DROPDOWNS_V1__=true;
 const byId=id=>document.getElementById(id);
 const all=(selector,root)=>Array.from((root||document).querySelectorAll(selector));
 function norm(value){
- return String(value==null?'':value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('id').replace(/^(input|select|edit|field|control)[_-]?/,'').replace(/[^a-z0-9]/g,'');
+ return String(value==null?'':value).replace(/\(\s*opsional\s*\)/gi,' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('id').replace(/^(input|select|edit|field|control)[_-]?/,'').replace(/[^a-z0-9]/g,'');
 }
 function labelFor(control,root){
  if(!control)return '';
@@ -1823,7 +1823,7 @@ function syncEditDropdownsToInput(holder){
  const form=byId('form-entry');
  if(!form||!holder)return;
  const targets=all('[data-edit-field],#edit-menyebabkan-downtime,#edit-location-kind,#edit-area-category,#edit-area-name',holder)
-  .filter(el=>!el.closest('#edit-sparepart-details-panel'));
+  .filter(el=>!el.closest('#edit-sparepart-details-panel')&&el.id!=='edit-area-name'&&norm(el.getAttribute('data-edit-field'))!=='namaarea');
  all('select',form).forEach(source=>{
   if(source.multiple||source.disabled&&source.options.length<2)return;
   if(source.closest('#sparepart-rows'))return;
