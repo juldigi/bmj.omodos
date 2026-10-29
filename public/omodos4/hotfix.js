@@ -1471,14 +1471,23 @@ function ensureEditPanel(entry){
  if(!holder||!q('#btn-save-entry-edit',holder))return;
  const id=String(entry&&(entry.ID||entry.id)||'');
  if(!id)return;
+ const nameField=q('[data-edit-field="Nama Material"]',holder);
+ const sapField=q('[data-edit-field="Material Number SAP"]',holder);
+ const legacyPartField=q('[data-edit-field="Spare Part Digunakan"]',holder);
+ [nameField,sapField,legacyPartField].forEach(function(field){
+  if(field&&field.closest('.field'))field.closest('.field').hidden=true;
+ });
  let panel=byId('edit-sparepart-details-panel');
- if(panel&&panel.dataset.entryId===id)return;
+ if(panel&&panel.dataset.entryId===id){
+  panel.querySelectorAll('[data-edit-sparepart-row]').forEach(function(row){
+   const notes=qa('[data-edit-part-note]',row);
+   notes.slice(1).forEach(function(note){const wrap=note.closest('.omodos-edit-sparepart-field');if(wrap)wrap.remove();else note.remove();});
+  });
+  return;
+ }
  if(panel)panel.remove();
- const nameField=q('[data-edit-field="Nama Material"]',holder),sapField=q('[data-edit-field="Material Number SAP"]',holder);
- if(nameField&&nameField.closest('.field'))nameField.closest('.field').hidden=true;
- if(sapField&&sapField.closest('.field'))sapField.closest('.field').hidden=true;
  panel=document.createElement('section');panel.id='edit-sparepart-details-panel';panel.className='omodos-edit-sparepart-panel';panel.dataset.entryId=id;
- panel.innerHTML='<div class="omodos-edit-sparepart-heading"><div><strong>Sparepart Digunakan</strong><p>Periksa atau ubah jumlah pemakaian dan catatan setiap material.</p></div><button type="button" class="btn btn-ghost btn-sm" data-edit-sparepart-add>+ Tambah sparepart</button></div><div data-edit-sparepart-list></div><p class="omodos-edit-sparepart-hint">Jumlah wajib diisi jika nama atau nomor SAP sparepart diisi.</p>';
+ panel.innerHTML='<div class="omodos-edit-sparepart-heading"><div><strong>Sparepart Digunakan</strong><p>Periksa atau ubah jumlah pemakaian dan catatan setiap material.</p></div><button type="button" class="btn btn-ghost btn-sm" data-edit-sparepart-add>+ Tambah sparepart</button></div><div data-edit-sparepart-list></div><p class="omodos-edit-sparepart-hint">Material baru belum terdaftar? Klik <strong>+ Tambah sparepart</strong>, isi nama, nomor SAP jika ada, jumlah, dan satuan. Setelah menekan <strong>Simpan Perubahan</strong>, OMODOS akan menambahkan material tersebut ke Master Sparepart dengan status <strong>Perlu Verifikasi</strong>. Lengkapi lokasi dan stoknya di menu Sparepart.</p>';
  const anchor=(sapField&&sapField.closest('.field'))||(nameField&&nameField.closest('.field'));
  if(anchor)anchor.insertAdjacentElement('afterend',panel);
  else{const actions=q('#btn-save-entry-edit',holder).closest('div');if(actions)actions.insertAdjacentElement('beforebegin',panel);else holder.appendChild(panel);}
