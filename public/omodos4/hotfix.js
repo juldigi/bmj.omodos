@@ -1649,7 +1649,9 @@ function cleanupEditSparepartNotes(){
   const value=String(candidate&&candidate.value||'').trim();
   if(value){
    const first=panel.querySelector('[data-edit-part-note]');
-   if(first&&!String(first.value||'').trim())first.value=value;
+   const current=String(first&&first.value||'').trim();
+   if(first&&!current)first.value=value.slice(0,500);
+   else if(first&&current!==value&&!current.split(/\\n+/).some(line=>line.trim()===value))first.value=(current+'\\n'+value).slice(0,500);
   }
   field.remove();
  });
