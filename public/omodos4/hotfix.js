@@ -1689,3 +1689,177 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 else cleanupEditSparepartNotes();
 window.addEventListener('pageshow',cleanupEditSparepartNotes,{passive:true});
 })();
+
+
+/* LOGBOOK_EDIT_FORM_MATCH_INPUT_DROPDOWNS_V1
+   Edit Logbook inherits live select options from Input Logbook; remove duplicate sparepart-note fields. */
+(function(){
+'use strict';
+if(window.__OMODOS_LOGBOOK_EDIT_FORM_MATCH_INPUT_DROPDOWNS_V1__)return;
+window.__OMODOS_LOGBOOK_EDIT_FORM_MATCH_INPUT_DROPDOWNS_V1__=true;
+const byId=id=>document.getElementById(id);
+const all=(selector,root)=>Array.from((root||document).querySelectorAll(selector));
+function norm(value){
+ return String(value==null?'':value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('id').replace(/^(input|select|edit|field|control)[_-]?/,'').replace(/[^a-z0-9]/g,'');
+}
+function labelFor(control,root){
+ if(!control)return '';
+ const field=control.closest('.field');
+ const label=field&&field.querySelector('label');
+ if(label&&String(label.textContent||'').trim())return String(label.textContent||'').trim();
+ if(control.id){
+  const labels=all('label[for]',root||document);
+  const found=labels.find(l=>l.getAttribute('for')===control.id);
+  if(found)return String(found.textContent||'').trim();
+ }
+ return '';
+}
+function keysFor(control,root){
+ if(!control)return [];
+ const raw=[control.getAttribute('data-edit-field'),control.name,control.id,labelFor(control,root)];
+ return Array.from(new Set(raw.map(norm).filter(Boolean)));
+}
+function noteLabelKey(label){return norm(label&&label.textContent);}
+function isSparepartNoteLabel(label){
+ const key=noteLabelKey(label);
+ return key==='catatansparepart'||key==='catatansparepartopsional'||key==='sparepartcatatan'||key==='sparepartcatatanopsional';
+}
+function nearestField(label){return label&&(label.closest('.field')||label.parentElement);}
+function moveNoteValue(label,panel){
+ const field=nearestField(label),control=field&&field.querySelector('textarea,input');
+ const value=String(control&&control.value||'').trim();
+ if(!value||!panel)return;
+ const row=label.closest('[data-edit-sparepart-row]');
+ const destination=(row&&row.querySelector('[data-edit-part-note]'))||panel.querySelector('[data-edit-part-note]');
+ if(destination&&!String(destination.value||'').trim())destination.value=value;
+}
+function dedupeSparepartNotes(holder){
+ const panel=holder.querySelector('#edit-sparepart-details-panel');
+ const keptByRow=new Set();
+ all('label',holder).forEach(label=>{
+  if(!isSparepartNoteLabel(label))return;
+  const key=noteLabelKey(label);
+  const row=label.closest('[data-edit-sparepart-row]');
+  const field=nearestField(label);
+  const canonical=key==='catatansparepart'||key==='catatansparepartopsional';
+  const isDedicated=!!(panel&&panel.contains(label)&&row&&field&&field.querySelector('[data-edit-part-note]'));
+  if(canonical&&isDedicated){
+   if(!keptByRow.has(row)){keptByRow.add(row);return;}
+  }
+  moveNoteValue(label,panel);
+  if(field&&field!==holder&&!(panel&&field===panel))field.remove();
+ });
+ // A single dedicated text area per sparepart row is the canonical field.
+ all('[data-edit-sparepart-row]',panel||holder).forEach(row=>{
+  const notes=all('[data-edit-part-note]',row);
+  if(notes.length>1){
+   const keep=notes[0];
+   notes.slice(1).forEach(extra=>{if(String(extra.value||'').trim()&&!String(keep.value||'').trim())keep.value=extra.value;extra.remove();});
+  }
+ });
+}
+function controlLabelKey(control,root){return norm(labelFor(control,root));}
+function sourceKeySet(control,form){
+ return new Set([...keysFor(control,form),controlLabelKey(control,form)].filter(Boolean));
+}
+function targetMatches(source,target,form,holder){
+ const sourceKeys=sourceKeySet(source,form);
+ const targetKeys=new Set([...keysFor(target,holder),controlLabelKey(target,holder)].filter(Boolean));
+ for(const key of sourceKeys)if(targetKeys.has(key))return true;
+ return false;
+}
+function addLegacyOption(select,value){
+ const legacy=document.createElement('option');
+ legacy.value=String(value);
+ legacy.textContent='Nilai lama: '+String(value)+' (tidak tersedia di opsi Input Logbook)';
+ legacy.disabled=true;
+ legacy.selected=true;
+ legacy.dataset.omodosLegacyOption='1';
+ select.insertBefore(legacy,select.firstChild);
+ select.value=String(value);
+ select.dataset.omodosLegacyValue=String(value);
+ if(select.dataset.omodosLegacyChangeBound!=='1'){
+  select.dataset.omodosLegacyChangeBound='1';
+  select.addEventListener('change',function(){
+   const old=select.querySelector('option[data-omodos-legacy-option]');
+   if(old&&select.value!==old.value){old.remove();delete select.dataset.omodosLegacyValue;}
+  });
+ }
+}
+function copyInputDropdownOptions(source,target){
+ const current=String(target.value==null?'':target.value);
+ const signature=Array.from(source.options).map(o=>JSON.stringify([o.value,o.textContent,o.disabled,o.hidden])).join('|');
+ if(target.dataset.omodosInputDropdownSignature===signature)return;
+ const sourceOptions=Array.from(source.options);
+ if(target.tagName==='SELECT'){
+  target.replaceChildren(...sourceOptions.map(o=>o.cloneNode(true)));
+ }else{
+  if(target.tagName!=='INPUT')return;
+  const replacement=document.createElement('select');
+  Array.from(target.attributes).forEach(attr=>{
+   if(['type','placeholder','min','max','step','value','autocomplete','inputmode'].includes(attr.name))return;
+   replacement.setAttribute(attr.name,attr.value);
+  });
+  replacement.className=target.className||source.className||'';
+  replacement.style.cssText=target.style.cssText;
+  sourceOptions.forEach(o=>replacement.appendChild(o.cloneNode(true)));
+  target.replaceWith(replacement);
+  target=replacement;
+ }
+ target.dataset.omodosInputDropdownSignature=signature;
+ const hasCurrent=sourceOptions.some(o=>o.value===current);
+ if(current!==''&&hasCurrent){
+  target.value=current;
+  delete target.dataset.omodosLegacyValue;
+ }else if(current!==''){
+  addLegacyOption(target,current);
+ }else{
+  const empty=sourceOptions.some(o=>o.value==='');
+  if(empty)target.value='';
+  else target.selectedIndex=0;
+ }
+}
+function syncEditDropdownsToInput(holder){
+ const form=byId('form-entry');
+ if(!form||!holder)return;
+ const targets=all('[data-edit-field],#edit-menyebabkan-downtime,#edit-location-kind,#edit-area-category,#edit-area-name',holder)
+  .filter(el=>!el.closest('#edit-sparepart-details-panel'));
+ all('select',form).forEach(source=>{
+  if(source.multiple||source.disabled&&source.options.length<2)return;
+  if(source.closest('#sparepart-rows'))return;
+  if(source.options.length<2)return;
+  const sourceKeys=sourceKeySet(source,form);
+  if(!sourceKeys.size)return;
+  const candidates=targets.filter(target=>targetMatches(source,target,form,holder));
+  if(!candidates.length)return;
+  // Prefer a direct name/data-field match over a label-only match.
+  candidates.sort((a,b)=>{
+   const ak=keysFor(a,holder),bk=keysFor(b,holder);
+   const directA=ak.some(k=>sourceKeys.has(k))?1:0,directB=bk.some(k=>sourceKeys.has(k))?1:0;
+   return directB-directA;
+  });
+  const target=candidates[0];
+  if(!target||target===source)return;
+  try{copyInputDropdownOptions(source,target);}catch(e){console.warn('[OMODOS] Opsi dropdown Edit Logbook gagal disamakan',e);}
+ });
+}
+function refreshEditForm(){
+ const holder=byId('entry-view-mode');
+ if(!holder||!holder.querySelector('#btn-save-entry-edit'))return;
+ dedupeSparepartNotes(holder);
+ syncEditDropdownsToInput(holder);
+}
+const original=window.renderEntryEditForm;
+if(typeof original==='function'&&!original.__matchInputDropdownsV1){
+ const wrapped=function(){
+  const result=original.apply(this,arguments);
+  try{refreshEditForm();}catch(e){console.warn('[OMODOS] Sinkronisasi form edit gagal',e);}
+  setTimeout(()=>{try{refreshEditForm();}catch(e){}},0);
+  return result;
+ };
+ wrapped.__matchInputDropdownsV1=true;
+ window.renderEntryEditForm=wrapped;
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refreshEditForm,{once:true});
+else refreshEditForm();
+})();
