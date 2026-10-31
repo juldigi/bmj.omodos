@@ -196,7 +196,7 @@ jobs:
             assert.notEqual(mode3d.rootDisplay, 'none', '3D viewer must be visible in Factory 3D mode');
             assert.equal(mode3d.active3d, true, '3D mode must isolate the factory view');
             assert.equal(mode3d.title, 'Factory Overview');
-            assert.equal(mode3d.src, 'https://digitaltwin.juldigi.workers.dev/?embed=omodos-status');
+            assert.equal(mode3d.src, 'https://digitaltwin.offsetbmj.workers.dev/?embed=omodos-status');
             assert.equal(mode3d.gridDisplay, 'none', 'regular machine cards should not leak into 3D mode');
             assert.equal(mode3d.pressed, 'true');
 
