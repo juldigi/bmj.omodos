@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 
 const html = readFileSync('public/index.html', 'utf8');
+const hotfix = readFileSync('public/omodos4/hotfix.js', 'utf8');
 const worker = readFileSync('src/worker.js', 'utf8');
 
 // UI wiring and persistence fields: the choice must exist in the add form and edit schema.
@@ -121,4 +122,16 @@ assert.ok(jobTypeStart >= 0 && jobTypeEnd > jobTypeStart);
 assert.match(html.slice(jobTypeStart, jobTypeEnd), /parseWorkDurationMinutes\(e\)/);
 assert.match(html, /filter\(e=> \(parseWorkDurationMinutes\(e\)\|\|0\) > 0\)/);
 
-console.log('Logbook downtime choice and analytics tests passed.');
+
+// The production hotfix supplies the interactive add/edit downtime control.
+// Keep explicit coverage for the injected UI and the payload contract as well.
+assert.match(hotfix, /select-menyebabkanDowntime/);
+assert.match(hotfix, /name="menyebabkanDowntime" required/);
+assert.match(hotfix, /duration\.name='durasiPekerjaan'/);
+assert.match(hotfix, /downtimeField\.value=choice\.value==='Tidak'\?'0':choice\.value==='Ya'&&minutes!==null\?String\(minutes\):''/);
+assert.match(hotfix, /payload\.entry\.menyebabkanDowntime=select\.value/);
+assert.match(hotfix, /payload\.entry\.downtime=select\.value==='Ya'\?duration:0/);
+assert.match(hotfix, /payload\.entry\.durasiPekerjaan=duration/);
+new Function(hotfix);
+
+console.log('Logbook downtime UI, analytics and hotfix payload tests passed.');
