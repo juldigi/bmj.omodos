@@ -2087,8 +2087,13 @@ function renderStockout(data){
 }
 function renderDead(data){
  return rows(data.deadStockCandidates,function(x){
-  return item(partName(x),partNo(x)+' • '+(x.reason||'Kandidat untuk diperiksa'),'<span class="v4-risk-chip">KANDIDAT</span>');
- },60)+note('Artinya hanya: masih ada stok positif tetapi belum ditemukan pemakaian yang terhubung secara tepat pada Logbook yang tersedia. Ini bukan bukti bahwa sparepart benar-benar tidak diperlukan.','warn');
+  var historyDays=Number(x.historyDays);
+  var coverageStart=x.coverageStart?String(x.coverageStart).slice(0,10):'';
+  var coverage=Number.isFinite(historyDays)&&historyDays>0
+   ? historyDays+' hari histori sejak '+(coverageStart||'tanggal awal belum tersedia')
+   : 'cakupan histori belum tersedia';
+  return item(partName(x),partNo(x)+' • '+coverage+'; belum ada pemakaian yang terhubung','<span class="v4-risk-chip">PERLU CEK</span>');
+ },60)+note('Daftar ini hanya menunjukkan stok positif yang belum memiliki catatan pemakaian yang cocok pada rentang histori OMODOS 4.0 yang tersedia. Ini bukan klasifikasi dead stock dan bukan dasar keputusan disposal. Periksa histori yang lebih panjang, kebutuhan engineering, reservasi, dan rencana pekerjaan.','warn');
 }
 function renderConsumption(data){
  return rows(data.consumptionTop,function(x){
