@@ -332,4 +332,5 @@ assert.match(hot,/LOGBOOK_EDIT_FORM_MATCH_INPUT_DROPDOWNS_V1/,'Edit Logbook sync
 assert.match(hot,/all\('select',form\)/,'Edit dropdown synchronization reads the live Input Logbook options');
 assert.match(hot,/sparepartcatatan/,'Edit Logbook removes duplicate Spare Part (catatan) label');
 assert.match(hot,/Nilai lama: /,'an invalid legacy selection is preserved visibly without becoming a selectable input option');
+assert.match(worker,/\"Satuan\":d\.unit \|\| \"pcs\"/,'newly discovered sparepart keeps its selected unit, with pcs only as a safe fallback');
 console.log('Logbook custom area, incremental list rendering, delegated clicks, edit photos, MO field, local refresh, scoped observers and PDF filters passed.');
