@@ -276,7 +276,7 @@ function odinCanonicalIssue(machine,issue){
  if((m==='OFU1'||m==='OFU#1')&&/(roll.*(tinta|bak)|tinta.*roll)/.test(low)&&/(unit\s*8|\bu8\b|putaran|tidak berputar|abnormal|berhenti)/.test(low))return 'Roll Bak Tinta Unit 8 — Tidak Berputar / Abnormal';
  if(/gripper|griper|grifer|greefer/.test(low))return 'Gripper Transfer';
  if(/register/.test(low))return 'Register Berubah / Abnormal';
- if(/feeder|federt|feder|sucker|vacum|vacuum/.test(low))return 'Feeder / Suction — Abnormal';
+ if(/feeder|federt|feder|fider|sucker|vacum|vacuum/.test(low))return 'Feeder / Suction — Abnormal';
  return String(issue||'').trim().replace(/\s+/g,' ');
 }
 function odinGroupedRows(){
