@@ -2087,8 +2087,10 @@ function renderStockout(data){
 }
 function renderDead(data){
  return rows(data.deadStockCandidates,function(x){
-  return item(partName(x),partNo(x)+' • '+(x.reason||'Kandidat untuk diperiksa'),'<span class="v4-risk-chip">KANDIDAT</span>');
- },60)+note('Artinya hanya: masih ada stok positif tetapi belum ditemukan pemakaian yang terhubung secara tepat pada Logbook yang tersedia. Ini bukan bukti bahwa sparepart benar-benar tidak diperlukan.','warn');
+  var days=Number(x.historyDays)||0,start=x.coverageStart?String(x.coverageStart).slice(0,10):'2026-09-01';
+  var coverage=days+' hari histori sejak '+start;
+  return item(partName(x),partNo(x)+' • '+(x.reason||'Belum ada pemakaian yang terhubung')+' • '+coverage,'<span class="v4-risk-chip">PERLU CEK</span>');
+ },60)+note('Daftar ini BUKAN klasifikasi dead stock. Isinya hanya stok positif yang belum memiliki catatan pemakaian yang cocok sejak source-of-truth OMODOS 4.0. Periksa histori lebih panjang, kebutuhan engineering, reservasi, dan rencana pekerjaan sebelum keputusan disposal.','warn');
 }
 function renderConsumption(data){
  return rows(data.consumptionTop,function(x){
