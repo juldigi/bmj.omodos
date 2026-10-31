@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'public/index.html'
+      - 'public/omodos4/hotfix.js'
       - 'src/worker.js'
       - 'tools/test_logbook_downtime_choice.cjs'
       - '.github/workflows/test-logbook-downtime.yml'
@@ -12,6 +13,7 @@ on:
     branches: [main]
     paths:
       - 'public/index.html'
+      - 'public/omodos4/hotfix.js'
       - 'src/worker.js'
       - 'tools/test_logbook_downtime_choice.cjs'
       - '.github/workflows/test-logbook-downtime.yml'
