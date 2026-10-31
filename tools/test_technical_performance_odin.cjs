@@ -116,7 +116,8 @@ state.odin.rows = [
   row('OFS-8', 'Auxility at file battom feeder', 50, '1400076204'),
   row('OFU-1', 'PROBLEM REGISTER GERAK SENDIRI UNIT 6 DAN 7', 220, '1400076104'),
   row('OFU-1', 'Perbaikan Register Unit6', 90, '1400076093'),
-  row('OFU-1', 'PROBLEM REGISTER RUBAH2 SENDIRI', 30, '1400076094')
+  row('OFU-1', 'PROBLEM REGISTER RUBAH2 SENDIRI', 30, '1400076094'),
+  row('APM-2', 'motor up down meja fider suaranya berisik', 20, '1400076095')
 ];
 const septemberTop = context.odinTopRows();
 assert.equal(septemberTop[0].issue, 'Gripper Transfer');
@@ -132,6 +133,9 @@ assert.equal(septemberTop[2].issue, 'Register Berubah / Abnormal');
 assert.equal(septemberTop[2].machine, 'OFU-1');
 assert.equal(septemberTop[2].events, 3);
 assert.ok(Math.abs(septemberTop[2].hours - (340 / 60)) < 1e-9);
+const fider = context.odinGroupedRows().find(g => g.machine === 'APM-2' && g.issue === 'Feeder / Suction — Abnormal');
+assert.ok(fider, 'the common fider typo should map to the feeder family');
+assert.equal(fider.events, 1);
 
 
 console.log('Technical Performance ODIN tests passed: recurring variants, notification count, duration conversion, traceable raw variants, and total-row exclusion.');
