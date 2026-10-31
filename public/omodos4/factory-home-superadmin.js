@@ -101,6 +101,8 @@ function syncModeSwitch_(){
   else if(currentMode==='3d')host=root?.querySelector('.ofh-mode-holder');
   else host=document.querySelector('#view-dashboard .topbar > div:last-child');
   if(!host)host=document.querySelector('.topbar-title-row')||root?.querySelector('.ofh-mode-holder')||document.querySelector('#view-dashboard .topbar > div:last-child');
+  document.querySelectorAll('.topbar-title-row.ofh-mode-switch-mobile-host').forEach(row=>{if(row!==host||!mobileLayout)row.classList.remove('ofh-mode-switch-mobile-host');});
+  if(mobileLayout&&host?.classList.contains('topbar-title-row'))host.classList.add('ofh-mode-switch-mobile-host');
   if(host){
     const settingsButton=host.querySelector('#btn-open-pengaturan');
     if(settingsButton&&settingsButton.parentElement===host){
@@ -172,6 +174,11 @@ function makeStyles(){
     '.ofh-global-mode-switch button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:31px;height:28px;min-height:28px;margin:0;padding:0 3px;border:0;border-radius:6px;background:transparent;color:var(--text-dim,#536e80);font:800 10px/1 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;white-space:nowrap;cursor:pointer;touch-action:manipulation}',
     '.ofh-global-mode-switch button[aria-pressed=\"true\"]{background:#193a51;color:#fff}',
     '.ofh-global-mode-switch button:focus-visible{outline:2px solid #1685c5;outline-offset:2px}',
+    '.topbar-title-row.ofh-mode-switch-mobile-host{display:flex!important;align-items:center!important;flex-wrap:wrap!important;column-gap:6px!important;row-gap:6px!important;min-width:0!important;box-sizing:border-box!important}',
+    '.topbar-title-row.ofh-mode-switch-mobile-host > :not(#omodos-factory-mode-switch):not(#btn-open-pengaturan){min-width:0!important;flex:1 1 140px!important}',
+    '.topbar-title-row.ofh-mode-switch-mobile-host #btn-open-pengaturan{flex:0 0 auto!important;margin-left:auto!important}',
+    '.topbar-title-row.ofh-mode-switch-mobile-host #omodos-factory-mode-switch{flex:0 0 auto!important;margin-left:0!important;position:relative!important;z-index:5!important}',
+    '@media(max-width:420px){.topbar-title-row.ofh-mode-switch-mobile-host{column-gap:5px!important;row-gap:6px!important}.topbar-title-row.ofh-mode-switch-mobile-host > :not(#omodos-factory-mode-switch):not(#btn-open-pengaturan){flex-basis:130px!important}}',
     '#'+ROOT_ID+' .ofh-stage{position:relative;display:flex;flex:1 1 auto;width:100%;height:0;min-height:300px;overflow:hidden;border:1px solid #d5e0e7;border-radius:14px;background:#eaf0f3;box-shadow:0 6px 22px rgba(20,49,67,.09)}',
     '#'+ROOT_ID+' .ofh-fullscreen-toggle{position:absolute;z-index:12;top:10px;right:10px;min-height:36px;padding:8px 11px;border:1px solid #c5d5df;border-radius:10px;background:rgba(255,255,255,.96);color:#193a51;font:800 12px/1.1 system-ui,-apple-system,sans-serif;box-shadow:0 2px 8px rgba(15,40,55,.15);cursor:pointer;touch-action:manipulation}',
     '#'+ROOT_ID+' .ofh-fullscreen-toggle:focus-visible{outline:3px solid #1785c1;outline-offset:2px}',
@@ -243,7 +250,7 @@ function restoreViewSizing_(view){
   if(!view)return;
   for(const key of ['height','min-height','max-height','overflow-y','overflow-x'])view.style.removeProperty(key);
 }
-function cleanup(){const view=homeView||document.querySelector('.view.'+VIEW_CLASS);clearResumePath_(view);document.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());document.getElementById(MODE_SWITCH_ID)?.remove();restoreViewSizing_(view);document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';currentMode='3d';}
+function cleanup(){const view=homeView||document.querySelector('.view.'+VIEW_CLASS);clearResumePath_(view);document.querySelectorAll('#omodos-smart-resume-compact').forEach(node=>node.remove());document.getElementById(MODE_SWITCH_ID)?.remove();document.querySelectorAll('.topbar-title-row.ofh-mode-switch-mobile-host').forEach(node=>node.classList.remove('ofh-mode-switch-mobile-host'));restoreViewSizing_(view);document.querySelectorAll('#'+ROOT_ID).forEach(node=>node.remove());document.querySelectorAll('.'+VIEW_CLASS).forEach(node=>node.classList.remove(VIEW_CLASS));document.documentElement.classList.remove(VIEW_CLASS);homeView=null;iframe=null;lastFingerprint='';currentMode='3d';}
 function findHomeView(){const marker=document.getElementById('home-smart-resume');if(!marker)return null;return marker.closest('.view')||marker.closest('[data-view]')||marker.parentElement;}
 function createRoot(view){
   const root=document.createElement('section');root.id=ROOT_ID;root.setAttribute('aria-label','Factory Overview — status mesin khusus Superadmin');
