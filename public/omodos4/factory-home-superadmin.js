@@ -2,7 +2,7 @@
 'use strict';
 if(window.__OMODOS_FACTORY_HOME_MODULE__)return;
 window.__OMODOS_FACTORY_HOME_MODULE__=true;
-const ROOT_ID='omodos-superadmin-factory-home',VIEW_CLASS='omodos-superadmin-factory-home',TWIN_ORIGIN='https://digitaltwin.juldigi.workers.dev',TWIN_URL=TWIN_ORIGIN+'/?embed=omodos-status';
+const ROOT_ID='omodos-superadmin-factory-home',VIEW_CLASS='omodos-superadmin-factory-home',TWIN_ORIGIN='https://digitaltwin.offsetbmj.workers.dev',TWIN_URL=TWIN_ORIGIN+'/?embed=omodos-status';
 const MODE_SWITCH_ID='omodos-factory-mode-switch';
 let homeView=null,iframe=null,styleNode=null,lastFingerprint='',lastSendAt=0,currentMode='3d';
 const MODE_STORAGE_PREFIX='omodos.factoryHomeMode.v1.';
