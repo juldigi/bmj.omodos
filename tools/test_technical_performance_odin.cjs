@@ -104,4 +104,38 @@ assert.equal(ofs8.variants.length, 2);
 assert.ok(Math.abs(ofs8.hours - 3.75) < 1e-9, 'OFS-8 feeder sucker issue should sum to 225 minutes / 60');
 assert.ok(top.every(x => x.issue !== 'Total'), 'Summary rows must not be ranked as issues');
 
+// September 2026 source contains common typing variants that must roll up
+// without losing the original descriptions or mixing different machines.
+state.odin.rows = [
+  row('OFU-1', 'PERBAIKAN GREEFER TRANSFER UNIT 8 GA JEPIT KERTAS', 415, '1400076101'),
+  row('OFU-1', 'PERBAIKAN GRIFER TRANSFER', 240, '1400076105'),
+  row('OFU-1', 'Perbaikan Gripper Transfer', 60, '1400076108'),
+  row('OFS-8', 'PRBAIKAN FEDERT', 205, '1400076201'),
+  row('OFS-8', 'PERBAIKAN FEDERT TIDAK MAU BERGERAK', 140, '1400076202'),
+  row('OFS-8', 'feeder fault, vacum, blower feeder problem', 80, '1400076203'),
+  row('OFS-8', 'Auxility at file battom feeder', 50, '1400076204'),
+  row('OFU-1', 'PROBLEM REGISTER GERAK SENDIRI UNIT 6 DAN 7', 220, '1400076104'),
+  row('OFU-1', 'Perbaikan Register Unit6', 90, '1400076093'),
+  row('OFU-1', 'PROBLEM REGISTER RUBAH2 SENDIRI', 30, '1400076094'),
+  row('APM-2', 'motor up down meja fider suaranya berisik', 20, '1400076095')
+];
+const septemberTop = context.odinTopRows();
+assert.equal(septemberTop[0].issue, 'Gripper Transfer');
+assert.equal(septemberTop[0].machine, 'OFU-1');
+assert.equal(septemberTop[0].events, 3);
+assert.ok(Math.abs(septemberTop[0].hours - (715 / 60)) < 1e-9);
+assert.equal(septemberTop[0].variants.length, 3);
+assert.equal(septemberTop[1].issue, 'Feeder / Suction — Abnormal');
+assert.equal(septemberTop[1].machine, 'OFS-8');
+assert.equal(septemberTop[1].events, 4);
+assert.ok(Math.abs(septemberTop[1].hours - (475 / 60)) < 1e-9);
+assert.equal(septemberTop[2].issue, 'Register Berubah / Abnormal');
+assert.equal(septemberTop[2].machine, 'OFU-1');
+assert.equal(septemberTop[2].events, 3);
+assert.ok(Math.abs(septemberTop[2].hours - (340 / 60)) < 1e-9);
+const fider = context.odinGroupedRows().find(g => g.machine === 'APM-2' && g.issue === 'Feeder / Suction — Abnormal');
+assert.ok(fider, 'the common fider typo should map to the feeder family');
+assert.equal(fider.events, 1);
+
+
 console.log('Technical Performance ODIN tests passed: recurring variants, notification count, duration conversion, traceable raw variants, and total-row exclusion.');
