@@ -333,4 +333,9 @@ assert.match(hot,/all\('select',form\)/,'Edit dropdown synchronization reads the
 assert.match(hot,/sparepartcatatan/,'Edit Logbook removes duplicate Spare Part (catatan) label');
 assert.match(hot,/Nilai lama: /,'an invalid legacy selection is preserved visibly without becoming a selectable input option');
 assert.match(worker,/\"Satuan\":d\.unit \|\| \"pcs\"/,'newly discovered sparepart keeps its selected unit, with pcs only as a safe fallback');
+assert.match(worker,/label: \"NO_RECORDED_USAGE_CANDIDATE\"/,'no-usage candidates are not classified as dead stock');
+assert.match(worker,/historyDays: usageHistoryDays/,'no-usage candidates disclose the covered history window');
+assert.match(worker,/coverageStart: SOURCE_TRUTH_START_ISO/,'no-usage candidates disclose the source-truth cutoff');
+assert.match(superadmin,/var coverage=days\+' hari histori sejak '\+start/,'the no-usage view displays the actual coverage period');
+assert.match(superadmin,/PERLU CEK/,'the no-usage view labels candidates for human review');
 console.log('Logbook custom area, incremental list rendering, delegated clicks, edit photos, MO field, local refresh, scoped observers and PDF filters passed.');

@@ -1478,13 +1478,22 @@ function createOmodos4({ SpreadsheetApp, Utilities, ContentService, Session }) {
     criticality.filter((x) => x.factors.stockRisk || x.factors.etaOverdue).slice(0, 100).forEach((x) => {
       risks.push({ severity: x.priority, type: x.factors.stockout ? "stockout" : x.factors.stockRisk ? "stock-risk" : "eta-overdue", material: x.material, materialNumber: x.materialNumber, score: x.criticalityScore, factors: x.factors });
     });
+    const usageHistoryDays = Math.max(1, Math.ceil((now - SOURCE_TRUTH_START_MS) / 864e5));
     const deadStockCandidates = criticality.filter((x) => {
       const hasPositive = x.records.stock.some((r) => {
         const qty = stockQtyValue(r);
         return qty !== null && qty > 0;
       });
       return hasPositive && x.factors.consumptionCount === 0;
-    }).slice(0, 100).map((x) => ({ material: x.material, materialNumber: x.materialNumber, label: "CANDIDATE_ONLY", reason: "Positive stock with no exact linked Logbook consumption in available history", records: x.records.stock }));
+    }).slice(0, 100).map((x) => ({
+      material: x.material,
+      materialNumber: x.materialNumber,
+      label: "NO_RECORDED_USAGE_CANDIDATE",
+      reason: "Positive stock with no exact linked Logbook usage since the OMODOS 4.0 source-truth cutoff. This is not a dead-stock classification.",
+      historyDays: usageHistoryDays,
+      coverageStart: SOURCE_TRUTH_START_ISO,
+      records: x.records.stock
+    }));
     const shelfMap = /* @__PURE__ */ new Map();
     [...lokasi, ...opname, ...warehouse].forEach((r) => {
       const loc = text(first(r, ["Lokasi Gudang", "Lokasi Rak", "Warehouse Location", "Location", "Lokasi"]));
