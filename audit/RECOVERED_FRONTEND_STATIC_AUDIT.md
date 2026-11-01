@@ -1,9 +1,9 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-10-25T12:28:43.594012+00:00
-- File bytes: 1691302
-- Lines: 29359
-- SHA-256: 83f5a79a6b5d5489f3dfb8888e2de50e8b129bd773dbaf48af2b382d3b1593a1
+- Audited UTC: 2026-11-01T01:20:49.746496+00:00
+- File bytes: 1691373
+- Lines: 29360
+- SHA-256: 24ef2ddad473f880c5ed852ab28bca76e9ef3e7e6cd013f3e1b9f9bdeda4f2c5
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
@@ -271,7 +271,7 @@
 - L29141: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
 - L29239: if(!v4IsSuperadmin()){
 - L29284: isAllowed:v4IsSuperadmin,
-- L29294: <!-- OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1: single Superadmin-only module loader -->
+- L29295: <!-- OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1: single Superadmin-only module loader -->
 
 ## Copilot & Bantuan
 ### Copilot — 367 match(es)
