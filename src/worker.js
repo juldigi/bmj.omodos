@@ -4880,7 +4880,7 @@ function createBackend(services, env = {}) {
     if (!data.length) return [];
     const hdr = data.shift();
     const rows = data.filter(function(r) {
-      return r[0] !== "" || (sheetName === SHEET_SPAREPART_LOKASI && !!trainingValue_(r[hdr.indexOf("Nama Material")]));
+      return r[0] !== "" || (sheetName === SHEET_SPAREPART_LOKASI && !!trainingValue_(r[hdr.indexOf("Nama Material")])) || (sheetName === SHEET_SPAREPART_MASTER && !!trainingValue_(r[hdr.indexOf("Material Number")]));
     }).map(function(r) {
       return rowToObj_(hdr, r);
     }).filter(function(o) {
