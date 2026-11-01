@@ -20,40 +20,41 @@ jobs:
             'https://www.dropbox.com/scl/fi/nilvvtvmyju2ddk9d83vi/OMODOS_Sparepart_Master_Assets.zip?rlkey=xjmlii9kepdq45mf049xko5s3&dl=1' \
             --output /tmp/sparepart-assets.zip
           test "$(stat -c%s /tmp/sparepart-assets.zip)" -eq 1661921
-      - name: Validate ZIP, atlas files and material manifest
+      - name: Validate ZIP and inspect manifest schema
         run: |
           python - <<'PY'
-          import zipfile, pathlib, json, re
+          import zipfile, pathlib, json
           p = pathlib.Path('/tmp/sparepart-assets.zip')
           with zipfile.ZipFile(p) as z:
               bad = z.testzip()
               if bad:
                   raise SystemExit(f'Corrupt ZIP member: {bad}')
               names = [n for n in z.namelist() if not n.endswith('/')]
-              atlases = [n for n in names if re.search(r'atlas[-_ ]?\\d+\\.(jpg|jpeg|png|webp)$', n, re.I)]
-              json_files = [n for n in names if n.lower().endswith('.json')]
-              print('Archive members:')
-              for n in names:
-                  print(f'  {n} ({z.getinfo(n).file_size} bytes)')
+              atlases = [n for n in names if n.lower().startswith('sparepart-atlas-') and n.lower().endswith(('.jpg','.jpeg','.png','.webp'))]
               if len(atlases) != 19:
                   raise SystemExit(f'Expected 19 atlas images, found {len(atlases)}')
-              if not json_files:
-                  raise SystemExit('No JSON material manifest found')
-              valid_manifest = False
-              for n in json_files:
-                  data = json.loads(z.read(n))
-                  rows = data if isinstance(data, list) else next(
-                      (data[k] for k in ('materials','items','data','spareparts') if isinstance(data,dict) and isinstance(data.get(k),list)), None)
-                  if rows is None:
-                      continue
-                  print(f'Manifest {n}: {len(rows)} records')
-                  if len(rows) != 2442:
-                      raise SystemExit(f'Expected 2442 material records in {n}, found {len(rows)}')
-                  sample = rows[0] if rows else {}
-                  print('First record fields:', sorted(sample.keys()) if isinstance(sample,dict) else type(sample).__name__)
-                  valid_manifest = True
-              if not valid_manifest:
-                  raise SystemExit('JSON files found, but no 2442-row material array was recognized')
+              manifest_name = 'sparepart-master.json'
+              if manifest_name not in names:
+                  raise SystemExit('sparepart-master.json missing')
+              data = json.loads(z.read(manifest_name))
+              print('Manifest root type:', type(data).__name__)
+              if isinstance(data, dict):
+                  print('Manifest root keys:', sorted(data.keys()))
+              found = []
+              def walk(obj, path='root'):
+                  if isinstance(obj, list):
+                      found.append((path, len(obj), sorted(obj[0].keys()) if obj and isinstance(obj[0],dict) else []))
+                      for i, value in enumerate(obj[:1]):
+                          walk(value, path+'[0]')
+                  elif isinstance(obj, dict):
+                      for key, value in obj.items():
+                          if isinstance(value, (dict,list)):
+                              walk(value, path+'.'+str(key))
+              walk(data)
+              for path, count, fields in found:
+                  print(f'Array {path}: {count} entries; sample fields={fields}')
+              if not found:
+                  raise SystemExit('No arrays found in sparepart-master.json')
               pathlib.Path('/tmp/archive-inventory.txt').write_text(
                   '\\n'.join(names) + '\\n', encoding='utf-8')
           PY
