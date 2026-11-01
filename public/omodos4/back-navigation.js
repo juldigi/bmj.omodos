@@ -140,7 +140,7 @@
         try { originalSwitch.call(window, target); }
         finally { replaying = false; }
       }
-      if (index === 0 && !state.rootGuard) push(target, 0, true);
+      if (index === 0) push(target, 0, true);
       return;
     }
     var fallback = stack.length > 1 ? stack[stack.length - 2] : (stack[0] || 'dashboard');
