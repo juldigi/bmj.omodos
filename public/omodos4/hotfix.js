@@ -1893,3 +1893,216 @@ if(typeof original==='function'&&!original.__matchInputDropdownsV1){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refreshEditForm,{once:true});
 else refreshEditForm();
 })();
+
+
+/* OMODOS_BACK_NAVIGATION_HISTORY_V1 — page-aware Back for screen and hardware keys. */
+(function(){
+'use strict';
+if(window.__OMODOS_BACK_NAV_HISTORY_V1__) return;
+const originalSwitchToView=window.switchToView;
+if(typeof originalSwitchToView!=='function') return;
+window.__OMODOS_BACK_NAV_HISTORY_V1__=true;
+const STATE_FLAG='__omodosBackNavV1';
+let routeStack=[];
+let initialized=false;
+let replaying=false;
+
+function currentView(){
+  const active=document.querySelector('.view.active[id^="view-"]');
+  return active?String(active.id).replace(/^view-/,''):'utama';
+}
+function makeState(view,index,rootGuard){
+  const old=history.state&&typeof history.state==='object'?history.state:{};
+  const next=Object.assign({},old);
+  next[STATE_FLAG]=true;
+  next.omodosView=String(view||'utama');
+  next.omodosIndex=Math.max(0,Number(index)||0);
+  next.omodosRootGuard=!!rootGuard;
+  return next;
+}
+function pushRouteState(view,index,rootGuard){
+  try{history.pushState(makeState(view,index,rootGuard),'',location.href);return true;}
+  catch(err){console.warn('[OMODOS Back] Tidak dapat menambah riwayat browser.',err);return false;}
+}
+function initHistory(){
+  if(initialized)return;
+  const root=currentView();
+  routeStack=[root];
+  try{
+    history.replaceState(makeState(root,0,false),'',location.href);
+    // Guard entry: Back di halaman awal tetap berada di OMODOS, bukan keluar.
+    history.pushState(makeState(root,0,true),'',location.href);
+  }catch(err){console.warn('[OMODOS Back] Inisialisasi riwayat gagal.',err);}
+  initialized=true;
+}
+function isVisible(el){
+  if(!el||el.hidden)return false;
+  if(el.style&&el.style.display==='none')return false;
+  return !el.closest('[hidden]');
+}
+function clickIfVisible(selector){
+  const el=document.querySelector(selector);
+  if(!isVisible(el))return false;
+  el.click();
+  return true;
+}
+function closeTopLayer(){
+  let el=document.getElementById('lightbox-bg');
+  if(el&&el.classList.contains('active')){
+    if(typeof window.closeLightbox==='function')window.closeLightbox();
+    else el.classList.remove('active');
+    return true;
+  }
+  el=document.getElementById('camera-capture-bg');
+  if(el&&el.classList.contains('active')){
+    if(typeof window.closeCameraCapture==='function')window.closeCameraCapture();
+    else el.classList.remove('active');
+    return true;
+  }
+  el=document.getElementById('omodos-patrol-photo-picker');
+  if(el&&isVisible(el)){
+    const close=el.querySelector('[data-picker-close]');
+    if(close)close.click();else el.hidden=true;
+    return true;
+  }
+  el=document.querySelector('.omodos-photo-choice');
+  if(el){el.remove();return true;}
+  el=document.getElementById('copilot-record-detail-modal');
+  if(el&&isVisible(el)){
+    const close=el.querySelector('[data-detail-close]');
+    if(close)close.click();else el.hidden=true;
+    return true;
+  }
+  el=document.getElementById('bnav-sheet-bg');
+  if(el&&el.classList.contains('open')){
+    if(typeof window.closeBnavSheet==='function')window.closeBnavSheet();
+    else el.classList.remove('open');
+    return true;
+  }
+  el=document.getElementById('sidebar-overlay');
+  if(el&&el.classList.contains('active')){
+    if(typeof window.closeSidebarDrawer==='function')window.closeSidebarDrawer();
+    else el.classList.remove('active');
+    if(typeof window.closeDashMenu==='function')window.closeDashMenu();
+    return true;
+  }
+  const app=document.getElementById('app-root');
+  if(app&&app.classList.contains('menu-visible')){
+    if(typeof window.closeDashMenu==='function')window.closeDashMenu();
+    else app.classList.remove('menu-visible');
+    return true;
+  }
+  el=document.getElementById('modal-bg');
+  if(el&&el.classList.contains('active')){
+    // Saat Edit Logbook terbuka, Back pertama membatalkan mode edit dan
+    // mengembalikan detail record; tidak langsung menutup seluruh dialog.
+    if(clickIfVisible('#btn-cancel-entry-edit'))return true;
+    if(clickIfVisible('#btn-close-modal'))return true;
+    if(typeof window.closeModal==='function')window.closeModal();
+    else el.classList.remove('active');
+    return true;
+  }
+  return false;
+}
+function handleLocalBack(){
+  if(closeTopLayer())return true;
+  const view=currentView();
+  if(view==='patrol'){
+    const step3=document.getElementById('patrol-step-3');
+    const step2=document.getElementById('patrol-step-2');
+    if(isVisible(step3)&&clickIfVisible('#btn-patrol-back-2'))return true;
+    if(isVisible(step2)&&clickIfVisible('#btn-patrol-back-1'))return true;
+  }
+  if(view==='wiki'&&clickIfVisible('#btn-wiki-back:not(:disabled)'))return true;
+  if(view==='report'&&clickIfVisible('#btn-report-back-cat'))return true;
+  if(view==='report-hub'&&clickIfVisible('#btn-report-hub-back-cat'))return true;
+  if(view==='utama'&&clickIfVisible('#wizard-btn-prev'))return true;
+  return false;
+}
+
+const wrappedSwitchToView=function(view){
+  const target=String(view||'').trim();
+  if(!initialized)initHistory();
+  if(replaying||!target)return originalSwitchToView.apply(this,arguments);
+  const current=currentView();
+  if(target===current)return originalSwitchToView.apply(this,arguments);
+
+  // Bila tombol Back layar meminta halaman yang memang ada dalam riwayat,
+  // gunakan history browser agar perilaku tombol layar dan tombol perangkat sama.
+  const currentIndex=routeStack.length-1;
+  const previousIndex=routeStack.lastIndexOf(target);
+  if(previousIndex>=0&&previousIndex<currentIndex){
+    const delta=previousIndex-currentIndex;
+    try{history.go(delta);return true;}
+    catch(err){console.warn('[OMODOS Back] Navigasi riwayat gagal; memakai navigasi langsung.',err);}
+  }
+
+  const result=originalSwitchToView.apply(this,arguments);
+  const after=currentView();
+  if(result===false||!after||after===current)return result;
+  routeStack=routeStack.slice(0,currentIndex+1);
+  routeStack.push(after);
+  pushRouteState(after,routeStack.length-1,false);
+  return result===undefined?true:result;
+};
+wrappedSwitchToView.__omodosBackHistoryV1=true;
+window.switchToView=wrappedSwitchToView;
+
+window.addEventListener('popstate',function(event){
+  if(!initialized)initHistory();
+  const current=currentView();
+
+  // The first Back closes the top dialog, wizard step, or in-page detail.
+  // Restore the current route entry so the next Back reaches the prior page.
+  if(handleLocalBack()){
+    const idx=routeStack.length-1;
+    pushRouteState(current,idx,idx===0);
+    return;
+  }
+
+  const state=event.state;
+  if(state&&state[STATE_FLAG]&&state.omodosView){
+    const target=String(state.omodosView);
+    const index=Math.max(0,Number(state.omodosIndex)||0);
+    routeStack=routeStack.slice(0,index+1);
+    if(!routeStack.length||routeStack[routeStack.length-1]!==target)routeStack.push(target);
+    if(target!==current){
+      replaying=true;
+      try{originalSwitchToView.call(window,target);}
+      finally{replaying=false;}
+    }
+    // The root entry is immediately protected again so repeated Back presses
+    // at the landing page never close the app or leave the OMODOS session.
+    if(index===0&&!state.omodosRootGuard)pushRouteState(target,0,true);
+    return;
+  }
+
+  // Fail-safe for an unexpected browser history entry: stay inside OMODOS and
+  // restore the most recent known application page.
+  const fallback=routeStack.length>1?routeStack[routeStack.length-2]:(routeStack[0]||'utama');
+  if(routeStack.length>1)routeStack.pop();
+  if(fallback!==current){
+    replaying=true;
+    try{originalSwitchToView.call(window,fallback);}
+    finally{replaying=false;}
+  }
+  pushRouteState(fallback,routeStack.length-1,routeStack.length<=1);
+},{capture:true});
+
+document.addEventListener('keydown',function(event){
+  const key=String(event.key||'');
+  const active=document.activeElement;
+  const editing=!!(active&&active.closest&&active.closest('input,textarea,select,[contenteditable="true"],[role="textbox"]'));
+  const systemBack=key==='Escape'||key==='BrowserBack'||key==='GoBack'||key==='Back'||
+    (key==='Backspace'&&!editing)||(event.altKey&&key==='ArrowLeft');
+  if(!systemBack)return;
+  // Do not let the browser/WebView close the page before popstate can restore OMODOS.
+  event.preventDefault();
+  event.stopPropagation();
+  if(typeof event.stopImmediatePropagation==='function')event.stopImmediatePropagation();
+  try{history.back();}catch(err){handleLocalBack();}
+},true);
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initHistory,{once:true});
+else initHistory();
+})();
