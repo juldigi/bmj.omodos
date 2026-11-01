@@ -160,14 +160,6 @@
       window.switchToView = function (target) {
         if (!ready) initialize();
         var before = activeView();
-        if (!replaying && target && String(target) !== before) {
-          var currentIndex = stack.length - 1;
-          var previousIndex = stack.lastIndexOf(String(target));
-          if (previousIndex >= 0 && previousIndex < currentIndex) {
-            history.go(previousIndex - currentIndex);
-            return true;
-          }
-        }
         var result = originalSwitch.apply(this, arguments);
         var after = activeView();
         if (result !== false && after && after !== before) recordView(after);
