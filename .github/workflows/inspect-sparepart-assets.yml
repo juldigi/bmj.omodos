@@ -1,0 +1,71 @@
+name: Inspect OMODOS sparepart asset archive
+
+on:
+  push:
+    branches:
+      - sparepart-master-photo-price
+    paths:
+      - .github/workflows/inspect-sparepart-assets.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download authorized Dropbox archive
+        run: |
+          curl --fail --location --retry 3 \
+            'https://www.dropbox.com/scl/fi/nilvvtvmyju2ddk9d83vi/OMODOS_Sparepart_Master_Assets.zip?rlkey=xjmlii9kepdq45mf049xko5s3&dl=1' \
+            --output /tmp/sparepart-assets.zip
+          test "$(stat -c%s /tmp/sparepart-assets.zip)" -eq 1661921
+      - name: Validate ZIP and inventory contents
+        run: |
+          python - <<'PY'
+          import zipfile, pathlib, json, csv, collections, re
+          p = pathlib.Path('/tmp/sparepart-assets.zip')
+          with zipfile.ZipFile(p) as z:
+              bad = z.testzip()
+              if bad:
+                  raise SystemExit(f'Corrupt ZIP member: {bad}')
+              names = [n for n in z.namelist() if not n.endswith('/')]
+              images = [n for n in names if pathlib.PurePosixPath(n).suffix.lower() in {'.jpg','.jpeg','.png','.webp','.gif'}]
+              atlases = [n for n in names if 'atlas' in pathlib.PurePosixPath(n).name.lower()]
+              manifests = [n for n in names if 'manifest' in pathlib.PurePosixPath(n).name.lower()]
+              print(f'ZIP members: {len(names)}')
+              print(f'Image files: {len(images)}')
+              print(f'Atlas-named files: {len(atlases)}')
+              print('Manifest candidates:')
+              for n in manifests:
+                  info = z.getinfo(n)
+                  print(f'  {n} ({info.file_size} bytes)')
+                  raw = z.read(n)
+                  try:
+                      data = json.loads(raw)
+                      if isinstance(data, list):
+                          print(f'    JSON list rows: {len(data)}')
+                      elif isinstance(data, dict):
+                          print(f'    JSON object keys: {len(data)}')
+                  except Exception:
+                      try:
+                          text = raw.decode('utf-8-sig')
+                          rows = list(csv.reader(text.splitlines()))
+                          print(f'    CSV rows incl header: {len(rows)}')
+                      except Exception:
+                          print('    Unrecognized manifest encoding/format')
+              if len(images) != 913:
+                  raise SystemExit(f'Expected 913 images, found {len(images)}')
+              if len(atlases) != 19:
+                  raise SystemExit(f'Expected 19 atlas-named files, found {len(atlases)}')
+              if not manifests:
+                  raise SystemExit('No manifest file found')
+              pathlib.Path('/tmp/archive-inventory.txt').write_text(
+                  '\\n'.join(names) + '\\n', encoding='utf-8')
+          PY
+      - name: Upload inspection report
+        uses: actions/upload-artifact@v4
+        with:
+          name: omodos-sparepart-asset-inventory
+          path: /tmp/archive-inventory.txt
+          if-no-files-found: error
