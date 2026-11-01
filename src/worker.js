@@ -2820,6 +2820,7 @@ function createBackend(services, env = {}) {
   const SHEET_KB = "Knowledge_Base";
   const SHEET_DOWNTIME_EM = "Downtime_EM";
   const SHEET_SPAREPART_LOKASI = "Sparepart_Lokasi";
+  const SHEET_SPAREPART_MASTER = "Sparepart_Master";
   const SHEET_SPAREPART_ETA = "Sparepart_ETA";
   const SHEET_SPAREPART_OPNAME = "Sparepart_Opname";
   const SHEET_KPI_KERJA = "KPI_Kertas_Kerja";
@@ -2857,6 +2858,7 @@ function createBackend(services, env = {}) {
   const PI_PERSONNEL_HEADERS = ["ID Karyawan", "Nama", "Job Title", "Tanggal Lahir", "Grouping Team", "Foto URL"];
   const PATROL_TEMPLATE_HEADERS = ["ID", "Kode Mesin", "Nama Mesin", "Kategori", "Area/Sub Area", "Deskripsi Pemeriksaan", "Kondisi Standar", "Urutan"];
   const SPAREPART_LOKASI_HEADERS = ["Material Number SAP", "Nama Material", "Lokasi Gudang", "Harga Satuan", "Stock Qty", "Satuan"];
+  const SPAREPART_MASTER_HEADERS = ["No", "Material Number", "Material Description", "Harga satuan", "MRP Type", "Min Stock", "Max Stock", "Criticality", "Actual Pict", "Material Group", "Long Material Text", "Machine Allocation", "Storage Bin", "Latest PO", "Latest Consume", "Average Consume by Qty (Per Month)", "Vendor Name", "Lead Time Delivery by Vendor", "Remarks", "Stock Qty (SAP)", "Base UoM", "Nilai Stok (IDR)", "Status SAP", "Old Material Number", "Created Date", "Total Consume Qty (YTD)", "Total Consume Value (YTD, IDR)", "Sumber Data", "Status Foto", "Cek Key", "Tren Konsumsi 12 Bulan", "Import Source", "Imported At"];
   const SPAREPART_ETA_HEADERS = ["ID", "Timestamp", "Nama Material", "Material Number SAP", "Nomor PO", "Vendor", "Qty", "Tanggal PO", "Estimasi ETA", "Status", "Tanggal Tiba", "Catatan"];
   const SPAREPART_OPNAME_HEADERS = ["ID", "Timestamp", "Tanggal", "Part No", "Nama Material", "Material Number SAP", "Stock Sistem", "Stock Fisik", "Selisih", "Lokasi Rak", "Catatan"];
   const SPAREPART_SAP_HEADERS = ["Entry ID", "Status", "SAP Doc No", "PIC", "Updated At"];
@@ -3947,6 +3949,9 @@ function createBackend(services, env = {}) {
     "deletePiPersonnelMaster": { permission: "person.manage", audit: true, idempotent: true, handler: "deletePiPersonnelMaster_" },
     // SPAREPART
     "sparepartLokasi": { permission: "sparepart.read", audit: false, idempotent: false, handler: "getSparepartLokasiMerged_", method: "GET" },
+    "sparepartMaster": { permission: "sparepart.read", audit: false, idempotent: false, handler: "getSparepartMaster_", method: "GET" },
+    "sparepartMasterRead": { permission: "sparepart.read", audit: false, idempotent: false, handler: "getSparepartMaster_" },
+    "importSparepartMasterBatch": { permission: "sparepart.manage", audit: true, idempotent: true, handler: "importSparepartMasterBatch_" },
     "saveSparepartLokasi": { permission: "sparepart.manage", audit: true, idempotent: true, handler: "saveSparepartLokasi_" },
     "deleteSparepartLokasi": { permission: "sparepart.manage", audit: true, idempotent: true, handler: "deleteSparepartLokasi_" },
     "sparepartEta": { permission: "sparepart.read", audit: false, idempotent: false, handler: "getSparepartEta_", method: "GET" },
@@ -4255,6 +4260,8 @@ function createBackend(services, env = {}) {
       if (action === "personil" && typeof getPersonilList_ === "function") return jsonDataOut_(getPersonilList_());
       if (action === "piPersonnelMaster" && typeof getPiPersonnelMaster_ === "function") return jsonDataOut_(getPiPersonnelMaster_());
       if (action === "sparepartLokasi" && typeof getSparepartLokasiMerged_ === "function") return jsonDataOut_(getSparepartLokasiMerged_());
+      if (action === "sparepartMaster" && typeof getSparepartMaster_ === "function") return jsonDataOut_(getSparepartMaster_());
+      if (action === "sparepartMasterRead" && typeof getSparepartMaster_ === "function") return jsonDataOut_(getSparepartMaster_());
       if (action === "sparepartEta" && typeof getSparepartEta_ === "function") return jsonDataOut_(getSparepartEta_());
       if (action === "sparepartOpname" && typeof getSparepartOpname_ === "function") return jsonDataOut_(getSparepartOpname_());
       if (action === "kpiKerjaList" && typeof getKpiKerjaList_ === "function") return jsonDataOut_(getKpiKerjaList_());
@@ -4307,6 +4314,8 @@ function createBackend(services, env = {}) {
     if (action === "deletePersonil" && typeof deletePersonil_ === "function") return deletePersonil_(body);
     if (action === "savePiPersonnelMaster" && typeof savePiPersonnelMaster_ === "function") return savePiPersonnelMaster_(body);
     if (action === "deletePiPersonnelMaster" && typeof deletePiPersonnelMaster_ === "function") return deletePiPersonnelMaster_(body);
+    if (action === "sparepartMasterRead" && typeof getSparepartMaster_ === "function") return jsonDataOut_(getSparepartMaster_());
+    if (action === "importSparepartMasterBatch" && typeof importSparepartMasterBatch_ === "function") return importSparepartMasterBatch_(body);
     if (action === "saveSparepartLokasi" && typeof saveSparepartLokasi_ === "function") return saveSparepartLokasi_(body);
     if (action === "deleteSparepartLokasi" && typeof deleteSparepartLokasi_ === "function") return deleteSparepartLokasi_(body);
     if (action === "saveSparepartEta" && typeof saveSparepartEta_ === "function") return saveSparepartEta_(body);
@@ -4871,7 +4880,7 @@ function createBackend(services, env = {}) {
     if (!data.length) return [];
     const hdr = data.shift();
     const rows = data.filter(function(r) {
-      return r[0] !== "" || (sheetName === SHEET_SPAREPART_LOKASI && !!trainingValue_(r[hdr.indexOf("Nama Material")]));
+      return r[0] !== "" || (sheetName === SHEET_SPAREPART_LOKASI && !!trainingValue_(r[hdr.indexOf("Nama Material")])) || (sheetName === SHEET_SPAREPART_MASTER && !!trainingValue_(r[hdr.indexOf("Material Number")]));
     }).map(function(r) {
       return rowToObj_(hdr, r);
     }).filter(function(o) {
@@ -5290,6 +5299,65 @@ function createBackend(services, env = {}) {
     return jsonOut_({ ok: true, added, skipped: items.length - added });
   }
   __name(seedPiPersonnelMasterBulk_, "seedPiPersonnelMasterBulk_");
+  function getSparepartMaster_() {
+    return getGenericRows_(SHEET_SPAREPART_MASTER, SPAREPART_MASTER_HEADERS);
+  }
+  __name(getSparepartMaster_, "getSparepartMaster_");
+  function importSparepartMasterBatch_(body) {
+    var items = Array.isArray(body && body.items) ? body.items : [];
+    if (!items.length) return jsonOut_({ ok: false, error: "Tidak ada data material untuk diimpor." });
+    if (items.length > 200) return jsonOut_({ ok: false, error: "Maksimal 200 material per batch." });
+    var sh = getOrCreateSheet_(SHEET_SPAREPART_MASTER, SPAREPART_MASTER_HEADERS);
+    ensureHeaderColumns_(sh, SPAREPART_MASTER_HEADERS);
+    var data = sh.getDataRange().getValues();
+    var headers = data[0] || SPAREPART_MASTER_HEADERS;
+    var numberCol = headers.indexOf("Material Number");
+    if (numberCol < 0) throw new Error("SPAREPART_MASTER_SCHEMA_INVALID");
+    var existing = new Map();
+    for (var i = 1; i < data.length; i++) {
+      var key = String(data[i][numberCol] == null ? "" : data[i][numberCol]).trim();
+      if (key && !existing.has(key)) existing.set(key, i + 1);
+    }
+    var seen = new Set(), updates = [], inserts = [], skipped = 0, updated = 0;
+    var now = new Date().toISOString();
+    var source = String(body.sourceFile || "Master Database Sparepart").slice(0, 180);
+    items.forEach(function(item) {
+      item = item && typeof item === "object" ? item : {};
+      var key = String(item["Material Number"] == null ? "" : item["Material Number"]).trim();
+      if (!key || seen.has(key)) { skipped++; return; }
+      seen.add(key);
+      var rowIndex = existing.get(key);
+      var row = rowIndex ? data[rowIndex - 1].slice() : Array(headers.length).fill("");
+      headers.forEach(function(header, col) {
+        if (Object.prototype.hasOwnProperty.call(item, header)) {
+          var value = item[header];
+          if (value !== "" && value !== null && value !== void 0) row[col] = value;
+        }
+      });
+      row[numberCol] = key;
+      var sourceCol = headers.indexOf("Import Source");
+      var importedCol = headers.indexOf("Imported At");
+      if (sourceCol >= 0) row[sourceCol] = source;
+      if (importedCol >= 0) row[importedCol] = now;
+      if (rowIndex) {
+        updates.push({ index: rowIndex, row: row });
+        data[rowIndex - 1] = row;
+        updated++;
+      } else {
+        inserts.push(row);
+        existing.set(key, data.length + inserts.length);
+      }
+    });
+    updates.forEach(function(entry) {
+      sh.getRange(entry.index, 1, 1, headers.length).setValues([entry.row]);
+    });
+    if (inserts.length) {
+      sh.getRange(sh.getLastRow() + 1, 1, inserts.length, headers.length).setValues(inserts);
+    }
+    invalidateCacheForSheet_(SHEET_SPAREPART_MASTER);
+    return jsonOut_({ ok: true, inserted: inserts.length, updated: updated, skipped: skipped, batch: items.length, total: sh.getLastRow() - 1, sourceFile: source });
+  }
+  __name(importSparepartMasterBatch_, "importSparepartMasterBatch_");
   function getSparepartLokasiMerged_() {
     const sh = getOrCreateSheet_(SHEET_SPAREPART_LOKASI, SPAREPART_LOKASI_HEADERS);
     const legacy = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STOCK_SPAREPART);
@@ -7646,6 +7714,7 @@ function createBackend(services, env = {}) {
     getOrCreateSheet_(SHEET_RCA, RCA_HEADERS);
     getOrCreateSheet_(SHEET_DOWNTIME_EM, DOWNTIME_EM_HEADERS);
     getOrCreateSheet_(SHEET_SPAREPART_LOKASI, SPAREPART_LOKASI_HEADERS);
+    getOrCreateSheet_(SHEET_SPAREPART_MASTER, SPAREPART_MASTER_HEADERS);
     getOrCreateSheet_(SHEET_SPAREPART_ETA, SPAREPART_ETA_HEADERS);
     getOrCreateSheet_(SHEET_SPAREPART_OPNAME, SPAREPART_OPNAME_HEADERS);
     getOrCreateSheet_(SHEET_SPAREPART_SAP, SPAREPART_SAP_HEADERS);
@@ -9838,7 +9907,7 @@ function normalizeLogbookDowntimeChoice_(value) {
   handleLegacyGet_ = /* @__PURE__ */ __name(function(e) {
     if (String(e.parameter.action) !== "prepareManifest") return preparationGetFallback_(e);
     var session = requireSession_(e.parameter.sessionToken || "");
-    var actions = ["bootstrap", "list", "machines", "personil", "patrolChecklistTemplate", "predictiveReports", "generalReports", "ipalReports", "rcaReports", "kbEntries", "sparepartLokasi", "sparepartStatus", "sparepartSapStatus", "sparepartEta", "sparepartWarehouse", "sparepartOpname", "kpiKerjaList", "kpiDepartmentData", "machineBreakdownList", "recordYtdList", "runHourComparisonList", "energyCostToeList", "correctiveReportList", "energyUtilityList", "analitikConfig", "patrolCategoryConfig", "patrolGeneralChecklist", "piHardSkillStandard", "piHardSkillAssessments", "piSoftskillAssessments", "piPersonnelMaster", "pmcFactoryProjects", "pmcKaizens", "pmcSgas", "meetingList", "meetingActionList"];
+    var actions = ["bootstrap", "list", "machines", "personil", "patrolChecklistTemplate", "predictiveReports", "generalReports", "ipalReports", "rcaReports", "kbEntries", "sparepartLokasi", "sparepartMaster", "sparepartStatus", "sparepartSapStatus", "sparepartEta", "sparepartWarehouse", "sparepartOpname", "kpiKerjaList", "kpiDepartmentData", "machineBreakdownList", "recordYtdList", "runHourComparisonList", "energyCostToeList", "correctiveReportList", "energyUtilityList", "analitikConfig", "patrolCategoryConfig", "patrolGeneralChecklist", "piHardSkillStandard", "piHardSkillAssessments", "piSoftskillAssessments", "piPersonnelMaster", "pmcFactoryProjects", "pmcKaizens", "pmcSgas", "meetingList", "meetingActionList"];
     var allowed = actions.filter(function(action) {
       var reg = resolveAction_(action);
       if (!reg) throw new Error("UNKNOWN_ACTION: " + action);
