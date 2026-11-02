@@ -20,6 +20,8 @@ jobs:
             'https://www.dropbox.com/scl/fi/nilvvtvmyju2ddk9d83vi/OMODOS_Sparepart_Master_Assets.zip?rlkey=xjmlii9kepdq45mf049xko5s3&dl=1' \
             --output /tmp/sparepart-assets.zip
           test "$(stat -c%s /tmp/sparepart-assets.zip)" -eq 1661921
+      - name: Install image tooling
+        run: python -m pip install --disable-pip-version-check Pillow
       - name: Validate ZIP and inspect manifest schema
         run: |
           python - <<'PY'
