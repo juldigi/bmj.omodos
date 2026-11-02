@@ -40,21 +40,35 @@ jobs:
               print('Manifest root type:', type(data).__name__)
               if isinstance(data, dict):
                   print('Manifest root keys:', sorted(data.keys()))
-              found = []
-              def walk(obj, path='root'):
-                  if isinstance(obj, list):
-                      found.append((path, len(obj), sorted(obj[0].keys()) if obj and isinstance(obj[0],dict) else []))
-                      for i, value in enumerate(obj[:1]):
-                          walk(value, path+'[0]')
-                  elif isinstance(obj, dict):
-                      for key, value in obj.items():
-                          if isinstance(value, (dict,list)):
-                              walk(value, path+'.'+str(key))
-              walk(data)
-              for path, count, fields in found:
-                  print(f'Array {path}: {count} entries; sample fields={fields}')
-              if not found:
-                  raise SystemExit('No arrays found in sparepart-master.json')
+              materials = data.get('materials', []) if isinstance(data, dict) else []
+              photos = data.get('photos', []) if isinstance(data, dict) else []
+              print('Declared totalMaterials:', data.get('totalMaterials') if isinstance(data, dict) else None)
+              print('Materials array:', len(materials))
+              print('Photos root type:', type(photos).__name__)
+              if isinstance(photos, dict):
+                  print('Photos keys:', sorted(photos.keys())[:30])
+                  photo_values = list(photos.values())
+              elif isinstance(photos, list):
+                  print('Photos entries:', len(photos))
+                  photo_values = photos
+              else:
+                  photo_values = []
+              print('First photo sample:', str(photo_values[0])[:1200] if photo_values else 'none')
+              photo_materials = [m for m in materials if isinstance(m, dict) and any(k in m for k in ('photo','foto','image','atlas','statusFoto'))]
+              print('Materials with photo-related fields:', len(photo_materials))
+              print('First material sample:', json.dumps(materials[0], ensure_ascii=False)[:1800] if materials else 'none')
+              print('First photo-linked material samples:')
+              shown = 0
+              for material in materials:
+                  if isinstance(material, dict) and material.get('statusFoto'):
+                      print(json.dumps({k:v for k,v in material.items() if k in ('sap','nama','statusFoto','photo','foto','image','atlas','x','y','width','height')}, ensure_ascii=False)[:1200])
+                      shown += 1
+                      if shown == 3:
+                          break
+              if len(materials) != int(data.get('totalMaterials', len(materials))):
+                  raise SystemExit('totalMaterials does not match materials array')
+              if not materials:
+                  raise SystemExit('Materials array is empty')
               pathlib.Path('/tmp/archive-inventory.txt').write_text(
                   '\\n'.join(names) + '\\n', encoding='utf-8')
           PY
