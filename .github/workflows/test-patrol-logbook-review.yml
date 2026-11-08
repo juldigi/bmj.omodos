@@ -48,3 +48,5 @@ jobs:
           fi
           git commit -m "feat: persist Patrol area and checklist notes"
           git push origin "HEAD:\${GITHUB_REF_NAME}"
+
+# Feature-branch validation trigger.
