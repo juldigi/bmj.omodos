@@ -132,7 +132,7 @@ function prRenderNotes(){
     const category=row.dataset.kategori,index=String(row.dataset.idx),status=prStatus(category,index);
     if(status!=='warning'&&status!=='abnormal')return;
     const wrap=document.createElement('div');wrap.className='patrol-checkpoint-note';wrap.style.cssText='width:100%;margin:7px 0 9px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel-2);';
-    const label=document.createElement('label');label.textContent='Keterangan '+(status==='abnormal'?'Abnormal':'Warning')+' (opsional)';label.style.cssText='display:block;font-size:12px;font-weight:700;margin-bottom:5px;';
+    const label=document.createElement('label');label.textContent=status==='abnormal'?'Keterangan Abnormal (opsional)':'Keterangan Warning (opsional)';label.style.cssText='display:block;font-size:12px;font-weight:700;margin-bottom:5px;';
     const input=document.createElement('textarea');input.rows=2;input.maxLength=1200;input.placeholder='Jelaskan kondisi pada titik pemeriksaan ini...';input.value=prNote(category,index);input.style.cssText='width:100%;min-height:58px;';input.dataset.prCategory=category;input.dataset.prIndex=index;
     input.addEventListener('input',()=>{if(!state.checklistNotes[category])state.checklistNotes[category]={};state.checklistNotes[category][index]=input.value;});
     wrap.append(label,input);row.parentElement.appendChild(wrap);
