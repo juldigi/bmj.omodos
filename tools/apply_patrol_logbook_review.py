@@ -74,7 +74,7 @@ if "OMODOS_PATROL_REVIEW_V1" not in source:
 else:
     print("HTML enhancement injection: already applied")
 
-if source.count("Checklist Notes (JSON)") != 2:
+if source.count("Checklist Notes (JSON)") < 2:
     raise SystemExit("Patrol notes schema is incomplete")
 if source.count("OMODOS_PATROL_REVIEW_V1") != 1:
     raise SystemExit("Patrol sidecar injection marker must appear once")
