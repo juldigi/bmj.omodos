@@ -6783,7 +6783,6 @@ function createBackend(services, env = {}) {
     }
     var latest = {};
     rows.forEach(function(r) {
-      if (String(r["Lokasi Jenis"] || "").toLowerCase() === "area") return;
       var tanggal = r["Tanggal"];
       var dateText = "";
       if (tanggal instanceof Date && !isNaN(tanggal.getTime())) {
@@ -6831,7 +6830,7 @@ function createBackend(services, env = {}) {
   function savePredictiveReport_(report, files) {
     report = report || {};
     const sh = getOrCreateSheet_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS);
-    ensureHeaderColumns_(sh, ["Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)", "Lokasi Jenis", "Kategori Area", "Nama Area", "Checklist Notes (JSON)"]);
+    ensureHeaderColumns_(sh, ["Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)"]);
     const data = sh.getDataRange().getValues();
     const id = report.id || "PM-" + Date.now();
     let targetRow = -1;
@@ -6890,14 +6889,6 @@ function createBackend(services, env = {}) {
       "Files": JSON.stringify(attachments),
       "Grouping Team": report.groupingTeam || "",
       "Waktu Patrol": report.waktuPatrol || "",
-      "Lokasi Jenis": report.lokasiJenis || "Mesin",
-      "Kategori Area": report.kategoriArea || "",
-      "Nama Area": report.namaArea || "",
-      "Checklist Notes (JSON)": JSON.stringify(report.checklistNotes || {}),
-      "Lokasi Jenis": report.lokasiJenis || "Mesin",
-      "Kategori Area": report.kategoriArea || "",
-      "Nama Area": report.namaArea || "",
-      "Checklist Notes (JSON)": JSON.stringify(report.checklistNotes || {}),
       "Patrol Mode": report.patrolMode === true || String(report.patrolMode).toLowerCase() === "true" || (Array.isArray(report.findings) && report.findings.length > 0),
       "Checklist (JSON)": JSON.stringify(report.checklist || {}),
       "Counts (JSON)": JSON.stringify(report.counts || {}),
@@ -10540,18 +10531,7 @@ var MaintenanceStore = class extends DurableObject {
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/files/")) return env.MAINTENANCE.get(env.MAINTENANCE.idFromName("maintenance-production")).fetch(request);
-  const response = await env.ASSETS.fetch(request);
-  const contentType = response.headers.get("content-type") || "";
-  if (request.method !== "GET" || response.status !== 200 || !contentType.includes("text/html")) return response;
-  const marker = "<!-- OMODOS_PATROL_REVIEW_V1 -->";
-  const injection = marker + '<script src="/omodos4/patrol-area-feedback.js?v=20261108-1" defer></script><script src="/omodos4/patrol-review-enhancements.js?v=20261108-1" defer></script>';
-  const html = await response.text();
-  if (html.includes(marker)) return new Response(html, response);
-  const body = html.includes("</body>") ? html.replace("</body>", injection + "</body>") : html + injection;
-  const headers = new Headers(response.headers);
-  headers.delete("content-length");
-  headers.set("cache-control", "no-store, no-cache, must-revalidate");
-  return new Response(body, { status: response.status, statusText: response.statusText, headers });
+  return env.ASSETS.fetch(request);
 } };
 export {
   MaintenanceStore,
