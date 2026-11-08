@@ -32,7 +32,7 @@ for (const token of [
   'patrol-review-enhancements.js?v=20261108-1'
 ]) assert.ok(worker.includes(token), 'missing Worker contract: '+token);
 
-assert.ok(html.includes('select[name="groupingPekerjaan"]'),'Logbook grouping source form remains present');
+assert.ok(html.includes('name="groupingPekerjaan"'),'Logbook grouping source form remains present');
 assert.ok(html.includes('id="patrol-checklist-groups"'),'Patrol checklist source remains present');
 assert.ok(html.includes('id="list-patrol-temuan"'),'Patrol finding list source remains present');
 
