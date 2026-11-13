@@ -1,81 +1,97 @@
-name: Inspect OMODOS sparepart asset archive
+name: Publish OMODOS sparepart photo assets
 
 on:
   push:
     branches:
-      - sparepart-master-photo-price
+      - sparepart-photo-assets
     paths:
       - .github/workflows/inspect-sparepart-assets.yml
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: omodos-sparepart-photo-assets
+  cancel-in-progress: false
 
 jobs:
-  inspect:
+  publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout isolated integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: sparepart-photo-assets
+          fetch-depth: 0
       - name: Download authorized Dropbox archive
         run: |
+          set -euo pipefail
           curl --fail --location --retry 3 \
             'https://www.dropbox.com/scl/fi/nilvvtvmyju2ddk9d83vi/OMODOS_Sparepart_Master_Assets.zip?rlkey=xjmlii9kepdq45mf049xko5s3&dl=1' \
             --output /tmp/sparepart-assets.zip
           test "$(stat -c%s /tmp/sparepart-assets.zip)" -eq 1661921
-      - name: Install image tooling
-        run: python -m pip install --disable-pip-version-check Pillow
-      - name: Validate ZIP and inspect manifest schema
+      - name: Validate and stage atlas assets
         run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check Pillow
           python - <<'PY'
           import zipfile, pathlib, json, hashlib
-          from PIL import Image, ImageOps, ImageDraw
-          p = pathlib.Path('/tmp/sparepart-assets.zip')
-          out = pathlib.Path('/tmp/atlas-review')
-          out.mkdir(parents=True, exist_ok=True)
-          with zipfile.ZipFile(p) as z:
+          from PIL import Image
+          archive = pathlib.Path('/tmp/sparepart-assets.zip')
+          target = pathlib.Path('public/omodos4/sparepart-assets')
+          target.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(archive) as z:
               bad = z.testzip()
               if bad:
                   raise SystemExit(f'Corrupt ZIP member: {bad}')
               names = [n for n in z.namelist() if not n.endswith('/')]
-              atlases = sorted(n for n in names if n.lower().startswith('sparepart-atlas-') and n.lower().endswith(('.jpg','.jpeg','.png','.webp')))
-              if len(atlases) != 19:
-                  raise SystemExit(f'Expected 19 atlas images, found {len(atlases)}')
+              atlas_names = sorted(n for n in names if pathlib.Path(n).name.lower().startswith('sparepart-atlas-') and pathlib.Path(n).suffix.lower() in ('.jpg','.jpeg','.png','.webp'))
+              if len(atlas_names) != 19:
+                  raise SystemExit(f'Expected 19 atlas images, found {len(atlas_names)}')
               manifest_name = 'sparepart-master.json'
               if manifest_name not in names:
                   raise SystemExit('sparepart-master.json missing')
               data = json.loads(z.read(manifest_name))
-              materials = data.get('materials', []) if isinstance(data, dict) else []
-              photos = data.get('photos', []) if isinstance(data, dict) else []
-              print('Manifest root keys:', sorted(data.keys()) if isinstance(data, dict) else [])
-              print('Declared totalMaterials:', data.get('totalMaterials') if isinstance(data, dict) else None)
-              print('Materials array:', len(materials))
-              print('Photos root type/value:', type(photos).__name__, repr(photos)[:300])
-              print('Material sample:', json.dumps(materials[0], ensure_ascii=False)[:1800] if materials else 'none')
-              if len(materials) != int(data.get('totalMaterials', len(materials))) or not materials:
-                  raise SystemExit('Material count validation failed')
-              thumbs = []
-              report = []
-              for name in atlases:
+              materials = data.get('materials', [])
+              if len(materials) != 2442 or len({str(m.get('sap','')).strip() for m in materials}) != len(materials):
+                  raise SystemExit('Material count or unique SAP validation failed')
+              actual_refs = 0
+              seen = set()
+              for item in materials:
+                  photo = item.get('foto')
+                  if not photo:
+                      continue
+                  actual_refs += 1
+                  atlas = pathlib.Path(str(photo.get('atlas',''))).name
+                  if atlas not in [pathlib.Path(n).name for n in atlas_names]:
+                      raise SystemExit(f'Unknown atlas for SAP {item.get("sap")}: {atlas}')
+                  key = (atlas, photo.get('x'), photo.get('y'), photo.get('width'), photo.get('height'))
+                  if key in seen:
+                      raise SystemExit(f'Duplicate crop reference: {key}')
+                  seen.add(key)
+                  if not all(isinstance(photo.get(k), (int,float)) for k in ('x','y','width','height')):
+                      raise SystemExit(f'Invalid crop coordinates for SAP {item.get("sap")}')
+              if actual_refs != 912:
+                  raise SystemExit(f'Expected 912 verified material photo references, found {actual_refs}')
+              for name in atlas_names:
                   raw = z.read(name)
-                  dest = out / pathlib.Path(name).name
-                  dest.write_bytes(raw)
-                  im = Image.open(dest).convert('RGB')
-                  print(f'ATLAS {dest.name}: {im.width}x{im.height}, sha256={hashlib.sha256(raw).hexdigest()}')
-                  thumb = ImageOps.contain(im, (420, 300))
-                  tile = Image.new('RGB', (440, 340), 'white')
-                  tile.paste(thumb, ((440-thumb.width)//2, 28))
-                  ImageDraw.Draw(tile).text((12, 8), f'{dest.name} · {im.width}x{im.height}', fill='black')
-                  thumbs.append(tile)
-                  report.append(f'{dest.name}\t{im.width}x{im.height}\t{hashlib.sha256(raw).hexdigest()}')
-              cols = 3
-              rows = (len(thumbs)+cols-1)//cols
-              sheet = Image.new('RGB', (cols*440, rows*340), '#d9dee5')
-              for i, tile in enumerate(thumbs):
-                  sheet.paste(tile, ((i%cols)*440, (i//cols)*340))
-              sheet.save(out/'atlas-contact-sheet.jpg', quality=88)
-              (out/'atlas-inventory.tsv').write_text('\n'.join(report)+'\n', encoding='utf-8')
+                  image = Image.open(__import__('io').BytesIO(raw))
+                  if image.size != (600,800):
+                      raise SystemExit(f'Unexpected dimensions for {name}: {image.size}')
+                  (target / pathlib.Path(name).name).write_bytes(raw)
+              (target / manifest_name).write_bytes(z.read(manifest_name))
+              print(json.dumps({'materials':len(materials),'rootPhotos':data.get('photos'),'mappedPhotos':actual_refs,'atlasCount':len(atlas_names),'assetBytes':sum((target/pathlib.Path(n).name).stat().st_size for n in atlas_names)},indent=2))
           PY
-      - name: Upload atlas review package
-        uses: actions/upload-artifact@v4
-        with:
-          name: omodos-sparepart-atlas-review
-          path: /tmp/atlas-review/
-          if-no-files-found: error
+      - name: Commit assets to isolated branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/omodos4/sparepart-assets/
+          if git diff --cached --quiet; then
+            echo "No asset changes to publish."
+          else
+            git commit -m "Add verified sparepart atlas photo assets"
+            git push origin HEAD:sparepart-photo-assets
+          fi
