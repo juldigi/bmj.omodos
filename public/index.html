@@ -20090,7 +20090,7 @@ function renderPatrolChecklist(){
               ${PATROL_STATUS_OPTS.map(o=>`<button type="button" class="machine-chip patrol-chk-btn${cur===o.key?' active':''}" data-status="${o.key}" style="${cur===o.key?`background:${patrolStatusColor(o.key)};border-color:${patrolStatusColor(o.key)};color:var(--on-accent);`:''}">${o.label}</button>`).join('')}
             </div>
             <div class="patrol-checklist-note" style="margin-top:7px;${cur==='warning'||cur==='abnormal'?'':'display:none;'}">
-              <textarea class="patrol-chk-note" data-kategori="${escapeHtml(kategori)}" data-idx="${i}" rows="2" maxlength="500" placeholder="Keterangan kondisi / temuan (wajib diisi)" style="width:100%;min-width:220px;">${escapeHtml(note)}</textarea>
+              <textarea class="patrol-chk-note" data-kategori="${escapeHtml(kategori)}" data-idx="${i}" rows="2" maxlength="500" placeholder="Tuliskan keterangan kondisi / temuan..." style="width:100%;min-width:220px;">${escapeHtml(note)}</textarea>
             </div>
           </div>
         </div>`;
