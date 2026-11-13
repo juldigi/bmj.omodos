@@ -6,7 +6,6 @@ const worker = fs.readFileSync('src/worker.js','utf8');
 const html = fs.readFileSync('public/index.html','utf8');
 const ui = fs.readFileSync('public/omodos4/patrol-review-enhancements.js','utf8');
 const photos = fs.readFileSync('public/omodos4/patrol-area-feedback.js','utf8');
-new vm.Script(worker,{filename:'worker.js'});
 new vm.Script(ui,{filename:'patrol-review-enhancements.js'});
 new vm.Script(photos,{filename:'patrol-area-feedback.js'});
 for (const token of [
