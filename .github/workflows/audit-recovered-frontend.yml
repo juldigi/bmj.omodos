@@ -2,6 +2,8 @@ name: Audit OMODOS Recovered Frontend
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "public/index.html"
       - ".github/workflows/audit-recovered-frontend.yml"
