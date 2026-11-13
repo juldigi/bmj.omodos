@@ -10536,18 +10536,7 @@ var MaintenanceStore = class extends DurableObject {
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/files/")) return env.MAINTENANCE.get(env.MAINTENANCE.idFromName("maintenance-production")).fetch(request);
-  const response = await env.ASSETS.fetch(request);
-  const contentType = response.headers.get("content-type") || "";
-  if (request.method !== "GET" || response.status !== 200 || !contentType.toLowerCase().includes("text/html")) return response;
-  const marker = "<!-- OMODOS_PATROL_REVIEW_V1 -->";
-  const html = await response.text();
-  const headers = new Headers(response.headers);
-  headers.delete("content-length");
-  if (html.includes(marker)) return new Response(html, { status: response.status, statusText: response.statusText, headers });
-  const injection = marker + '<script src="/omodos4/patrol-area-feedback.js?v=20261113-1" defer></script><script src="/omodos4/patrol-review-enhancements.js?v=20261113-1" defer></script>';
-  const body = html.includes("</body>") ? html.replace("</body>", injection + "</body>") : html + injection;
-  headers.set("cache-control", "no-store, no-cache, must-revalidate");
-  return new Response(body, { status: response.status, statusText: response.statusText, headers });
+  return env.ASSETS.fetch(request);
 } };
 export {
   MaintenanceStore,

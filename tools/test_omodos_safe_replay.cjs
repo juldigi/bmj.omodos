@@ -21,9 +21,7 @@ for (const token of [
  '"Nama Area": report.namaArea || ""',
  '"Checklist Notes (JSON)": JSON.stringify(report.checklistNotes || {})',
  'String(r["Lokasi Jenis"] || "").toLowerCase() === "area"',
- 'OMODOS_PATROL_REVIEW_V1',
- 'patrol-area-feedback.js?v=20261113-1',
- 'patrol-review-enhancements.js?v=20261113-1'
+ 'Lokasi Jenis'
 ]) assert.ok(worker.includes(token),'missing Worker contract: '+token);
 const saveStart=worker.indexOf('function savePredictiveReport_(report, files)');
 const saveEnd=worker.indexOf('__name(savePredictiveReport_',saveStart);
@@ -34,6 +32,12 @@ assert.ok(save.includes('Checklist Notes (JSON)'),'Patrol note field is persiste
 assert.ok(html.includes('name="groupingPekerjaan"'),'Logbook grouping selector remains present');
 assert.ok(html.includes('id="patrol-checklist-groups"'),'Patrol tasklist remains present');
 assert.ok(html.includes('id="list-patrol-temuan"'),'Patrol finding list remains present');
+assert.ok(html.includes('<!-- OMODOS_PATROL_REVIEW_V1 -->'),'Patrol enhancement marker is in the static HTML asset');
+assert.ok(html.includes('<script src="/omodos4/patrol-area-feedback.js?v=20261113-1" defer></script>'),'Patrol checkpoint photo helper is linked from static HTML');
+assert.ok(html.includes('<script src="/omodos4/patrol-review-enhancements.js?v=20261113-1" defer></script>'),'Patrol review enhancement is linked from static HTML');
+assert.ok(html.indexOf('<script src="/omodos4/patrol-area-feedback.js?v=20261113-1" defer></script>') < html.indexOf('<script src="/omodos4/patrol-review-enhancements.js?v=20261113-1" defer></script>'),'photo helper loads before review enhancement');
+assert.ok(worker.includes('return env.ASSETS.fetch(request);'),'Worker leaves static HTML routing to the asset service');
+assert.ok(!worker.includes('OMODOS_PATROL_REVIEW_V1'),'Worker does not rewrite static HTML');
 assert.ok(html.includes('<form id="form-login" autocomplete="off" onsubmit="return false;">'),'login native-submit guard is present');
 const pdfStart=html.indexOf('function openGrReportDetail(id){');
 const pdfEnd=html.indexOf('\nfunction ',pdfStart+20);
