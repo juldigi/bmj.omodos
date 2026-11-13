@@ -19578,6 +19578,7 @@ async function syncPmReportsFromBackend(){
           String(r.patrolMode ?? r['Patrol Mode'] ?? '')==='1' ||
           /^patrol harian/i.test(String(r.titikInspeksi || r['Titik Inspeksi'] || '')),
         checklist: safeJsonParseClient_(r.checklist || r['Checklist (JSON)'], {}),
+        checklistNotes: safeJsonParseClient_(r.checklistNotes || r['Checklist Notes (JSON)'], {}),
         counts: safeJsonParseClient_(r.counts || r['Counts (JSON)'], {}),
         score: patrolScoreFromBackend_(r),
         findings: hydratePatrolFindingFiles_(
@@ -19596,6 +19597,7 @@ async function syncPmReportsFromBackend(){
           ...r,
           files: !backendHasRealMedia && local.files && local.files.length ? local.files : r.files,
           checklist: Object.keys(r.checklist||{}).length ? r.checklist : (local.checklist||{}),
+          checklistNotes: Object.keys(r.checklistNotes||{}).length ? r.checklistNotes : (local.checklistNotes||{}),
           counts: Object.keys(r.counts||{}).length ? r.counts : (local.counts||{}),
           findings: Array.isArray(r.findings) && r.findings.length ? r.findings : (local.findings||[]),
           score: r.score || local.score || 0,
