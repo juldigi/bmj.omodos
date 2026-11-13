@@ -1,16 +1,16 @@
 # OMODOS Recovered Frontend — Static Audit
 
-- Audited UTC: 2026-11-13T09:25:26.785731+00:00
-- File bytes: 1693145
-- Lines: 29381
-- SHA-256: 2cc397a94b7b271524faebadc833a372bc94ae32a0e46a92365ef7da4b0fced1
+- Audited UTC: 2026-11-13T09:24:21.396359+00:00
+- File bytes: 1691936
+- Lines: 29370
+- SHA-256: 2f8ecec7b6237d6ba3c2ed3e30ade8bb7f0dd893519411a2aac3dbd36be0df8a
 
 ## Dollar helper definitions
 ### const $ = — 1 match(es)
 - L7320: const $ = (sel, root=document) => root.querySelector(sel);
 
 ## Potential jQuery-like chained calls
-### ).forEach( — 327 match(es)
+### ).forEach( — 326 match(es)
 - L6127: (changed||[]).forEach(item=>{ if(item && item[idField]!==undefined) byId[item[idField]] = item; });
 - L6128: (deletedIds||[]).forEach(id=>{ delete byId[id]; });
 - L6417: clone.querySelectorAll('.ico, .chev, .count, .ihc-desc').forEach(el=> el.remove());
@@ -69,15 +69,15 @@
 - L16258: const stats = expertFinderStats(ENTRIES).find(s=>s.nama===label);
 - L16533: const stats = expertFinderStats(entries).find(s=>s.nama===nama) || { total:entries.length, selesai:0, breakdown:0, successRate:0, mesinCount:0, tahunPengalaman:0 };
 - L18088: const invalidField = requiredFieldsIn(steps[idx]).find(f=> !f.validity.valid) || firstInvalid;
-- L20281: const original = (PM_REPORTS||[]).find(r=>r.id===PATROL_STATE.id);
-- L20542: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
-- L20609: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
-- L20859: const rep = loadIpalReportsLocal().find(r=>r.id===card.dataset.id);
-- L20886: const rep = loadRcaReportsLocal().find(r=>r.id===card.dataset.id);
-- L24466: return (list||[]).find(item=> piNamesMatch(getter(item), nama)) || null;
-- L24744: const ef = expertFinderStats(ENTRIES).find(r=>r.nama===nama) || { total:0, selesai:0, breakdown:0, mesinCount:0, successRate:0, tahunPengalaman:0, score:0 };
-- L27424: const item = id ? (PMC_STATE.data[type]||[]).find(x=>x.ID===id) : null;
-- L27609: return (PMC_STATE.data[PMC_DETAIL.type]||[]).find(x=>x.ID===PMC_DETAIL.id);
+- L20263: const original = (PM_REPORTS||[]).find(r=>r.id===PATROL_STATE.id);
+- L20523: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
+- L20589: const r = (PM_REPORTS||[]).find(x=>x.id===reportId);
+- L20838: const rep = loadIpalReportsLocal().find(r=>r.id===card.dataset.id);
+- L20865: const rep = loadRcaReportsLocal().find(r=>r.id===card.dataset.id);
+- L24455: return (list||[]).find(item=> piNamesMatch(getter(item), nama)) || null;
+- L24733: const ef = expertFinderStats(ENTRIES).find(r=>r.nama===nama) || { total:0, selesai:0, breakdown:0, mesinCount:0, successRate:0, tahunPengalaman:0, score:0 };
+- L27413: const item = id ? (PMC_STATE.data[type]||[]).find(x=>x.ID===id) : null;
+- L27598: return (PMC_STATE.data[PMC_DETAIL.type]||[]).find(x=>x.ID===PMC_DETAIL.id);
 ### ).map( — 164 match(es)
 - L6923: const dateRows = (res.dateFixSample||[]).map(x=> `<tr><td>${escapeHtml(String(x.id))}</td><td>${escapeHtml(x.oldValue)}</td><td>→ ${escapeHtml(x.newValue)}</td></tr>`).join('');
 - L6924: const jenisRows = (res.jenisFixSample||[]).map(x=> `<tr><td>${escapeHtml(String(x.id))}</td><td>${escapeHtml(x.oldDeskripsi)}</td><td>→ Jenis Pekerjaan: ${escapeHtml(x.newJenis)}</td></tr>`).join('');
@@ -201,28 +201,28 @@
 - L8515: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
 - L8526: showSettingLoginModal(()=> switchToView('setting'));
 - L8529: switchToView(view);
-- L20671: /* ---- Entry point (dipanggil dari switchToView) ---- */
-- L21620: if(typeof switchToView === 'function'){ switchToView('dashboard'); }
-- L25972: const _origSwitchToView = window.switchToView;
-- L25973: if(typeof _origSwitchToView === 'function'){
-- L25974: window.switchToView = function(enteringView){
-- L25975: const result = _origSwitchToView.apply(this, arguments);
-- L28763: const origSwitchToView = window.switchToView;
-- L28764: window.switchToView = function(view){
-- L28765: const result = typeof origSwitchToView==='function' ? origSwitchToView(view) : false;
+- L20650: /* ---- Entry point (dipanggil dari switchToView) ---- */
+- L21609: if(typeof switchToView === 'function'){ switchToView('dashboard'); }
+- L25961: const _origSwitchToView = window.switchToView;
+- L25962: if(typeof _origSwitchToView === 'function'){
+- L25963: window.switchToView = function(enteringView){
+- L25964: const result = _origSwitchToView.apply(this, arguments);
+- L28752: const origSwitchToView = window.switchToView;
+- L28753: window.switchToView = function(view){
+- L28754: const result = typeof origSwitchToView==='function' ? origSwitchToView(view) : false;
 
 ## OMODOS 4 RBAC
 ### omodos4.view — 3 match(es)
 - L6499: if(!discovered.some(f=>f.PermissionKey==='omodos4.view')){
 - L6500: discovered.push({PermissionKey:'omodos4.view',Label:'OMODOS 4.0 (Superadmin Root)',Group:'OMODOS 4.0'});
-- L29156: const V4_PERMISSION_ROOT = 'omodos4.view';
+- L29145: const V4_PERMISSION_ROOT = 'omodos4.view';
 ### OMODOS 4.0 — 7 match(es)
 - L3425: <button class="nav-parent-btn" data-group="omodos4"><span class="ico"><i class="ph-bold ph-cpu"></i></span> OMODOS 4.0 <span class="v4-badge">SUPERADMIN</span> <span class="chev"><i class="ph-bold ph-caret-down"></i></span></button>
 - L4228: <h1 style="margin-top:4px;">OMODOS 4.0</h1>
 - L8285: toast('Modul OMODOS 4.0 gagal dimuat. Periksa koneksi lalu coba kembali.',true);
 - L8515: // TypeError pada switchToView(). OMODOS 4.0 memakai switchToView langsung
-- L23642: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
-- L29311: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
+- L23631: omodos4:{title:'OMODOS 4.0 Command Center',steps:[
+- L29300: if(refresh) refresh.addEventListener('click',()=>{ renderOmodos4(); if(typeof toast==='function') toast('OMODOS 4.0 diperbarui dari data existing.'); });
 ### Superadmin — 54 match(es)
 - L4229: <div class="sub">Command Center Superadmin yang membaca data existing tanpa membuat duplikasi sumber data.</div>
 - L5450: <div class="setting-tab-empty" id="rbac-empty-hint" style="display:none;">Memuat data user... Jika tetap kosong, pastikan kamu login sebagai Superadmin.</div>
@@ -255,23 +255,23 @@
 - L8487: // Technical Performance is a read-only imported-report workspace restricted to Superadmin.
 - L8488: if(view === 'technical-performance') return isSuperadmin();
 - L8489: if(view === 'omodos4' || view.startsWith('omodos4-')) return isSuperadmin();
-- L21537: errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App). Hubungi Superadmin untuk konfigurasi awal.';
-- L21579: // code.gs) supaya perubahan yang diatur Superadmin di satu device ikut
-- L23643: 'Halaman ini khusus Superadmin dan membaca data existing tanpa input ganda.',
-- L26111: dengan RBAC yang sudah ada, jadi Superadmin bisa mengatur DUA hal
-- L26134: if(CURRENT_USER.role === 'Superadmin') return false; // Superadmin selalu full, sama seperti RBAC akses biasa
-- L26261: // diatur Superadmin) gagal tersimpan. Kegagalan utama di atas sudah
-- L26925: sampai Superadmin menyimpannya secara eksplisit. Mapping role yang
-- L26960: // sekali), beri penanda visual kecil "Baru" supaya Superadmin sadar ini
-- L28657: // ternyata tidak diizinkan (mis. baru diubah Superadmin), otomatis
-- L28696: // restore sesi, dan setiap kali Superadmin menyimpan perubahan Role
-- L29158: function v4IsSuperadmin(){
-- L29160: return typeof isSuperadmin === 'function'
-- L29161: ? isSuperadmin()
-- L29162: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
-- L29260: if(!v4IsSuperadmin()){
-- L29305: isAllowed:v4IsSuperadmin,
-- L29316: <!-- OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1: single Superadmin-only module loader -->
+- L21526: errEl.textContent = 'Aplikasi belum terhubung ke database SQLite (URL Web App). Hubungi Superadmin untuk konfigurasi awal.';
+- L21568: // code.gs) supaya perubahan yang diatur Superadmin di satu device ikut
+- L23632: 'Halaman ini khusus Superadmin dan membaca data existing tanpa input ganda.',
+- L26100: dengan RBAC yang sudah ada, jadi Superadmin bisa mengatur DUA hal
+- L26123: if(CURRENT_USER.role === 'Superadmin') return false; // Superadmin selalu full, sama seperti RBAC akses biasa
+- L26250: // diatur Superadmin) gagal tersimpan. Kegagalan utama di atas sudah
+- L26914: sampai Superadmin menyimpannya secara eksplisit. Mapping role yang
+- L26949: // sekali), beri penanda visual kecil "Baru" supaya Superadmin sadar ini
+- L28646: // ternyata tidak diizinkan (mis. baru diubah Superadmin), otomatis
+- L28685: // restore sesi, dan setiap kali Superadmin menyimpan perubahan Role
+- L29147: function v4IsSuperadmin(){
+- L29149: return typeof isSuperadmin === 'function'
+- L29150: ? isSuperadmin()
+- L29151: : !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'Superadmin');
+- L29249: if(!v4IsSuperadmin()){
+- L29294: isAllowed:v4IsSuperadmin,
+- L29305: <!-- OMODOS_TECHNICAL_PERFORMANCE_LAZY_V1: single Superadmin-only module loader -->
 
 ## Copilot & Bantuan
 ### Copilot — 367 match(es)
@@ -328,11 +328,11 @@
 ### Bantuan — 7 match(es)
 - L5912: <button class="btn btn-sm" type="button" id="copilot-help" title="Buka bantuan untuk halaman yang sedang digunakan"><i class="ph-bold ph-question"></i> Bantuan</button>
 - L12472: { key:'ai',             icon:'✦',  title:'Analisa AI', sub:'Minta bantuan AI membaca data dan memberi saran. Tetap periksa hasilnya.', enabled:true },
-- L23647: return helpMap[view] || {title:'Bantuan Halaman',steps:[
-- L23667: <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
-- L24872: <div class="sub" style="margin-top:10px;">Rekomendasi dihasilkan 100% lokal dari data Logbook, Hard Skill/Soft Skill Assessment, Kaizen/Project Improvement, dan Meeting Action Item yang sudah tersimpan di aplikasi ini (tanpa API/LLM eksternal) — gunakan sebagai bantuan pengambilan keputusan, tetap verifikasi di lapangan.</div>
-- L28920: /* BANTUAN_PAGE_CARD_REMOVAL_V1 */
-- L28961: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
+- L23636: return helpMap[view] || {title:'Bantuan Halaman',steps:[
+- L23656: <div class="copilot-answer-head">Bantuan · ${escapeHtml(help.title)}</div>
+- L24861: <div class="sub" style="margin-top:10px;">Rekomendasi dihasilkan 100% lokal dari data Logbook, Hard Skill/Soft Skill Assessment, Kaizen/Project Improvement, dan Meeting Action Item yang sudah tersimpan di aplikasi ini (tanpa API/LLM eksternal) — gunakan sebagai bantuan pengambilan keputusan, tetap verifikasi di lapangan.</div>
+- L28909: /* BANTUAN_PAGE_CARD_REMOVAL_V1 */
+- L28950: ai:['Bantuan AI','Gunakan AI sebagai alat bantu membaca data, bukan pengganti keputusan manusia.','Tulis masalah atau pertanyaan.','Periksa jawaban dan data pendukung sebelum bertindak.'],
 
 ## Machine status
 ### machineStatus — 7 match(es)
@@ -342,7 +342,7 @@
 - L18709: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
 - L18715: <div class="detail-row"><div class="k">Waktu Update</div><div class="v">${escapeHtml(formatMachineStatusTime_(snap.ts))}</div></div>
 - L18732: <span style="font-size:12px;color:var(--text-dim);">${escapeHtml(snap.sourceLabel)} • ${escapeHtml(formatMachineStatusTime_(snap.ts))}</span>
-- L19734: function formatMachineStatusTime_(ts){
+- L19732: function formatMachineStatusTime_(ts){
 ### status mesin — 15 match(es)
 - L1807: /* [FIX] Card mesin di Home: HANYA menampilkan Kode Mesin + Status Mesin
 - L1980: /* Judul "Home" & sub-teks diperkecil supaya area cards status mesin yang mendominasi layar */
@@ -355,15 +355,15 @@
 - L4208: <div class="section-title home-status-title"><i class="ph-bold ph-gauge"></i> Status Mesin Sekarang</div>
 - L16682: // [FIX SOT] Status Mesin Sekarang di Home HARUS hanya mencerminkan data
 - L18726: <div class="sub">Status mesin terkini berdasarkan data Logbook atau Patrol yang waktunya paling baru.</div>
-- L23614: dashboard:{title:'Home & Status Mesin',steps:[
-- L23615: 'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
-- L25842: dashboard:'Semua staf shift, untuk memantau status mesin secara real-time',
-- L29183: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
+- L23603: dashboard:{title:'Home & Status Mesin',steps:[
+- L23604: 'Lihat status mesin berdasarkan data Logbook atau Patrol yang paling baru.',
+- L25831: dashboard:'Semua staf shift, untuk memantau status mesin secara real-time',
+- L29172: return String((e && (e['Status'] || e['Status Pekerjaan'] || e['Status Mesin'])) || '').trim();
 ### latestLogbook — 2 match(es)
 - L16731: function latestLogbookForMachine_(machine){
-- L19724: const log=latestLogbookForMachine_(machine), patrol=latestPatrolForMachine_(machine);
+- L19722: const log=latestLogbookForMachine_(machine), patrol=latestPatrolForMachine_(machine);
 ### latestPatrol — 2 match(es)
-- L19715: function latestPatrolForMachine_(machine){
+- L19713: function latestPatrolForMachine_(machine){
 
 ## Pagination controls
 ### pageSize — 6 match(es)
@@ -371,12 +371,12 @@
 - L9455: const end=Math.min(start+pageSize,total);
 - L9461: const next=Math.min(pageSize,total-end);
 - L12303: const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
-- L21371: const pageW = pdf.internal.pageSize.getWidth();
-- L21372: const pageH = pdf.internal.pageSize.getHeight();
+- L21360: const pageW = pdf.internal.pageSize.getWidth();
+- L21361: const pageH = pdf.internal.pageSize.getHeight();
 ### Halaman Sebelumnya — 3 match(es)
 - L7451: '<button type="button" data-page-action="prev" '+(st.page<=1?'disabled':'')+'>Halaman Sebelumnya</button>'+
 - L15326: '<button type="button" data-sp-pg-action="prev" '+(page<=1?'disabled':'')+'>Halaman Sebelumnya</button>';
-- L25819: Tidak ada carry-over data dari halaman sebelumnya.
+- L25808: Tidak ada carry-over data dari halaman sebelumnya.
 ### Halaman Selanjutnya — 2 match(es)
 - L7453: '<button type="button" data-page-action="next" '+(st.page>=totalPages?'disabled':'')+'>Halaman Selanjutnya</button>'+
 - L15334: nav += '<button type="button" data-sp-pg-action="next" '+(page>=totalPages?'disabled':'')+'>Halaman Selanjutnya</button>'+
@@ -388,7 +388,7 @@
 - L15335: '<button type="button" data-sp-pg-action="last" '+(page>=totalPages?'disabled':'')+'>Halaman Akhir</button>';
 
 ## Regression risk summary
-- HIGH: found 175 direct dollar-helper .forEach/.find call(s).
+- HIGH: found 174 direct dollar-helper .forEach/.find call(s).
   - L6515: $$('.nav-btn[data-view]').forEach(btn=>{
   - L6546: $$('.nav-group-collapsible').forEach(group=>{
   - L6569: $$('.bottom-nav-btn[data-group="'+groupKey+'"]').forEach(bn=>{ bn.style.display = visible ? '' : 'none'; });
