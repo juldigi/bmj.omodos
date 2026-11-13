@@ -19933,7 +19933,7 @@ function patrolStatusColor(key){
 }
 
 let PATROL_ACTIVE_TAB = 'mulai';
-let PATROL_STATE = { id:null, kodeMesin:'', namaMesin:'', checklist:{}, findings:[] };
+let PATROL_STATE = { id:null, kodeMesin:'', namaMesin:'', checklist:{}, checklistNotes:{}, findings:[] };
 let PATROL_FINDING_FILES = []; // {name, mimeType, base64, _localUrl, _isVideo} — sama seperti PENDING_FILES di Input Logbook
 
 
@@ -19987,7 +19987,7 @@ function Utilities_nowTimeStr(){
 }
 
 function patrolResetWizard(){
-  PATROL_STATE = { id:null, kodeMesin:'', namaMesin:'', checklist:{}, findings:[] };
+  PATROL_STATE = { id:null, kodeMesin:'', namaMesin:'', checklist:{}, checklistNotes:{}, findings:[] };
   PATROL_FINDING_FILES = [];
   $('#patrol-step-1').style.display = '';
   $('#patrol-step-2').style.display = 'none';
@@ -20026,6 +20026,7 @@ function patrolSelectMachine(kode, nama){
   PATROL_STATE.kodeMesin = kode;
   PATROL_STATE.namaMesin = nama;
   PATROL_STATE.checklist = {};
+  PATROL_STATE.checklistNotes = {};
   $('#patrol-step-1').style.display = 'none';
   $('#patrol-step-2').style.display = '';
   $('#patrol-step-3').style.display = 'none';
@@ -20080,11 +20081,17 @@ function renderPatrolChecklist(){
     <div>
       ${items.map((item,i)=>{
         const cur = (PATROL_STATE.checklist[kategori] && PATROL_STATE.checklist[kategori][i]) || '';
+        const note = (PATROL_STATE.checklistNotes && PATROL_STATE.checklistNotes[kategori] && PATROL_STATE.checklistNotes[kategori][i]) || '';
         return `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line);">
           <div style="font-size:15px;flex:1 1 200px;">${escapeHtml(item)}</div>
-          <div class="machine-chip-row" style="margin-bottom:0;" data-kategori="${escapeHtml(kategori)}" data-idx="${i}">
-            ${PATROL_STATUS_OPTS.map(o=>`<button type="button" class="machine-chip patrol-chk-btn${cur===o.key?' active':''}" data-status="${o.key}" style="${cur===o.key?`background:${patrolStatusColor(o.key)};border-color:${patrolStatusColor(o.key)};color:var(--on-accent);`:''}">${o.label}</button>`).join('')}
+          <div style="flex:0 1 auto;min-width:220px;">
+            <div class="machine-chip-row" style="margin-bottom:0;" data-kategori="${escapeHtml(kategori)}" data-idx="${i}">
+              ${PATROL_STATUS_OPTS.map(o=>`<button type="button" class="machine-chip patrol-chk-btn${cur===o.key?' active':''}" data-status="${o.key}" style="${cur===o.key?`background:${patrolStatusColor(o.key)};border-color:${patrolStatusColor(o.key)};color:var(--on-accent);`:''}">${o.label}</button>`).join('')}
+            </div>
+            <div class="patrol-checklist-note" style="margin-top:7px;${cur==='warning'||cur==='abnormal'?'':'display:none;'}">
+              <textarea class="patrol-chk-note" data-kategori="${escapeHtml(kategori)}" data-idx="${i}" rows="2" maxlength="500" placeholder="Keterangan kondisi / temuan (wajib diisi)" style="width:100%;min-width:220px;">${escapeHtml(note)}</textarea>
+            </div>
           </div>
         </div>`;
       }).join('')}
@@ -20120,6 +20127,15 @@ function renderPatrolChecklist(){
       btn.style.background = patrolStatusColor(status);
       btn.style.borderColor = patrolStatusColor(status);
       btn.style.color = 'var(--on-accent)';
+      const noteWrap = row.parentElement.querySelector('.patrol-checklist-note');
+      if(noteWrap) noteWrap.style.display = (status==='warning'||status==='abnormal') ? '' : 'none';
+    });
+  });
+  $('.patrol-chk-note', holder).forEach(input=>{
+    input.addEventListener('input', ()=>{
+      const kategori=input.dataset.kategori, idx=input.dataset.idx;
+      if(!PATROL_STATE.checklistNotes[kategori]) PATROL_STATE.checklistNotes[kategori]={};
+      PATROL_STATE.checklistNotes[kategori][idx]=input.value;
     });
   });
 }
@@ -20345,6 +20361,7 @@ $('#btn-patrol-save').addEventListener('click', async ()=>{
     files: PATROL_STATE.findings.flatMap(f=> (f.files||[]).map(x=>({ name:x.name, type:x.type, viewUrl:x.viewUrl }))),
     patrolMode: true,
     checklist: PATROL_STATE.checklist,
+    checklistNotes: PATROL_STATE.checklistNotes || {},
     counts: c,
     score,
     findings: PATROL_STATE.findings
@@ -20533,8 +20550,9 @@ function openPatrolSessionDetail(reportId){
       const label = items[idx] || `Item #${Number(idx)+1}`;
       const st = statuses[idx];
       const stLabel = (PATROL_STATUS_OPTS.find(o=>o.key===st)||{}).label || st;
+      const note = r.checklistNotes && r.checklistNotes[kategori] ? r.checklistNotes[kategori][idx] : '';
       return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);">
-        <div style="font-size:13px;flex:1 1 200px;">${escapeHtml(label)}</div>
+        <div style="font-size:13px;flex:1 1 200px;">${escapeHtml(label)}${note?`<div style="font-size:12px;color:var(--text-dim);margin-top:4px;"><b>Keterangan:</b> ${escapeHtml(note)}</div>`:''}</div>
         <div style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:${patrolStatusColor(st)};color:var(--on-accent);white-space:nowrap;">${escapeHtml(stLabel||'-')}</div>
       </div>`;
     }).join('');
@@ -20595,6 +20613,7 @@ function patrolLoadSessionForEdit(reportId){
     kodeMesin: r.kodeMesin || '',
     namaMesin: r.namaMesin || '',
     checklist: JSON.parse(JSON.stringify(r.checklist || {})),
+    checklistNotes: JSON.parse(JSON.stringify(r.checklistNotes || {})),
     findings: JSON.parse(JSON.stringify(r.findings || []))
   };
   PATROL_FINDING_FILES = [];
