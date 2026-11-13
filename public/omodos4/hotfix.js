@@ -568,12 +568,39 @@ function bindEditPicker(){
    const candidates=byName?idx.name:idx.sap;items=[];
    for(const candidate of candidates){if(query&&!candidate.key.includes(query))continue;items.push(candidate.row);if(items.length>=30)break;}
    if(!items.length){box.innerHTML='<div style="padding:10px 12px;color:var(--text-dim)">'+(idx.master.length?'Tidak ada material yang cocok.':'Master material belum termuat. Coba fokuskan kembali setelah koneksi tersedia.')+'</div>';box.classList.add('open');return;}
-   box.innerHTML=items.map((x,i)=>'<button type="button" data-v4-pick="'+i+'" style="display:flex;width:100%;text-align:left;flex-direction:column;gap:2px;padding:10px 12px;border:0;border-bottom:1px solid var(--line,#e5e7eb);background:transparent;color:inherit;cursor:pointer"><span>'+escape(byName?x.nama:x.sap)+'</span><small>'+escape(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</small></button>').join('');
+   box.innerHTML=items.map((x,i)=>{
+    const raw=x.hargaMaster!=null&&String(x.hargaMaster).trim()!==''?Number(String(x.hargaMaster).replace(/[^0-9,.-]/g,'').replace(/\.(?=.*\.)/g,'').replace(',','.')):NaN;
+    const price=Number.isFinite(raw)&&raw>0?'Harga: '+raw.toLocaleString('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}):'Harga belum tersedia';
+    const unit=x.satuanMaster||x.satuan||'';
+    return '<button type="button" data-v4-pick="'+i+'" style="display:flex;width:100%;text-align:left;flex-direction:column;gap:3px;padding:10px 12px;border:0;border-bottom:1px solid var(--line,#e5e7eb);background:transparent;color:inherit;cursor:pointer"><span>'+escape(byName?x.nama:x.sap)+'</span><small>'+escape(byName?('SAP: '+(x.sap||'-')):(x.nama||'Nama material belum tersedia'))+'</small><small style="color:var(--text-dim,#64748b)">'+escape(price+(unit?' · '+unit:''))+'</small></button>';
+   }).join('');
    box.classList.add('open');
   };
   const loadThenRender=async()=>{
    let master=[];try{master=Array.isArray(SPAREPART_LOKASI)?SPAREPART_LOKASI:[];}catch(e){}
    if(!master.length&&typeof syncSparepartLokasiFromBackend==='function'){try{await syncSparepartLokasiFromBackend();}catch(e){}}
+   /* Enrich picker rows from the separate Master Sparepart catalogue.
+      Live stock/location remains sourced from Sparepart_Lokasi. */
+   try{
+    if(!window.__omodosSparepartPriceMap){
+     if(!window.__omodosSparepartPricePromise){
+      window.__omodosSparepartPricePromise=window.apiPost({action:'sparepartMasterRead'}).then(function(res){
+       const map=new Map();
+       (Array.isArray(res&&res.data)?res.data:[]).forEach(function(r){
+        const sap=String(r&&r['Material Number']||'').trim();
+        if(sap)map.set(sap,r);
+       });
+       window.__omodosSparepartPriceMap=map;return map;
+      }).catch(function(){return new Map();});
+     }
+     await window.__omodosSparepartPricePromise;
+    }
+    const priceMap=window.__omodosSparepartPriceMap;
+    master.forEach(function(row){
+     const source=priceMap&&priceMap.get(String(row.sap||'').trim());
+     if(source){row.hargaMaster=source['Harga satuan'];row.satuanMaster=source['Base UoM'];}
+    });
+   }catch(e){}
    render();
   };
   input.addEventListener('focus',loadThenRender);
