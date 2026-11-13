@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - fix/omodos-safe-patrol-replay-20261113
+      - fix/omodos-patrol-static-asset-activation-20261113
     paths:
       - "src/worker.js"
       - "public/index.html"
