@@ -20131,7 +20131,7 @@ function renderPatrolChecklist(){
       if(noteWrap) noteWrap.style.display = (status==='warning'||status==='abnormal') ? '' : 'none';
     });
   });
-  $('.patrol-chk-note', holder).forEach(input=>{
+  $$('.patrol-chk-note', holder).forEach(input=>{
     input.addEventListener('input', ()=>{
       const kategori=input.dataset.kategori, idx=input.dataset.idx;
       if(!PATROL_STATE.checklistNotes[kategori]) PATROL_STATE.checklistNotes[kategori]={};
