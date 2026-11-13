@@ -113,7 +113,7 @@ ready(function(){
   var picker=document.createElement('div');
   picker.id='omodos-patrol-photo-picker';
   picker.hidden=true;
-  picker.innerHTML='<div class="omodos-patrol-picker-backdrop" data-picker-close></div><div class="omodos-patrol-picker-card" role="dialog" aria-modal="true" aria-labelledby="omodos-patrol-picker-title"><div id="omodos-patrol-picker-title" style="font-weight:700;font-size:16px;margin-bottom:6px">Tambah lampiran</div><div id="omodos-patrol-picker-sub" style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Pilih sumber foto atau video.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button type="button" class="btn btn-primary" data-picker-camera><i class="ph-bold ph-camera"></i> Kamera</button><button type="button" class="btn btn-ghost" data-picker-gallery><i class="ph-bold ph-images"></i> Galeri</button></div><button type="button" class="btn btn-ghost" data-picker-close style="width:100%;margin-top:10px">Batal</button></div>';
+  picker.innerHTML='<div class="omodos-patrol-picker-backdrop" data-picker-close></div><div class="omodos-patrol-picker-card" role="dialog" aria-modal="true" aria-labelledby="omodos-patrol-picker-title"><div id="omodos-patrol-picker-title" style="font-weight:700;font-size:16px;margin-bottom:6px">Pemeriksaan Checklist</div><div id="omodos-patrol-picker-sub" style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Pilih sumber foto atau video.</div><div id="omodos-patrol-checkpoint-description-wrap" hidden style="margin:0 0 14px"><label for="omodos-patrol-checkpoint-description" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Keterangan Abnormal / Warning <span style="font-weight:400;color:var(--text-dim)">(opsional)</span></label><textarea id="omodos-patrol-checkpoint-description" rows="3" maxlength="1000" placeholder="Jelaskan kondisi yang ditemukan pada titik checklist ini..." style="box-sizing:border-box;width:100%;min-height:76px;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--text);font:inherit;font-size:13px;resize:vertical"></textarea></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button type="button" class="btn btn-primary" data-picker-camera><i class="ph-bold ph-camera"></i> Kamera</button><button type="button" class="btn btn-ghost" data-picker-gallery><i class="ph-bold ph-images"></i> Galeri</button></div><button type="button" class="btn btn-ghost" data-picker-save hidden style="width:100%;margin-top:10px">Simpan tanpa foto</button><button type="button" class="btn btn-ghost" data-picker-close style="width:100%;margin-top:10px">Batal</button></div>';
   picker.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px';
   picker.querySelector('.omodos-patrol-picker-backdrop').style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.58)';
   picker.querySelector('.omodos-patrol-picker-card').style.cssText='position:relative;width:min(100%,380px);padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 60px rgba(0,0,0,.3)';
@@ -124,12 +124,34 @@ ready(function(){
   function openPicker(checkpoint){
     pendingCheckpoint=checkpoint||null;
     var sub=byId('omodos-patrol-picker-sub');
-    if(sub)sub.textContent=checkpoint?'Lampirkan bukti untuk: '+checkpoint.item:'Lampiran untuk temuan di luar checklist.';
+    var descriptionWrap=byId('omodos-patrol-checkpoint-description-wrap');
+    var descriptionField=byId('omodos-patrol-checkpoint-description');
+    var saveButton=picker.querySelector('[data-picker-save]');
+    if(sub)sub.textContent=checkpoint?'Pilih foto atau simpan keterangan untuk: '+checkpoint.item:'Lampiran untuk temuan di luar checklist.';
+    if(descriptionWrap)descriptionWrap.hidden=!checkpoint;
+    if(saveButton)saveButton.hidden=!checkpoint;
+    if(descriptionField){
+      var existing=checkpoint&&typeof PATROL_STATE!=='undefined'&&PATROL_STATE.findings.find(function(f){return f.source==='checklist'&&f.checklistCategory===checkpoint.category&&String(f.checklistIndex)===String(checkpoint.index);});
+      descriptionField.value=checkpoint?String(checkpoint.description||(existing&&existing.checklistDescription)||''):'';
+    }
     picker.hidden=false;
   }
+  function captureCheckpointDescription(){
+    if(!pendingCheckpoint)return null;
+    var field=byId('omodos-patrol-checkpoint-description');
+    pendingCheckpoint.description=String(field&&field.value||'').trim().slice(0,1000);
+    return pendingCheckpoint;
+  }
   picker.querySelectorAll('[data-picker-close]').forEach(function(b){b.addEventListener('click',closePicker);});
-  picker.querySelector('[data-picker-camera]').addEventListener('click',function(){closePicker();cameraInput.click();});
-  picker.querySelector('[data-picker-gallery]').addEventListener('click',function(){closePicker();galleryInput.click();});
+  picker.querySelector('[data-picker-camera]').addEventListener('click',function(){captureCheckpointDescription();closePicker();cameraInput.click();});
+  picker.querySelector('[data-picker-gallery]').addEventListener('click',function(){captureCheckpointDescription();closePicker();galleryInput.click();});
+  picker.querySelector('[data-picker-save]').addEventListener('click',function(){
+    var checkpoint=captureCheckpointDescription();
+    if(!checkpoint)return;
+    pendingCheckpoint=null;
+    closePicker();
+    saveCheckpointFinding(checkpoint);
+  });
   function routeFiles(fileList){
     var files=Array.from(fileList||[]);if(!files.length)return;
     var checkpoint=pendingCheckpoint;pendingCheckpoint=null;
@@ -164,17 +186,25 @@ ready(function(){
   }
   function saveCheckpointFinding(cp){
     var files=PATROL_FINDING_FILES.map(function(f){return {name:f.name,type:f._isVideo?'video':'image',viewUrl:f._localUrl,base64:f.base64,mimeType:f.mimeType};});
-    if(!files.length)return;
+    var description=String(cp.description||'').trim().slice(0,1000);
     var existing=PATROL_STATE.findings.find(function(f){return f.source==='checklist'&&f.checklistCategory===cp.category&&String(f.checklistIndex)===String(cp.index);});
-    if(existing){existing.files=(existing.files||[]).concat(files);existing.prioritas=cp.status==='abnormal'?'Tinggi':'Sedang';existing.checklistStatus=cp.status;}
-    else PATROL_STATE.findings.push({id:'CHK-'+Date.now()+'-'+Math.floor(Math.random()*900+100),kategori:'Checklist Patrol',prioritas:cp.status==='abnormal'?'Tinggi':'Sedang',deskripsi:'Checklist '+cp.category+' — '+cp.item+' ('+(cp.status==='abnormal'?'Abnormal':'Warning')+')',status:'Open',source:'checklist',checklistCategory:cp.category,checklistIndex:cp.index,checklistItem:cp.item,checklistStatus:cp.status,files:files});
+    var statusLabel=cp.status==='abnormal'?'Abnormal':'Warning';
+    var checklistLabel='Checklist '+cp.category+' — '+cp.item+' ('+statusLabel+')';
+    var fullDescription=description?checklistLabel+' — '+description:checklistLabel;
+    if(existing){
+      existing.files=(existing.files||[]).concat(files);
+      existing.prioritas=cp.status==='abnormal'?'Tinggi':'Sedang';
+      existing.checklistStatus=cp.status;
+      existing.checklistDescription=description;
+      existing.deskripsi=fullDescription;
+    }else PATROL_STATE.findings.push({id:'CHK-'+Date.now()+'-'+Math.floor(Math.random()*900+100),kategori:'Checklist Patrol',prioritas:cp.status==='abnormal'?'Tinggi':'Sedang',deskripsi:fullDescription,checklistDescription:description,status:'Open',source:'checklist',checklistCategory:cp.category,checklistIndex:cp.index,checklistItem:cp.item,checklistStatus:cp.status,files:files});
     PATROL_FINDING_FILES=[];
     if(checklistPreview)checklistPreview.innerHTML='';
     var desc=byId('patrol-temuan-deskripsi');if(desc)desc.value='';
     var yes=document.querySelector('[data-ada-temuan="ya"]');if(yes&&!yes.classList.contains('active'))yes.click();
     if(typeof renderPatrolFindingsInputList==='function')renderPatrolFindingsInputList();
-    checkpointBadge(cp,files);
-    if(typeof toast==='function')toast('Lampiran ditautkan ke titik checklist: '+cp.item+'.');
+    if(files.length)checkpointBadge(cp,files);
+    if(typeof toast==='function')toast(files.length?'Keterangan dan lampiran ditautkan ke titik checklist: '+cp.item+'.':'Keterangan tersimpan pada titik checklist: '+cp.item+'.');
   }
   document.addEventListener('click',function(ev){
     var btn=ev.target.closest&&ev.target.closest('#patrol-checklist-groups .patrol-chk-btn');
