@@ -3307,7 +3307,7 @@ table input,table select,table textarea,table button,.sp-inline-input,.sp-inline
     <div class="omodos-tagline">OUR <b class="c-blue">MOTTO</b>. OUR <b class="c-pink">DUTY</b>. OUR <b class="c-amber">STRATEGY</b>.</div>
     <div class="omodos-divider"><span></span><i></i><span></span></div>
     <div class="sub-title">Smart Maintenance Reporting Platform <br> Packaging Offset BMJ</div>
-    <form id="form-login" autocomplete="off">
+    <form id="form-login" autocomplete="off" onsubmit="return false;">
       <div class="field">
         <label>Username</label>
         <input type="text" id="login-username" name="username" placeholder="Masukkan username" required>
@@ -20915,6 +20915,16 @@ function renderGrGrid(){
 function openGrReportDetail(id){
   const r = GENERAL_REPORTS.find(x=>x.id===id);
   if(!r) return;
+  // Reject unresolved/template placeholders before assigning them to iframe/src or href.
+  // A malformed PDF URL must never be interpreted by the browser as a download/navigation.
+  const pdfUrlRaw = String(r.pdfUrl || '').trim();
+  let safePdfUrl = '';
+  try {
+    const parsedPdfUrl = new URL(pdfUrlRaw, window.location.origin);
+    if (pdfUrlRaw && !/[\u0024{}]/.test(pdfUrlRaw) && parsedPdfUrl.protocol === 'https:') {
+      safePdfUrl = parsedPdfUrl.href;
+    }
+  } catch (_) { safePdfUrl = ''; }
   $('#modal-content').innerHTML = `
     <div class="modal-head">
       <div>
@@ -20932,10 +20942,10 @@ function openGrReportDetail(id){
     ${r.tanggalMulai ? `<div class="detail-row"><div class="k">Tanggal Mulai</div><div class="v">${escapeHtml(r.tanggalMulai)}</div></div>` : ''}
     ${r.tanggalSelesai ? `<div class="detail-row"><div class="k">Tanggal Selesai / Target</div><div class="v">${escapeHtml(r.tanggalSelesai)}</div></div>` : ''}
     ${r.summary ? `<div class="detail-row"><div class="k">Ringkasan</div><div class="v" style="white-space:pre-wrap;">${escapeHtml(r.summary)}</div></div>` : ''}
-    ${(!r.pdfUrl && r.contentHtml) ? `<div style="margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:50vh;background:#fff;padding:8px;">${r.contentHtml}</div>` : ''}
-    ${r.pdfUrl ? `<div style="margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;height:50vh;background:#fff;"><iframe src="${r.pdfUrl}" style="width:100%;height:100%;border:0;" title="PDF ${escapeHtml(r.title)}"></iframe></div>` : ''}
+    ${(!safePdfUrl && r.contentHtml) ? `<div style="margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:50vh;background:#fff;padding:8px;">${r.contentHtml}</div>` : ''}
+    ${safePdfUrl ? `<div style="margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;height:50vh;background:#fff;"><iframe src="${escapeHtml(safePdfUrl)}" style="width:100%;height:100%;border:0;" title="PDF ${escapeHtml(r.title)}"></iframe></div>` : ''}
     <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
-      ${r.pdfUrl ? `<a class="btn btn-sm" href="${r.pdfUrl.replace('/preview','/view')}" target="_blank" rel="noopener"><i class="ph-bold ph-file-pdf"></i> Buka PDF di Tab Baru</a>` : ''}
+      ${safePdfUrl ? `<a class="btn btn-sm" href="${escapeHtml(safePdfUrl.replace('/preview','/view'))}" target="_blank" rel="noopener"><i class="ph-bold ph-file-pdf"></i> Buka PDF di Tab Baru</a>` : ''}
       ${(r.type === 'project') ? `<button type="button" class="btn btn-sm btn-primary" id="btn-gr-edit-project"><i class="ph-bold ph-pencil-simple"></i> Edit Progress &amp; Timeline</button>
       <button type="button" class="btn btn-sm" id="btn-gr-export-pdf"><i class="ph-bold ph-file-pdf"></i> Export PDF</button>
       <button type="button" class="btn btn-sm" id="btn-gr-export-docx"><i class="ph-bold ph-file-doc"></i> Export Word</button>
