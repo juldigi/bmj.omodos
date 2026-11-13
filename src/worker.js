@@ -2886,7 +2886,7 @@ function createBackend(services, env = {}) {
   const RUN_HOUR_COMPARISON_HEADERS = ["ID", "Tahun", "Lini", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agust", "Sep", "Okt", "Nop", "Des", "Catatan", "Created At", "Updated At"];
   const ENERGY_COST_TOE_HEADERS = ["ID", "Tahun", "Bulan", "Good Sheet Produced", "Stand Meter (GWh)", "Energy Use (GWh)", "Tariff (IDR/kWh)", "TOE", "Catatan", "Created At", "Updated At"];
   const REPORTS_HEADERS = ["ID", "Timestamp", "Type", "Title", "Subtitle", "Author", "Category", "Status", "Progress", "Tanggal Mulai", "Tanggal Selesai", "Summary", "Content", "PDF URL", "Revision", "RawDataJSON"];
-  const PREDICTIVE_HEADERS = ["ID", "Timestamp", "Tanggal", "Shift", "Petugas", "Kode Mesin", "Nama Mesin", "Titik Inspeksi", "Vibrasi", "Suhu", "Suara", "Kebocoran", "Kelistrikan", "Pelumasan", "Severity", "Deskripsi Temuan", "Rekomendasi", "Files", "Grouping Team", "Waktu Patrol", "Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)"];
+  const PREDICTIVE_HEADERS = ["ID", "Timestamp", "Tanggal", "Shift", "Petugas", "Kode Mesin", "Nama Mesin", "Titik Inspeksi", "Vibrasi", "Suhu", "Suara", "Kebocoran", "Kelistrikan", "Pelumasan", "Severity", "Deskripsi Temuan", "Rekomendasi", "Files", "Grouping Team", "Waktu Patrol", "Patrol Mode", "Checklist (JSON)", "Checklist Notes (JSON)", "Counts (JSON)", "Score", "Findings (JSON)"];
   const IPAL_HEADERS = ["ID", "Timestamp", "Pelapor", "Bulan", "OutletLabel", "DailyJSON", "ChemicalJSON"];
   const RCA_HEADERS = ["ID", "Timestamp", "Nama Mesin", "Title", "SectionsJSON"];
   const KB_HEADERS = ["ID", "Timestamp", "Kategori", "Kode Mesin", "Nama Mesin", "Judul", "Konten", "Tags", "Author", "Source Type", "Source ID"];
@@ -6830,7 +6830,7 @@ function createBackend(services, env = {}) {
   function savePredictiveReport_(report, files) {
     report = report || {};
     const sh = getOrCreateSheet_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS);
-    ensureHeaderColumns_(sh, ["Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)"]);
+    ensureHeaderColumns_(sh, ["Patrol Mode", "Checklist (JSON)", "Checklist Notes (JSON)", "Counts (JSON)", "Score", "Findings (JSON)"]);
     const data = sh.getDataRange().getValues();
     const id = report.id || "PM-" + Date.now();
     let targetRow = -1;
@@ -6891,6 +6891,7 @@ function createBackend(services, env = {}) {
       "Waktu Patrol": report.waktuPatrol || "",
       "Patrol Mode": report.patrolMode === true || String(report.patrolMode).toLowerCase() === "true" || (Array.isArray(report.findings) && report.findings.length > 0),
       "Checklist (JSON)": JSON.stringify(report.checklist || {}),
+      "Checklist Notes (JSON)": JSON.stringify(report.checklistNotes || {}),
       "Counts (JSON)": JSON.stringify(report.counts || {}),
       "Score": report.score === void 0 || report.score === null ? "" : report.score,
       // Findings dari frontend dapat membawa blob: URL lokal untuk preview instan.
