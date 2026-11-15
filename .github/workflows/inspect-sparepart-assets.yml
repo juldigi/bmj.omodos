@@ -6,6 +6,7 @@ on:
       - sparepart-master-photo-price
     paths:
       - .github/workflows/inspect-sparepart-assets.yml
+      - public/omodos4/sparepart-assets/manifest.json
 
 permissions:
   contents: write
