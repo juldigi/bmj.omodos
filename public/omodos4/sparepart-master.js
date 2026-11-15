@@ -67,7 +67,7 @@ async function loadPhotoMap(){
   const next=Object.create(null);
   rows.forEach(function(row){
    const sap=String(row&&row.sap||'').trim(),foto=row&&(row.foto||row);
-   if(!sap||!foto||!/^sparepart-atlas-\\d{2}\\.jpg$/i.test(String(foto.atlas||'')))return;
+   if(!sap||!foto||!/^sparepart-atlas-\d{2}\.jpg$/i.test(String(foto.atlas||'')))return;
    const values=[foto.x,foto.y,foto.width,foto.height];
    if(!values.every(Number.isInteger)||foto.x<0||foto.y<0||foto.width!==120||foto.height!==80)return;
    next[sap]={atlas:String(foto.atlas),x:foto.x,y:foto.y,width:foto.width,height:foto.height};
