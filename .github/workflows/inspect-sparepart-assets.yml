@@ -84,7 +84,9 @@ jobs:
                   if not sap or sap in seen:
                       raise SystemExit(f'Missing or duplicate SAP key: {sap!r}')
                   seen.add(sap)
-                  photo = row.get('foto')
+                  # The source archive stores photo coordinates directly on each row;
+                  # accept nested foto objects too, but never infer from row order.
+                  photo = row.get('foto') or (row if row.get('atlas') else None)
                   if not photo:
                       continue
                   atlas = photo.get('atlas')
@@ -97,8 +99,8 @@ jobs:
                       raise SystemExit(f'Crop outside atlas bounds for SAP {sap}: {photo}, atlas={aw}x{ah}')
                   if (w,h) != (120,80):
                       raise SystemExit(f'Unexpected crop size for SAP {sap}: {w}x{h}')
-              print(f'Validated {len(seen)} unique SAP keys and {sum(1 for m in materials if m.get("foto"))} photo crops.')
-              mapped_count = sum(1 for m in materials if m.get('foto'))
+              print(f'Validated {len(seen)} unique SAP keys and {sum(1 for m in materials if m.get("foto") or m.get("atlas"))} photo crops.')
+              mapped_count = sum(1 for m in materials if m.get('foto') or m.get('atlas'))
               if not isinstance(photos, int) or photos != mapped_count:
                   print(f'WARNING: root photos value {photos!r} differs from mapped rows ({mapped_count}); row mappings are authoritative.')
               cols = 3
