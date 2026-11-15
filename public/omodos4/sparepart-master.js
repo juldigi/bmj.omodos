@@ -96,7 +96,15 @@ function renderCatalog(){
  const rows=filtered.slice(0,300);
  tbody.innerHTML=rows.length?rows.map(function(r){
   const photo=String(r['Actual Pict']||'').trim();
-  const photoCell=/^https?:\/\//i.test(photo)?'<img src="'+esc(photo)+'" alt="Foto '+esc(r['Material Number'])+'" loading="lazy" style="width:48px;height:42px;object-fit:contain;border:1px solid var(--line,#dbe3e8);border-radius:6px;background:#fff">':'<span style="color:var(--text-dim,#64748b)">Belum ada URL foto</span>';
+  const mapped=photoMap[String(r['Material Number']||'').trim()];
+  let photoCell='<span style="color:var(--text-dim,#64748b)">Belum ada foto</span>';
+  if(mapped){
+   const sx=mapped.x*.4,sy=mapped.y*.4;
+   const atlasUrl='/omodos4/sparepart-assets/atlases/'+mapped.atlas;
+   photoCell='<span role="img" aria-label="Foto material '+esc(r['Material Number'])+'" title="Foto dari atlas SAP" style="display:inline-block;width:48px;height:32px;border:1px solid var(--line,#dbe3e8);border-radius:6px;background-color:#fff;background-image:url(&quot;'+esc(atlasUrl)+'&quot;);background-repeat:no-repeat;background-size:240px 320px;background-position:-'+sx+'px -'+sy+'px"></span>';
+  }else if(/^https?:\\/\\//i.test(photo)){
+   photoCell='<img src="'+esc(photo)+'" alt="Foto '+esc(r['Material Number'])+'" loading="lazy" style="width:48px;height:32px;object-fit:contain;border:1px solid var(--line,#dbe3e8);border-radius:6px;background:#fff">';
+  }
   return '<tr><td>'+photoCell+'</td><td>'+esc(r['Material Number'])+'</td><td>'+esc(r['Material Description'])+'</td><td>'+esc(r['Base UoM'])+'</td><td>'+esc(r['Harga satuan'])+'</td><td>'+esc(r['Stock Qty (SAP)'])+'</td><td>'+esc(r['Min Stock'])+' / '+esc(r['Max Stock'])+'</td><td>'+esc(r['Machine Allocation'])+'</td><td>'+esc(r['Storage Bin'])+'</td></tr>';
  }).join(''):'<tr><td colspan="9" class="om-spm-empty">Tidak ada material yang cocok.</td></tr>';
  if(filtered.length>300)count.textContent+=' · tampil 300 pertama, gunakan pencarian untuk mempersempit';
