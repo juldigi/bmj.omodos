@@ -55,9 +55,30 @@ function ensureUi(){
  byId('om-spm-import-btn').addEventListener('click',importWorkbook);
 }
 let catalog=[];
+let photoMap=Object.create(null);
+let photoMapLoaded=false;
+async function loadPhotoMap(){
+ if(photoMapLoaded)return;
+ try{
+  const response=await fetch('/omodos4/sparepart-assets/manifest.json',{cache:'no-store',credentials:'same-origin'});
+  if(!response.ok)throw new Error('Manifest foto tidak tersedia ('+response.status+').');
+  const manifest=await response.json();
+  const rows=Array.isArray(manifest.materials)?manifest.materials:[];
+  const next=Object.create(null);
+  rows.forEach(function(row){
+   const sap=String(row&&row.sap||'').trim(),foto=row&&row.foto;
+   if(!sap||!foto||!/^sparepart-atlas-\\d{2}\\.jpg$/i.test(String(foto.atlas||'')))return;
+   const values=[foto.x,foto.y,foto.width,foto.height];
+   if(!values.every(Number.isInteger)||foto.x<0||foto.y<0||foto.width!==120||foto.height!==80)return;
+   next[sap]={atlas:String(foto.atlas),x:foto.x,y:foto.y,width:foto.width,height:foto.height};
+  });
+  photoMap=next;photoMapLoaded=true;
+ }catch(err){console.warn('[OMODOS Master Sparepart] Manifest foto belum dapat dimuat',err);}
+}
 async function loadCatalog(){
  const status=byId('om-spm-status');if(status)status.textContent='Memuat katalog dari database OMODOS...';
  try{
+  await loadPhotoMap();
   const result=await window.apiPost({action:'sparepartMasterRead'});
   if(!result||result.ok===false)throw new Error(result&&result.error||'Gagal membaca katalog master.');
   catalog=Array.isArray(result.data)?result.data:[];
