@@ -117,7 +117,7 @@ jobs:
           set -euo pipefail
           target="public/omodos4/sparepart-assets/atlases"
           mkdir -p "$target"
-          unzip -j /tmp/sparepart-assets.zip 'sparepart-atlas-*.jpg' -d "$target"
+          unzip -jo /tmp/sparepart-assets.zip 'sparepart-atlas-*.jpg' -d "$target"
           test "$(find "$target" -maxdepth 1 -type f -name 'sparepart-atlas-*.jpg' | wc -l)" -eq 19
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
