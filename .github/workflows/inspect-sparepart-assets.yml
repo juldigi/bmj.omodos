@@ -79,3 +79,5 @@ jobs:
           name: omodos-sparepart-atlas-review
           path: /tmp/atlas-review/
           if-no-files-found: error
+
+# Re-run atlas inspection after source archive was verified in Dropbox.
