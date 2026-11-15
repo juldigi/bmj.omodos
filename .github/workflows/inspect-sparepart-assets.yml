@@ -23,7 +23,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
           fetch-depth: 0
       - name: Download authorized Dropbox archive
         run: |
@@ -123,7 +123,8 @@ jobs:
             echo "Atlas assets already current; no commit needed."
           else
             git commit -m "assets: publish validated sparepart atlases"
-            git push origin "HEAD:$GITHUB_REF_NAME"
+            target_branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+            git push origin "HEAD:$target_branch"
           fi
       - name: Upload atlas review package
         uses: actions/upload-artifact@v4
