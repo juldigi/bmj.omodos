@@ -98,8 +98,9 @@ jobs:
                   if (w,h) != (120,80):
                       raise SystemExit(f'Unexpected crop size for SAP {sap}: {w}x{h}')
               print(f'Validated {len(seen)} unique SAP keys and {sum(1 for m in materials if m.get("foto"))} photo crops.')
-              if len(photos) != sum(1 for m in materials if m.get('foto')):
-                  print(f'WARNING: root photos count {photos!r} differs from mapped rows; row mappings are authoritative.')
+              mapped_count = sum(1 for m in materials if m.get('foto'))
+              if not isinstance(photos, int) or photos != mapped_count:
+                  print(f'WARNING: root photos value {photos!r} differs from mapped rows ({mapped_count}); row mappings are authoritative.')
               cols = 3
               rows = (len(thumbs)+cols-1)//cols
               sheet = Image.new('RGB', (cols*440, rows*340), '#d9dee5')
