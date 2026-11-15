@@ -8,12 +8,17 @@ on:
       - .github/workflows/inspect-sparepart-assets.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
       - name: Download authorized Dropbox archive
         run: |
           curl --fail --location --retry 3 \
@@ -53,11 +58,13 @@ jobs:
                   raise SystemExit('Material count validation failed')
               thumbs = []
               report = []
+              atlas_sizes = {}
               for name in atlases:
                   raw = z.read(name)
                   dest = out / pathlib.Path(name).name
                   dest.write_bytes(raw)
                   im = Image.open(dest).convert('RGB')
+                  atlas_sizes[dest.name] = (im.width, im.height)
                   print(f'ATLAS {dest.name}: {im.width}x{im.height}, sha256={hashlib.sha256(raw).hexdigest()}')
                   thumb = ImageOps.contain(im, (420, 300))
                   tile = Image.new('RGB', (440, 340), 'white')
@@ -65,6 +72,28 @@ jobs:
                   ImageDraw.Draw(tile).text((12, 8), f'{dest.name} · {im.width}x{im.height}', fill='black')
                   thumbs.append(tile)
                   report.append(f'{dest.name}\t{im.width}x{im.height}\t{hashlib.sha256(raw).hexdigest()}')
+              seen = set()
+              for row in materials:
+                  sap = str(row.get('sap') or '').strip()
+                  if not sap or sap in seen:
+                      raise SystemExit(f'Missing or duplicate SAP key: {sap!r}')
+                  seen.add(sap)
+                  photo = row.get('foto')
+                  if not photo:
+                      continue
+                  atlas = photo.get('atlas')
+                  x, y = photo.get('x'), photo.get('y')
+                  w, h = photo.get('width'), photo.get('height')
+                  if atlas not in atlas_sizes or not all(isinstance(v, int) for v in (x,y,w,h)) or w <= 0 or h <= 0:
+                      raise SystemExit(f'Invalid photo mapping for SAP {sap}: {photo}')
+                  aw, ah = atlas_sizes[atlas]
+                  if x < 0 or y < 0 or x+w > aw or y+h > ah:
+                      raise SystemExit(f'Crop outside atlas bounds for SAP {sap}: {photo}, atlas={aw}x{ah}')
+                  if (w,h) != (120,80):
+                      raise SystemExit(f'Unexpected crop size for SAP {sap}: {w}x{h}')
+              print(f'Validated {len(seen)} unique SAP keys and {sum(1 for m in materials if m.get("foto"))} photo crops.')
+              if len(photos) != sum(1 for m in materials if m.get('foto')):
+                  print(f'WARNING: root photos count {photos!r} differs from mapped rows; row mappings are authoritative.')
               cols = 3
               rows = (len(thumbs)+cols-1)//cols
               sheet = Image.new('RGB', (cols*440, rows*340), '#d9dee5')
@@ -73,6 +102,23 @@ jobs:
               sheet.save(out/'atlas-contact-sheet.jpg', quality=88)
               (out/'atlas-inventory.tsv').write_text('\n'.join(report)+'\n', encoding='utf-8')
           PY
+      - name: Publish validated atlas files to PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="public/omodos4/sparepart-assets/atlases"
+          mkdir -p "$target"
+          unzip -j /tmp/sparepart-assets.zip 'sparepart-atlas-*.jpg' -d "$target"
+          test "$(find "$target" -maxdepth 1 -type f -name 'sparepart-atlas-*.jpg' | wc -l)" -eq 19
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$target"
+          if git diff --cached --quiet; then
+            echo "Atlas assets already current; no commit needed."
+          else
+            git commit -m "assets: publish validated sparepart atlases"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
       - name: Upload atlas review package
         uses: actions/upload-artifact@v4
         with:
