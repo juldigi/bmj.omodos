@@ -1,6 +1,11 @@
 name: Inspect OMODOS sparepart asset archive
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/inspect-sparepart-assets.yml
+      - public/omodos4/sparepart-assets/manifest.json
   push:
     branches:
       - sparepart-master-photo-price
