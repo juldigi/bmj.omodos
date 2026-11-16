@@ -4991,6 +4991,38 @@ function createBackend(services, env = {}) {
   }
   __name(getMachinesList_, "getMachinesList_");
   function getPersonilList_() {
+    // Keep this required picker entry in the authoritative Master_Personil
+    // source so Logbook, PM, and Patrol all receive the same canonical name.
+    const sh = getOrCreateSheet_(SHEET_PERSONIL, PERSONIL_HEADERS);
+    const data = sh.getDataRange().getValues();
+    const headers = data[0] || PERSONIL_HEADERS;
+    const nameCol = headers.indexOf("Nama Personil");
+    const deletedAtCol = headers.indexOf("DeletedAt");
+    const targetName = "Jamhuriyat";
+    const normalizeName = (value) => String(value == null ? "" : value)
+      .normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+    const targetKey = normalizeName(targetName);
+    const activeMatchIndex = nameCol < 0 ? -1 : data.slice(1).findIndex((row) =>
+      normalizeName(row[nameCol]) === targetKey &&
+      (deletedAtCol < 0 || !String(row[deletedAtCol] || "").trim())
+    );
+    const cache = getCache_();
+    const cacheKey = "rows_" + SHEET_PERSONIL;
+    let changed = false;
+    if (activeMatchIndex >= 0) {
+      const rowIndex = activeMatchIndex + 2;
+      if (String(data[rowIndex - 1][nameCol] || "") !== targetName) {
+        sh.getRange(rowIndex, nameCol + 1).setValue(targetName);
+        changed = true;
+      }
+    } else {
+      const row = headers.map((header) => header === "Nama Personil" ? targetName : "");
+      sh.appendRow(row);
+      changed = true;
+    }
+    if (changed && cache) {
+      try { cache.remove(cacheKey); } catch (e) {}
+    }
     return getGenericRows_(SHEET_PERSONIL, PERSONIL_HEADERS);
   }
   __name(getPersonilList_, "getPersonilList_");
