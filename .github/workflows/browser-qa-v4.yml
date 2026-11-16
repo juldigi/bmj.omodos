@@ -36,6 +36,8 @@ jobs:
           node tools/test_factory_home_card_detail.cjs
           node tools/test_logbook_review_fixes.cjs
           node tools/test_jamhuriyat_personil_seed.cjs
+          node tools/test_report_change_audit.cjs
+          node --check public/omodos4/report-change-audit.js
           node tools/test_work_areas.cjs
 
           node <<'NODE'
