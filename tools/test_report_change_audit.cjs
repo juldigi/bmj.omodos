@@ -53,7 +53,7 @@ assert.match(worker,/\["savePredictiveReport", "deletePredictiveReport"\]\.forEa
 assert.match(worker,/body\.actor = session\.username/,'account identity comes from authenticated server session');
 assert.match(worker,/function handleGetAuditLog_\(params, session\)[\s\S]*requirePermission_\(session\.role, "rbac\.manage"\)/,'Audit_Log reading remains restricted to Superadmin permissions');
 
-assert.match(ui,/data-change-audit-select/,'UI requires a name selection');
+assert.match(ui,/dataset\.changeAuditSelect/,'UI requires a name selection');
 assert.match(ui,/data-change-audit-confirm/,'UI has an explicit confirm step');
 assert.match(ui,/updateEntry/);
 assert.match(ui,/deleteEntry/);
