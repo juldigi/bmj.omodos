@@ -36,6 +36,8 @@ jobs:
           node tools/test_factory_home_card_detail.cjs
           node tools/test_logbook_review_fixes.cjs
           node tools/test_jamhuriyat_personil_seed.cjs
+          node tools/test_report_change_audit.cjs
+          node --check public/omodos4/report-change-audit.js
           node tools/test_work_areas.cjs
 
           node <<'NODE'
@@ -164,6 +166,63 @@ jobs:
               timeout: 15000
             });
             result.phases.push('open');
+
+            console.log('[QA] report change name selection guard');
+            const auditPickerSetup = await page.evaluate(() => {
+              if (typeof window.apiPost !== 'function') return { ready:false, reason:'apiPost missing' };
+              const selects = [...document.querySelectorAll('#select-namaPelapor,#patrol-nama-pelapor,#select-pmPetugas')]
+                .filter(node => node.tagName === 'SELECT');
+              if (!selects.length) return { ready:false, reason:'personnel select missing' };
+              window.__qaRealApiPost = window.apiPost;
+              window.__qaAuditPosted = [];
+              window.apiPost = async payload => {
+                window.__qaAuditPosted.push(payload);
+                return { ok:true, received:payload };
+              };
+              selects.forEach(select => {
+                if (![...select.options].some(option => option.value === 'QA Auditor')) {
+                  const option=document.createElement('option');
+                  option.value='QA Auditor'; option.textContent='QA Auditor'; select.appendChild(option);
+                }
+              });
+              return { ready:true, selectCount:selects.length };
+            });
+            if (!auditPickerSetup.ready) throw new Error('Report change audit picker setup failed: ' + JSON.stringify(auditPickerSetup));
+            await page.addScriptTag({ path:'public/omodos4/report-change-audit.js' });
+            const guarded = await page.evaluate(() => ({
+              installed: !!window.__OMODOS_REPORT_CHANGE_AUDIT_V1__,
+              wrapper: !!window.apiPost.__omodosReportChangeAudit
+            }));
+            if (!guarded.installed || !guarded.wrapper) throw new Error('Report change audit guard not installed: ' + JSON.stringify(guarded));
+
+            await page.evaluate(() => {
+              window.__qaAuditPending = window.apiPost({ action:'updateEntry', id:'QA-LOGBOOK', entry:{id:'QA-LOGBOOK'} });
+            });
+            await page.waitForSelector('.omodos-report-change-modal');
+            await page.locator('[data-change-audit-cancel]').click();
+            const cancelled = await page.evaluate(() => window.__qaAuditPending);
+            if (cancelled.error !== 'NAME_SELECTION_CANCELLED') throw new Error('Cancelling name selection did not block Logbook edit: ' + JSON.stringify(cancelled));
+
+            const auditActions = [
+              { action:'updateEntry', id:'QA-LOGBOOK', entry:{id:'QA-LOGBOOK'} },
+              { action:'deleteEntry', id:'QA-LOGBOOK' },
+              { action:'savePredictiveReport', report:{id:'QA-PATROL'}, files:[] },
+              { action:'deletePredictiveReport', id:'QA-PATROL' }
+            ];
+            const auditResults = [];
+            for (const payload of auditActions) {
+              await page.evaluate(payload => { window.__qaAuditPending = window.apiPost(payload); }, payload);
+              await page.waitForSelector('.omodos-report-change-modal');
+              await page.locator('[data-change-audit-select]').selectOption('QA Auditor');
+              await page.locator('[data-change-audit-confirm]').click();
+              auditResults.push(await page.evaluate(() => window.__qaAuditPending));
+            }
+            const auditValid = auditResults.every(result => result && result.ok && result.received && result.received.modifierName === 'QA Auditor');
+            const postedCount = await page.evaluate(() => window.__qaAuditPosted.length);
+            await page.evaluate(() => { window.apiPost = window.__qaRealApiPost; });
+            result.reportChangeAudit = { guarded, cancelled, postedCount, actions:auditResults.map(x=>x.received.action) };
+            if (!auditValid || postedCount !== 4) throw new Error('Report change audit did not require and pass personnel names: ' + JSON.stringify(result.reportChangeAudit));
+            result.phases.push('report-change-audit');
 
             console.log('[QA] structural');
             const structural = await page.evaluate(() => ({
