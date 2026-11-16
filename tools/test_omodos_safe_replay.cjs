@@ -23,7 +23,7 @@ for (const token of [
  'String(r["Lokasi Jenis"] || "").toLowerCase() === "area"',
  'Lokasi Jenis'
 ]) assert.ok(worker.includes(token),'missing Worker contract: '+token);
-const saveStart=worker.indexOf('function savePredictiveReport_(report, files)');
+const saveStart=worker.indexOf('function savePredictiveReport_(');
 const saveEnd=worker.indexOf('__name(savePredictiveReport_',saveStart);
 assert.ok(saveStart>=0&&saveEnd>saveStart,'Patrol save function exists');
 const save=worker.slice(saveStart,saveEnd);
