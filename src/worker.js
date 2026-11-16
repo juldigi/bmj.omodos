@@ -5000,7 +5000,7 @@ function createBackend(services, env = {}) {
     const deletedAtCol = headers.indexOf("DeletedAt");
     const targetName = "Jamhuriyat";
     const normalizeName = (value) => String(value == null ? "" : value)
-      .normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("id-ID");
+      .normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
     const targetKey = normalizeName(targetName);
     const activeMatchIndex = nameCol < 0 ? -1 : data.slice(1).findIndex((row) =>
       normalizeName(row[nameCol]) === targetKey &&
