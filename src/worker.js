@@ -6897,7 +6897,6 @@ function createBackend(services, env = {}) {
         break;
       }
     }
-    if (report.id && targetRow < 0) throw { code: "NOT_FOUND", message: "Laporan Patrol yang akan diedit tidak ditemukan." };
     var modifierName = "";
     var modifierAccount = "";
     if (targetRow > 0) {
