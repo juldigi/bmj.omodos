@@ -131,7 +131,14 @@ if(typeof originalApiPost==='function'&&!originalApiPost.__omodosReportChangeAud
     const person=await pickPerson(kind);
     if(!person)return {ok:false,error:'NAME_SELECTION_CANCELLED'};
     const args=Array.from(arguments);
-    args[0]=Object.assign({},payload,{modifierName:person});
+    const prepared=Object.assign({},payload,{modifierName:person});
+    if(!prepared.id){
+      const action=String(payload.action||'');
+      const nested=payload.entry||payload.data||{};
+      const report=payload.report||{};
+      prepared.id=payload.ID||nested.ID||nested.id||report.ID||report.id||'';
+    }
+    args[0]=prepared;
     return originalApiPost.apply(this,args);
   };
   guardedApiPost.__omodosReportChangeAudit=true;
