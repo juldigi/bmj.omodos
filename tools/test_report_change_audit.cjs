@@ -18,8 +18,8 @@ const resolver=new Function('getPersonilList_',worker.slice(helperStart,helperEn
 );
 assert.equal(resolver(' qa   person '),'QA Person','name matching is normalized and returns canonical Master Personil name');
 assert.equal(resolver('JAMHURIYAT'),'Jamhuriyat','Jamhuriyat is available as a canonical personnel value');
-assert.throws(()=>resolver('  '),/Nama personil/i,'blank modifier is rejected');
-assert.throws(()=>resolver('Unknown Person'),/Master Personil/i,'names outside Master Personil are rejected');
+assert.throws(()=>resolver('  '),err=>err&&err.code==='VALIDATION_ERROR'&&/Nama personil/i.test(err.message),'blank modifier is rejected');
+assert.throws(()=>resolver('Unknown Person'),err=>err&&err.code==='VALIDATION_ERROR'&&/Master Personil/i.test(err.message),'names outside Master Personil are rejected');
 
 const update=block('  function updateEntry_(body) {','  __name(updateEntry_, "updateEntry_");');
 assert.match(update,/requiredChangePersonilName_\(body\.modifierName\)/,'Logbook edit requires a Master Personil selection');
