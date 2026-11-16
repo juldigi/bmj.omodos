@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   browser-qa:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +35,7 @@ jobs:
           node --check src/worker.js
           node tools/test_factory_home_card_detail.cjs
           node tools/test_logbook_review_fixes.cjs
+          node tools/test_work_areas.cjs
 
           node <<'NODE'
           const fs=require('fs');
@@ -133,6 +134,7 @@ jobs:
 
           const browser = await chromium.launch({ headless: true });
           const errors = [];
+          const dialogs = [];
           const result = { phases: [] };
 
           try {
@@ -142,6 +144,7 @@ jobs:
 
             page.on('pageerror', e => errors.push(String(e)));
             page.on('dialog', async d => {
+              dialogs.push({ type: d.type(), message: d.message() });
               console.log('[QA_DIALOG] ' + d.type() + ': ' + d.message());
               try { await d.dismiss(); } catch {}
             });
@@ -1573,6 +1576,70 @@ jobs:
             result.areaFormQA=areaFormQA;
             result.phases.push('area-work-logbook-mobile');
 
+            console.log('[QA] Logbook machine/area selector regression');
+            const dialogsBeforeLocationPicker = dialogs.length;
+            const locationPicker = await page.evaluate(() => {
+              const oldMachines = MACHINES;
+              const location = document.getElementById('select-lokasiPekerjaan');
+              const category = document.getElementById('select-kategoriArea');
+              const area = document.getElementById('select-namaArea');
+              const code = document.getElementById('select-kodeMesin');
+              const name = document.getElementById('select-namaMesin');
+              const messages = [];
+              const oldToast = window.toast;
+              if (!location || !category || !area || !code || !name) throw new Error('Logbook location controls are incomplete');
+              try {
+                if (typeof oldToast === 'function') {
+                  window.toast = function(message, isError) {
+                    if (isError) messages.push(String(message));
+                    return oldToast.apply(this, arguments);
+                  };
+                }
+                MACHINES = [{ 'Kode Mesin':'QA-LOC-1', 'Nama Mesin':'QA Offset 5', 'Lokasi/Area':'QA Printing' }];
+                populateMachineSelects();
+                location.value = 'Mesin';
+                location.dispatchEvent(new Event('change', { bubbles:true }));
+                code.value = 'QA-LOC-1';
+                code.dispatchEvent(new Event('change', { bubbles:true }));
+                if (name.value !== 'QA Offset 5') throw new Error('Selecting machine code did not sync machine name');
+                const machinePayload = applyLogbookLocationPayload_({
+                  lokasiPekerjaan:'Mesin', kodeMesin:code.value, namaMesin:name.value, namaUnit:'QA Unit'
+                });
+                if (machinePayload.lokasi !== 'QA Printing' || machinePayload.kategoriArea !== '-') {
+                  throw new Error('Machine location payload mismatch: ' + JSON.stringify(machinePayload));
+                }
+                location.value = 'Area';
+                location.dispatchEvent(new Event('change', { bubbles:true }));
+                category.value = 'Office';
+                category.dispatchEvent(new Event('change', { bubbles:true }));
+                area.value = 'RMS';
+                const areaPayload = applyLogbookLocationPayload_({
+                  lokasiPekerjaan:'Area', kategoriArea:category.value, namaArea:area.value, kodeMesin:'stale', namaMesin:'stale'
+                });
+                if (areaPayload.lokasi !== 'Office · RMS' || areaPayload.kodeMesin !== '-' || areaPayload.namaMesin !== '-') {
+                  throw new Error('Area location payload mismatch: ' + JSON.stringify(areaPayload));
+                }
+                location.value = 'Mesin';
+                location.dispatchEvent(new Event('change', { bubbles:true }));
+                if (document.getElementById('entry-area-fields').hidden !== true ||
+                    document.getElementById('entry-machine-fields').hidden !== false) {
+                  throw new Error('Switching back to machine mode did not restore the machine picker');
+                }
+                if (messages.length) throw new Error('Location picker raised an error toast: ' + messages.join(' | '));
+                return { machine:machinePayload.namaMesin, machineLocation:machinePayload.lokasi, area:areaPayload.lokasi, toggled:true, errorToasts:messages };
+              } finally {
+                MACHINES = oldMachines;
+                populateMachineSelects();
+                if (oldToast) window.toast = oldToast;
+                location.value = 'Mesin';
+                syncLogbookLocationForm_();
+              }
+            });
+            result.locationPicker = locationPicker;
+            if (dialogs.length !== dialogsBeforeLocationPicker) {
+              throw new Error('Location picker opened an unexpected dialog: ' + JSON.stringify(dialogs.slice(dialogsBeforeLocationPicker)));
+            }
+            result.phases.push('logbook-machine-area-selector');
 
             console.log('[QA] patrol team and unadded finding protection');
             const patrolRevisions=await page.evaluate(async()=>{

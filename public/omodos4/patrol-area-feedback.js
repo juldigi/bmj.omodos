@@ -13,64 +13,84 @@ ready(function(){
     if(typeof OMODOS_WORK_AREAS!=='undefined' && typeof populateWorkAreaOptions_==='function'){
       const originalPopulate = populateWorkAreaOptions_;
       populateWorkAreaOptions_ = function(category,select,value){
+        if(!select) return false;
         originalPopulate(category,select,value);
-        if(!select) return;
-        if(!Array.from(select.options).some(o=>o.value==='Lainnya')){
+        if(!Array.from(select.options||[]).some(o=>o.value==='Lainnya')){
           const option=document.createElement('option');
           option.value='Lainnya'; option.textContent='Lainnya (area belum tersedia)';
           select.appendChild(option);
         }
         if(value==='Lainnya') select.value='Lainnya';
+        return true;
       };
       const category=$('#select-kategoriArea');
       const name=$('#select-namaArea');
       const areaFields=$('#entry-area-fields');
-      if(category && !Array.from(category.options).some(o=>o.value==='Lainnya')){
+      let customWrap=$('#entry-custom-area-wrap');
+      let custom=$('#input-namaArea-lainnya');
+      if(areaFields && !customWrap){
+        customWrap=document.createElement('div');
+        customWrap.className='field'; customWrap.id='entry-custom-area-wrap'; customWrap.hidden=true;
+        if(custom){
+          customWrap.appendChild(custom);
+        }else{
+          const label=document.createElement('label');label.htmlFor='input-namaArea-lainnya';label.textContent='Nama area yang belum tersedia';
+          custom=document.createElement('input');custom.type='text';custom.id='input-namaArea-lainnya';custom.placeholder='Masukkan nama area';custom.autocomplete='off';
+          const hint=document.createElement('div');hint.className='sub';hint.textContent='Nama ini akan disimpan pada Logbook.';
+          customWrap.append(label,custom,hint);
+        }
+        areaFields.appendChild(customWrap);
+      }
+      if(customWrap && !custom){
+        custom=document.createElement('input');custom.type='text';custom.id='input-namaArea-lainnya';custom.placeholder='Masukkan nama area';custom.autocomplete='off';
+        customWrap.appendChild(custom);
+      }else if(customWrap && custom && !customWrap.contains(custom)){
+        customWrap.appendChild(custom);
+      }
+      if(category && !Array.from(category.options||[]).some(o=>o.value==='Lainnya')){
         const option=document.createElement('option'); option.value='Lainnya'; option.textContent='Lainnya'; category.appendChild(option);
       }
-      if(areaFields && !$('#input-namaArea-lainnya')){
-        const wrap=document.createElement('div');
-        wrap.className='field'; wrap.id='entry-custom-area-wrap'; wrap.hidden=true;
-        wrap.innerHTML='<label for="input-namaArea-lainnya">Nama area yang belum tersedia</label><input type="text" id="input-namaArea-lainnya" placeholder="Masukkan nama area" autocomplete="off"><div class="sub">Nama ini akan disimpan pada Logbook.</div>';
-        areaFields.appendChild(wrap);
-      }
-      const custom=$('#input-namaArea-lainnya');
       function syncCustomArea(){
-        if(!category||!name||!custom) return;
-        const isArea=$('#select-lokasiPekerjaan') && $('#select-lokasiPekerjaan').value==='Area';
+        if(!category||!name||!custom||!customWrap) return;
+        const location=$('#select-lokasiPekerjaan');
+        const isArea=!!location && location.value==='Area';
         const isCustom=isArea && (category.value==='Lainnya'||name.value==='Lainnya');
-        $('#entry-custom-area-wrap').hidden=!isCustom;
+        customWrap.hidden=!isCustom;
         custom.required=!!isCustom;
         if(isCustom && category.value==='Lainnya' && name.value!=='Lainnya'){
           name.value='Lainnya';
         }
       }
-      category.addEventListener('change',function(){
-        if(category.value==='Lainnya'){
+      if(category) category.addEventListener('change',function(){
+        if(category.value==='Lainnya' && name){
           originalPopulate('Lainnya',name,'');
-          if(!Array.from(name.options).some(o=>o.value==='Lainnya')){
+          if(!Array.from(name.options||[]).some(o=>o.value==='Lainnya')){
             const o=document.createElement('option');o.value='Lainnya';o.textContent='Lainnya (isi nama area)';name.appendChild(o);
           }
           name.value='Lainnya';
         }
         syncCustomArea();
       });
-      name.addEventListener('change',syncCustomArea);
-      $('#select-lokasiPekerjaan').addEventListener('change',syncCustomArea);
-      const originalApply=applyLogbookLocationPayload_;
-      applyLogbookLocationPayload_ = function(entry){
-        if(entry && entry.lokasiPekerjaan==='Area' && (entry.kategoriArea==='Lainnya'||entry.namaArea==='Lainnya')){
-          const customName=String(custom.value||'').trim();
-          if(!customName) throw new Error('Nama area baru wajib diisi.');
-          const categoryName=entry.kategoriArea==='Lainnya'?'Lainnya':entry.kategoriArea;
-          entry.kategoriArea=categoryName;
-          entry.namaArea=customName;
-          entry.kodeMesin='-'; entry.namaMesin='-'; entry.namaUnit='-';
-          entry.lokasi=categoryName==='Lainnya'?customName:(categoryName+' · '+customName);
-          return entry;
-        }
-        return originalApply(entry);
-      };
+      if(name) name.addEventListener('change',syncCustomArea);
+      const locationSelect=$('#select-lokasiPekerjaan');
+      if(locationSelect) locationSelect.addEventListener('change',syncCustomArea);
+      const originalApply=typeof applyLogbookLocationPayload_==='function'?applyLogbookLocationPayload_:null;
+      if(originalApply){
+        applyLogbookLocationPayload_ = function(entry){
+          if(entry && entry.lokasiPekerjaan==='Area' && (entry.kategoriArea==='Lainnya'||entry.namaArea==='Lainnya')){
+            const customName=String(custom&&custom.value||'').trim();
+            if(!customName) throw new Error('Nama area baru wajib diisi.');
+            const categoryName=entry.kategoriArea==='Lainnya'?'Lainnya':entry.kategoriArea;
+            entry.kategoriArea=categoryName;
+            entry.namaArea=customName;
+            entry.namaAreaLainnya=customName;
+            entry.kodeMesin='-'; entry.namaMesin='-'; entry.namaUnit='-';
+            entry.lokasi=categoryName==='Lainnya'?customName:(categoryName+' · '+customName);
+            return entry;
+          }
+          return originalApply(entry);
+        };
+      }
       syncCustomArea();
       const form=$('#form-entry');
       if(form) form.addEventListener('reset',()=>setTimeout(()=>{if(custom)custom.value='';syncCustomArea();},0));
