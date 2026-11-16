@@ -8829,11 +8829,16 @@ bindPmMachineSync();
 function toggleMachineLainnyaRow(){
   const selKode = $('#select-kodeMesin'), selNama = $('#select-namaMesin');
   const row = $('#row-mesin-lainnya');
-  if(!selKode || !selNama || !row) return;
-  const isLainnya = $('#select-lokasiPekerjaan')?.value!=='Area' && (selKode.value === MACHINE_LAINNYA_VALUE || selNama.value === MACHINE_LAINNYA_VALUE);
+  const location = $('#select-lokasiPekerjaan');
+  const inputKode = $('#input-kodeMesin-lainnya');
+  const inputNama = $('#input-namaMesin-lainnya');
+  if(!selKode || !selNama || !row) return false;
+  const isLainnya = (!location || location.value !== 'Area') &&
+    (selKode.value === MACHINE_LAINNYA_VALUE || selNama.value === MACHINE_LAINNYA_VALUE);
   row.style.display = isLainnya ? 'grid' : 'none';
-  $('#input-kodeMesin-lainnya').required = isLainnya;
-  $('#input-namaMesin-lainnya').required = isLainnya;
+  if(inputKode) inputKode.required = isLainnya;
+  if(inputNama) inputNama.required = isLainnya;
+  return true;
 }
 const selectKodeMesin = $('#select-kodeMesin');
 if(selectKodeMesin){
@@ -8864,37 +8869,75 @@ if(selectNamaMesin){
 function isAreaEntry_(e){return String(e&&e['Lokasi Pekerjaan']||'').toLowerCase()==='area';}
 function logbookLocationLabel_(e){return isAreaEntry_(e)?(e['Lokasi/Area']||[e['Kategori Area'],e['Nama Area']].filter(Boolean).join(' · ')):(e['Nama Mesin']||e['Kode Mesin']||'-');}
 function populateWorkAreaOptions_(category,select,value){
- const areas=OMODOS_WORK_AREAS[category]||[];
+ if(!select) return false;
+ const catalog=(typeof OMODOS_WORK_AREAS!=='undefined' && OMODOS_WORK_AREAS && typeof OMODOS_WORK_AREAS==='object')?OMODOS_WORK_AREAS:{};
+ const areas=Array.isArray(catalog[category])?catalog[category]:[];
+ const requested=value===undefined||value===null?'':String(value);
  select.innerHTML='<option value="">Pilih area...</option>'+areas.map(a=>'<option value="'+escapeHtml(a)+'">'+escapeHtml(a)+'</option>').join('');
- select.value=areas.includes(value)?value:(areas.length===1?areas[0]:'');
+ select.value=areas.includes(requested)?requested:(areas.length===1?areas[0]:'');
+ return true;
 }
 function syncLogbookLocationForm_(){
- const area=$('#select-lokasiPekerjaan').value==='Area',category=$('#select-kategoriArea'),name=$('#select-namaArea');
- $('#entry-machine-fields').hidden=area;$('#entry-area-fields').hidden=!area;
- ['select-kodeMesin','select-namaMesin','input-namaUnit','input-kodeMesin-lainnya','input-namaMesin-lainnya'].forEach(id=>{const e=$('#'+id);e.disabled=area;e.required=!area&&!id.includes('lainnya');});
+ const location=$('#select-lokasiPekerjaan'),category=$('#select-kategoriArea'),name=$('#select-namaArea');
+ if(!location||!category||!name) return false;
+ const area=location.value==='Area';
+ const machineFields=$('#entry-machine-fields'),areaFields=$('#entry-area-fields');
+ if(machineFields) machineFields.hidden=area;
+ if(areaFields) areaFields.hidden=!area;
+ ['select-kodeMesin','select-namaMesin','input-namaUnit','input-kodeMesin-lainnya','input-namaMesin-lainnya'].forEach(id=>{
+   const field=$('#'+id);
+   if(!field) return;
+   field.disabled=area;
+   field.required=!area&&!id.includes('lainnya');
+ });
  category.disabled=!area;name.disabled=!area;category.required=area;name.required=area;
  populateWorkAreaOptions_(category.value,name,name.value);
- toggleMachineLainnyaRow();
+ if(typeof toggleMachineLainnyaRow==='function') toggleMachineLainnyaRow();
+ return true;
 }
 function applyLogbookLocationPayload_(entry){
- if(entry.lokasiPekerjaan==='Area'){
-  if(!(OMODOS_WORK_AREAS[entry.kategoriArea]||[]).includes(entry.namaArea))throw new Error('Pilih kategori dan area pekerjaan.');
+ if(!entry || typeof entry!=='object') throw new Error('Data lokasi Logbook tidak valid.');
+ if(String(entry.lokasiPekerjaan||'').trim()==='Area'){
+  const catalog=(typeof OMODOS_WORK_AREAS!=='undefined' && OMODOS_WORK_AREAS && typeof OMODOS_WORK_AREAS==='object')?OMODOS_WORK_AREAS:{};
+  const areas=Array.isArray(catalog[entry.kategoriArea])?catalog[entry.kategoriArea]:[];
+  if(!areas.includes(String(entry.namaArea||''))) throw new Error('Pilih kategori dan area pekerjaan.');
+  entry.lokasiPekerjaan='Area';
   entry.kodeMesin='-';entry.namaMesin='-';entry.namaUnit='-';
   entry.lokasi=entry.kategoriArea===entry.namaArea?entry.kategoriArea:entry.kategoriArea+' · '+entry.namaArea;
  }else{
   entry.lokasiPekerjaan='Mesin';entry.kategoriArea='-';entry.namaArea='-';
-  if(entry.kodeMesin===MACHINE_LAINNYA_VALUE)entry.kodeMesin=$('#input-kodeMesin-lainnya').value.trim();
-  if(entry.namaMesin===MACHINE_LAINNYA_VALUE)entry.namaMesin=$('#input-namaMesin-lainnya').value.trim();
-  if(!entry.kodeMesin||!entry.namaMesin)throw new Error('Kode Mesin dan Nama Mesin wajib diisi.');
-  const machine=MACHINES.find(m=>String(m['Kode Mesin']||'').trim()===entry.kodeMesin||String(m['Nama Mesin']||'').trim()===entry.namaMesin);
+  if(entry.kodeMesin===MACHINE_LAINNYA_VALUE){
+    const field=$('#input-kodeMesin-lainnya');
+    entry.kodeMesin=field?String(field.value||'').trim():'';
+  }
+  if(entry.namaMesin===MACHINE_LAINNYA_VALUE){
+    const field=$('#input-namaMesin-lainnya');
+    entry.namaMesin=field?String(field.value||'').trim():'';
+  }
+  if(!entry.kodeMesin||!entry.namaMesin) throw new Error('Kode Mesin dan Nama Mesin wajib diisi.');
+  const machineList=Array.isArray(MACHINES)?MACHINES:[];
+  const machine=machineList.find(m=>String(m&&m['Kode Mesin']||'').trim()===entry.kodeMesin||String(m&&m['Nama Mesin']||'').trim()===entry.namaMesin);
   entry.lokasi=machine?String(machine['Lokasi/Area']||'').trim():'-';
  }
  return entry;
 }
-$('#select-kategoriArea').innerHTML='<option value="">Pilih kategori...</option>'+Object.keys(OMODOS_WORK_AREAS).map(a=>'<option>'+escapeHtml(a)+'</option>').join('');
-$('#select-lokasiPekerjaan').addEventListener('change',syncLogbookLocationForm_);
-$('#select-kategoriArea').addEventListener('change',()=>populateWorkAreaOptions_($('#select-kategoriArea').value,$('#select-namaArea'),''));
-$('#form-entry').addEventListener('reset',()=>setTimeout(syncLogbookLocationForm_,0));
+const logbookAreaCatalog_=(typeof OMODOS_WORK_AREAS!=='undefined' && OMODOS_WORK_AREAS && typeof OMODOS_WORK_AREAS==='object')?OMODOS_WORK_AREAS:{};
+const logbookCategorySelect_=$('#select-kategoriArea');
+if(logbookCategorySelect_) logbookCategorySelect_.innerHTML='<option value="">Pilih kategori...</option>'+Object.keys(logbookAreaCatalog_).map(a=>'<option>'+escapeHtml(a)+'</option>').join('');
+const logbookLocationSelect_=$('#select-lokasiPekerjaan');
+if(logbookLocationSelect_ && !logbookLocationSelect_.dataset.logbookLocationBound){
+ logbookLocationSelect_.dataset.logbookLocationBound='1';
+ logbookLocationSelect_.addEventListener('change',syncLogbookLocationForm_);
+}
+if(logbookCategorySelect_ && !logbookCategorySelect_.dataset.logbookCategoryBound){
+ logbookCategorySelect_.dataset.logbookCategoryBound='1';
+ logbookCategorySelect_.addEventListener('change',()=>populateWorkAreaOptions_(logbookCategorySelect_.value,$('#select-namaArea'),''));
+}
+const logbookEntryForm_=$('#form-entry');
+if(logbookEntryForm_ && !logbookEntryForm_.dataset.logbookLocationResetBound){
+ logbookEntryForm_.dataset.logbookLocationResetBound='1';
+ logbookEntryForm_.addEventListener('reset',()=>setTimeout(syncLogbookLocationForm_,0));
+}
 syncLogbookLocationForm_();
 
 function updateSidebarCounts(){
