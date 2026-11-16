@@ -49,8 +49,7 @@ assert.match(patrolDelete,/softDeleted: true/,'Patrol deletion is a soft delete'
 
 assert.match(worker,/"updateEntry": \{ permission: "logbook\.update", audit: true/,'Logbook edit remains covered by Audit_Log');
 assert.match(worker,/"deleteEntry": \{ permission: "logbook\.delete", audit: true/,'Logbook delete remains covered by Audit_Log');
-assert.match(worker,/add\("savePredictiveReport", "patrol\.manage", "POST", true\)/,'Patrol save remains audited');
-assert.match(worker,/add\("deletePredictiveReport", "patrol\.manage", "POST", true\)/,'Patrol delete remains audited');
+assert.match(worker,/\["savePredictiveReport", "deletePredictiveReport"\]\.forEach\(function\(a\)\s*\{\s*add\(a, "patrol\.manage", "POST", true\)/,'Patrol save/delete remain audited');
 assert.match(worker,/body\.actor = session\.username/,'account identity comes from authenticated server session');
 assert.match(worker,/function handleGetAuditLog_\(params, session\)[\s\S]*requirePermission_\(session\.role, "rbac\.manage"\)/,'Audit_Log reading remains restricted to Superadmin permissions');
 
