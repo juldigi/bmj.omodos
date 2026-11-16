@@ -3793,10 +3793,8 @@ function createBackend(services, env = {}) {
         }
         break;
       case "deleteEntry":
-        validateRequired_(body, ["id", "modifierName"]);
-        break;
       case "deletePredictiveReport":
-        validateRequired_(body, ["id", "modifierName"]);
+        validateRequired_(body, ["modifierName"]);
         break;
       case "savePredictiveReport":
         if (body.report && body.report.id) validateRequired_(body, ["modifierName"]);
@@ -5037,17 +5035,17 @@ function createBackend(services, env = {}) {
   }
   __name(getPersonilList_, "getPersonilList_");
   function requiredChangePersonilName_(value) {
-    var requested = String(value == null ? "" : value).normalize("NFKC").trim().replace(/\\s+/g, " ");
+    var requested = String(value == null ? "" : value).normalize("NFKC").trim().replace(/\s+/g, " ");
     if (!requested) throw { code: "VALIDATION_ERROR", message: "Nama personil yang melakukan perubahan wajib dipilih." };
     var normalize = function(name) {
-      return String(name == null ? "" : name).normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("id-ID");
+      return String(name == null ? "" : name).normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
     };
     var people = getPersonilList_() || [];
     var match = people.find(function(row) {
       return normalize(row && (row["Nama Personil"] || row.namaPersonil || row.name)) === normalize(requested);
     });
     if (!match) throw { code: "VALIDATION_ERROR", message: "Pilih nama pengubah/penghapus yang terdaftar pada Master Personil." };
-    return String(match["Nama Personil"] || match.namaPersonil || match.name).trim().replace(/\\s+/g, " ");
+    return String(match["Nama Personil"] || match.namaPersonil || match.name).trim().replace(/\s+/g, " ");
   }
   __name(requiredChangePersonilName_, "requiredChangePersonilName_");
   function getPiPersonnelMaster_() {
