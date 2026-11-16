@@ -4,7 +4,7 @@ if(window.__OMODOS_REPORT_CHANGE_AUDIT_V1__)return;
 window.__OMODOS_REPORT_CHANGE_AUDIT_V1__=true;
 
 const selectors=['#select-namaPelapor','#patrol-nama-pelapor','#select-pmPetugas'];
-function normalized(value){return String(value==null?'':value).normalize('NFKC').trim().replace(/\\s+/g,' ');}
+function normalized(value){return String(value==null?'':value).normalize('NFKC').trim().replace(/\s+/g,' ');}
 function personnelNames(){
   const names=new Map();
   function add(value){
