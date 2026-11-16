@@ -2886,7 +2886,7 @@ function createBackend(services, env = {}) {
   const RUN_HOUR_COMPARISON_HEADERS = ["ID", "Tahun", "Lini", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agust", "Sep", "Okt", "Nop", "Des", "Catatan", "Created At", "Updated At"];
   const ENERGY_COST_TOE_HEADERS = ["ID", "Tahun", "Bulan", "Good Sheet Produced", "Stand Meter (GWh)", "Energy Use (GWh)", "Tariff (IDR/kWh)", "TOE", "Catatan", "Created At", "Updated At"];
   const REPORTS_HEADERS = ["ID", "Timestamp", "Type", "Title", "Subtitle", "Author", "Category", "Status", "Progress", "Tanggal Mulai", "Tanggal Selesai", "Summary", "Content", "PDF URL", "Revision", "RawDataJSON"];
-  const PREDICTIVE_HEADERS = ["ID", "Timestamp", "Tanggal", "Shift", "Petugas", "Kode Mesin", "Nama Mesin", "Titik Inspeksi", "Vibrasi", "Suhu", "Suara", "Kebocoran", "Kelistrikan", "Pelumasan", "Severity", "Deskripsi Temuan", "Rekomendasi", "Files", "Grouping Team", "Waktu Patrol", "Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)"];
+  const PREDICTIVE_HEADERS = ["ID", "Timestamp", "Tanggal", "Shift", "Petugas", "Kode Mesin", "Nama Mesin", "Titik Inspeksi", "Vibrasi", "Suhu", "Suara", "Kebocoran", "Kelistrikan", "Pelumasan", "Severity", "Deskripsi Temuan", "Rekomendasi", "Files", "Grouping Team", "Waktu Patrol", "Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)", "UpdatedAt", "UpdatedBy", "UpdatedByAccount", "DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason"];
   const IPAL_HEADERS = ["ID", "Timestamp", "Pelapor", "Bulan", "OutletLabel", "DailyJSON", "ChemicalJSON"];
   const RCA_HEADERS = ["ID", "Timestamp", "Nama Mesin", "Title", "SectionsJSON"];
   const KB_HEADERS = ["ID", "Timestamp", "Kategori", "Kode Mesin", "Nama Mesin", "Judul", "Konten", "Tags", "Author", "Source Type", "Source ID"];
@@ -3789,7 +3789,17 @@ function createBackend(services, env = {}) {
         }
         if (action === "updateEntry") {
           if (!(body.entry && (body.entry.ID || body.entry.id)) && !body.id) throw { code: "VALIDATION_ERROR", message: "ID wajib diisi untuk update" };
+          validateRequired_(body, ["modifierName"]);
         }
+        break;
+      case "deleteEntry":
+        validateRequired_(body, ["id", "modifierName"]);
+        break;
+      case "deletePredictiveReport":
+        validateRequired_(body, ["id", "modifierName"]);
+        break;
+      case "savePredictiveReport":
+        if (body.report && body.report.id) validateRequired_(body, ["modifierName"]);
         break;
       case "addMachine":
         validateRequired_(body, ["machine"]);
@@ -5026,6 +5036,20 @@ function createBackend(services, env = {}) {
     return getGenericRows_(SHEET_PERSONIL, PERSONIL_HEADERS);
   }
   __name(getPersonilList_, "getPersonilList_");
+  function requiredChangePersonilName_(value) {
+    var requested = String(value == null ? "" : value).normalize("NFKC").trim().replace(/\\s+/g, " ");
+    if (!requested) throw { code: "VALIDATION_ERROR", message: "Nama personil yang melakukan perubahan wajib dipilih." };
+    var normalize = function(name) {
+      return String(name == null ? "" : name).normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("id-ID");
+    };
+    var people = getPersonilList_() || [];
+    var match = people.find(function(row) {
+      return normalize(row && (row["Nama Personil"] || row.namaPersonil || row.name)) === normalize(requested);
+    });
+    if (!match) throw { code: "VALIDATION_ERROR", message: "Pilih nama pengubah/penghapus yang terdaftar pada Master Personil." };
+    return String(match["Nama Personil"] || match.namaPersonil || match.name).trim().replace(/\\s+/g, " ");
+  }
+  __name(requiredChangePersonilName_, "requiredChangePersonilName_");
   function getPiPersonnelMaster_() {
     return getGenericRows_(SHEET_PI_PERSONNEL, PI_PERSONNEL_HEADERS);
   }
@@ -6754,7 +6778,9 @@ function createBackend(services, env = {}) {
   }
   __name(deleteGeneralReport_, "deleteGeneralReport_");
   function getPredictiveReports_() {
-    return getGenericRows_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS);
+    return getGenericRows_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS).filter(function(row) {
+      return !String(row && row.DeletedAt || "").trim();
+    });
   }
   __name(getPredictiveReports_, "getPredictiveReports_");
   function bootstrapCan_(role, permissionKey) {
@@ -6860,10 +6886,10 @@ function createBackend(services, env = {}) {
     });
   }
   __name(getHomePatrolLatest_, "getHomePatrolLatest_");
-  function savePredictiveReport_(report, files) {
+  function savePredictiveReport_(report, files, modifierNameInput, accountInput) {
     report = report || {};
     const sh = getOrCreateSheet_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS);
-    ensureHeaderColumns_(sh, ["Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)", "Lokasi Jenis", "Kategori Area", "Nama Area", "Checklist Notes (JSON)"]);
+    ensureHeaderColumns_(sh, ["Patrol Mode", "Checklist (JSON)", "Counts (JSON)", "Score", "Findings (JSON)", "Lokasi Jenis", "Kategori Area", "Nama Area", "Checklist Notes (JSON)", "UpdatedAt", "UpdatedBy", "UpdatedByAccount", "DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason"]);
     const data = sh.getDataRange().getValues();
     const id = report.id || "PM-" + Date.now();
     let targetRow = -1;
@@ -6871,6 +6897,18 @@ function createBackend(services, env = {}) {
       if (String(data[i][0]) === String(id)) {
         targetRow = i + 1;
         break;
+      }
+    }
+    if (report.id && targetRow < 0) throw { code: "NOT_FOUND", message: "Laporan Patrol yang akan diedit tidak ditemukan." };
+    var modifierName = "";
+    var modifierAccount = "";
+    if (targetRow > 0) {
+      modifierName = requiredChangePersonilName_(modifierNameInput);
+      modifierAccount = String(accountInput || "").trim();
+      if (!modifierAccount) throw { code: "AUTH_REQUIRED", message: "Sesi pengguna tidak valid untuk mencatat pengubah Patrol." };
+      var deletedAtIndex = data[0].indexOf("DeletedAt");
+      if (deletedAtIndex >= 0 && String(data[targetRow - 1][deletedAtIndex] || "").trim()) {
+        throw { code: "NOT_FOUND", message: "Laporan Patrol sudah dihapus dan tidak dapat diedit." };
       }
     }
     let attachments = [];
@@ -6930,6 +6968,9 @@ function createBackend(services, env = {}) {
       "Checklist (JSON)": JSON.stringify(report.checklist || {}),
       "Counts (JSON)": JSON.stringify(report.counts || {}),
       "Score": report.score === void 0 || report.score === null ? "" : report.score,
+      "UpdatedAt": targetRow > 0 ? nowIso_() : "",
+      "UpdatedBy": modifierName,
+      "UpdatedByAccount": modifierAccount,
       // Findings dari frontend dapat membawa blob: URL lokal untuk preview instan.
       // Sebelum persisted, ganti file di setiap finding dengan attachment permanen
       // hasil upload Cloudflare sesuai urutan file. Dengan begitu gadget lain selalu
@@ -6962,17 +7003,38 @@ function createBackend(services, env = {}) {
     return jsonOut_({ ok: true, id, attachments });
   }
   __name(savePredictiveReport_, "savePredictiveReport_");
-  function deletePredictiveReport_(id) {
+  function deletePredictiveReport_(body) {
+    body = body || {};
+    var id = body.id || body.ID;
+    if (!id) throw { code: "VALIDATION_ERROR", message: "ID laporan Patrol wajib diisi." };
+    var modifierName = requiredChangePersonilName_(body.modifierName);
+    var modifierAccount = String(body.actor || "").trim();
+    if (!modifierAccount) throw { code: "AUTH_REQUIRED", message: "Sesi pengguna tidak valid untuk mencatat penghapus Patrol." };
     const sh = getOrCreateSheet_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS);
+    ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "UpdatedByAccount", "DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason"]);
     const data = sh.getDataRange().getValues();
+    const headers = data[0] || [];
+    const idCol = headers.indexOf("ID");
+    const deletedAtCol = headers.indexOf("DeletedAt");
+    const deletedByCol = headers.indexOf("DeletedBy");
+    const deletedByAccountCol = headers.indexOf("DeletedByAccount");
+    const updatedAtCol = headers.indexOf("UpdatedAt");
     for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(id)) {
-        sh.deleteRow(i + 1);
+      if (idCol >= 0 && String(data[i][idCol]) === String(id)) {
+        if (deletedAtCol >= 0 && String(data[i][deletedAtCol] || "").trim()) {
+          return jsonOut_({ ok: false, error: "Laporan Patrol sudah dihapus sebelumnya." });
+        }
+        var rowNumber = i + 1;
+        var timestamp = nowIso_();
+        if (deletedAtCol >= 0) sh.getRange(rowNumber, deletedAtCol + 1).setValue(timestamp);
+        if (deletedByCol >= 0) sh.getRange(rowNumber, deletedByCol + 1).setValue(modifierName);
+        if (deletedByAccountCol >= 0) sh.getRange(rowNumber, deletedByAccountCol + 1).setValue(modifierAccount);
+        if (updatedAtCol >= 0) sh.getRange(rowNumber, updatedAtCol + 1).setValue(timestamp);
         invalidateCacheForSheet_(PREDICTIVE_SHEET_NAME);
-        return jsonOut_({ ok: true, deleted: true });
+        return jsonOut_({ ok: true, id: id, deleted: true, softDeleted: true });
       }
     }
-    return jsonOut_({ ok: false, error: "ID laporan patrol tidak ditemukan" });
+    return jsonOut_({ ok: false, error: "ID laporan Patrol tidak ditemukan" });
   }
   __name(deletePredictiveReport_, "deletePredictiveReport_");
   function getIpalReports_() {
@@ -8478,9 +8540,12 @@ function normalizeLogbookDowntimeChoice_(value) {
       var data = body.entry || body.data || body;
       var id = data.ID || data.id || body.id;
       if (!id) throw { code: "VALIDATION_ERROR", message: "ID wajib diisi untuk update" };
+      var modifierName = requiredChangePersonilName_(body.modifierName);
+      var modifierAccount = String(body.actor || "").trim();
+      if (!modifierAccount) throw { code: "AUTH_REQUIRED", message: "Sesi pengguna tidak valid untuk mencatat pengubah." };
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
-      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "Sparepart Detail (JSON)", "Lampiran (JSON)", "Nomor MO", "Lokasi Pekerjaan", "Kategori Area", "Nama Area", "Menyebabkan Downtime", "Durasi Pekerjaan (menit)"]);
+      ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "UpdatedByAccount", "Sparepart Detail (JSON)", "Lampiran (JSON)", "Nomor MO", "Lokasi Pekerjaan", "Kategori Area", "Nama Area", "Menyebabkan Downtime", "Durasi Pekerjaan (menit)"]);
       var lastColumn = sh.getLastColumn();
       var lastRow = sh.getLastRow();
       var headers = sh.getRange(1, 1, 1, lastColumn).getValues()[0];
@@ -8567,7 +8632,8 @@ function normalizeLogbookDowntimeChoice_(value) {
       rowMap["Nama Unit"] = data.namaUnit !== void 0 ? data.namaUnit : getExisting("Nama Unit");
       rowMap["Status Sparepart"] = usesSparepart ? getExisting("Status Sparepart") || "PENDING" : getExisting("Status Sparepart");
       rowMap["UpdatedAt"] = nowIso_();
-      rowMap["UpdatedBy"] = body.actor || "";
+      rowMap["UpdatedBy"] = modifierName;
+      rowMap["UpdatedByAccount"] = modifierAccount;
       var newRow = headers.map(function(h) {
         return rowMap.hasOwnProperty(h) ? rowMap[h] : existingRow[headers.indexOf(h)];
       });
@@ -8582,13 +8648,17 @@ function normalizeLogbookDowntimeChoice_(value) {
   __name(updateEntry_, "updateEntry_");
   function deleteEntry_(body) {
     try {
+      body = body || {};
       var id = body.id || body.ID;
       if (!id) throw { code: "VALIDATION_ERROR", message: "ID wajib" };
+      var modifierName = requiredChangePersonilName_(body.modifierName);
+      var modifierAccount = String(body.actor || "").trim();
+      if (!modifierAccount) throw { code: "AUTH_REQUIRED", message: "Sesi pengguna tidak valid untuk mencatat penghapus." };
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
       var lastCol = sh.getLastColumn();
       var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-      ensureHeaderColumns_(sh, ["DeletedAt", "DeletedBy", "DeleteReason", "TransactionID"]);
+      ensureHeaderColumns_(sh, ["DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason", "TransactionID"]);
       headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
       var idCol = headers.indexOf("ID");
       var delAtCol = headers.indexOf("DeletedAt");
@@ -8599,7 +8669,9 @@ function normalizeLogbookDowntimeChoice_(value) {
         if (String(values[i][idCol]) === String(id)) {
           var before = rowToObj_(headers, values[i]);
           if (delAtCol !== -1) sh.getRange(i + 1, delAtCol + 1).setValue(nowIso_());
-          if (delByCol !== -1) sh.getRange(i + 1, delByCol + 1).setValue(body.actor || "");
+          if (delByCol !== -1) sh.getRange(i + 1, delByCol + 1).setValue(modifierName);
+          var delAccountCol = headers.indexOf("DeletedByAccount");
+          if (delAccountCol !== -1) sh.getRange(i + 1, delAccountCol + 1).setValue(modifierAccount);
           if (txCol !== -1 && body.transactionId) sh.getRange(i + 1, txCol + 1).setValue(body.transactionId);
           var delUpdAtCol = headers.indexOf("UpdatedAt");
           if (delUpdAtCol !== -1) sh.getRange(i + 1, delUpdAtCol + 1).setValue(nowIso_());
@@ -9765,10 +9837,10 @@ function normalizeLogbookDowntimeChoice_(value) {
         return deleteGeneralReport_(body.id);
       }, "deleteGeneralReport"),
       savePredictiveReport: /* @__PURE__ */ __name(function() {
-        return savePredictiveReport_(body.report, body.files);
+        return savePredictiveReport_(body.report, body.files, body.modifierName, body.actor);
       }, "savePredictiveReport"),
       deletePredictiveReport: /* @__PURE__ */ __name(function() {
-        return deletePredictiveReport_(body.id);
+        return deletePredictiveReport_(body);
       }, "deletePredictiveReport"),
       saveIpalReport: /* @__PURE__ */ __name(function() {
         return saveIpalReport_(body.report);
