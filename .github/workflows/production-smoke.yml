@@ -41,6 +41,11 @@ jobs:
           grep -q '"main": "src/worker.js"' wrangler.jsonc
           grep -q '"no_bundle": true' wrangler.jsonc
           node --check public/omodos4/hotfix.js
+          node --check public/omodos4/report-change-audit.js
+          node --check public/omodos4/deleted-reports.js
+          node --input-type=module --check < src/worker.js
+          node --input-type=module --check < src/entry.js
+          node tools/test_report_change_audit.cjs
           node --check public/omodos4/offset-ways.js
           test -s public/omodos4/hotfix.css
           test -s public/omodos4/offset-ways.css
