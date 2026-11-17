@@ -3799,6 +3799,10 @@ function createBackend(services, env = {}) {
       case "savePredictiveReport":
         if (body.report && body.report.id) validateRequired_(body, ["modifierName"]);
         break;
+      case "restoreDeletedReport":
+      case "permanentlyDeleteReport":
+        validateRequired_(body, ["id", "type"]);
+        break;
       case "addMachine":
         validateRequired_(body, ["machine"]);
         break;
@@ -3915,6 +3919,9 @@ function createBackend(services, env = {}) {
     "updateEntry": { permission: "logbook.update", audit: true, idempotent: true, handler: "updateEntry_" },
     "updateStatus": { permission: "logbook.update", audit: true, idempotent: true, handler: "updateStatus_" },
     "deleteEntry": { permission: "logbook.delete", audit: true, idempotent: true, handler: "deleteEntry_" },
+    "deletedReports": { permission: "rbac.manage", audit: false, idempotent: false, handler: "getDeletedReports_", method: "GET" },
+    "restoreDeletedReport": { permission: "rbac.manage", audit: true, idempotent: true, handler: "restoreDeletedReport_" },
+    "permanentlyDeleteReport": { permission: "rbac.manage", audit: false, idempotent: true, handler: "permanentlyDeleteReport_" },
     // MACHINES
     "bootstrap": { permission: null, audit: false, idempotent: false, handler: "getBootstrap_", method: "GET" },
     // Master mesin adalah data referensi dasar lintas-halaman: Home, Input
@@ -4266,6 +4273,7 @@ function createBackend(services, env = {}) {
       if (action === "machines" && typeof getMachinesList_ === "function") return jsonDataOut_(getMachinesList_());
       if (action === "patrolChecklistTemplate" && typeof getPatrolTemplateList_ === "function") return jsonDataOut_(getPatrolTemplateList_());
       if (action === "personil" && typeof getPersonilList_ === "function") return jsonDataOut_(getPersonilList_());
+    if (action === "deletedReports" && typeof getDeletedReports_ === "function") return jsonDataOut_(getDeletedReports_(params));
       if (action === "piPersonnelMaster" && typeof getPiPersonnelMaster_ === "function") return jsonDataOut_(getPiPersonnelMaster_());
       if (action === "sparepartLokasi" && typeof getSparepartLokasiMerged_ === "function") return jsonDataOut_(getSparepartLokasiMerged_());
       if (action === "sparepartMaster" && typeof getSparepartMaster_ === "function") return jsonDataOut_(getSparepartMaster_());
@@ -4312,6 +4320,8 @@ function createBackend(services, env = {}) {
     if (action === "updateEntry" && typeof updateEntry_ === "function") return updateEntry_(body);
     if (action === "updateStatus" && typeof updateStatus_ === "function") return updateStatus_(body);
     if (action === "deleteEntry" && typeof deleteEntry_ === "function") return deleteEntry_(body);
+    if (action === "restoreDeletedReport" && typeof restoreDeletedReport_ === "function") return restoreDeletedReport_(body);
+    if (action === "permanentlyDeleteReport" && typeof permanentlyDeleteReport_ === "function") return permanentlyDeleteReport_(body);
     if (action === "addMachine" && typeof addMachine_ === "function") return addMachine_(body);
     if (action === "updateMachine" && typeof updateMachine_ === "function") return updateMachine_(body);
     if (action === "deleteMachine" && typeof deleteMachine_ === "function") return deleteMachine_(body);
@@ -6775,6 +6785,92 @@ function createBackend(services, env = {}) {
     return jsonOut_({ ok: false, error: "ID laporan tidak ditemukan" });
   }
   __name(deleteGeneralReport_, "deleteGeneralReport_");
+  function getDeletedReports_(params) {
+    params = params || {};
+    requireSuperadmin_(params.actor);
+    var result = [];
+    var sources = [
+      { type: "Logbook", sheet: getSS_().getSheetByName(SHEET_LOGBOOK) },
+      { type: "Patrol", sheet: getSS_().getSheetByName(PREDICTIVE_SHEET_NAME) }
+    ];
+    sources.forEach(function(source) {
+      var sh = source.sheet;
+      if (!sh || sh.getLastRow() < 2 || sh.getLastColumn() < 1) return;
+      var values = sh.getDataRange().getValues(), headers = values[0] || [];
+      var idCol = headers.indexOf("ID"), deletedAtCol = headers.indexOf("DeletedAt");
+      if (idCol < 0 || deletedAtCol < 0) return;
+      for (var i = 1; i < values.length; i++) {
+        var deletedAt = values[i][deletedAtCol];
+        if (!String(deletedAt || "").trim()) continue;
+        var row = rowToObj_(headers, values[i]);
+        var dateValue = row["Tanggal"] || row["Timestamp Input"] || row["Timestamp"] || "";
+        var machineValue = row["Nama Mesin"] || row["Nama Area"] || row["Kode Mesin"] || "";
+        var reporterValue = row["Nama Pelapor"] || row["Petugas"] || row["Pelapor"] || "";
+        var summaryValue = row["Deskripsi Masalah"] || row["Deskripsi Temuan"] || row["Tindakan Perbaikan"] || row["Rekomendasi"] || row["Titik Inspeksi"] || "";
+        result.push({
+          id: String(row.ID || values[i][idCol] || ""), type: source.type,
+          deletedAt: deletedAt instanceof Date ? deletedAt.toISOString() : String(deletedAt),
+          deletedBy: String(row.DeletedBy || ""), deletedByAccount: String(row.DeletedByAccount || ""),
+          date: dateValue instanceof Date ? dateValue.toISOString() : String(dateValue || ""),
+          machine: String(machineValue || ""), reporter: String(reporterValue || ""), summary: String(summaryValue || "")
+        });
+      }
+    });
+    result.sort(function(a, b) { return (Date.parse(b.deletedAt) || 0) - (Date.parse(a.deletedAt) || 0); });
+    return result;
+  }
+  __name(getDeletedReports_, "getDeletedReports_");
+  function restoreDeletedReport_(body) {
+    body = body || {};
+    requireSuperadmin_(body.actor);
+    var type = String(body.type || "").trim().toLowerCase();
+    var sheetName = type === "logbook" ? SHEET_LOGBOOK : type === "patrol" ? PREDICTIVE_SHEET_NAME : "";
+    if (!sheetName) throw { code: "VALIDATION_ERROR", message: "Jenis laporan tidak dikenal." };
+    var sh = getSS_().getSheetByName(sheetName);
+    if (!sh || sh.getLastRow() < 2) throw { code: "NOT_FOUND", message: "Laporan tidak ditemukan di arsip." };
+    ensureHeaderColumns_(sh, ["DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason", "UpdatedAt"]);
+    var values = sh.getDataRange().getValues(), headers = values[0] || [];
+    var idCol = headers.indexOf("ID"), deletedAtCol = headers.indexOf("DeletedAt");
+    if (idCol < 0 || deletedAtCol < 0) throw { code: "NOT_FOUND", message: "Kolom arsip laporan tidak tersedia." };
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][idCol]) !== String(body.id)) continue;
+      if (!String(values[i][deletedAtCol] || "").trim()) throw { code: "VALIDATION_ERROR", message: "Laporan ini sudah aktif dan bukan berada di arsip." };
+      var rowNumber = i + 1;
+      ["DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason"].forEach(function(name) {
+        var col = headers.indexOf(name); if (col >= 0) sh.getRange(rowNumber, col + 1).setValue("");
+      });
+      var updatedAtCol = headers.indexOf("UpdatedAt");
+      if (updatedAtCol >= 0) sh.getRange(rowNumber, updatedAtCol + 1).setValue(nowIso_());
+      invalidateCacheForSheet_(sheetName);
+      return jsonOut_({ ok: true, id: String(body.id), type: type, restored: true });
+    }
+    throw { code: "NOT_FOUND", message: "Laporan tidak ditemukan di arsip." };
+  }
+  __name(restoreDeletedReport_, "restoreDeletedReport_");
+  function permanentlyDeleteReport_(body) {
+    body = body || {};
+    requireSuperadmin_(body.actor);
+    var type = String(body.type || "").trim().toLowerCase();
+    var sheetName = type === "logbook" ? SHEET_LOGBOOK : type === "patrol" ? PREDICTIVE_SHEET_NAME : "";
+    if (!sheetName) throw { code: "VALIDATION_ERROR", message: "Jenis laporan tidak dikenal." };
+    var sh = getSS_().getSheetByName(sheetName);
+    if (!sh || sh.getLastRow() < 2) throw { code: "NOT_FOUND", message: "Laporan tidak ditemukan di arsip." };
+    var values = sh.getDataRange().getValues(), headers = values[0] || [];
+    var idCol = headers.indexOf("ID"), deletedAtCol = headers.indexOf("DeletedAt");
+    if (idCol < 0 || deletedAtCol < 0) throw { code: "NOT_FOUND", message: "Kolom arsip laporan tidak tersedia." };
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][idCol]) !== String(body.id)) continue;
+      if (!String(values[i][deletedAtCol] || "").trim()) throw { code: "VALIDATION_ERROR", message: "Hanya laporan di Sampah Laporan yang dapat dihapus permanen." };
+      var before = rowToObj_(headers, values[i]);
+      sh.deleteRow(i + 1);
+      invalidateCacheForSheet_(sheetName);
+      writeAuditLog_(body.actor || "", body.role || "", "permanentlyDeleteReport", "report_" + type, String(body.id), before,
+        { type: type, permanentlyDeleted: true }, body.transactionId || body.clientTransactionId || "", "success");
+      return jsonOut_({ ok: true, id: String(body.id), type: type, permanentlyDeleted: true });
+    }
+    throw { code: "NOT_FOUND", message: "Laporan tidak ditemukan di arsip." };
+  }
+  __name(permanentlyDeleteReport_, "permanentlyDeleteReport_");
   function getPredictiveReports_() {
     return getGenericRows_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS).filter(function(row) {
       return !String(row && row.DeletedAt || "").trim();
