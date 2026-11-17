@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const worker=fs.readFileSync('src/worker.js','utf8');
 const entry=fs.readFileSync('src/entry.js','utf8');
 const ui=fs.readFileSync('public/omodos4/report-change-audit.js','utf8');
+const archiveUi=fs.readFileSync('public/omodos4/deleted-reports.js','utf8');
 
 function block(startMarker,endMarker){
   const start=worker.indexOf(startMarker),end=worker.indexOf(endMarker,start);
