@@ -64,3 +64,14 @@ assert.match(ui,/NAME_SELECTION_CANCELLED/);
 assert.match(entry,/report-change-audit\.js/,'production Worker injects the name picker script');
 
 console.log('Report change audit: PASS (Master Personil validation, Logbook/Patrol editor and deleter identity, Patrol soft delete, Superadmin audit permissions, UI selection guard).');
+
+assert.ok(worker.includes('"deletedReports": { permission: "rbac.manage"'));
+assert.ok(worker.includes('"restoreDeletedReport": { permission: "rbac.manage"'));
+assert.ok(worker.includes('"permanentlyDeleteReport": { permission: "rbac.manage"'));
+assert.ok(worker.includes('function getDeletedReports_(params)'));
+assert.ok(worker.includes('function restoreDeletedReport_(body)'));
+assert.ok(worker.includes('function permanentlyDeleteReport_(body)'));
+assert.ok(ui.includes("window.apiGet('personil'"));
+assert.ok(ui.includes('edit-modifier-name'));
+assert.ok(archiveUi.includes('data-archive-action="permanent"'));
+assert.ok(entry.includes('deleted-reports.js?v=20261117-1'));
