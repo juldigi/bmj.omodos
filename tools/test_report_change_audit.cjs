@@ -34,11 +34,11 @@ assert.match(remove,/requiredChangePersonilName_\(body\.modifierName\)/,'Logbook
 assert.match(remove,/setValue\(modifierName\)/,'Logbook DeletedBy stores selected person');
 assert.match(remove,/DeletedByAccount/,'Logbook records account username separately');
 assert.match(remove,/softDeleted: true/,'Logbook keeps soft-delete behavior');
-assert.doesNotMatch(remove,/getDataRange\\(\\)\\.getValues\\(\\)/,'Logbook delete must not load every column/photo payload');
-assert.match(remove,/getRange\\(2, idCol \\+ 1, lastRow - 1, 1\\)\\.getValues\\(\\)/,'Logbook delete searches only the ID column');
+assert.doesNotMatch(remove,/getDataRange\(\)\.getValues\(\)/,'Logbook delete must not load every column/photo payload');
+assert.match(remove,/getRange\(2, idCol \+ 1, lastRow - 1, 1\)\.getValues\(\)/,'Logbook delete searches only the ID column');
 const patrolRemove=block('  function deletePredictiveReport_(body) {','  __name(deletePredictiveReport_, "deletePredictiveReport_");');
-assert.doesNotMatch(patrolRemove,/getDataRange\\(\\)\\.getValues\\(\\)/,'Patrol delete must not load every column/photo payload');
-assert.match(patrolRemove,/getRange\\(2, idCol \\+ 1, lastRow - 1, 1\\)\\.getValues\\(\\)/,'Patrol delete searches only the ID column');
+assert.doesNotMatch(patrolRemove,/getDataRange\(\)\.getValues\(\)/,'Patrol delete must not load every column/photo payload');
+assert.match(patrolRemove,/getRange\(2, idCol \+ 1, lastRow - 1, 1\)\.getValues\(\)/,'Patrol delete searches only the ID column');
 
 // Execute both real delete handlers against a sheet that rejects full-table reads.
 function fakeDeleteSheet(headers, rows) {
