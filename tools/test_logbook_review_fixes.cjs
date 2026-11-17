@@ -192,6 +192,21 @@ assert.match(edit,/files:editFiles/);
 assert.match(edit,/refreshLogbookLocal_\(entry,saved,'update'\)/);
 assert.match(hot,/invalidateLogbookSortCache_\(\)/);
 assert.doesNotMatch(edit,/await loadAll\(\)/);
+// Regression guard: deleting one report must not reload all OMODOS modules.
+const deleteHandlerStart=base.indexOf('async function deleteEntry(id){');
+const deleteHandlerEnd=base.indexOf('\nfunction refreshCurrentView()',deleteHandlerStart);
+assert.ok(deleteHandlerStart>=0&&deleteHandlerEnd>deleteHandlerStart,'Logbook delete handler exists');
+const deleteHandler=base.slice(deleteHandlerStart,deleteHandlerEnd);
+assert.match(deleteHandler,/refreshLogbookLocal_\(targetEntry,result,'delete'\)/,'successful deletion updates only the local Logbook list');
+assert.doesNotMatch(deleteHandler,/await loadAll\(\)/,'Logbook deletion must not reload every application module');
+assert.match(deleteHandler,/NAME_SELECTION_CANCELLED/,'cancelling modifier-name selection must not be reported as a successful delete');
+const localRefreshStart=hot.indexOf('window.refreshLogbookLocal_=function(entry,saved,mode){');
+const localRefreshEnd=hot.indexOf('\n};',localRefreshStart);
+assert.ok(localRefreshStart>=0&&localRefreshEnd>localRefreshStart,'local Logbook refresh helper exists');
+const localRefresh=hot.slice(localRefreshStart,localRefreshEnd);
+assert.match(localRefresh,/remove=mode==='delete'/,'local refresh supports deleting a Logbook record');
+assert.match(localRefresh,/rows\.splice\(i,1\)/,'local delete mutates the shared ENTRIES array in place');
+
 assert.match(base,/function loadOmodos4Intelligence_\(\)/);
 assert.match(base,/superadmin-intelligence\.js/);
 assert.match(base,/technicians never fetch this optional script/);
