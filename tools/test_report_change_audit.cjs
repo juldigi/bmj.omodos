@@ -76,3 +76,6 @@ assert.ok(ui.includes("window.apiGet('personil'"));
 assert.ok(ui.includes('edit-modifier-name'));
 assert.ok(archiveUi.includes('data-archive-action="permanent"'));
 assert.ok(entry.includes('deleted-reports.js?v=20261117-1'));
+
+assert.ok(ui.includes('__OMODOS_REPORT_CHANGE_AUDIT_V1__'));
+assert.ok(ui.includes('__omodosReportChangeAudit=true'));
