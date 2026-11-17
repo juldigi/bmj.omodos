@@ -188,6 +188,8 @@ jobs:
               return { ready:true, selectCount:selects.length };
             });
             if (!auditPickerSetup.ready) throw new Error('Report change audit picker setup failed: ' + JSON.stringify(auditPickerSetup));
+            // The production HTML now loads this script automatically. Reset only its one-time guard after the QA mock apiPost is installed, then reload to verify the wrapper against the mock.
+            await page.evaluate(() => { window.__OMODOS_REPORT_CHANGE_AUDIT_V2__ = false; });
             await page.addScriptTag({ path:'public/omodos4/report-change-audit.js' });
             const guarded = await page.evaluate(() => ({
               installed: !!window.__OMODOS_REPORT_CHANGE_AUDIT_V1__,
