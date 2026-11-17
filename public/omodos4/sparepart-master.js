@@ -46,7 +46,7 @@ function ensureUi(){
  document.head.appendChild(style);
  const launch=document.createElement('button');launch.type='button';launch.id='omodos-sparepart-master-launcher';launch.textContent='Master Sparepart';launch.hidden=true;
  const modal=document.createElement('div');modal.id='omodos-sparepart-master-modal';modal.hidden=true;
- modal.innerHTML='<div class="om-spm-backdrop" data-spm-close></div><section class="om-spm-dialog" role="dialog" aria-modal="true" aria-labelledby="om-spm-title"><header class="om-spm-head"><div><h2 id="om-spm-title">Master Database Sparepart</h2><div class="om-spm-sub">Katalog material OMODOS · Primary Key: Material Number SAP</div></div><button type="button" class="om-spm-close" data-spm-close aria-label="Tutup">×</button></header><div class="om-spm-body"><div class="om-spm-import"><label for="om-spm-file">Import workbook Excel (.xlsx)</label><input id="om-spm-file" type="file" accept=".xlsx,.xls"><p class="om-spm-note">Import melakukan upsert berdasarkan Material Number. Kolom kosong tidak menghapus nilai yang sudah tersimpan. Data Logbook, transaksi stok, ETA, opname, dan lokasi operasional tidak ditimpa. Gambar yang tertanam di Excel tidak dipindahkan; URL pada kolom Actual Pict tetap dapat diimpor.</p><div class="om-spm-actions"><button type="button" id="om-spm-import-btn">Validasi & Import Master</button><button type="button" id="om-spm-refresh-btn" style="background:transparent;color:inherit">Muat Ulang Katalog</button></div><div class="om-spm-status" id="om-spm-status" aria-live="polite"></div></div><div class="om-spm-search"><input id="om-spm-search" type="search" placeholder="Cari Material Number, deskripsi, old material, mesin..."></div><div class="om-spm-count" id="om-spm-count">Katalog belum dimuat.</div><div class="om-spm-table-wrap"><table class="om-spm-table"><thead><tr><th>Material Number</th><th>Material Description</th><th>UoM</th><th>Harga Satuan</th><th>Stock SAP</th><th>Min / Max</th><th>Machine Allocation</th><th>Storage Bin</th></tr></thead><tbody id="om-spm-rows"><tr><td colspan="8" class="om-spm-empty">Muat katalog untuk melihat material.</td></tr></tbody></table></div></div></section>';
+ modal.innerHTML='<div class="om-spm-backdrop" data-spm-close></div><section class="om-spm-dialog" role="dialog" aria-modal="true" aria-labelledby="om-spm-title"><header class="om-spm-head"><div><h2 id="om-spm-title">Master Database Sparepart</h2><div class="om-spm-sub">Katalog material OMODOS · Primary Key: Material Number SAP</div></div><button type="button" class="om-spm-close" data-spm-close aria-label="Tutup">×</button></header><div class="om-spm-body"><div class="om-spm-import"><label for="om-spm-file">Import workbook Excel (.xlsx)</label><input id="om-spm-file" type="file" accept=".xlsx,.xls"><p class="om-spm-note">Import melakukan upsert berdasarkan Material Number. Kolom kosong tidak menghapus nilai yang sudah tersimpan. Data Logbook, transaksi stok, ETA, opname, dan lokasi operasional tidak ditimpa. Gambar yang tertanam di Excel tidak dipindahkan; URL pada kolom Actual Pict tetap dapat diimpor.</p><div class="om-spm-actions"><button type="button" id="om-spm-import-btn">Validasi & Import Master</button><button type="button" id="om-spm-refresh-btn" style="background:transparent;color:inherit">Muat Ulang Katalog</button></div><div class="om-spm-status" id="om-spm-status" aria-live="polite"></div></div><div class="om-spm-search"><input id="om-spm-search" type="search" placeholder="Cari Material Number, deskripsi, old material, mesin..."></div><div class="om-spm-count" id="om-spm-count">Katalog belum dimuat.</div><div class="om-spm-table-wrap"><table class="om-spm-table"><thead><tr><th>Foto</th><th>Material Number</th><th>Material Description</th><th>UoM</th><th>Harga Satuan</th><th>Stock SAP</th><th>Min / Max</th><th>Machine Allocation</th><th>Storage Bin</th></tr></thead><tbody id="om-spm-rows"><tr><td colspan="9" class="om-spm-empty">Muat katalog untuk melihat material.</td></tr></tbody></table></div></div></section>';
  document.body.append(launch,modal);
  launch.addEventListener('click',function(){modal.hidden=false;loadCatalog();});
  modal.querySelectorAll('[data-spm-close]').forEach(function(el){el.addEventListener('click',function(){modal.hidden=true;});});
@@ -55,9 +55,30 @@ function ensureUi(){
  byId('om-spm-import-btn').addEventListener('click',importWorkbook);
 }
 let catalog=[];
+let photoMap=Object.create(null);
+let photoMapLoaded=false;
+async function loadPhotoMap(){
+ if(photoMapLoaded)return;
+ try{
+  const response=await fetch('/omodos4/sparepart-assets/manifest.json',{cache:'no-store',credentials:'same-origin'});
+  if(!response.ok)throw new Error('Manifest foto tidak tersedia ('+response.status+').');
+  const manifest=await response.json();
+  const rows=Array.isArray(manifest.materials)?manifest.materials:[];
+  const next=Object.create(null);
+  rows.forEach(function(row){
+   const sap=String(row&&row.sap||'').trim(),foto=row&&(row.foto||row);
+   if(!sap||!foto||!/^sparepart-atlas-\d{2}\.jpg$/i.test(String(foto.atlas||'')))return;
+   const values=[foto.x,foto.y,foto.width,foto.height];
+   if(!values.every(Number.isInteger)||foto.x<0||foto.y<0||foto.width!==120||foto.height!==80)return;
+   next[sap]={atlas:String(foto.atlas),x:foto.x,y:foto.y,width:foto.width,height:foto.height};
+  });
+  photoMap=next;photoMapLoaded=true;
+ }catch(err){console.warn('[OMODOS Master Sparepart] Manifest foto belum dapat dimuat',err);}
+}
 async function loadCatalog(){
  const status=byId('om-spm-status');if(status)status.textContent='Memuat katalog dari database OMODOS...';
  try{
+  await loadPhotoMap();
   const result=await window.apiPost({action:'sparepartMasterRead'});
   if(!result||result.ok===false)throw new Error(result&&result.error||'Gagal membaca katalog master.');
   catalog=Array.isArray(result.data)?result.data:[];
@@ -74,8 +95,18 @@ function renderCatalog(){
  const tbody=byId('om-spm-rows');if(!tbody)return;
  const rows=filtered.slice(0,300);
  tbody.innerHTML=rows.length?rows.map(function(r){
-  return '<tr><td>'+esc(r['Material Number'])+'</td><td>'+esc(r['Material Description'])+'</td><td>'+esc(r['Base UoM'])+'</td><td>'+esc(r['Harga satuan'])+'</td><td>'+esc(r['Stock Qty (SAP)'])+'</td><td>'+esc(r['Min Stock'])+' / '+esc(r['Max Stock'])+'</td><td>'+esc(r['Machine Allocation'])+'</td><td>'+esc(r['Storage Bin'])+'</td></tr>';
- }).join(''):'<tr><td colspan="8" class="om-spm-empty">Tidak ada material yang cocok.</td></tr>';
+  const photo=String(r['Actual Pict']||'').trim();
+  const mapped=photoMap[String(r['Material Number']||'').trim()];
+  let photoCell='<span style="color:var(--text-dim,#64748b)">Belum ada foto</span>';
+  if(mapped){
+   const sx=mapped.x*.4,sy=mapped.y*.4;
+   const atlasUrl='/omodos4/sparepart-assets/atlases/'+mapped.atlas;
+   photoCell='<span role="img" aria-label="Foto material '+esc(r['Material Number'])+'" title="Foto dari atlas SAP" style="display:inline-block;width:48px;height:32px;border:1px solid var(--line,#dbe3e8);border-radius:6px;background-color:#fff;background-image:url(&quot;'+esc(atlasUrl)+'&quot;);background-repeat:no-repeat;background-size:240px 320px;background-position:-'+sx+'px -'+sy+'px"></span>';
+  }else if(/^https?:\\/\\//i.test(photo)){
+   photoCell='<img src="'+esc(photo)+'" alt="Foto '+esc(r['Material Number'])+'" loading="lazy" style="width:48px;height:32px;object-fit:contain;border:1px solid var(--line,#dbe3e8);border-radius:6px;background:#fff">';
+  }
+  return '<tr><td>'+photoCell+'</td><td>'+esc(r['Material Number'])+'</td><td>'+esc(r['Material Description'])+'</td><td>'+esc(r['Base UoM'])+'</td><td>'+esc(r['Harga satuan'])+'</td><td>'+esc(r['Stock Qty (SAP)'])+'</td><td>'+esc(r['Min Stock'])+' / '+esc(r['Max Stock'])+'</td><td>'+esc(r['Machine Allocation'])+'</td><td>'+esc(r['Storage Bin'])+'</td></tr>';
+ }).join(''):'<tr><td colspan="9" class="om-spm-empty">Tidak ada material yang cocok.</td></tr>';
  if(filtered.length>300)count.textContent+=' · tampil 300 pertama, gunakan pencarian untuk mempersempit';
 }
 function normalizeValue(v){
