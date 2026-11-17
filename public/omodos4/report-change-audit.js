@@ -1,6 +1,7 @@
 (function(){
 'use strict';
 if(window.__OMODOS_REPORT_CHANGE_AUDIT_V2__)return;
+window.__OMODOS_REPORT_CHANGE_AUDIT_V1__=true;
 window.__OMODOS_REPORT_CHANGE_AUDIT_V2__=true;
 function normalized(v){return String(v==null?'':v).normalize('NFKC').trim().replace(/\s+/g,' ');}
 function addNames(map,rows){(Array.isArray(rows)?rows:[]).forEach(function(row){
@@ -10,15 +11,18 @@ function addNames(map,rows){(Array.isArray(rows)?rows:[]).forEach(function(row){
 });}
 async function personnelNames(){
  var names=new Map();
+ // PERSONIL adalah global lexical pada halaman utama, tidak selalu window.PERSONIL.
+ try{if(typeof PERSONIL!=='undefined')addNames(names,PERSONIL);}catch(error){}
+ if(names.size)return Array.from(names.values()).sort(function(a,b){return a.localeCompare(b,'id');});
+ // Jika data bootstrap belum tersedia, ambil sumber Master Personil yang sama dengan validasi backend.
  try{
   if(typeof window.apiGet==='function'){
    var response=await window.apiGet('personil',{fresh:'1',_ts:String(Date.now())});
    var rows=Array.isArray(response)?response:(response&&Array.isArray(response.data)?response.data:[]);
    addNames(names,rows);
-   if(names.size)return Array.from(names.values()).sort(function(a,b){return a.localeCompare(b,'id');});
   }
  }catch(error){console.warn('[OMODOS] Master Personil belum dapat dimuat dari server.',error);}
- try{if(typeof PERSONIL!=='undefined')addNames(names,PERSONIL);}catch(error){}
+ if(names.size)return Array.from(names.values()).sort(function(a,b){return a.localeCompare(b,'id');});
  addNames(names,window.PERSONIL||window.personil);
  ['#select-namaPelapor','#patrol-nama-pelapor','#select-pmPetugas'].forEach(function(sel){
   var el=document.querySelector(sel);if(el)Array.from(el.options||[]).forEach(function(o){if(!o.disabled)addNames(names,[o.value||o.textContent]);});
@@ -89,6 +93,6 @@ if(typeof originalApiPost==='function'&&!originalApiPost.__omodosReportChangeAud
   if(!prepared.id){var nested=payload.entry||payload.data||{},report=payload.report||{};prepared.id=payload.ID||nested.ID||nested.id||report.ID||report.id||'';}
   args[0]=prepared;return originalApiPost.apply(this,args);
  };
- guardedApiPost.__omodosReportChangeAuditV2=true;window.apiPost=guardedApiPost;
+ guardedApiPost.__omodosReportChangeAudit=true;guardedApiPost.__omodosReportChangeAuditV2=true;window.apiPost=guardedApiPost;
 }else if(typeof originalApiPost!=='function')console.warn('[OMODOS] Audit nama pengubah tidak aktif: apiPost belum tersedia.');
 })();
