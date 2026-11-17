@@ -7105,29 +7105,33 @@ function createBackend(services, env = {}) {
     if (!modifierAccount) throw { code: "AUTH_REQUIRED", message: "Sesi pengguna tidak valid untuk mencatat penghapus Patrol." };
     const sh = getOrCreateSheet_(PREDICTIVE_SHEET_NAME, PREDICTIVE_HEADERS);
     ensureHeaderColumns_(sh, ["UpdatedAt", "UpdatedBy", "UpdatedByAccount", "DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason"]);
-    const data = sh.getDataRange().getValues();
-    const headers = data[0] || [];
+    // Hindari membaca seluruh tabel beserta JSON foto; cukup cari ID lalu ubah sel pada baris target.
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0] || [];
     const idCol = headers.indexOf("ID");
+    if (idCol < 0) throw { code: "DATA_INTEGRITY", message: "Kolom ID tidak ditemukan pada laporan Patrol." };
     const deletedAtCol = headers.indexOf("DeletedAt");
     const deletedByCol = headers.indexOf("DeletedBy");
     const deletedByAccountCol = headers.indexOf("DeletedByAccount");
     const updatedAtCol = headers.indexOf("UpdatedAt");
-    for (var i = 1; i < data.length; i++) {
-      if (idCol >= 0 && String(data[i][idCol]) === String(id)) {
-        if (deletedAtCol >= 0 && String(data[i][deletedAtCol] || "").trim()) {
-          return jsonOut_({ ok: false, error: "Laporan Patrol sudah dihapus sebelumnya." });
-        }
-        var rowNumber = i + 1;
-        var timestamp = nowIso_();
-        if (deletedAtCol >= 0) sh.getRange(rowNumber, deletedAtCol + 1).setValue(timestamp);
-        if (deletedByCol >= 0) sh.getRange(rowNumber, deletedByCol + 1).setValue(modifierName);
-        if (deletedByAccountCol >= 0) sh.getRange(rowNumber, deletedByAccountCol + 1).setValue(modifierAccount);
-        if (updatedAtCol >= 0) sh.getRange(rowNumber, updatedAtCol + 1).setValue(timestamp);
-        invalidateCacheForSheet_(PREDICTIVE_SHEET_NAME);
-        return jsonOut_({ ok: true, id: id, deleted: true, softDeleted: true });
-      }
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) return jsonOut_({ ok: false, error: "ID laporan Patrol tidak ditemukan" });
+    const idValues = sh.getRange(2, idCol + 1, lastRow - 1, 1).getValues();
+    var rowNumber = -1;
+    for (var i = 0; i < idValues.length; i++) {
+      if (String(idValues[i][0] || "") === String(id)) { rowNumber = i + 2; break; }
     }
-    return jsonOut_({ ok: false, error: "ID laporan Patrol tidak ditemukan" });
+    if (rowNumber < 0) return jsonOut_({ ok: false, error: "ID laporan Patrol tidak ditemukan" });
+    const deletedAt = deletedAtCol >= 0 ? sh.getRange(rowNumber, deletedAtCol + 1).getValue() : "";
+    if (deletedAtCol >= 0 && String(deletedAt || "").trim()) {
+      return jsonOut_({ ok: false, error: "Laporan Patrol sudah dihapus sebelumnya." });
+    }
+    const timestamp = nowIso_();
+    if (deletedAtCol >= 0) sh.getRange(rowNumber, deletedAtCol + 1).setValue(timestamp);
+    if (deletedByCol >= 0) sh.getRange(rowNumber, deletedByCol + 1).setValue(modifierName);
+    if (deletedByAccountCol >= 0) sh.getRange(rowNumber, deletedByAccountCol + 1).setValue(modifierAccount);
+    if (updatedAtCol >= 0) sh.getRange(rowNumber, updatedAtCol + 1).setValue(timestamp);
+    invalidateCacheForSheet_(PREDICTIVE_SHEET_NAME);
+    return jsonOut_({ ok: true, id: id, deleted: true, softDeleted: true });
   }
   __name(deletePredictiveReport_, "deletePredictiveReport_");
   function getIpalReports_() {
@@ -8749,31 +8753,36 @@ function normalizeLogbookDowntimeChoice_(value) {
       if (!modifierAccount) throw { code: "AUTH_REQUIRED", message: "Sesi pengguna tidak valid untuk mencatat penghapus." };
       var sh = getSS_().getSheetByName(SHEET_LOGBOOK);
       if (!sh) throw { code: "NOT_FOUND", message: "Sheet Logbook tidak ada" };
-      var lastCol = sh.getLastColumn();
-      var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
       ensureHeaderColumns_(sh, ["DeletedAt", "DeletedBy", "DeletedByAccount", "DeleteReason", "TransactionID"]);
-      headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+      var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
       var idCol = headers.indexOf("ID");
+      if (idCol < 0) throw { code: "DATA_INTEGRITY", message: "Kolom ID tidak ditemukan pada Logbook." };
       var delAtCol = headers.indexOf("DeletedAt");
       var delByCol = headers.indexOf("DeletedBy");
+      var delAccountCol = headers.indexOf("DeletedByAccount");
       var txCol = headers.indexOf("TransactionID");
-      var values = sh.getDataRange().getValues();
-      for (var i = 1; i < values.length; i++) {
-        if (String(values[i][idCol]) === String(id)) {
-          var before = rowToObj_(headers, values[i]);
-          if (delAtCol !== -1) sh.getRange(i + 1, delAtCol + 1).setValue(nowIso_());
-          if (delByCol !== -1) sh.getRange(i + 1, delByCol + 1).setValue(modifierName);
-          var delAccountCol = headers.indexOf("DeletedByAccount");
-          if (delAccountCol !== -1) sh.getRange(i + 1, delAccountCol + 1).setValue(modifierAccount);
-          if (txCol !== -1 && body.transactionId) sh.getRange(i + 1, txCol + 1).setValue(body.transactionId);
-          var delUpdAtCol = headers.indexOf("UpdatedAt");
-          if (delUpdAtCol !== -1) sh.getRange(i + 1, delUpdAtCol + 1).setValue(nowIso_());
-          invalidateCacheForSheet_(SHEET_LOGBOOK);
-          var res = { ok: true, id, softDeleted: true, transactionId: body.transactionId || "" };
-          return jsonOut_(res);
-        }
+      var updAtCol = headers.indexOf("UpdatedAt");
+      var lastRow = sh.getLastRow();
+      if (lastRow < 2) throw { code: "NOT_FOUND", message: "ID tidak ditemukan: " + id };
+      // Cari berdasarkan satu kolom ID saja; jangan salin semua foto/lampiran ke memori.
+      var idValues = sh.getRange(2, idCol + 1, lastRow - 1, 1).getValues();
+      var targetRow = -1;
+      for (var i = 0; i < idValues.length; i++) {
+        if (String(idValues[i][0] || "") === String(id)) { targetRow = i + 2; break; }
       }
-      throw { code: "NOT_FOUND", message: "ID tidak ditemukan: " + id };
+      if (targetRow < 0) throw { code: "NOT_FOUND", message: "ID tidak ditemukan: " + id };
+      var deletedAt = delAtCol >= 0 ? sh.getRange(targetRow, delAtCol + 1).getValue() : "";
+      if (delAtCol >= 0 && String(deletedAt || "").trim()) {
+        throw { code: "VALIDATION_ERROR", message: "Laporan Logbook sudah dihapus sebelumnya." };
+      }
+      var timestamp = nowIso_();
+      if (delAtCol !== -1) sh.getRange(targetRow, delAtCol + 1).setValue(timestamp);
+      if (delByCol !== -1) sh.getRange(targetRow, delByCol + 1).setValue(modifierName);
+      if (delAccountCol !== -1) sh.getRange(targetRow, delAccountCol + 1).setValue(modifierAccount);
+      if (txCol !== -1 && body.transactionId) sh.getRange(targetRow, txCol + 1).setValue(body.transactionId);
+      if (updAtCol !== -1) sh.getRange(targetRow, updAtCol + 1).setValue(timestamp);
+      invalidateCacheForSheet_(SHEET_LOGBOOK);
+      return jsonOut_({ ok: true, id: id, softDeleted: true, transactionId: body.transactionId || "" });
     } catch (e) {
       return handleError_(e);
     }

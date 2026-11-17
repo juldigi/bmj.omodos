@@ -34,6 +34,80 @@ assert.match(remove,/requiredChangePersonilName_\(body\.modifierName\)/,'Logbook
 assert.match(remove,/setValue\(modifierName\)/,'Logbook DeletedBy stores selected person');
 assert.match(remove,/DeletedByAccount/,'Logbook records account username separately');
 assert.match(remove,/softDeleted: true/,'Logbook keeps soft-delete behavior');
+assert.doesNotMatch(remove,/getDataRange\\(\\)\\.getValues\\(\\)/,'Logbook delete must not load every column/photo payload');
+assert.match(remove,/getRange\\(2, idCol \\+ 1, lastRow - 1, 1\\)\\.getValues\\(\\)/,'Logbook delete searches only the ID column');
+const patrolRemove=block('  function deletePredictiveReport_(body) {','  __name(deletePredictiveReport_, "deletePredictiveReport_");');
+assert.doesNotMatch(patrolRemove,/getDataRange\\(\\)\\.getValues\\(\\)/,'Patrol delete must not load every column/photo payload');
+assert.match(patrolRemove,/getRange\\(2, idCol \\+ 1, lastRow - 1, 1\\)\\.getValues\\(\\)/,'Patrol delete searches only the ID column');
+
+// Execute both real delete handlers against a sheet that rejects full-table reads.
+function fakeDeleteSheet(headers, rows) {
+  const values=[headers.slice(),...rows.map(r=>r.slice())];
+  const reads=[];
+  const writes=[];
+  const sheet={
+    getLastColumn:()=>headers.length,
+    getLastRow:()=>values.length,
+    getDataRange(){throw new Error('Full-table read is prohibited in a delete handler');},
+    getRange(row,col,numRows=1,numCols=1){
+      return {
+        getValues(){
+          reads.push({row,col,numRows,numCols});
+          return values.slice(row-1,row-1+numRows).map(r=>r.slice(col-1,col-1+numCols));
+        },
+        getValue(){return this.getValues()[0][0];},
+        setValue(value){values[row-1][col-1]=value;writes.push({row,col,value});return this;}
+      };
+    }
+  };
+  return {sheet,values,reads,writes};
+}
+const deleteHeaders=['ID','Tanggal','Lampiran (JSON)','DeletedAt','DeletedBy','DeletedByAccount','DeleteReason','TransactionID','UpdatedAt'];
+const hugeAttachmentPayload='x'.repeat(250000);
+const logFixture=fakeDeleteSheet(deleteHeaders,[
+  ['LB-1','2026-11-16',hugeAttachmentPayload,'','','','','',''],
+  ['LB-2','2026-11-17',hugeAttachmentPayload,'','','','','','']
+]);
+const logDeleteFn=new Function(
+  'requiredChangePersonilName_','getSS_','SHEET_LOGBOOK','ensureHeaderColumns_','nowIso_',
+  'invalidateCacheForSheet_','jsonOut_','handleError_',
+  remove+';return deleteEntry_;'
+)(
+  value=>value==='Jamhuriyat'?value:(()=>{throw Error('Unexpected modifier');})(),
+  ()=>({getSheetByName:()=>logFixture.sheet}),
+  'Logbook',()=>{},()=>'2026-11-17T08:00:00.000Z',()=>{},value=>value,
+  error=>({ok:false,error:String(error&&error.message||error)})
+);
+const logDeleteResult=logDeleteFn({id:'LB-2',modifierName:'Jamhuriyat',actor:'superadmin',transactionId:'delete-logbook-1'});
+assert.equal(logDeleteResult.ok,true,'Logbook delete succeeds with ID-only lookup');
+assert.equal(logFixture.values[2][3],'2026-11-17T08:00:00.000Z','Logbook soft-delete timestamp is written');
+assert.equal(logFixture.values[2][4],'Jamhuriyat','Logbook deletion records selected person');
+assert.equal(logFixture.values[2][5],'superadmin','Logbook deletion records account identity');
+assert.equal(logFixture.values[2][7],'delete-logbook-1','Logbook transaction ID is preserved');
+assert.ok(logFixture.reads.some(r=>r.row===2&&r.col===1&&r.numRows===2&&r.numCols===1),'Logbook reads only the ID column to locate the target row');
+assert.ok(!logFixture.reads.some(r=>r.row>1&&r.numCols>1),'Logbook does not read any full data row');
+
+const patrolFixture=fakeDeleteSheet(deleteHeaders,[
+  ['PM-1','2026-11-16',hugeAttachmentPayload,'','','','','',''],
+  ['PM-2','2026-11-17',hugeAttachmentPayload,'','','','','','']
+]);
+const patrolDeleteFn=new Function(
+  'requiredChangePersonilName_','getOrCreateSheet_','PREDICTIVE_SHEET_NAME','PREDICTIVE_HEADERS',
+  'ensureHeaderColumns_','nowIso_','invalidateCacheForSheet_','jsonOut_',
+  patrolRemove+';return deletePredictiveReport_;'
+)(
+  value=>value==='Jamhuriyat'?value:(()=>{throw Error('Unexpected modifier');})(),
+  ()=>patrolFixture.sheet,'Predictive_Maintenance',[],()=>{},()=>'2026-11-17T08:05:00.000Z',
+  ()=>{},value=>value
+);
+const patrolDeleteResult=patrolDeleteFn({id:'PM-2',modifierName:'Jamhuriyat',actor:'superadmin'});
+assert.equal(patrolDeleteResult.ok,true,'Patrol delete succeeds with ID-only lookup');
+assert.equal(patrolFixture.values[2][3],'2026-11-17T08:05:00.000Z','Patrol soft-delete timestamp is written');
+assert.equal(patrolFixture.values[2][4],'Jamhuriyat','Patrol deletion records selected person');
+assert.equal(patrolFixture.values[2][5],'superadmin','Patrol deletion records account identity');
+assert.ok(patrolFixture.reads.some(r=>r.row===2&&r.col===1&&r.numRows===2&&r.numCols===1),'Patrol reads only the ID column to locate the target row');
+assert.ok(!patrolFixture.reads.some(r=>r.row>1&&r.numCols>1),'Patrol does not read any full data row');
+
 
 const getter=block('  function getPredictiveReports_() {','  __name(getPredictiveReports_, "getPredictiveReports_");');
 assert.match(getter,/DeletedAt/,'deleted Patrol reports are hidden from standard Patrol list');
