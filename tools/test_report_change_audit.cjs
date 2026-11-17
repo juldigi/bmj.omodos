@@ -5,6 +5,7 @@ const worker=fs.readFileSync('src/worker.js','utf8');
 const entry=fs.readFileSync('src/entry.js','utf8');
 const ui=fs.readFileSync('public/omodos4/report-change-audit.js','utf8');
 const archiveUi=fs.readFileSync('public/omodos4/deleted-reports.js','utf8');
+const indexHtml=fs.readFileSync('public/index.html','utf8');
 
 function block(startMarker,endMarker){
   const start=worker.indexOf(startMarker),end=worker.indexOf(endMarker,start);
@@ -76,6 +77,8 @@ assert.ok(ui.includes("window.apiGet('personil'"));
 assert.ok(ui.includes('edit-modifier-name'));
 assert.ok(archiveUi.includes('data-archive-action="permanent"'));
 assert.ok(entry.includes('deleted-reports.js?v=20261117-1'));
+assert.ok(indexHtml.includes('src="/omodos4/report-change-audit.js?v=20261117-2"'), 'production HTML loads Modifier Name script');
+assert.ok(indexHtml.includes('src="/omodos4/deleted-reports.js?v=20261117-1"'), 'production HTML loads Superadmin archive script');
 
 assert.ok(ui.includes('__OMODOS_REPORT_CHANGE_AUDIT_V1__'));
 assert.ok(ui.includes('__omodosReportChangeAudit=true'));
