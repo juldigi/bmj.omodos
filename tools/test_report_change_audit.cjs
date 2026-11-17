@@ -40,6 +40,7 @@ const patrolRemove=block('  function deletePredictiveReport_(body) {','  __name(
 assert.doesNotMatch(patrolRemove,/getDataRange\(\)\.getValues\(\)/,'Patrol delete must not load every column/photo payload');
 assert.match(patrolRemove,/getRange\(2, idCol \+ 1, lastRow - 1, 1\)\.getValues\(\)/,'Patrol delete searches only the ID column');
 
+// Runtime regression coverage: deletes must never read full attachment-bearing rows.
 // Execute both real delete handlers against a sheet that rejects full-table reads.
 function fakeDeleteSheet(headers, rows) {
   const values=[headers.slice(),...rows.map(r=>r.slice())];
