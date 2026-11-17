@@ -192,6 +192,7 @@ assert.match(edit,/files:editFiles/);
 assert.match(edit,/refreshLogbookLocal_\(entry,saved,'update'\)/);
 assert.match(hot,/invalidateLogbookSortCache_\(\)/);
 assert.doesNotMatch(edit,/await loadAll\(\)/);
+// Regression guard: deleting one report must not reload all OMODOS modules.
 const deleteHandlerStart=base.indexOf('async function deleteEntry(id){');
 const deleteHandlerEnd=base.indexOf('\nfunction refreshCurrentView()',deleteHandlerStart);
 assert.ok(deleteHandlerStart>=0&&deleteHandlerEnd>deleteHandlerStart,'Logbook delete handler exists');
