@@ -17263,14 +17263,36 @@ async function quickUpdateStatus(id){
   }catch(err){ toast('Gagal update status: ' + err.message, true); }
 }
 async function deleteEntry(id){
-  if(!confirm('Hapus entri logbook ini? Tindakan ini tidak bisa dibatalkan.')) return;
+  if(!confirm('Hapus entri logbook ini? Laporan akan dipindahkan ke Sampah Laporan dan dapat dipulihkan oleh Superadmin.')) return;
+  const btn=$('#btn-delete-entry');
+  const oldHtml=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.textContent='Menghapus...';}
   try{
-    await apiPost({action:'deleteEntry', id});
-    toast('Entri dihapus');
+    const targetEntry=Array.isArray(ENTRIES)?(ENTRIES.find(e=>String(e.ID||e.id||'')===String(id))||{ID:id}):{ID:id};
+    const result=await apiPost({action:'deleteEntry', id});
+    if(result&&result.ok===false){
+      if(result.error==='NAME_SELECTION_CANCELLED'){
+        if(btn){btn.disabled=false;btn.innerHTML=oldHtml;}
+        return;
+      }
+      throw new Error(result.error||'Server menolak penghapusan.');
+    }
+    if(typeof window.refreshLogbookLocal_==='function'){
+      window.refreshLogbookLocal_(targetEntry,result,'delete');
+    }else{
+      for(let i=ENTRIES.length-1;i>=0;i--){
+        if(String(ENTRIES[i].ID||ENTRIES[i].id||'')===String(id)) ENTRIES.splice(i,1);
+      }
+      if(typeof invalidateLogbookSortCache_==='function') invalidateLogbookSortCache_();
+      window.ENTRIES=ENTRIES;
+    }
+    toast('Entri dipindahkan ke Sampah Laporan');
     closeModal();
-    await loadAll();
     refreshCurrentView();
-  }catch(err){ toast('Gagal menghapus: ' + err.message, true); }
+  }catch(err){
+    toast('Gagal menghapus: ' + err.message, true);
+    if(btn){btn.disabled=false;btn.innerHTML=oldHtml;}
+  }
 }
 function refreshCurrentView(){
   const navActive = $('.nav-btn.active');

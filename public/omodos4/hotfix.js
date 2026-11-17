@@ -870,8 +870,20 @@ function installMoField(){
 function dateValue(v){const s=String(v==null?'':v).trim();if(!s)return null;let d=new Date(s);if(!Number.isNaN(d.getTime()))return d;const m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);if(m){d=new Date(+m[3],+m[2]-1,+m[1]);if(!Number.isNaN(d.getTime()))return d;}return null;}
 window.refreshLogbookLocal_=function(entry,saved,mode){
  try{
-  const add=mode==='add',id=String(add?(saved&&(saved.id||saved.ID)||entry.ID||entry.id||''):(entry.ID||entry.id||''));
-  const rows=Array.isArray(window.ENTRIES)?window.ENTRIES:[];let row=rows.find(x=>String(x.ID||x.id||'')===id)||{ID:id};
+  const add=mode==='add',remove=mode==='delete',id=String(add?(saved&&(saved.id||saved.ID)||entry.ID||entry.id||''):(entry.ID||entry.id||''));
+  const rows=Array.isArray(window.ENTRIES)?window.ENTRIES:[];
+  if(remove){
+   // Mutate the existing array so the page's lexical ENTRIES reference stays in sync.
+   for(let i=rows.length-1;i>=0;i--){
+    if(String(rows[i].ID||rows[i].id||'')===id) rows.splice(i,1);
+   }
+   if(typeof window.invalidateLogbookSortCache_==='function')window.invalidateLogbookSortCache_();
+   window.ENTRIES=rows;
+   try{if(typeof renderDashboardCriticalSummary==='function')renderDashboardCriticalSummary();}catch(e){}
+   try{if(typeof renderHomeSmartResume==='function')renderHomeSmartResume();}catch(e){}
+   return null;
+  }
+  let row=rows.find(x=>String(x.ID||x.id||'')===id)||{ID:id};
   const map={tanggal:'Tanggal',waktu:'Waktu',shift:'Shift',namaPelapor:'Nama Pelapor',personilTambahanStr:'Personil Tambahan',semuaPersonil:'Semua Personil',kodeMesin:'Kode Mesin',namaMesin:'Nama Mesin',namaUnit:'Nama Unit',lokasiPekerjaan:'Lokasi Pekerjaan',kategoriArea:'Kategori Area',namaArea:'Nama Area',lokasi:'Lokasi/Area',jenisPekerjaan:'Jenis Pekerjaan',prioritas:'Prioritas',deskripsiMasalah:'Deskripsi Masalah',tindakanPerbaikan:'Tindakan Perbaikan',sparePart:'Spare Part Digunakan',namaMaterial:'Nama Material',materialNumberSAP:'Material Number SAP',status:'Status',jamMulai:'Jam Mulai',jamSelesai:'Jam Selesai',downtime:'Downtime (menit)',catatan:'Catatan Tambahan',menyebabkanDowntime:'Menyebabkan Downtime',durasiPekerjaan:'Durasi Pekerjaan (menit)',groupingPekerjaan:'Grouping Pekerjaan',groupingTeam:'Grouping Team',nomorNotifikasi:'Nomor Notifikasi Pekerjaan',nomorMO:'Nomor MO'};
   Object.entries(map).forEach(([a,b])=>{if(Object.prototype.hasOwnProperty.call(entry,a))row[b]=entry[a];});
   if(add){row.ID=id;row['Timestamp Input']=new Date().toISOString();row.Timestamp=row.Timestamp||row['Timestamp Input'];}
